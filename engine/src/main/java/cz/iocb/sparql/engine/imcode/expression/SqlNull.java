@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBindings;
 
@@ -41,7 +42,7 @@ public final class SqlNull extends SqlExpressionIntercode
 
 
     @Override
-    public Restrictions getRequirements()
+    public Restrictions getRequirements(ClassRelations relations)
     {
         return new Restrictions();
     }

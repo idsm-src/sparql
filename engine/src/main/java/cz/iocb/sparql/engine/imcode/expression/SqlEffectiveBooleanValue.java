@@ -47,6 +47,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBindings;
@@ -89,23 +90,26 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
     /**
      * Effective boolean value of the operand.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operand the operand
      * @return effective boolean value of the operand
      */
-    public static SqlExpressionIntercode create(SqlExpressionIntercode operand)
+    public static SqlExpressionIntercode create(ClassRelations relations, SqlExpressionIntercode operand)
     {
-        return create(operand, Restriction.ALL);
+        return create(relations, operand, Restriction.ALL);
     }
 
 
     /**
      * Effective boolean value materialising only when needed; constants and NULL pass through.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operand the operand
      * @param restriction the result classes the parent needs
      * @return effective boolean value materialising only when needed; constants and NULL pass through
      */
-    private static SqlExpressionIntercode create(SqlExpressionIntercode operand, Restriction restriction)
+    private static SqlExpressionIntercode create(ClassRelations relations, SqlExpressionIntercode operand,
+            Restriction restriction)
     {
         if(operand.equals(SqlNull.get()))
             return SqlNull.get();
@@ -115,7 +119,7 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
 
         //TODO: add compile-time evaluation for literals
 
-        if(operand.getMappings().keySet().stream().noneMatch(r -> !areDisjunct(r, operandClass)))
+        if(operand.getMappings().keySet().stream().noneMatch(r -> !areDisjunct(relations, r, operandClass)))
             return SqlNull.get();
 
         Set<ResourceClass> classes = operand.getMappings().keySet();
@@ -126,7 +130,7 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
                 FALSE_OR_ERROR : ANY;
 
 
-        List<Column> columns = restriction.contains(xsdBoolean) ? translate(operand) : null;
+        List<Column> columns = restriction.contains(relations, xsdBoolean) ? translate(relations, operand) : null;
         Map<ResourceClass, List<Column>> mappings = singletonMap(xsdBoolean, columns);
 
         return new SqlEffectiveBooleanValue(operand, mappings, canBeNull, value);
@@ -137,9 +141,11 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         Restriction operandRestriction = new Restriction();
 
-        if(restriction.contains(xsdBoolean))
+        if(restriction.contains(relations, xsdBoolean))
             operandRestriction.add(operandClasses);
 
         SqlExpressionIntercode optOperand = operand.optimize(request, bindings, operandRestriction, evalServices);
@@ -150,7 +156,7 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
         if(optOperand == operand)
             return this;
 
-        return create(optOperand);
+        return create(relations, optOperand);
     }
 
 
@@ -158,11 +164,12 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
      * SQL computing the effective boolean value: booleans as is, numerics compared to zero, strings tested for
      * emptiness, unsupported literals false.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operand the operand
      * @return SQL computing the effective boolean value: booleans as is, numerics compared to zero, strings tested for
      *         emptiness, unsupported literals false
      */
-    private static List<Column> translate(SqlExpressionIntercode operand)
+    private static List<Column> translate(ClassRelations relations, SqlExpressionIntercode operand)
     {
         Set<Column> cols = new HashSet<>();
 
@@ -205,9 +212,9 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
                 Column col = e.getKey().toGeneralClass(unsupportedType, e.getValue(), true).get(1);
                 cols.add(new ExpressionColumn("NULLIF(" + col + " NOT IN " + types + ", true)"));
             }
-            else if(!areDisjunct(e.getKey(), operandClass))
+            else if(!areDisjunct(relations, e.getKey(), operandClass))
             {
-                Column col = operand.get(unionize(operandClasses, box)).get(0);
+                Column col = operand.get(relations, unionize(operandClasses, box)).get(0);
                 cols.add(new ExpressionColumn("sparql.ebv_rdfbox(" + col + ")"));
             }
         }

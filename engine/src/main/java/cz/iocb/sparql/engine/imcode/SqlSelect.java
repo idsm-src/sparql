@@ -45,6 +45,7 @@ import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.database.VirtualTableDefinition;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -108,6 +109,7 @@ public final class SqlSelect extends SqlIntercode
     /**
      * Creates a top-level select.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param projections the projected variables
      * @param child the child node
      * @param orderBy ORDER BY variables with their directions
@@ -116,10 +118,11 @@ public final class SqlSelect extends SqlIntercode
      * @param simpleOrderBy variables ordered by raw columns after ORDER BY
      * @param distinct whether the mapping declares distinct rows
      */
-    protected SqlSelect(List<Variable> projections, SqlIntercode child, LinkedHashMap<Variable, Direction> orderBy,
-            BigInteger offset, BigInteger limit, List<Variable> simpleOrderBy, boolean distinct)
+    protected SqlSelect(ClassRelations relations, List<Variable> projections, SqlIntercode child,
+            LinkedHashMap<Variable, Direction> orderBy, BigInteger offset, BigInteger limit,
+            List<Variable> simpleOrderBy, boolean distinct)
     {
-        super(child.getVariableBindings().restrict(new Restrictions(projections)), child.isDeterministic());
+        super(child.getVariableBindings().restrict(relations, new Restrictions(projections)), child.isDeterministic());
 
         this.child = child;
         this.projections = projections;
@@ -184,8 +187,10 @@ public final class SqlSelect extends SqlIntercode
     public static SqlIntercode create(Request request, Set<Variable> variables, SqlIntercode child, boolean distinct,
             LinkedHashMap<Variable, Direction> orderBy, BigInteger offset, BigInteger limit)
     {
-        return new SqlSelect(child.getVariableBindings().restrict(new Restrictions(variables)), child, distinct,
-                orderBy, offset, limit);
+        ClassRelations relations = request.getConfiguration();
+
+        return new SqlSelect(child.getVariableBindings().restrict(relations, new Restrictions(variables)), child,
+                distinct, orderBy, offset, limit);
     }
 
 
@@ -225,7 +230,9 @@ public final class SqlSelect extends SqlIntercode
             boolean distinct, LinkedHashMap<Variable, Direction> orderBy, BigInteger offset, BigInteger limit,
             List<Variable> simpleOrderBy)
     {
-        return new SqlSelect(projections, child, orderBy, offset, limit, simpleOrderBy, distinct);
+        ClassRelations relations = request.getConfiguration();
+
+        return new SqlSelect(relations, projections, child, orderBy, offset, limit, simpleOrderBy, distinct);
     }
 
 
@@ -284,12 +291,14 @@ public final class SqlSelect extends SqlIntercode
      * limits combine, and when paging is in effect all projected variables are appended to the ordering so that the
      * pages are stable.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param offset the offset, or null
      * @param limit the upper bound
      * @param order variables to order the results by, on top of the query's own ORDER BY
      * @return the resulting select
      */
-    public SqlSelect addExternalLimits(BigInteger offset, BigInteger limit, List<Variable> order)
+    public SqlSelect addExternalLimits(ClassRelations relations, BigInteger offset, BigInteger limit,
+            List<Variable> order)
     {
         if(!isTopLevel() || !simpleOrderBy.isEmpty())
             throw new UnsupportedOperationException();
@@ -320,8 +329,8 @@ public final class SqlSelect extends SqlIntercode
             newLimit = outerLimit;
 
         if(newLimit != null && newLimit.compareTo(zero) <= 0)
-            return new SqlSelect(projections, SqlNoSolution.get(), new LinkedHashMap<>(), null, null, List.of(),
-                    distinct);
+            return new SqlSelect(relations, projections, SqlNoSolution.get(), new LinkedHashMap<>(), null, null,
+                    List.of(), distinct);
 
 
         List<Variable> newOrderBy = new ArrayList<>(order);
@@ -331,7 +340,7 @@ public final class SqlSelect extends SqlIntercode
                 if(!orderBy.containsKey(var) && !newOrderBy.contains(var))
                     newOrderBy.add(var);
 
-        return new SqlSelect(projections, child, orderBy, newOffset, newLimit, newOrderBy, distinct);
+        return new SqlSelect(relations, projections, child, orderBy, newOffset, newLimit, newOrderBy, distinct);
     }
 
 
@@ -345,6 +354,8 @@ public final class SqlSelect extends SqlIntercode
      */
     public SqlSelect optimize(Request request, boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         if(!isTopLevel())
             throw new UnsupportedOperationException();
 
@@ -370,8 +381,8 @@ public final class SqlSelect extends SqlIntercode
                 stripedSimpleOrderBy.add(var);
 
 
-        if(optChild.getVariableBindings().restrict(new Restrictions(stripedSimpleOrderBy)).getNonConstantColumns()
-                .isEmpty())
+        if(optChild.getVariableBindings().restrict(relations, new Restrictions(stripedSimpleOrderBy))
+                .getNonConstantColumns().isEmpty())
             stripedSimpleOrderBy = List.of();
 
 
@@ -397,6 +408,8 @@ public final class SqlSelect extends SqlIntercode
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         if(isTopLevel())
             throw new UnsupportedOperationException();
 
@@ -442,7 +455,7 @@ public final class SqlSelect extends SqlIntercode
             return optChild;
 
 
-        if(restrictions.isOptimized(bindings) && optChild == child && optDistinct == distinct
+        if(restrictions.isOptimized(relations, bindings) && optChild == child && optDistinct == distinct
                 && stripedOrderBy.equals(orderBy))
             return this;
 
@@ -511,6 +524,8 @@ public final class SqlSelect extends SqlIntercode
     @Override
     public String translate(Request request)
     {
+        ClassRelations relations = request.getConfiguration();
+
         StringBuilder builder = new StringBuilder();
 
         if(isTopLevel())
@@ -526,7 +541,7 @@ public final class SqlSelect extends SqlIntercode
                 builder.append(" FROM (SELECT ");
                 builder.append(translateInnerSelectVariables(bindings));
                 builder.append(", row_number() OVER (");
-                builder.append(translateOrderBy(false));
+                builder.append(translateOrderBy(relations, false));
                 builder.append(") AS \"#rn\"");
             }
 
@@ -547,7 +562,7 @@ public final class SqlSelect extends SqlIntercode
                 SqlIntercode branch = union.getChilds().get(i);
 
                 builder.append("SELECT ");
-                builder.append(translateSelectVariables(description, branch.getVariableBindings()));
+                builder.append(translateSelectVariables(relations, description, branch.getVariableBindings()));
                 builder.append(" FROM (");
                 builder.append(branch.translate(request));
                 builder.append(") AS tab");
@@ -556,14 +571,14 @@ public final class SqlSelect extends SqlIntercode
         else
         {
             builder.append("SELECT ");
-            builder.append(translateSelectVariables(description, child.getVariableBindings()));
+            builder.append(translateSelectVariables(relations, description, child.getVariableBindings()));
 
             if(distinct)
             {
                 builder.append(" FROM (SELECT ");
                 builder.append(translateInnerSelectVariables(bindings));
                 builder.append(", row_number() OVER (");
-                builder.append(translateOrderBy(false));
+                builder.append(translateOrderBy(relations, false));
                 builder.append(") AS \"#rn\"");
             }
 
@@ -581,7 +596,7 @@ public final class SqlSelect extends SqlIntercode
         }
         else if(!orderBy.isEmpty() || !simpleOrderBy.isEmpty())
         {
-            builder.append(translateOrderBy(true));
+            builder.append(translateOrderBy(relations, true));
         }
 
         if(limit != null)
@@ -598,13 +613,14 @@ public final class SqlSelect extends SqlIntercode
      * SELECT list of a top-level select: for each variable, one column group per result class (NULL for classes it
      * cannot take), named by the class.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param description result classes of each projected variable
      * @param bindings the variable bindings
      * @return SELECT list of a top-level select: for each variable, one column group per result class (NULL for classes
      *         it cannot take), named by the class
      */
-    private static String translateSelectVariables(Map<Variable, List<ResourceClass>> description,
-            VariableBindings bindings)
+    private static String translateSelectVariables(ClassRelations relations,
+            Map<Variable, List<ResourceClass>> description, VariableBindings bindings)
     {
         ColumnMap columnMap = new ColumnMap();
 
@@ -622,7 +638,7 @@ public final class SqlSelect extends SqlIntercode
             for(ResourceClass resClass : entry.getValue())
             {
                 List<Column> colNames = resClass.createColumns(columnMap, var);
-                List<Column> cols = binding.deriveMapping(resClass);
+                List<Column> cols = binding.deriveMapping(relations, resClass);
 
                 for(int i = 0; i < cols.size(); i++)
                 {
@@ -680,11 +696,12 @@ public final class SqlSelect extends SqlIntercode
     /**
      * ORDER BY clause over the sortable representation of the variables, optionally followed by the simple ordering.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param withSimple whether to append the simple ordering
      * @return ORDER BY clause over the sortable representation of the variables, optionally followed by the simple
      *         ordering
      */
-    private String translateOrderBy(boolean withSimple)
+    private String translateOrderBy(ClassRelations relations, boolean withSimple)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -741,12 +758,12 @@ public final class SqlSelect extends SqlIntercode
 
             // order blank nodes
             if(sortSet.get(scalarBlankNode) != null
-                    && !isConstantCondition(binding.getIsNull(unionize(sortSet.get(scalarBlankNode)))))
+                    && !isConstantCondition(binding.getIsNull(relations, unionize(sortSet.get(scalarBlankNode)))))
             {
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                builder.append(binding.getIsNull(unionize(sortSet.get(scalarBlankNode))));
+                builder.append(binding.getIsNull(relations, unionize(sortSet.get(scalarBlankNode))));
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");
@@ -762,7 +779,7 @@ public final class SqlSelect extends SqlIntercode
                     appendComma(builder, hasOrderCondition);
                     hasOrderCondition = true;
 
-                    builder.append(binding.deriveMapping(iri).get(0));
+                    builder.append(binding.deriveMapping(relations, iri).get(0));
 
                     if(order.getValue() == Direction.Descending)
                         builder.append(" DESC");
@@ -810,7 +827,7 @@ public final class SqlSelect extends SqlIntercode
                 }
                 else
                 {
-                    builder.append(binding.deriveMapping(unionize(numerics, box)));
+                    builder.append(binding.deriveMapping(relations, unionize(numerics, box)));
                 }
 
                 if(order.getValue() == Direction.Descending)
@@ -823,7 +840,7 @@ public final class SqlSelect extends SqlIntercode
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                builder.append(binding.deriveMapping(genBoolean).get(0));
+                builder.append(binding.deriveMapping(relations, genBoolean).get(0));
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");
@@ -835,7 +852,7 @@ public final class SqlSelect extends SqlIntercode
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                builder.append(binding.deriveMapping(xsdString).get(0));
+                builder.append(binding.deriveMapping(relations, xsdString).get(0));
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");
@@ -853,7 +870,7 @@ public final class SqlSelect extends SqlIntercode
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                builder.append(binding.deriveMapping(sortClass).get(0));
+                builder.append(binding.deriveMapping(relations, sortClass).get(0));
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");
@@ -868,9 +885,9 @@ public final class SqlSelect extends SqlIntercode
                 hasOrderCondition = true;
 
                 if(dates.size() == 1 && dates.iterator().next().getEffectiveClass() instanceof DateInZone)
-                    builder.append(binding.deriveMapping(dates.iterator().next()).get(0));
+                    builder.append(binding.deriveMapping(relations, dates.iterator().next()).get(0));
                 else
-                    builder.append(binding.deriveMapping(genScalarDate).get(0));
+                    builder.append(binding.deriveMapping(relations, genScalarDate).get(0));
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");
@@ -882,7 +899,7 @@ public final class SqlSelect extends SqlIntercode
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                builder.append(binding.deriveMapping(unionize(sortSet.get(box), box)).get(0));
+                builder.append(binding.deriveMapping(relations, unionize(sortSet.get(box), box)).get(0));
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");

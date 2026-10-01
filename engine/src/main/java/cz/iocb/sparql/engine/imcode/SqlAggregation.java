@@ -21,6 +21,7 @@ import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlLiteral;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -103,6 +104,8 @@ public final class SqlAggregation extends SqlIntercode
     protected static SqlIntercode aggregate(Request request, Set<Variable> groupVariables,
             Map<Variable, SqlExpressionIntercode> aggregations, SqlIntercode child, Restrictions restrictions)
     {
+        ClassRelations relations = request.getConfiguration();
+
         VariableBindings bindings = new VariableBindings();
 
         for(Variable variable : groupVariables)
@@ -118,12 +121,13 @@ public final class SqlAggregation extends SqlIntercode
             bindings.add(binding);
         }
 
-        bindings = bindings.restrict(restrictions);
+        bindings = bindings.restrict(relations, restrictions);
 
         boolean isDeterministic = child.isDeterministic();
 
         for(Entry<Variable, SqlExpressionIntercode> entry : aggregations.entrySet())
-            if(restrictions == null || restrictions.contains(entry.getKey(), entry.getValue().getResourceClasses()))
+            if(restrictions == null
+                    || restrictions.contains(relations, entry.getKey(), entry.getValue().getResourceClasses()))
                 isDeterministic &= entry.getValue().isDeterministic();
 
         return new SqlAggregation(bindings, isDeterministic, groupVariables, aggregations, child);
@@ -133,13 +137,15 @@ public final class SqlAggregation extends SqlIntercode
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         SqlIntercode optChild = child;
         Map<Variable, SqlExpressionIntercode> optAggregations = aggregations;
 
         boolean childReduce = optAggregations.values().stream()
                 .allMatch(a -> a instanceof SqlBuiltinCall c && c.isDistinct());
 
-        Restrictions childRestrictions = getChildRestrictions(groupVariables, optAggregations, restrictions);
+        Restrictions childRestrictions = getChildRestrictions(relations, groupVariables, optAggregations, restrictions);
 
         while(true)
         {
@@ -149,7 +155,8 @@ public final class SqlAggregation extends SqlIntercode
             boolean newChildReduce = optAggregations.values().stream()
                     .allMatch(a -> a instanceof SqlBuiltinCall c && c.isDistinct());
 
-            Restrictions newChildRestrictions = getChildRestrictions(groupVariables, optAggregations, restrictions);
+            Restrictions newChildRestrictions = getChildRestrictions(relations, groupVariables, optAggregations,
+                    restrictions);
 
             if(newChildReduce == childReduce && newChildRestrictions.equals(childRestrictions))
                 break;
@@ -203,10 +210,11 @@ public final class SqlAggregation extends SqlIntercode
 
                     SqlIntercode aggregate = aggregate(request, groupVariables, subAggregations, code);
 
-                    SqlExpressionIntercode card = SqlVariable.create(aggregate.getVariable(new Variable("@card")));
+                    SqlExpressionIntercode card = SqlVariable.create(relations,
+                            aggregate.getVariable(new Variable("@card")));
                     SqlExpressionIntercode factor = SqlLiteral.create(request,
                             new TypedLiteral(count.toString(), xsdIntegerIri));
-                    SqlExpressionIntercode expression = SqlBinaryArithmetic.create(MULTIPLY, factor, card);
+                    SqlExpressionIntercode expression = SqlBinaryArithmetic.create(relations, MULTIPLY, factor, card);
 
                     unionList.add(SqlBind.bind(request, new Variable("@bind"), expression, aggregate));
                 }
@@ -222,7 +230,7 @@ public final class SqlAggregation extends SqlIntercode
             SqlIntercode optUnion = SqlUnion.union(request, unionList);
 
             List<SqlExpressionIntercode> args = List
-                    .of(SqlVariable.create(optUnion.getVariable(new Variable("@bind"))));
+                    .of(SqlVariable.create(relations, optUnion.getVariable(new Variable("@bind"))));
             SqlExpressionIntercode expr = SqlBuiltinCall.create(request, "sum", false, args);
 
             Map<Variable, SqlExpressionIntercode> outerAggregations = new LinkedHashMap<>();
@@ -246,7 +254,8 @@ public final class SqlAggregation extends SqlIntercode
                     distinctVars.add(v);
 
             SqlIntercode child = SqlDistinct.create(request, optChild, distinctVars);
-            List<SqlExpressionIntercode> args = List.of(SqlVariable.create(child.getVariable(var.getVariable())));
+            List<SqlExpressionIntercode> args = List
+                    .of(SqlVariable.create(relations, child.getVariable(var.getVariable())));
 
             Map<Variable, SqlExpressionIntercode> subAggregations = Map.of(optAggregations.keySet().iterator().next(),
                     SqlBuiltinCall.create(request, "count", false, args));
@@ -270,7 +279,7 @@ public final class SqlAggregation extends SqlIntercode
         }
 
 
-        if(optAggregations.equals(aggregations) && optChild == child && restrictions.isOptimized(bindings))
+        if(optAggregations.equals(aggregations) && optChild == child && restrictions.isOptimized(relations, bindings))
             return this;
 
         return aggregate(request, groupVariables, optAggregations, optChild, restrictions);
@@ -292,6 +301,8 @@ public final class SqlAggregation extends SqlIntercode
             Map<Variable, SqlExpressionIntercode> aggregations, SqlIntercode child, Restrictions restrictions,
             boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
 
         LinkedHashMap<Variable, SqlExpressionIntercode> opt = new LinkedHashMap<>();
@@ -301,7 +312,7 @@ public final class SqlAggregation extends SqlIntercode
             SqlExpressionIntercode optExpr = e.getValue().optimize(request, child.getVariableBindings(),
                     restrictions.getRestriction(e.getKey()), evalServices);
 
-            if(optExpr.getResourceClasses().stream().anyMatch(r -> restrictions.contains(e.getKey(), r)))
+            if(optExpr.getResourceClasses().stream().anyMatch(r -> restrictions.contains(relations, e.getKey(), r)))
                 opt.put(e.getKey(), optExpr);
         }
 
@@ -330,19 +341,20 @@ public final class SqlAggregation extends SqlIntercode
     /**
      * Restrictions for the child: the grouping variables plus the requirements of the needed aggregates.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param groupVariables the grouping variables
      * @param aggregations aggregate expression of each result variable
      * @param restrictions what the parent needs of the variables
      * @return restrictions for the child: the grouping variables plus the requirements of the needed aggregates
      */
-    private static Restrictions getChildRestrictions(Set<Variable> groupVariables,
+    private static Restrictions getChildRestrictions(ClassRelations relations, Set<Variable> groupVariables,
             Map<Variable, SqlExpressionIntercode> aggregations, Restrictions restrictions)
     {
         Restrictions childRestrictions = new Restrictions(groupVariables);
 
         for(Entry<Variable, SqlExpressionIntercode> entry : aggregations.entrySet())
-            if(restrictions.contains(entry.getKey(), entry.getValue().getResourceClasses()))
-                childRestrictions.add(entry.getValue().getRequirements());
+            if(restrictions.contains(relations, entry.getKey(), entry.getValue().getResourceClasses()))
+                childRestrictions.add(entry.getValue().getRequirements(relations));
 
         return childRestrictions;
     }
@@ -373,7 +385,7 @@ public final class SqlAggregation extends SqlIntercode
             {
                 ResourceClass resClass = e.getKey();
                 List<Column> names = binding.getMapping(resClass);
-                List<Column> cols = expression.get(resClass);
+                List<Column> cols = expression.get(request.getConfiguration(), resClass);
 
                 for(int i = 0; i < resClass.getColumnCount(); i++)
                 {

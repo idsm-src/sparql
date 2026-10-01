@@ -26,6 +26,7 @@ import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonType;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical.LogicalOperator;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.Multiset;
@@ -70,10 +71,11 @@ public final class SqlInExpression extends SqlExpressionIntercode
         /**
          * The operand itself when it has no expression columns, otherwise its wrapper.
          *
+         * @param relations declarations which unrelated user IRI classes may overlap
          * @param operand the operand
          * @return the operand itself when it has no expression columns, otherwise its wrapper
          */
-        public static SqlExpressionIntercode create(SqlExpressionIntercode operand)
+        public static SqlExpressionIntercode create(ClassRelations relations, SqlExpressionIntercode operand)
         {
             if(!operand.getBinding().hasExpressionColumn())
                 return operand;
@@ -91,7 +93,7 @@ public final class SqlInExpression extends SqlExpressionIntercode
         }
 
         @Override
-        public Restrictions getRequirements()
+        public Restrictions getRequirements(ClassRelations relations)
         {
             throw new UnsupportedOperationException();
         }
@@ -185,15 +187,16 @@ public final class SqlInExpression extends SqlExpressionIntercode
     /**
      * Membership test of {@code left} in {@code rights}.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param negated whether the test is negated
      * @param left the left operand
      * @param rights the operands compared against
      * @return membership test of {@code left} in {@code rights}
      */
-    public static SqlExpressionIntercode create(boolean negated, SqlExpressionIntercode left,
+    public static SqlExpressionIntercode create(ClassRelations relations, boolean negated, SqlExpressionIntercode left,
             List<SqlExpressionIntercode> rights)
     {
-        return create(negated, left, rights, Restriction.ALL);
+        return create(relations, negated, left, rights, Restriction.ALL);
     }
 
 
@@ -201,6 +204,7 @@ public final class SqlInExpression extends SqlExpressionIntercode
      * Membership test materialising only when needed: an empty list is constant, a single operand a plain comparison,
      * otherwise a chain of comparisons over the wrapped left operand.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param negated whether the test is negated
      * @param left the left operand
      * @param rights the operands compared against
@@ -208,7 +212,7 @@ public final class SqlInExpression extends SqlExpressionIntercode
      * @return membership test materialising only when needed: an empty list is constant, a single operand a plain
      *         comparison, otherwise a chain of comparisons over the wrapped left operand
      */
-    public static SqlExpressionIntercode create(boolean negated, SqlExpressionIntercode left,
+    public static SqlExpressionIntercode create(ClassRelations relations, boolean negated, SqlExpressionIntercode left,
             List<SqlExpressionIntercode> rights, Restriction restriction)
     {
         if(rights.isEmpty() && negated)
@@ -218,20 +222,20 @@ public final class SqlInExpression extends SqlExpressionIntercode
             return falseValue;
 
 
-        SqlExpressionIntercode wrappedLeft = OperandWrapper.create(left);
+        SqlExpressionIntercode wrappedLeft = OperandWrapper.create(relations, left);
         ComparisonOperator compareOperator = negated ? NOT_EQUAL : EQUAL;
         LogicalOperator logicalOperator = negated ? AND : OR;
 
         SqlExpressionIntercode expression = negated ? trueValue : falseValue;
 
         for(SqlExpressionIntercode right : rights)
-            expression = SqlBinaryLogical.create(logicalOperator, expression,
-                    SqlBinaryComparison.create(compareOperator, wrappedLeft, right));
+            expression = SqlBinaryLogical.create(relations, logicalOperator, expression,
+                    SqlBinaryComparison.create(relations, compareOperator, wrappedLeft, right));
 
         if(expression instanceof SqlLiteral || expression instanceof SqlNull)
             return expression;
 
-        if(!restriction.contains(xsdBoolean))
+        if(!restriction.contains(relations, xsdBoolean))
         {
             return new SqlInExpression(negated, left, rights, singletonMap(xsdBoolean, null), expression.canBeNull());
         }
@@ -242,7 +246,7 @@ public final class SqlInExpression extends SqlExpressionIntercode
             Map<Column, Column> columnMap = wrapped.getColumnMap();
 
             builder.append("(SELECT ");
-            builder.append(expression.get(xsdBoolean).get(0));
+            builder.append(expression.get(relations, xsdBoolean).get(0));
             builder.append(" FROM (VALUES (");
             builder.append(columnMap.keySet().stream().map(c -> c.toString()).collect(joining(", ")));
             builder.append(")) AS \"tab\"(");
@@ -261,14 +265,14 @@ public final class SqlInExpression extends SqlExpressionIntercode
 
 
     @Override
-    public Restrictions getRequirements()
+    public Restrictions getRequirements(ClassRelations relations)
     {
         Restrictions restrictions = new Restrictions();
 
-        restrictions.add(left.getRequirements());
+        restrictions.add(left.getRequirements(relations));
 
         for(SqlExpressionIntercode argument : rights)
-            restrictions.add(argument.getRequirements());
+            restrictions.add(argument.getRequirements(relations));
 
         return restrictions;
     }
@@ -278,6 +282,8 @@ public final class SqlInExpression extends SqlExpressionIntercode
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         ComparisonOperator operator = negated ? NOT_EQUAL : EQUAL;
 
         Restriction leftSet = new Restriction();
@@ -292,7 +298,7 @@ public final class SqlInExpression extends SqlExpressionIntercode
 
                 for(ResourceClass rightClass : right.getMappings().keySet())
                 {
-                    if(areComparable(operator, leftClass, rightClass) != ComparisonType.NULL)
+                    if(areComparable(relations, operator, leftClass, rightClass) != ComparisonType.NULL)
                     {
                         leftSet.add(leftClass);
                         rightSet.add(rightClass);
@@ -310,7 +316,7 @@ public final class SqlInExpression extends SqlExpressionIntercode
         if(optRights.equals(rights) && optLeft == left)
             return this;
 
-        return create(negated, optLeft, optRights, restriction);
+        return create(relations, negated, optLeft, optRights, restriction);
     }
 
 

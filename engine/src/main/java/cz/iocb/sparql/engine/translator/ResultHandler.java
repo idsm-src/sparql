@@ -1,9 +1,9 @@
 package cz.iocb.sparql.engine.translator;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedIri;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.estimateAsUnion;
 import java.sql.SQLException;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -11,7 +11,8 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.imcode.SqlIntercode;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
-import cz.iocb.sparql.engine.mapping.classes.IriClass;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
+import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
 import cz.iocb.sparql.engine.rdf.BlankNode;
@@ -28,7 +29,7 @@ import cz.iocb.sparql.engine.request.Request;
 /**
  * Collects the solutions received from a federated SERVICE endpoint and turns them into intermediate code. It
  * classifies the received terms, trying for each variable the IRI classes admitted by the restrictions and moving the
- * class that matched to the front.
+ * classes that matched to the front.
  */
 public abstract class ResultHandler implements AutoCloseable
 {
@@ -61,18 +62,23 @@ public abstract class ResultHandler implements AutoCloseable
      */
     protected ResultHandler(Request request, Restrictions restrictions)
     {
+        ClassRelations relations = request.getConfiguration();
+
         this.request = request;
         this.restrictions = restrictions;
+
+        List<UserIriClass> iriClasses = request.getConfiguration().getIriClasses();
 
         for(Variable var : restrictions.getNames())
         {
             Set<ResourceClass> restriction = restrictions.get(var);
 
-            if(restriction == null || restriction.contains(unsupportedIri))
-                typeIriClassesMap.put(var, new LinkedList<>(request.getConfiguration().getIriClasses()));
+            // an IRI of no user class is recognised only by trying all of them
+            if(restriction == null || !ResourceClass.areDisjunct(relations, unsupportedIri, restriction))
+                typeIriClassesMap.put(var, new LinkedList<>(iriClasses));
             else
-                typeIriClassesMap.put(var, new LinkedList<>(restriction.stream().filter(c -> c instanceof UserIriClass)
-                        .map(c -> (UserIriClass) c).toList()));
+                typeIriClassesMap.put(var, new LinkedList<>(iriClasses.stream()
+                        .filter(c -> !ResourceClass.areDisjunct(relations, c, restriction)).toList()));
         }
     }
 
@@ -101,13 +107,13 @@ public abstract class ResultHandler implements AutoCloseable
 
 
     /**
-     * Class of a received IRI: the first admitted user class that matches, moved to the front for the next lookup.
+     * Class of a received IRI among the admitted user classes (see {@link Request#detectIriClass}); the classes found
+     * move to the front of the admitted classes for the next lookup, as the IRIs of one variable tend to be alike.
      *
      * @param request the current request
      * @param iri the IRI
      * @param variable the variable
-     * @return class of a received IRI: the first admitted user class that matches, moved to the front for the next
-     *         lookup
+     * @return class of a received IRI among the admitted user classes
      */
     private ResourceClass getIriClass(Request request, Iri iri, Variable variable)
     {
@@ -118,25 +124,20 @@ public abstract class ResultHandler implements AutoCloseable
 
         List<UserIriClass> iriClasses = typeIriClassesMap.get(variable);
 
-        Iterator<UserIriClass> it = iriClasses.iterator();
+        iriClass = request.detectIriClass(iri, iriClasses);
 
-        while(it.hasNext())
+        for(PrimitiveResourceClass found : estimateAsUnion(iriClass))
         {
-            UserIriClass resClass = it.next();
-
-            if(resClass.match(request, iri))
+            if(found instanceof UserIriClass user && !user.equals(iriClasses.getFirst()))
             {
-                if(!resClass.equals(iriClasses.getFirst()))
-                {
-                    it.remove();
-                    iriClasses.addFirst(resClass);
-                }
-
-                return resClass;
+                iriClasses.remove(user);
+                iriClasses.addFirst(user);
             }
         }
 
-        return unsupportedIri;
+        iriCache.storeClass(iri, iriClass);
+
+        return iriClass;
     }
 
 
@@ -176,30 +177,30 @@ public abstract class ResultHandler implements AutoCloseable
      */
     public List<Column> getColumns(Request request, ResourceClass resClass, RdfTerm term)
     {
-        if(resClass instanceof IriClass iriClass && term instanceof Iri iri)
-            return getColumns(request, iriClass, iri);
+        if(term instanceof Iri iri)
+            return getColumns(request, resClass, iri);
 
         return resClass.toColumns(request, term);
     }
 
 
     /**
-     * Constant columns representing the IRI in the class, cached.
+     * Constant columns representing the IRI in the class, one of the classes the IRI belongs to; cached.
      *
      * @param request the current request
-     * @param iriClass the IRI class
+     * @param resClass the resource class
      * @param iri the IRI
      * @return constant columns representing the IRI in the class, cached
      */
-    public List<Column> getColumns(Request request, IriClass iriClass, Iri iri)
+    public List<Column> getColumns(Request request, ResourceClass resClass, Iri iri)
     {
-        List<Column> columns = iriCache.getIriColumns(iri);
+        List<Column> columns = iriCache.getIriColumns(iri, resClass);
 
         if(columns != null)
             return columns;
 
-        columns = iriClass.toColumns(request, iri);
-        iriCache.storeToCache(iri, iriClass, columns);
+        columns = resClass.toColumns(request, iri);
+        iriCache.storeColumns(iri, resClass, columns);
 
         return columns;
     }

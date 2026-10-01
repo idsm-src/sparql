@@ -35,6 +35,7 @@ import cz.iocb.sparql.engine.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.imcode.expression.SqlUnaryArithmetic;
 import cz.iocb.sparql.engine.imcode.expression.SqlUnaryLogical;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.mapping.datatypes.UserDatatype;
@@ -114,26 +115,28 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     @Override
     public SqlExpressionIntercode visit(BinaryExpression binaryExpression)
     {
+        ClassRelations relations = request.getConfiguration();
+
         Operator operator = binaryExpression.getOperator();
         SqlExpressionIntercode left = visitElement(binaryExpression.getLeft());
         SqlExpressionIntercode right = visitElement(binaryExpression.getRight());
 
         return switch(operator)
         {
-            case And -> SqlBinaryLogical.create(AND, SqlEffectiveBooleanValue.create(left),
-                    SqlEffectiveBooleanValue.create(right));
-            case Or -> SqlBinaryLogical.create(OR, SqlEffectiveBooleanValue.create(left),
-                    SqlEffectiveBooleanValue.create(right));
-            case Add -> SqlBinaryArithmetic.create(ADD, left, right);
-            case Subtract -> SqlBinaryArithmetic.create(SUBTRACT, left, right);
-            case Multiply -> SqlBinaryArithmetic.create(MULTIPLY, left, right);
-            case Divide -> SqlBinaryArithmetic.create(DIVIDE, left, right);
-            case Equals -> SqlBinaryComparison.create(EQUAL, left, right);
-            case NotEquals -> SqlBinaryComparison.create(NOT_EQUAL, left, right);
-            case LessThan -> SqlBinaryComparison.create(LESS_THAN, left, right);
-            case LessThanOrEqual -> SqlBinaryComparison.create(LESS_THAN_OR_EQUAL, left, right);
-            case GreaterThan -> SqlBinaryComparison.create(GREATER_THAN, left, right);
-            case GreaterThanOrEqual -> SqlBinaryComparison.create(GREATER_THAN_OR_EQUAL, left, right);
+            case And -> SqlBinaryLogical.create(relations, AND, SqlEffectiveBooleanValue.create(relations, left),
+                    SqlEffectiveBooleanValue.create(relations, right));
+            case Or -> SqlBinaryLogical.create(relations, OR, SqlEffectiveBooleanValue.create(relations, left),
+                    SqlEffectiveBooleanValue.create(relations, right));
+            case Add -> SqlBinaryArithmetic.create(relations, ADD, left, right);
+            case Subtract -> SqlBinaryArithmetic.create(relations, SUBTRACT, left, right);
+            case Multiply -> SqlBinaryArithmetic.create(relations, MULTIPLY, left, right);
+            case Divide -> SqlBinaryArithmetic.create(relations, DIVIDE, left, right);
+            case Equals -> SqlBinaryComparison.create(relations, EQUAL, left, right);
+            case NotEquals -> SqlBinaryComparison.create(relations, NOT_EQUAL, left, right);
+            case LessThan -> SqlBinaryComparison.create(relations, LESS_THAN, left, right);
+            case LessThanOrEqual -> SqlBinaryComparison.create(relations, LESS_THAN_OR_EQUAL, left, right);
+            case GreaterThan -> SqlBinaryComparison.create(relations, GREATER_THAN, left, right);
+            case GreaterThanOrEqual -> SqlBinaryComparison.create(relations, GREATER_THAN_OR_EQUAL, left, right);
             default -> null;
         };
     }
@@ -148,25 +151,27 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         for(Expression expression : inExpression.getRight())
             right.add(visitElement(expression));
 
-        return SqlInExpression.create(inExpression.isNegated(), left, right);
+        return SqlInExpression.create(request.getConfiguration(), inExpression.isNegated(), left, right);
     }
 
 
     @Override
     public SqlExpressionIntercode visit(UnaryExpression unaryExpression)
     {
+        ClassRelations relations = request.getConfiguration();
+
         SqlExpressionIntercode operand = visitElement(unaryExpression.getOperand());
 
         switch(unaryExpression.getOperator())
         {
             case Plus:
-                return SqlUnaryArithmetic.create(false, operand);
+                return SqlUnaryArithmetic.create(relations, false, operand);
 
             case Minus:
-                return SqlUnaryArithmetic.create(true, operand);
+                return SqlUnaryArithmetic.create(relations, true, operand);
 
             case Not:
-                return SqlUnaryLogical.create(SqlEffectiveBooleanValue.create(operand));
+                return SqlUnaryLogical.create(relations, SqlEffectiveBooleanValue.create(relations, operand));
         }
 
         return null;
@@ -193,7 +198,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
             arguments.add(SqlIri.create(request, new Iri(prologue.getBase())));
 
         if(function.equalsIgnoreCase("if") && arguments.size() > 0)
-            arguments.set(0, SqlEffectiveBooleanValue.create(arguments.get(0)));
+            arguments.set(0, SqlEffectiveBooleanValue.create(request.getConfiguration(), arguments.get(0)));
 
         return SqlBuiltinCall.create(request, function.toLowerCase(), builtInCallExpression.isDistinct(), arguments);
     }
@@ -210,6 +215,8 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     @Override
     public SqlExpressionIntercode visit(FunctionCallExpression functionCallExpression)
     {
+        ClassRelations relations = request.getConfiguration();
+
         Iri iri = getIri(functionCallExpression.getFunction());
         List<SqlExpressionIntercode> arguemnts = new LinkedList<>();
 
@@ -227,13 +234,13 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
                     || isLanguageTaggedString(literalClass))
                 return SqlNull.get();
 
-            return SqlCast.create(literalClass, arguemnts.get(0));
+            return SqlCast.create(relations, literalClass, arguemnts.get(0));
         }
 
         FunctionDefinition definition = request.getConfiguration().getFunctions(parent.getService())
                 .get(iri.getValue());
 
-        return SqlFunctionCall.create(definition, arguemnts);
+        return SqlFunctionCall.create(relations, definition, arguemnts);
     }
 
 
@@ -262,6 +269,6 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     @Override
     public SqlExpressionIntercode visit(VariableNode variable)
     {
-        return SqlVariable.create(bindings.get(getVariable(variable)));
+        return SqlVariable.create(request.getConfiguration(), bindings.get(getVariable(variable)));
     }
 }

@@ -18,6 +18,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBindings;
@@ -55,26 +56,29 @@ public final class SqlUnaryArithmetic extends SqlUnary
     /**
      * Unary plus or minus of the operand.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param isMinus true for minus, false for plus
      * @param operand the operand
      * @return unary plus or minus of the operand
      */
-    public static SqlExpressionIntercode create(boolean isMinus, SqlExpressionIntercode operand)
+    public static SqlExpressionIntercode create(ClassRelations relations, boolean isMinus,
+            SqlExpressionIntercode operand)
     {
-        return create(isMinus, operand, Restriction.ALL);
+        return create(relations, isMinus, operand, Restriction.ALL);
     }
 
 
     /**
      * Unary plus or minus materialising only the needed result classes; NULL for non-numeric operands.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param isMinus true for minus, false for plus
      * @param operand the operand
      * @param restriction the result classes the parent needs
      * @return unary plus or minus materialising only the needed result classes; NULL for non-numeric operands
      */
-    public static SqlExpressionIntercode create(boolean isMinus, SqlExpressionIntercode operand,
-            Restriction restriction)
+    public static SqlExpressionIntercode create(ClassRelations relations, boolean isMinus,
+            SqlExpressionIntercode operand, Restriction restriction)
     {
         Map<ResourceClass, Set<List<ResourceClass>>> map = new HashMap<>();
 
@@ -96,13 +100,14 @@ public final class SqlUnaryArithmetic extends SqlUnary
 
 
         List<SqlExpressionIntercode> operands = List.of(operand);
-        Map<ResourceClass, Set<List<Set<ResourceClass>>>> resMap = processResultMap(operands, map, restriction, box);
+        Map<ResourceClass, Set<List<Set<ResourceClass>>>> resMap = processResultMap(relations, operands, map,
+                restriction, box);
 
         Map<ResourceClass, List<Column>> mappings = new HashMap<>();
 
         for(Entry<ResourceClass, Set<List<Set<ResourceClass>>>> e : resMap.entrySet())
             mappings.put(e.getKey(),
-                    e.getValue() == null ? null : translate(isMinus, e.getKey(), e.getValue(), operand));
+                    e.getValue() == null ? null : translate(relations, isMinus, e.getKey(), e.getValue(), operand));
 
         return new SqlUnaryArithmetic(isMinus, operand, mappings, canBeNull);
     }
@@ -111,13 +116,14 @@ public final class SqlUnaryArithmetic extends SqlUnary
     /**
      * SQL computing the result in the class from the operand promoted to it.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param isMinus true for minus, false for plus
      * @param resultClass the result class
      * @param variants combinations of argument classes
      * @param operand the operand
      * @return SQL computing the result in the class from the operand promoted to it
      */
-    private static List<Column> translate(boolean isMinus, ResourceClass resultClass,
+    private static List<Column> translate(ClassRelations relations, boolean isMinus, ResourceClass resultClass,
             Set<List<Set<ResourceClass>>> variants, SqlExpressionIntercode operand)
     {
         Set<Column> cols = new HashSet<>();
@@ -134,7 +140,7 @@ public final class SqlUnaryArithmetic extends SqlUnary
         {
             for(List<Set<ResourceClass>> variant : variants)
             {
-                Column op = operand.get(unionize(variant.get(0), box)).get(0);
+                Column op = operand.get(relations, unionize(variant.get(0), box)).get(0);
                 cols.add(new ExpressionColumn("(operator(sparql.-) " + op + ")"));
             }
         }
@@ -147,21 +153,23 @@ public final class SqlUnaryArithmetic extends SqlUnary
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         List<ResourceClass> results = List.of(xsdDouble, xsdFloat, xsdDecimal, xsdInteger);
 
         Restriction operandRestriction = new Restriction();
 
         // the operands promoted to a result class are all the classes not following it in the promotion order
         for(int i = 0; i < results.size(); i++)
-            if(restriction.contains(results.get(i)))
+            if(restriction.contains(relations, results.get(i)))
                 operandRestriction.add(numericBaseClasses.subList(0, numericBaseClasses.size() - i));
 
         SqlExpressionIntercode optOperand = operand.optimize(request, bindings, operandRestriction, evalServices);
 
-        if(optOperand == operand && restriction.isOptimized(variableBinding))
+        if(optOperand == operand && restriction.isOptimized(relations, variableBinding))
             return this;
 
-        return create(isMinus, optOperand, restriction);
+        return create(relations, isMinus, optOperand, restriction);
     }
 
 

@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
@@ -121,15 +122,18 @@ public final class SqlMerge extends SqlIntercode
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         SqlIntercode optChild = child;
 
-        Restrictions childRestrictions = getRestrictions(optChild, variable1, variable2, restrictions);
+        Restrictions childRestrictions = getRestrictions(relations, optChild, variable1, variable2, restrictions);
 
         while(true)
         {
             optChild = child.optimize(request, childRestrictions, reduced, evalServices);
 
-            Restrictions newChildRestrictions = getRestrictions(optChild, variable1, variable2, restrictions);
+            Restrictions newChildRestrictions = getRestrictions(relations, optChild, variable1, variable2,
+                    restrictions);
 
             if(newChildRestrictions.equals(childRestrictions))
                 break;
@@ -140,7 +144,8 @@ public final class SqlMerge extends SqlIntercode
         if(optChild.equals(SqlNoSolution.get()))
             return SqlNoSolution.get();
 
-        if(!(new VariableBindingPair(optChild.getVariable(variable1), optChild.getVariable(variable2))).isJoinable())
+        if(!(new VariableBindingPair(relations, optChild.getVariable(variable1), optChild.getVariable(variable2)))
+                .isJoinable())
             return SqlNoSolution.get();
 
         if(optChild.getVariableBindings().get(variable1) == null && !restrictions.containsVar(variable1))
@@ -160,7 +165,7 @@ public final class SqlMerge extends SqlIntercode
         }
 
 
-        if(restrictions.isOptimized(bindings) && optChild == child)
+        if(restrictions.isOptimized(relations, bindings) && optChild == child)
             return this;
 
         return create(request, variable1, variable2, optChild, restrictions);
@@ -190,7 +195,7 @@ public final class SqlMerge extends SqlIntercode
         builder.append(" ) AS ");
         builder.append("tab");
 
-        String condition = generateJoinCondition(binding1, binding2, null, null);
+        String condition = generateJoinCondition(request.getConfiguration(), binding1, binding2, null, null);
 
         if(condition != null)
         {
@@ -205,21 +210,22 @@ public final class SqlMerge extends SqlIntercode
     /**
      * Restrictions for the child: the parent's plus the compatibility requirements between the two variables.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param child the child node
      * @param variable1 the variable kept
      * @param variable2 the variable merged into the first one
      * @param restrictions what the parent needs of the variables
      * @return restrictions for the child: the parent's plus the compatibility requirements between the two variables
      */
-    protected static Restrictions getRestrictions(SqlIntercode child, Variable variable1, Variable variable2,
-            Restrictions restrictions)
+    protected static Restrictions getRestrictions(ClassRelations relations, SqlIntercode child, Variable variable1,
+            Variable variable2, Restrictions restrictions)
     {
         VariableBinding binding1 = child.getVariable(variable1);
         VariableBinding binding2 = child.getVariable(variable2);
 
         Restrictions result = new Restrictions(restrictions);
-        result.add(getJoinRestrictions(binding1, binding2));
-        result.add(getJoinRestrictions(binding2, binding1));
+        result.add(getJoinRestrictions(relations, binding1, binding2));
+        result.add(getJoinRestrictions(relations, binding2, binding1));
 
         return result;
     }
@@ -228,12 +234,14 @@ public final class SqlMerge extends SqlIntercode
     /**
      * Restrictions for one of the merged variables: the classes compatible with the other (all when it may be unbound).
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param binding the variable binding
      * @param other binding of the other variable
      * @return restrictions for one of the merged variables: the classes compatible with the other (all when it may be
      *         unbound)
      */
-    protected static Restrictions getJoinRestrictions(VariableBinding binding, VariableBinding other)
+    protected static Restrictions getJoinRestrictions(ClassRelations relations, VariableBinding binding,
+            VariableBinding other)
     {
         Restrictions restrictions = new Restrictions();
 
@@ -247,7 +255,7 @@ public final class SqlMerge extends SqlIntercode
             restrictions.set(variable, binding.getClasses());
         else
             restrictions.set(variable,
-                    classes.stream().filter(c -> !areDisjunct(c, other.getClasses())).collect(toSet()));
+                    classes.stream().filter(c -> !areDisjunct(relations, c, other.getClasses())).collect(toSet()));
 
         return restrictions;
     }

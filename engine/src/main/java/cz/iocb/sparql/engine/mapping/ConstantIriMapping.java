@@ -2,7 +2,6 @@ package cz.iocb.sparql.engine.mapping;
 
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.request.Request;
@@ -54,9 +53,9 @@ public class ConstantIriMapping extends ConstantMapping
      *
      * @return the IRI class given at construction, or null when it is detected lazily
      */
-    public IriClass getResourceClass()
+    public ResourceClass getResourceClass()
     {
-        return (IriClass) resourceClass;
+        return resourceClass;
     }
 
 

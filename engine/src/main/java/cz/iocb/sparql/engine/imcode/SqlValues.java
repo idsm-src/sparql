@@ -87,7 +87,7 @@ public final class SqlValues extends SqlIntercode
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
-        VariableBindings optimizedBindings = bindings.restrict(restrictions);
+        VariableBindings optimizedBindings = bindings.restrict(request.getConfiguration(), restrictions);
 
         if(optimizedBindings.equals(bindings))
             return this;

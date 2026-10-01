@@ -140,7 +140,7 @@ public class StoredResultHandler extends ResultHandler
 
             ResourceClass resClass = getResourceClass(request, entry.getValue(), entry.getKey());
 
-            if(!restrictions.contains(entry.getKey(), resClass))
+            if(!restrictions.contains(request.getConfiguration(), entry.getKey(), resClass))
                 continue;
 
             resourceClasses.computeIfAbsent(entry.getKey(), _ -> new ArrayList<>(nCopies(batchSize, null)))

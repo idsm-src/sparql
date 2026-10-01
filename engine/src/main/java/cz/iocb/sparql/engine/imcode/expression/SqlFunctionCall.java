@@ -11,6 +11,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
 import cz.iocb.sparql.engine.request.Request;
@@ -61,27 +62,30 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
     /**
      * Call of the function with the given arguments.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param definition the function definition
      * @param arguments the arguments
      * @return call of the function with the given arguments
      */
-    public static SqlExpressionIntercode create(FunctionDefinition definition, List<SqlExpressionIntercode> arguments)
+    public static SqlExpressionIntercode create(ClassRelations relations, FunctionDefinition definition,
+            List<SqlExpressionIntercode> arguments)
     {
-        return create(definition, arguments, Restriction.ALL);
+        return create(relations, definition, arguments, Restriction.ALL);
     }
 
 
     /**
      * Call materialising the result only when needed; an argument disjoint with its declared class makes the call NULL.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param definition the function definition
      * @param arguments the arguments
      * @param restriction the result classes the parent needs
      * @return call materialising the result only when needed; an argument disjoint with its declared class makes the
      *         call NULL
      */
-    public static SqlExpressionIntercode create(FunctionDefinition definition, List<SqlExpressionIntercode> arguments,
-            Restriction restriction)
+    public static SqlExpressionIntercode create(ClassRelations relations, FunctionDefinition definition,
+            List<SqlExpressionIntercode> arguments, Restriction restriction)
     {
         boolean canBeNull = definition.canBeNull() || arguments.stream().anyMatch(a -> a.canBeNull());
 
@@ -90,11 +94,12 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
             Set<ResourceClass> resClasses = arguments.get(i).getResourceClasses();
             ResourceClass refClass = definition.getArgumentClasses().get(i);
 
-            if(ResourceClass.areDisjunct(refClass, resClasses))
+            if(ResourceClass.areDisjunct(relations, refClass, resClasses))
                 return SqlNull.get();
         }
 
-        List<Column> cols = restriction.contains(definition.getResultClass()) ? translate(definition, arguments) : null;
+        List<Column> cols = restriction.contains(relations, definition.getResultClass()) ?
+                translate(relations, definition, arguments) : null;
         Map<ResourceClass, List<Column>> mappings = singletonMap(definition.getResultClass(), cols);
 
         return new SqlFunctionCall(definition, arguments, mappings, canBeNull);
@@ -102,12 +107,12 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
 
 
     @Override
-    public Restrictions getRequirements()
+    public Restrictions getRequirements(ClassRelations relations)
     {
         Restrictions restrictions = new Restrictions();
 
         for(SqlExpressionIntercode argument : arguments)
-            restrictions.add(argument.getRequirements());
+            restrictions.add(argument.getRequirements(relations));
 
         return restrictions;
     }
@@ -117,13 +122,15 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         List<SqlExpressionIntercode> optArguments = new ArrayList<>();
 
         for(int i = 0; i < arguments.size(); i++)
         {
             Restriction argRestriction = new Restriction();
 
-            if(restriction.contains(definition.getResultClass()))
+            if(restriction.contains(relations, definition.getResultClass()))
                 argRestriction.add(definition.getArgumentClasses().get(i));
 
             optArguments.add(arguments.get(i).optimize(request, bindings, argRestriction, evalServices));
@@ -132,18 +139,20 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
         if(optArguments.equals(arguments))
             return this;
 
-        return create(definition, optArguments, restriction);
+        return create(relations, definition, optArguments, restriction);
     }
 
 
     /**
      * SQL calling the function with the arguments converted to their declared classes.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param definition the function definition
      * @param arguments the arguments
      * @return SQL calling the function with the arguments converted to their declared classes
      */
-    private static List<Column> translate(FunctionDefinition definition, List<SqlExpressionIntercode> arguments)
+    private static List<Column> translate(ClassRelations relations, FunctionDefinition definition,
+            List<SqlExpressionIntercode> arguments)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -159,7 +168,7 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
             if(argClass.equals(stringLiteral)) //FIXME: use different approach
                 builder.append(arguments.get(i).getStringLiteral());
             else
-                builder.append(arguments.get(i).get(argClass).get(0)); //NOTE: only first column is used
+                builder.append(arguments.get(i).get(relations, argClass).get(0)); //NOTE: only first column is used
         }
 
         builder.append(")");

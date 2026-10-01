@@ -278,7 +278,7 @@ public class IntegerUserIriClass extends SimpleUserIriClass
         if(length > 0)
             return columns;
 
-        return List.of(addPrefixAndSuffix(null, generateNonCheckedInverseFunction(columns.get(0)), suffix));
+        return List.of(addPrefixAndSuffix(null, numberAsString(columns.get(0)), suffix));
     }
 
 

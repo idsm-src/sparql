@@ -17,6 +17,7 @@ import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
@@ -150,6 +151,8 @@ public final class SqlRecursive extends SqlIntercode
     protected static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, Variable beginVar,
             Variable joinVar, Variable endVar, Variable graphVar, Restrictions restrictions)
     {
+        ClassRelations relations = request.getConfiguration();
+
         //TODO: accept also variables other than those directly participating in recursion
 
         Map<Column, Column> map = new HashMap<>();
@@ -196,7 +199,7 @@ public final class SqlRecursive extends SqlIntercode
         List<Column> innerColumns = new ArrayList<>(tmp.getNonConstantColumns());
         List<Column> outerColumns = innerColumns.stream().map(c -> map.get(c)).toList();
 
-        return new SqlRecursive(bindings.restrict(restrictions), init, next, endBinding, joinVar, beginVar,
+        return new SqlRecursive(bindings.restrict(relations, restrictions), init, next, endBinding, joinVar, beginVar,
                 innerColumns, outerColumns, graphVar);
     }
 
@@ -204,6 +207,8 @@ public final class SqlRecursive extends SqlIntercode
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         Restrictions childRestrictions = new Restrictions(restrictions);
 
         childRestrictions.add(endBinding.getVariable());
@@ -247,7 +252,8 @@ public final class SqlRecursive extends SqlIntercode
             List<SqlIntercode> childs = new ArrayList<>();
 
             for(SqlIntercode child : union.getChilds())
-                if((new VariableBindingPair(endBinding, child.getVariableBindings().get(joinVar))).isJoinable())
+                if((new VariableBindingPair(relations, endBinding, child.getVariableBindings().get(joinVar)))
+                        .isJoinable())
                     childs.add(child);
 
             if(childs.size() == union.getChilds().size())
@@ -266,7 +272,8 @@ public final class SqlRecursive extends SqlIntercode
                 Set<ResourceClass> additional = new HashSet<>(classes);
 
                 for(SqlIntercode c : union.getChilds())
-                    if(c.getVariable(joinVar) != null && !areDisjunct(classes, c.getVariable(joinVar).getClasses()))
+                    if(c.getVariable(joinVar) != null
+                            && !areDisjunct(relations, classes, c.getVariable(joinVar).getClasses()))
                         additional.addAll(c.getVariable(endVar).getClasses());
 
                 if(additional.equals(classes))
@@ -275,9 +282,8 @@ public final class SqlRecursive extends SqlIntercode
                 classes.addAll(additional);
             }
 
-            List<SqlIntercode> childs = union.getChilds().stream().filter(
-                    c -> c.getVariable(joinVar) != null && !areDisjunct(classes, c.getVariable(joinVar).getClasses()))
-                    .toList();
+            List<SqlIntercode> childs = union.getChilds().stream().filter(c -> c.getVariable(joinVar) != null
+                    && !areDisjunct(relations, classes, c.getVariable(joinVar).getClasses())).toList();
 
             if(childs.size() == union.getChilds().size())
                 break;
@@ -289,12 +295,12 @@ public final class SqlRecursive extends SqlIntercode
         if(nextOpt.equals(SqlNoSolution.get()))
             return SqlDistinct.create(request, initOpt, initOpt.getVariableBindings().getVariables());
 
-        if(!(new VariableBindingPair(initOpt.getVariableBindings().get(endVar),
+        if(!(new VariableBindingPair(relations, initOpt.getVariableBindings().get(endVar),
                 nextOpt.getVariableBindings().get(joinVar))).isJoinable())
             return SqlDistinct.create(request, initOpt, initOpt.getVariableBindings().getVariables());
 
 
-        if(initOpt == init && nextOpt == next && restrictions.isOptimized(bindings))
+        if(initOpt == init && nextOpt == next && restrictions.isOptimized(relations, bindings))
             return this;
 
         return create(request, initOpt, nextOpt, beginVar, joinVar, endBinding.getVariable(), graphVar, restrictions);
@@ -304,6 +310,8 @@ public final class SqlRecursive extends SqlIntercode
     @Override
     public String translate(Request request)
     {
+        ClassRelations relations = request.getConfiguration();
+
         List<ResourceClass> endVarClasses = new LinkedList<>(endBinding.getClasses()); // to stable order
 
         StringBuilder builder = new StringBuilder();
@@ -343,7 +351,7 @@ public final class SqlRecursive extends SqlIntercode
 
         for(ResourceClass resClass : endVarClasses)
         {
-            List<Column> columns = initEndBinding.deriveMapping(resClass);
+            List<Column> columns = initEndBinding.deriveMapping(relations, resClass);
 
             for(int j = 0; j < resClass.getColumnCount(); j++)
             {
@@ -376,7 +384,7 @@ public final class SqlRecursive extends SqlIntercode
 
         for(ResourceClass resClass : endVarClasses)
         {
-            List<Column> columns = nextEndBinding != null ? nextEndBinding.deriveMapping(resClass) : null;
+            List<Column> columns = nextEndBinding != null ? nextEndBinding.deriveMapping(relations, resClass) : null;
 
             for(int j = 0; j < resClass.getColumnCount(); j++)
             {
@@ -408,7 +416,7 @@ public final class SqlRecursive extends SqlIntercode
         tmp.remove(endBinding.getVariable());
         tmp.add(new VariableBinding(joinVar, endBinding.getMappings(), endBinding.canBeNull()));
 
-        String condition = generateJoinCondition(tmp, next.getVariableBindings(), leftTable, rightTable);
+        String condition = generateJoinCondition(relations, tmp, next.getVariableBindings(), leftTable, rightTable);
 
         if(condition != null)
         {
@@ -450,7 +458,7 @@ public final class SqlRecursive extends SqlIntercode
 
         VariableBinding endBinding = new VariableBinding(endVar, false);
 
-        for(ResourceClass resClass : unionResourceClasses(defs))
+        for(ResourceClass resClass : unionResourceClasses(request.getConfiguration(), defs))
             endBinding.addMapping(resClass, resClass.createColumns(request.getColumnMap(), endVar));
 
         //TODO: handle constant columns

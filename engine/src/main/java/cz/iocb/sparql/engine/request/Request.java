@@ -6,11 +6,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.slf4j.Logger;
@@ -26,6 +24,7 @@ import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.error.TranslateMessage;
 import cz.iocb.sparql.engine.imcode.SqlSelect;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
+import cz.iocb.sparql.engine.mapping.classes.DerivedClass;
 import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -195,11 +194,6 @@ public class Request implements AutoCloseable
      * Cache of IRI class detections private to this request.
      */
     private final IriCache iriCache = new IriCache(10000);
-
-    /**
-     * IRI classes already found not to match an IRI, to avoid repeating database lookups.
-     */
-    private final Map<Iri, Set<IriClass>> missmatches = new HashMap<>();
 
     /**
      * Database connection, opened on first use.
@@ -842,12 +836,12 @@ public class Request implements AutoCloseable
 
 
     /**
-     * Class of the IRI: the first user IRI class that matches it (in check-cost order), or the unsupported IRI class;
-     * detections are cached.
+     * Class of the IRI: the intersection of the user IRI classes of the configuration the IRI belongs to, or the
+     * unsupported IRI class when it belongs to none (see {@link #detectIriClass(Iri, List)}); detections are cached.
      *
      * @param value the value
-     * @return class of the IRI: the first user IRI class that matches it (in check-cost order), or the unsupported IRI
-     *         class; detections are cached
+     * @return class of the IRI: the intersection of the user IRI classes of the configuration the IRI belongs to, or
+     *         the unsupported IRI class when it belongs to none
      */
     public ResourceClass getIriClass(Iri value)
     {
@@ -861,7 +855,7 @@ public class Request implements AutoCloseable
         if(iriClass != null)
             return iriClass;
 
-        iriClass = detectIriClass(value);
+        iriClass = detectIriClass(value, config.getIriClasses());
         List<Column> columns = iriClass.toColumns(this, value);
         iriCache.storeToCache(value, iriClass, columns);
 
@@ -908,24 +902,39 @@ public class Request implements AutoCloseable
 
 
     /**
-     * The first user IRI class matching the IRI, in check-cost order, or the unsupported IRI class.
+     * Class of the IRI among the given user IRI classes: the intersection of those the IRI belongs to, or the
+     * unsupported IRI class when it belongs to none. The classes are tried in the given order (the configuration lists
+     * the cheap checks first), skipping every class that a class already found makes needless: a superclass of a found
+     * class contains the IRI too and adds nothing to the intersection, and a class disjoint with a found class cannot
+     * contain the IRI. So once a class is found, only its subclasses and the classes declared to share IRIs with it
+     * ({@link SparqlDatabaseConfiguration#addIriClassOverlap}) are still tried, and two classes not declared so are
+     * never both found. The result is not cached.
      *
      * @param value the value
-     * @return the first user IRI class matching the IRI, in check-cost order, or the unsupported IRI class
+     * @param candidates the user IRI classes to try, in the order to try them
+     * @return class of the IRI among the given user IRI classes
      */
-    private ResourceClass detectIriClass(Iri value)
+    public ResourceClass detectIriClass(Iri value, List<UserIriClass> candidates)
     {
-        for(UserIriClass iriClass : getConfiguration().getIriClasses())
-            if(iriClass.match(this, value))
-                return iriClass;
+        Set<ResourceClass> found = new HashSet<>();
 
-        return BuiltinClasses.unsupportedIri;
+        for(UserIriClass candidate : candidates)
+            if(found.stream()
+                    .noneMatch(f -> f.isSubclassOf(candidate) || ResourceClass.areDisjunct(config, f, candidate)))
+                if(candidate.match(this, value))
+                    found.add(candidate);
+
+        if(found.isEmpty())
+            return BuiltinClasses.unsupportedIri;
+
+        return DerivedClass.intersect(config, found);
     }
 
 
     /**
-     * True if the term is representable in the class; for IRIs, the answer is served from the caches and negative
-     * answers are remembered, since matching may query the database.
+     * True if the term is representable in the class. An IRI belongs to a class of IRIs exactly when its detected class
+     * ({@link #getIriClass}) is a subclass of it, so the test is served from the caches instead of matching the class,
+     * which may query the database.
      *
      * @param resClass the resource class
      * @param term the RDF term
@@ -934,87 +943,50 @@ public class Request implements AutoCloseable
     public boolean match(ResourceClass resClass, RdfTerm term)
     {
         if(resClass instanceof IriClass iriClass && term instanceof Iri iri)
-        {
-            ResourceClass cachedClass = iriCache.getIriClass(iri);
-
-            if(cachedClass != null)
-                return iriClass.equals(cachedClass);
-
-            cachedClass = config.getIriCache().getIriClass(iri);
-
-            if(cachedClass != null)
-                return iriClass.equals(cachedClass);
-
-            Set<IriClass> set = missmatches.get(iri);
-
-            if(set != null && set.contains(iriClass))
-                return false;
-
-            if(iriClass.match(this, iri))
-            {
-                if(set != null)
-                    missmatches.remove(iri);
-
-                List<Column> columns = iriClass.toColumns(this, iri);
-                iriCache.storeToCache(iri, iriClass, columns);
-
-                return true;
-            }
-            else
-            {
-                if(set == null)
-                {
-                    set = new HashSet<>();
-                    missmatches.put(iri, set);
-                }
-
-                set.add(iriClass);
-
-                return false;
-            }
-        }
+            return getIriClass(iri).isSubclassOf(iriClass);
 
         return resClass.match(this, term);
     }
 
 
     /**
-     * Constant columns representing the term in the class, served from the IRI caches when possible.
+     * Constant columns representing the term in the class, served from the IRI caches for IRIs.
      *
      * @param resClass the resource class
      * @param term the RDF term
-     * @return constant columns representing the term in the class, served from the IRI caches when possible
+     * @return constant columns representing the term in the class, served from the IRI caches for IRIs
      */
     public List<Column> getColumns(ResourceClass resClass, RdfTerm term)
     {
-        if(resClass instanceof IriClass iriClass && term instanceof Iri iri)
-            return getColumns(iriClass, iri);
+        if(term instanceof Iri iri)
+            return getColumns(resClass, iri);
 
         return resClass.toColumns(this, term);
     }
 
 
     /**
-     * Constant columns representing the IRI in the class, served from the IRI caches when possible.
+     * Constant columns representing the IRI in the class, which has to be one of the classes the IRI belongs to; served
+     * from the IRI caches when possible.
      *
-     * @param iriClass the IRI class
+     * @param resClass the resource class
      * @param iri the IRI
      * @return constant columns representing the IRI in the class, served from the IRI caches when possible
      */
-    public List<Column> getColumns(IriClass iriClass, Iri iri)
+    public List<Column> getColumns(ResourceClass resClass, Iri iri)
     {
-        List<Column> columns = iriCache.getIriColumns(iri);
+        List<Column> columns = iriCache.getIriColumns(iri, resClass);
 
         if(columns != null)
             return columns;
 
-        columns = config.getIriCache().getIriColumns(iri);
+        columns = config.getIriCache().getIriColumns(iri, resClass);
 
         if(columns != null)
             return columns;
 
-        columns = iriClass.toColumns(this, iri);
-        iriCache.storeToCache(iri, iriClass, columns);
+        columns = resClass.toColumns(this, iri);
+        iriCache.storeColumns(iri, resClass, columns);
 
         return columns;
     }

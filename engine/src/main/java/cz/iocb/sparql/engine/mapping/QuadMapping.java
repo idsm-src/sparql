@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.mapping;
 
 import cz.iocb.sparql.engine.database.Conditions;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -167,6 +168,8 @@ public abstract class QuadMapping
     private boolean checkNodeCondition(Request request, RdfTerm term1, RdfTerm term2, TermMapping map1,
             TermMapping map2)
     {
+        ClassRelations relations = request.getConfiguration();
+
         if(!(term1 instanceof Variable && term2 instanceof Variable))
             return true;
 
@@ -176,7 +179,7 @@ public abstract class QuadMapping
         if(map1 instanceof ConstantMapping cmap1 && map2 instanceof ConstantMapping cmap2)
             return cmap1.getValue().equals(cmap2.getValue());
 
-        return !ResourceClass.areDisjunct(map1.getResourceClass(request), map2.getResourceClass(request));
+        return !ResourceClass.areDisjunct(relations, map1.getResourceClass(request), map2.getResourceClass(request));
     }
 
 

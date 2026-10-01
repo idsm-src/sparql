@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 
@@ -92,11 +93,12 @@ public class VariableBindingPair
     /**
      * Creates the pair, pairing every left class with every overlapping right class.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param variable the variable
      * @param leftVariableBinding binding on the left side, or null
      * @param rightVariableBinding binding on the right side, or null
      */
-    public VariableBindingPair(Variable variable, VariableBinding leftVariableBinding,
+    public VariableBindingPair(ClassRelations relations, Variable variable, VariableBinding leftVariableBinding,
             VariableBinding rightVariableBinding)
     {
         this.variable = variable;
@@ -122,7 +124,7 @@ public class VariableBindingPair
             {
                 for(ResourceClass rightClass : rightVariableBinding.getClasses())
                 {
-                    if(!ResourceClass.areDisjunct(leftClass, rightClass))
+                    if(!ResourceClass.areDisjunct(relations, leftClass, rightClass))
                     {
                         addClasses(leftClass, rightClass);
                         leftOthers.remove(leftClass);
@@ -143,12 +145,14 @@ public class VariableBindingPair
     /**
      * Creates the pair without naming the variable.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param leftVariableBinding binding on the left side, or null
      * @param rightVariableBinding binding on the right side, or null
      */
-    public VariableBindingPair(VariableBinding leftVariableBinding, VariableBinding rightVariableBinding)
+    public VariableBindingPair(ClassRelations relations, VariableBinding leftVariableBinding,
+            VariableBinding rightVariableBinding)
     {
-        this(null, leftVariableBinding, rightVariableBinding);
+        this(relations, null, leftVariableBinding, rightVariableBinding);
     }
 
 
@@ -167,11 +171,13 @@ public class VariableBindingPair
     /**
      * Pairs for the variables bound on both sides.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param left bindings of the left side
      * @param right bindings of the right side
      * @return pairs for the variables bound on both sides
      */
-    public static List<VariableBindingPair> getPairs(VariableBindings left, VariableBindings right)
+    public static List<VariableBindingPair> getPairs(ClassRelations relations, VariableBindings left,
+            VariableBindings right)
     {
         Set<Variable> varNames = new HashSet<>(left.getVariables());
         varNames.retainAll(right.getVariables());
@@ -179,7 +185,7 @@ public class VariableBindingPair
         List<VariableBindingPair> pairs = new ArrayList<>(varNames.size());
 
         for(Variable var : varNames)
-            pairs.add(new VariableBindingPair(var, left.get(var), right.get(var)));
+            pairs.add(new VariableBindingPair(relations, var, left.get(var), right.get(var)));
 
         return pairs;
     }

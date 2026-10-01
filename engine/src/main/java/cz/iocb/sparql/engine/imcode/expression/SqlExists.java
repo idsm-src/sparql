@@ -21,6 +21,7 @@ import cz.iocb.sparql.engine.imcode.SqlIntercode;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.imcode.SqlNoSolution;
 import cz.iocb.sparql.engine.imcode.SqlUnion;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBinding;
@@ -101,19 +102,22 @@ public final class SqlExists extends SqlExpressionIntercode
     public static SqlExpressionIntercode create(Request request, boolean negated, SqlIntercode pattern,
             VariableBindings bindings, Restriction restriction)
     {
+        ClassRelations relations = request.getConfiguration();
+
         if(pattern.equals(SqlNoSolution.get()))
             return negated ? trueValue : falseValue;
 
         if(pattern.equals(SqlEmptySolution.get()))
             return negated ? falseValue : trueValue;
 
-        List<VariableBindingPair> pairs = VariableBindingPair.getPairs(pattern.getVariableBindings(), bindings);
+        List<VariableBindingPair> pairs = VariableBindingPair.getPairs(relations, pattern.getVariableBindings(),
+                bindings);
 
         if(pairs.stream().anyMatch(p -> !p.isJoinable()))
             return negated ? trueValue : falseValue;
 
 
-        if(!restriction.contains(xsdBoolean))
+        if(!restriction.contains(relations, xsdBoolean))
             return new SqlExists(negated, pattern, singletonMap(xsdBoolean, null), bindings);
 
 
@@ -124,9 +128,9 @@ public final class SqlExists extends SqlExpressionIntercode
 
 
     @Override
-    public Restrictions getRequirements()
+    public Restrictions getRequirements(ClassRelations relations)
     {
-        return SqlIntercode.getJoinRestrictions(bindings, pattern.getVariableBindings(), new Restrictions());
+        return SqlIntercode.getJoinRestrictions(relations, bindings, pattern.getVariableBindings(), new Restrictions());
     }
 
 
@@ -134,10 +138,12 @@ public final class SqlExists extends SqlExpressionIntercode
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         SqlIntercode optPattern = pattern;
 
-        Restrictions restrictions = SqlIntercode.getJoinRestrictions(optPattern.getVariableBindings(), bindings,
-                new Restrictions());
+        Restrictions restrictions = SqlIntercode.getJoinRestrictions(relations, optPattern.getVariableBindings(),
+                bindings, new Restrictions());
 
         while(true)
         {
@@ -149,8 +155,8 @@ public final class SqlExists extends SqlExpressionIntercode
 
                 for(SqlIntercode child : union.getChilds())
                 {
-                    List<VariableBindingPair> pairs = VariableBindingPair.getPairs(child.getVariableBindings(),
-                            bindings);
+                    List<VariableBindingPair> pairs = VariableBindingPair.getPairs(relations,
+                            child.getVariableBindings(), bindings);
 
                     if(pairs.stream().allMatch(p -> p.isJoinable()))
                         unionList.add(child);
@@ -159,8 +165,8 @@ public final class SqlExists extends SqlExpressionIntercode
                 optPattern = SqlUnion.union(request, unionList).optimize(request, restrictions, true, evalServices);
             }
 
-            Restrictions optRestrictions = SqlIntercode.getJoinRestrictions(optPattern.getVariableBindings(), bindings,
-                    new Restrictions());
+            Restrictions optRestrictions = SqlIntercode.getJoinRestrictions(relations, optPattern.getVariableBindings(),
+                    bindings, new Restrictions());
 
             if(optRestrictions.equals(restrictions))
                 break;
@@ -190,6 +196,8 @@ public final class SqlExists extends SqlExpressionIntercode
     public static List<Column> translate(Request request, boolean negated, SqlIntercode pattern,
             VariableBindings bindings)
     {
+        ClassRelations relations = request.getConfiguration();
+
         //NOTE: rename pattern columns to prevent collisions
 
         Map<Column, Column> map = new HashMap<>();
@@ -230,7 +238,7 @@ public final class SqlExists extends SqlExpressionIntercode
 
         builder.append(") AS tab) AS tabcnd");
 
-        String condition = SqlIntercode.generateJoinCondition(cndBindings, bindings, null, null);
+        String condition = SqlIntercode.generateJoinCondition(relations, cndBindings, bindings, null, null);
 
         if(condition != null)
         {

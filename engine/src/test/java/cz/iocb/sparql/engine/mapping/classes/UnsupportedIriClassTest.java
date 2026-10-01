@@ -73,7 +73,7 @@ public class UnsupportedIriClassTest
     @Test
     void derivedMatchTest()
     {
-        ResourceClass other = subtract(iri, TestRequest.iriClass);
+        ResourceClass other = subtract(request.getConfiguration(), iri, TestRequest.iriClass);
         ResourceClass any = unionize(unsupportedIri, TestRequest.iriClass);
 
         assertTrue(other.match(request, unknown));

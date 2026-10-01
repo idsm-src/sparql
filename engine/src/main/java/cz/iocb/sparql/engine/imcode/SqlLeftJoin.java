@@ -20,6 +20,7 @@ import cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBinding;
@@ -140,18 +141,20 @@ public final class SqlLeftJoin extends SqlIntercode
     /**
      * False if the sides can never match or a condition is always false or an error.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param left the left side
      * @param right the right side
      * @param conditions the conditions
      * @return false if the sides can never match or a condition is always false or an error
      */
-    private static boolean isJoinable(SqlIntercode left, SqlIntercode right, List<SqlExpressionIntercode> conditions)
+    private static boolean isJoinable(ClassRelations relations, SqlIntercode left, SqlIntercode right,
+            List<SqlExpressionIntercode> conditions)
     {
         if(conditions.stream().anyMatch(f -> f.equals(SqlNull.get()) || f.equals(falseValue)
                 || f instanceof SqlBooleanExpression b && b.isFalseOrError()))
             return false;
 
-        return isJoinable(left, right);
+        return isJoinable(relations, left, right);
     }
 
 
@@ -216,6 +219,8 @@ public final class SqlLeftJoin extends SqlIntercode
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         SqlIntercode right = this.right;
 
         if(right instanceof SqlStripConstantColumns strip)
@@ -230,11 +235,11 @@ public final class SqlLeftJoin extends SqlIntercode
         Restrictions cndRestrictions = new Restrictions(restrictions);
 
         for(SqlExpressionIntercode condition : optConditions)
-            cndRestrictions.add(condition.getRequirements());
+            cndRestrictions.add(condition.getRequirements(relations));
 
-        Restrictions leftRestrictions = getJoinRestrictions(optLeft.getVariableBindings(),
+        Restrictions leftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
                 optRight.getVariableBindings(), cndRestrictions);
-        Restrictions rightRestrictions = getJoinRestrictions(optRight.getVariableBindings(),
+        Restrictions rightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
                 optLeft.getVariableBindings(), cndRestrictions);
 
 
@@ -250,8 +255,8 @@ public final class SqlLeftJoin extends SqlIntercode
                 List<SqlIntercode> unionList = new ArrayList<>();
 
                 for(SqlIntercode child : union.getChilds())
-                    if(isJoinable(optLeft, child, optimize(request, optConditions, optLeft.getVariableBindings(),
-                            child.getVariableBindings(), evalServices)))
+                    if(isJoinable(relations, optLeft, child, optimize(request, optConditions,
+                            optLeft.getVariableBindings(), child.getVariableBindings(), evalServices)))
                         unionList.add(child);
 
                 if(!unionList.equals(union.getChilds()))
@@ -270,11 +275,11 @@ public final class SqlLeftJoin extends SqlIntercode
             Restrictions newCndRestrictions = new Restrictions(restrictions);
 
             for(SqlExpressionIntercode condition : optConditions)
-                newCndRestrictions.add(condition.getRequirements());
+                newCndRestrictions.add(condition.getRequirements(relations));
 
-            Restrictions newLeftRestrictions = getJoinRestrictions(optLeft.getVariableBindings(),
+            Restrictions newLeftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
                     optRight.getVariableBindings(), newCndRestrictions);
-            Restrictions newRightRestrictions = getJoinRestrictions(optRight.getVariableBindings(),
+            Restrictions newRightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
                     optLeft.getVariableBindings(), newCndRestrictions);
 
 
@@ -292,7 +297,7 @@ public final class SqlLeftJoin extends SqlIntercode
             return SqlNoSolution.get();
 
         if(optRight.equals(SqlNoSolution.get()) || optRight.equals(SqlEmptySolution.get())
-                || !isJoinable(optLeft, optRight, optConditions))
+                || !isJoinable(relations, optLeft, optRight, optConditions))
             return optLeft.optimize(request, restrictions, optReduced, evalServices);
 
         //FIXME: valid only if it is ensured that optRight has at least one solution
@@ -318,7 +323,7 @@ public final class SqlLeftJoin extends SqlIntercode
         {
             DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
 
-            SqlIntercode merge = SqlTableAccess.tryReduceLeftJoin(schema, l, r, restrictions);
+            SqlIntercode merge = SqlTableAccess.tryReduceLeftJoin(relations, schema, l, r, restrictions);
 
             if(merge != null)
                 return merge;
@@ -326,7 +331,7 @@ public final class SqlLeftJoin extends SqlIntercode
 
 
         if(optLeft == left && optRight == right && optConditions.equals(conditions)
-                && restrictions.isOptimized(bindings))
+                && restrictions.isOptimized(relations, bindings))
             return this;
 
         return leftJoin(request, optLeft, optRight, optConditions, restrictions);
@@ -360,6 +365,8 @@ public final class SqlLeftJoin extends SqlIntercode
     @Override
     public String translate(Request request)
     {
+        ClassRelations relations = request.getConfiguration();
+
         StringBuilder builder = new StringBuilder();
 
         Set<Column> columns = bindings.getNonConstantColumns();
@@ -382,7 +389,8 @@ public final class SqlLeftJoin extends SqlIntercode
         builder.append(" ) AS ");
         builder.append(rightTable);
 
-        String condition = generateJoinCondition(left.bindings, right.getVariableBindings(), leftTable, rightTable);
+        String condition = generateJoinCondition(relations, left.bindings, right.getVariableBindings(), leftTable,
+                rightTable);
 
         builder.append(" ON ");
 
@@ -392,7 +400,8 @@ public final class SqlLeftJoin extends SqlIntercode
         if(condition != null && !conditions.isEmpty())
             builder.append(" AND ");
 
-        builder.append(conditions.stream().map(c -> c.get(xsdBoolean).get(0).toString()).collect(joining(" AND ")));
+        builder.append(
+                conditions.stream().map(c -> c.get(relations, xsdBoolean).get(0).toString()).collect(joining(" AND ")));
 
         if(condition == null && conditions.isEmpty())
             builder.append("true");

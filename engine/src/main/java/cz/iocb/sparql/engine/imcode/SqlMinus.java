@@ -9,6 +9,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBinding;
@@ -86,20 +87,22 @@ public final class SqlMinus extends SqlIntercode
     protected static SqlIntercode minus(Request request, SqlIntercode left, SqlIntercode right,
             Restrictions restrictions)
     {
-        return new SqlMinus(left.getVariableBindings().restrict(restrictions), left, right);
+        return new SqlMinus(left.getVariableBindings().restrict(request.getConfiguration(), restrictions), left, right);
     }
 
 
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         SqlIntercode optLeft = left;
         SqlIntercode optRight = right;
 
         boolean leftReduced = reduced & optRight.isDeterministic;
-        Restrictions leftRestrictions = getJoinRestrictions(optLeft.getVariableBindings(),
+        Restrictions leftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
                 optRight.getVariableBindings(), restrictions);
-        Restrictions rightRestrictions = getJoinRestrictions(optRight.getVariableBindings(),
+        Restrictions rightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
                 optLeft.getVariableBindings(), new Restrictions());
 
         while(true)
@@ -112,7 +115,7 @@ public final class SqlMinus extends SqlIntercode
                 List<SqlIntercode> unionList = new ArrayList<>();
 
                 for(SqlIntercode child : union.getChilds())
-                    if(isJoinable(optLeft, child))
+                    if(isJoinable(relations, optLeft, child))
                         unionList.add(child);
 
                 if(!unionList.equals(union.getChilds()))
@@ -120,9 +123,9 @@ public final class SqlMinus extends SqlIntercode
             }
 
             boolean newLeftReduced = reduced & optRight.isDeterministic;
-            Restrictions newLeftRestrictions = getJoinRestrictions(optLeft.getVariableBindings(),
+            Restrictions newLeftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
                     optRight.getVariableBindings(), restrictions);
-            Restrictions newRightRestrictions = getJoinRestrictions(optRight.getVariableBindings(),
+            Restrictions newRightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
                     optLeft.getVariableBindings(), new Restrictions());
 
 
@@ -139,7 +142,7 @@ public final class SqlMinus extends SqlIntercode
 
         boolean shareVariables = false;
 
-        for(VariableBindingPair pair : VariableBindingPair.getPairs(optLeft.getVariableBindings(),
+        for(VariableBindingPair pair : VariableBindingPair.getPairs(relations, optLeft.getVariableBindings(),
                 optRight.getVariableBindings()))
         {
             if(pair.getLeftVariableBinding() != null && pair.getRightVariableBinding() != null)
@@ -163,7 +166,7 @@ public final class SqlMinus extends SqlIntercode
         }
 
 
-        if(restrictions.isOptimized(bindings) && optLeft == left && optRight == right)
+        if(restrictions.isOptimized(relations, bindings) && optLeft == left && optRight == right)
             return this;
 
         return minus(request, optLeft, optRight, restrictions);
@@ -173,6 +176,8 @@ public final class SqlMinus extends SqlIntercode
     @Override
     public String translate(Request request)
     {
+        ClassRelations relations = request.getConfiguration();
+
         StringBuilder builder = new StringBuilder();
 
         builder.append("SELECT ");
@@ -194,8 +199,8 @@ public final class SqlMinus extends SqlIntercode
         builder.append(") AS ");
         builder.append(rightTable);
 
-        String condition = generateCondition(left.getVariableBindings(), right.getVariableBindings(), leftTable,
-                rightTable);
+        String condition = generateCondition(relations, left.getVariableBindings(), right.getVariableBindings(),
+                leftTable, rightTable);
 
         if(condition != null)
         {
@@ -213,6 +218,7 @@ public final class SqlMinus extends SqlIntercode
      * SQL condition that a right solution removes a left one: the shared variables are compatible and at least one of
      * them is bound on both sides.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param left bindings of the left side
      * @param right bindings of the right side
      * @param leftTable the left table
@@ -220,12 +226,12 @@ public final class SqlMinus extends SqlIntercode
      * @return SQL condition that a right solution removes a left one: the shared variables are compatible and at least
      *         one of them is bound on both sides
      */
-    private String generateCondition(VariableBindings left, VariableBindings right, AliasTable leftTable,
-            AliasTable rightTable)
+    private String generateCondition(ClassRelations relations, VariableBindings left, VariableBindings right,
+            AliasTable leftTable, AliasTable rightTable)
     {
-        String joinCondition = generateJoinCondition(left, right, leftTable, rightTable);
+        String joinCondition = generateJoinCondition(relations, left, right, leftTable, rightTable);
 
-        List<VariableBindingPair> pairs = VariableBindingPair.getPairs(left, right);
+        List<VariableBindingPair> pairs = VariableBindingPair.getPairs(relations, left, right);
 
         for(VariableBindingPair pair : pairs)
             if(pair.getLeftVariableBinding() != null && pair.getRightVariableBinding() != null)

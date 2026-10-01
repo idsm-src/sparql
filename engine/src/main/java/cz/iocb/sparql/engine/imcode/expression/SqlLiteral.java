@@ -10,6 +10,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Literal;
@@ -119,7 +120,7 @@ public final class SqlLiteral extends SqlExpressionIntercode
 
 
     @Override
-    public Restrictions getRequirements()
+    public Restrictions getRequirements(ClassRelations relations)
     {
         return new Restrictions();
     }
@@ -129,7 +130,7 @@ public final class SqlLiteral extends SqlExpressionIntercode
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
-        if(restriction.isOptimized(variableBinding))
+        if(restriction.isOptimized(request.getConfiguration(), variableBinding))
             return this;
 
         return create(request, literal, restriction);

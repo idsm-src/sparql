@@ -96,6 +96,7 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
 import cz.iocb.sparql.engine.mapping.classes.DateInZoneClass;
 import cz.iocb.sparql.engine.mapping.classes.DateTimeInZone;
@@ -151,13 +152,15 @@ public final class SqlCast extends SqlUnary
     /**
      * Cast of the operand to the canonical literal class of a datatype.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param resourceClass the class to cast to
      * @param operand the operand
      * @return cast of the operand to the canonical literal class of a datatype
      */
-    public static SqlExpressionIntercode create(LiteralClass resourceClass, SqlExpressionIntercode operand)
+    public static SqlExpressionIntercode create(ClassRelations relations, LiteralClass resourceClass,
+            SqlExpressionIntercode operand)
     {
-        return create(resourceClass, operand, Restriction.ALL);
+        return create(relations, resourceClass, operand, Restriction.ALL);
     }
 
 
@@ -165,14 +168,15 @@ public final class SqlCast extends SqlUnary
      * Cast materialising only the needed result; a date or date-time cast of a constant-zone operand yields the class
      * of that zone.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param castClass the class to cast to
      * @param operand the operand
      * @param restriction the result classes the parent needs
      * @return cast materialising only the needed result; a date or date-time cast of a constant-zone operand yields the
      *         class of that zone
      */
-    public static SqlExpressionIntercode create(LiteralClass castClass, SqlExpressionIntercode operand,
-            Restriction restriction)
+    public static SqlExpressionIntercode create(ClassRelations relations, LiteralClass castClass,
+            SqlExpressionIntercode operand, Restriction restriction)
     {
         //TODO: add support for casting to user literals
 
@@ -204,7 +208,7 @@ public final class SqlCast extends SqlUnary
                 {
                     Integer zone = extractConstantZone(e.getKey());
                     LiteralClass resultClass = createConstantZoneResultClass(castClass, zone);
-                    Column column = translate(e.getValue(), e.getKey(), resultClass, partCanBeNull);
+                    Column column = translate(relations, e.getValue(), e.getKey(), resultClass, partCanBeNull);
                     variants.computeIfAbsent(resultClass, _ -> new HashSet<>()).add(column);
                 }
             }
@@ -213,7 +217,7 @@ public final class SqlCast extends SqlUnary
 
             for(Entry<ResourceClass, Set<Column>> e : variants.entrySet())
             {
-                if(!restriction.contains(e.getKey()))
+                if(!restriction.contains(relations, e.getKey()))
                     mappings.put(e.getKey(), null);
                 else
                     mappings.put(e.getKey(), List.of(coalesce(e.getValue())));
@@ -223,7 +227,7 @@ public final class SqlCast extends SqlUnary
         }
 
 
-        if(!restriction.contains(castClass))
+        if(!restriction.contains(relations, castClass))
             return new SqlCast(castClass, operand, singletonMap(castClass, null), canBeNull);
 
 
@@ -231,7 +235,7 @@ public final class SqlCast extends SqlUnary
 
         for(Entry<ResourceClass, List<Column>> e : operand.getMappings().entrySet())
             if(isCastable(e.getKey(), castClass))
-                variants.add(translate(e.getValue(), e.getKey(), castClass, partCanBeNull));
+                variants.add(translate(relations, e.getValue(), e.getKey(), castClass, partCanBeNull));
 
         Column result = coalesce(variants);
 
@@ -280,19 +284,21 @@ public final class SqlCast extends SqlUnary
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         Restriction operandRestriction = new Restriction();
 
-        if(restriction.contains(resourceClass))
+        if(restriction.contains(relations, resourceClass))
             for(ResourceClass resClass : operand.getResourceClasses())
                 if(isCastable(resClass, resourceClass))
                     operandRestriction.add(resClass);
 
         SqlExpressionIntercode optOperand = operand.optimize(request, bindings, operandRestriction, evalServices);
 
-        if(optOperand == operand && restriction.isOptimized(variableBinding))
+        if(optOperand == operand && restriction.isOptimized(relations, variableBinding))
             return this;
 
-        return create(resourceClass, optOperand, restriction);
+        return create(relations, resourceClass, optOperand, restriction);
     }
 
 
@@ -411,14 +417,15 @@ public final class SqlCast extends SqlUnary
     /**
      * SQL expression casting a value of {@code resClass} held in the columns to {@code castClass}.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param columns the columns
      * @param resClass the resource class
      * @param castClass the class to cast to
      * @param partCanBeNull whether the source columns may be null
      * @return SQL expression casting a value of {@code resClass} held in the columns to {@code castClass}
      */
-    public static Column translate(List<Column> columns, ResourceClass resClass, LiteralClass castClass,
-            boolean partCanBeNull)
+    public static Column translate(ClassRelations relations, List<Column> columns, ResourceClass resClass,
+            LiteralClass castClass, boolean partCanBeNull)
     {
         ResourceClass effClass = resClass.getEffectiveClass();
         StringBuilder builder = new StringBuilder();

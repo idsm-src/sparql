@@ -61,6 +61,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
 import cz.iocb.sparql.engine.mapping.classes.DateInZoneClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -296,29 +297,31 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     /**
      * Comparison of the operands.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operator the operator
      * @param left the left operand
      * @param right the right operand
      * @return comparison of the operands
      */
-    public static SqlExpressionIntercode create(ComparisonOperator operator, SqlExpressionIntercode left,
-            SqlExpressionIntercode right)
+    public static SqlExpressionIntercode create(ClassRelations relations, ComparisonOperator operator,
+            SqlExpressionIntercode left, SqlExpressionIntercode right)
     {
-        return create(operator, left, right, Restriction.ALL);
+        return create(relations, operator, left, right, Restriction.ALL);
     }
 
 
     /**
      * Comparison materialising only the needed result; constant when the classes decide it.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operator the operator
      * @param left the left operand
      * @param right the right operand
      * @param restriction the result classes the parent needs
      * @return comparison materialising only the needed result; constant when the classes decide it
      */
-    private static SqlExpressionIntercode create(ComparisonOperator operator, SqlExpressionIntercode left,
-            SqlExpressionIntercode right, Restriction restriction)
+    private static SqlExpressionIntercode create(ClassRelations relations, ComparisonOperator operator,
+            SqlExpressionIntercode left, SqlExpressionIntercode right, Restriction restriction)
     {
         if(left instanceof SqlIri a && right instanceof SqlIri b)
         {
@@ -341,7 +344,7 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
         {
             for(ResourceClass rightClass : right.getMappings().keySet())
             {
-                switch(areComparable(operator, leftClass, rightClass))
+                switch(areComparable(relations, operator, leftClass, rightClass))
                 {
                     case DIFFERENT ->
                     {
@@ -381,12 +384,14 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
 
 
         List<SqlExpressionIntercode> operands = List.of(left, right);
-        Map<ResourceClass, Set<List<Set<ResourceClass>>>> resMap = processResultMap(operands, map, restriction);
+        Map<ResourceClass, Set<List<Set<ResourceClass>>>> resMap = processResultMap(relations, operands, map,
+                restriction);
 
         Map<ResourceClass, List<Column>> mappings = new HashMap<>();
 
         for(Entry<ResourceClass, Set<List<Set<ResourceClass>>>> e : resMap.entrySet())
-            mappings.put(e.getKey(), e.getValue() == null ? null : translate(operator, e.getValue(), left, right));
+            mappings.put(e.getKey(),
+                    e.getValue() == null ? null : translate(relations, operator, e.getValue(), left, right));
 
         NonConstantBooleanValue value = switch(operator)
         {
@@ -402,12 +407,14 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     /**
      * Outcome of comparing values of the two classes with the operator, decided from the classes alone.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operator the operator
      * @param l class on the left side
      * @param r class on the right side
      * @return outcome of comparing values of the two classes with the operator, decided from the classes alone
      */
-    protected static ComparisonType areComparable(ComparisonOperator operator, ResourceClass l, ResourceClass r)
+    protected static ComparisonType areComparable(ClassRelations relations, ComparisonOperator operator,
+            ResourceClass l, ResourceClass r)
     {
         boolean equalityComparison = (operator == EQUAL || operator == NOT_EQUAL);
 
@@ -419,7 +426,8 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             return ComparisonType.NOT_NULL;
 
         if(isString(l) && isString(r))
-            return (equalityComparison && areDisjunct(l, r)) ? ComparisonType.DIFFERENT : ComparisonType.NOT_NULL;
+            return (equalityComparison && areDisjunct(relations, l, r)) ? ComparisonType.DIFFERENT :
+                    ComparisonType.NOT_NULL;
 
         if(isBoolean(l) && isBoolean(r))
             return ComparisonType.NOT_NULL;
@@ -448,13 +456,13 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
         if(!equalityComparison)
             return ComparisonType.NULL;
 
-        if(isLiteral(l) && isLiteral(r) && areDisjunct(l, r))
+        if(isLiteral(l) && isLiteral(r) && areDisjunct(relations, l, r))
             return ComparisonType.NULL;
 
         if(hasLiteral(l) && hasLiteral(r))
             return ComparisonType.FULL;
 
-        if(areDisjunct(l, r))
+        if(areDisjunct(relations, l, r))
             return ComparisonType.DIFFERENT;
 
         return ComparisonType.NOT_NULL;
@@ -464,19 +472,20 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     /**
      * Comparison mode covering all pairs of operand classes.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operator the operator
      * @param left classes of the left operand
      * @param right classes of the right operand
      * @return comparison mode covering all pairs of operand classes
      */
-    private static ComparisonMode getComparisonMode(ComparisonOperator operator, Set<ResourceClass> left,
-            Set<ResourceClass> right)
+    private static ComparisonMode getComparisonMode(ClassRelations relations, ComparisonOperator operator,
+            Set<ResourceClass> left, Set<ResourceClass> right)
     {
         ComparisonMode result = null;
 
         for(ResourceClass l : estimateAsUnion(left))
             for(ResourceClass r : estimateAsUnion(right))
-                result = mergeComparisonTypes(result, determineComparisonMode(operator, l, r));
+                result = mergeComparisonTypes(result, determineComparisonMode(relations, operator, l, r));
 
         return result;
     }
@@ -486,14 +495,15 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
      * Comparison mode of a pair of classes according to the SPARQL operator mapping; equality of dates in zones
      * differing by less than a day is handled specially.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operator the operator
      * @param left class of the left operand
      * @param right class of the right operand
      * @return comparison mode of a pair of classes according to the SPARQL operator mapping; equality of dates in zones
      *         differing by less than a day is handled specially
      */
-    private static ComparisonMode determineComparisonMode(ComparisonOperator operator, ResourceClass left,
-            ResourceClass right)
+    private static ComparisonMode determineComparisonMode(ClassRelations relations, ComparisonOperator operator,
+            ResourceClass left, ResourceClass right)
     {
         // special treatment for dates with constant timezones
 
@@ -535,9 +545,9 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
         else if(hasString(left) && hasString(right))
             return ComparisonMode.BOX;
         else if(isLiteral(left) && isLiteral(right))
-            return ResourceClass.areDisjunct(left, right) ? ComparisonMode.NULL : ComparisonMode.LITERAL;
+            return ResourceClass.areDisjunct(relations, left, right) ? ComparisonMode.NULL : ComparisonMode.LITERAL;
         else if(!hasLiteral(left) && !hasLiteral(right))
-            return ResourceClass.areDisjunct(left, right) ? ComparisonMode.DIFF : ComparisonMode.DIRECT;
+            return ResourceClass.areDisjunct(relations, left, right) ? ComparisonMode.DIFF : ComparisonMode.DIRECT;
         else
             return ComparisonMode.BOX;
     }
@@ -585,27 +595,29 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     /**
      * SQL of the comparison as a COALESCE over the argument class combinations.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operator the operator
      * @param variants combinations of argument classes
      * @param left the left operand
      * @param right the right operand
      * @return SQL of the comparison as a COALESCE over the argument class combinations
      */
-    private static List<Column> translate(ComparisonOperator operator, Set<List<Set<ResourceClass>>> variants,
-            SqlExpressionIntercode left, SqlExpressionIntercode right)
+    private static List<Column> translate(ClassRelations relations, ComparisonOperator operator,
+            Set<List<Set<ResourceClass>>> variants, SqlExpressionIntercode left, SqlExpressionIntercode right)
     {
         if(variants == null)
             return null;
 
-        return List.of(Column.coalesce(
-                variants.stream().map(v -> new ExpressionColumn(translate(operator, v.get(0), v.get(1), left, right)))
-                        .collect(toSet())));
+        return List.of(Column.coalesce(variants.stream()
+                .map(v -> new ExpressionColumn(translate(relations, operator, v.get(0), v.get(1), left, right)))
+                .collect(toSet())));
     }
 
 
     /**
      * SQL comparing the operands taken in the given classes, according to their comparison mode.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operator the operator
      * @param lset classes of the left operand
      * @param rset classes of the right operand
@@ -613,15 +625,15 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
      * @param right the right operand
      * @return SQL comparing the operands taken in the given classes, according to their comparison mode
      */
-    private static String translate(ComparisonOperator operator, Set<ResourceClass> lset, Set<ResourceClass> rset,
-            SqlExpressionIntercode left, SqlExpressionIntercode right)
+    private static String translate(ClassRelations relations, ComparisonOperator operator, Set<ResourceClass> lset,
+            Set<ResourceClass> rset, SqlExpressionIntercode left, SqlExpressionIntercode right)
     {
-        return switch(getComparisonMode(operator, lset, rset))
+        return switch(getComparisonMode(relations, operator, lset, rset))
         {
             case BOOLEAN ->
             {
-                Column cl = left.get(genBoolean).get(0);
-                Column cr = right.get(genBoolean).get(0);
+                Column cl = left.get(relations, genBoolean).get(0);
+                Column cr = right.get(relations, genBoolean).get(0);
                 yield "(" + cl + " " + operator.getText() + " " + cr + ")";
             }
 
@@ -644,22 +656,22 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             case DATETIME ->
             {
                 //FIXME: we assume that genScalarDateTime is equivalent to genDateTime
-                Column cl = left.get(genDateTime).get(0);
-                Column cr = right.get(genDateTime).get(0);
+                Column cl = left.get(relations, genDateTime).get(0);
+                Column cr = right.get(relations, genDateTime).get(0);
                 yield "(" + cl + " " + operator.getText() + " " + cr + ")";
             }
 
             case DATE ->
             {
-                Column cl = left.get(genScalarDate).get(0);
-                Column cr = right.get(genScalarDate).get(0);
+                Column cl = left.get(relations, genScalarDate).get(0);
+                Column cr = right.get(relations, genScalarDate).get(0);
                 yield "(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")";
             }
 
             case DATE_SAME_TZ ->
             {
-                Column cl = left.get(genDate).get(0);
-                Column cr = right.get(genDate).get(0);
+                Column cl = left.get(relations, genDate).get(0);
+                Column cr = right.get(relations, genDate).get(0);
                 yield "(" + cl + " " + operator.getText() + " " + cr + ")";
             }
 
@@ -674,8 +686,8 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                     default -> operator;
                 };
 
-                Column cl = left.get(genDate).get(0);
-                Column cr = right.get(genDate).get(0);
+                Column cl = left.get(relations, genDate).get(0);
+                Column cr = right.get(relations, genDate).get(0);
                 yield "(" + cl + " " + effectiveOperator.getText() + " " + cr + ")";
             }
 
@@ -690,15 +702,15 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                     default -> operator;
                 };
 
-                Column cl = left.get(genDate).get(0);
-                Column cr = right.get(genDate).get(0);
+                Column cl = left.get(relations, genDate).get(0);
+                Column cr = right.get(relations, genDate).get(0);
                 yield "(" + cl + " " + effectiveOperator.getText() + " " + cr + ")";
             }
 
             case BOX ->
             {
-                Column cl = left.get(unionize(lset, box)).get(0);
-                Column cr = right.get(unionize(rset, box)).get(0);
+                Column cl = left.get(relations, unionize(lset, box)).get(0);
+                Column cr = right.get(relations, unionize(rset, box)).get(0);
                 yield "(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")";
             }
 
@@ -718,13 +730,13 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                 ResourceClass cmp = unionize(classes);
 
                 //NOTE: to ensure that the expression column is not used more than once during conversion
-                if(left.hasExpressionColumn(lset) || right.hasExpressionColumn(rset))
+                if(left.hasExpressionColumn(relations, lset) || right.hasExpressionColumn(relations, rset))
                     cmp = getExpressionClass(classes);
 
                 //FIXME: use correct compare operator, when unionClass is rdfbox
 
-                List<Column> cl = left.get(cmp);
-                List<Column> cr = right.get(cmp);
+                List<Column> cl = left.get(relations, cmp);
+                List<Column> cr = right.get(relations, cmp);
 
                 if(operator == EQUAL)
                     yield getIdentityConditions(cmp, cl, cr).stream().collect(joining(" AND ", "(", ")"));
@@ -742,13 +754,13 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                 ResourceClass cmp = unionize(classes);
 
                 //NOTE: to ensure that the expression column is not used more than once during conversion
-                if(left.hasExpressionColumn(lset) || right.hasExpressionColumn(rset))
+                if(left.hasExpressionColumn(relations, lset) || right.hasExpressionColumn(relations, rset))
                     cmp = getExpressionClass(classes);
 
                 //FIXME: use correct compare operator, when unionClass is rdfbox or user type
 
-                List<Column> cl = left.get(cmp);
-                List<Column> cr = right.get(cmp);
+                List<Column> cl = left.get(relations, cmp);
+                List<Column> cr = right.get(relations, cmp);
 
                 if(operator == EQUAL)
                     yield getIdentityConditions(cmp, cl, cr).stream().collect(joining(" AND ", "NULLIF(", ", false)"));
@@ -829,16 +841,18 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         Restriction leftSet = new Restriction();
         Restriction rightSet = new Restriction();
 
-        if(restriction.contains(xsdBoolean))
+        if(restriction.contains(relations, xsdBoolean))
         {
             for(ResourceClass leftClass : left.getMappings().keySet())
             {
                 for(ResourceClass rightClass : right.getMappings().keySet())
                 {
-                    if(areComparable(operator, leftClass, rightClass) != ComparisonType.NULL)
+                    if(areComparable(relations, operator, leftClass, rightClass) != ComparisonType.NULL)
                     {
                         leftSet.add(leftClass);
                         rightSet.add(rightClass);
@@ -850,10 +864,10 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
         SqlExpressionIntercode optLeft = left.optimize(request, bindings, leftSet, evalServices);
         SqlExpressionIntercode optRight = right.optimize(request, bindings, rightSet, evalServices);
 
-        if(optLeft == left && optRight == right && restriction.isOptimized(variableBinding))
+        if(optLeft == left && optRight == right && restriction.isOptimized(relations, variableBinding))
             return this;
 
-        return create(operator, optLeft, optRight, restriction);
+        return create(relations, operator, optLeft, optRight, restriction);
     }
 
 

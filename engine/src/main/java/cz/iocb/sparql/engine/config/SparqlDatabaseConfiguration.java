@@ -73,6 +73,7 @@ import cz.iocb.sparql.engine.mapping.QuadMapping;
 import cz.iocb.sparql.engine.mapping.SingleTableQuadMapping;
 import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
@@ -96,7 +97,7 @@ import info.adams.ryu.RyuFloat;
  * register their definitions in the constructor; the endpoint instantiates it through JNDI, which requires a
  * {@code (String service, DataSource, DatabaseSchema)} constructor.
  */
-public class SparqlDatabaseConfiguration
+public class SparqlDatabaseConfiguration implements ClassRelations
 {
     /**
      * IRI of this endpoint's service, or null.
@@ -142,6 +143,12 @@ public class SparqlDatabaseConfiguration
      * User IRI classes by name.
      */
     protected Map<String, UserIriClass> iriClassMap = new HashMap<>();
+
+    /**
+     * Pairs of registered user IRI classes declared to share IRIs although neither is a subclass of the other
+     * ({@link #addIriClassOverlap}), as a symmetric adjacency: the classes each class may overlap with.
+     */
+    protected Map<UserIriClass, Set<UserIriClass>> iriClassOverlaps = new HashMap<>();
 
     /**
      * This service followed by the imported services.
@@ -316,10 +323,15 @@ public class SparqlDatabaseConfiguration
 
 
     /**
-     * Registers a user IRI class. Classes are kept ordered by {@link UserIriClass#getCheckCost}, so IRI class detection
-     * tries the cheap ones first.
+     * Registers a user IRI class. Two registered classes that are neither equal nor related (one a subclass of the
+     * other) are taken as disjoint, which lets the translator prune joins and comparisons between them, and lets the
+     * detection of the class of an IRI ({@link cz.iocb.sparql.engine.request.Request#getIriClass}) skip the classes
+     * disjoint with a class already found; classes that do share IRIs are declared by
+     * {@link #addIriClassOverlap(UserIriClass, UserIriClass)}. Classes are kept ordered by
+     * {@link UserIriClass#getCheckCost}, so the detection tries the cheap ones first.
      *
      * @param iriClass the user IRI class
+     * @throws IllegalArgumentException if a different class is already registered under the same name
      */
     public void addIriClass(UserIriClass iriClass)
     {
@@ -336,6 +348,46 @@ public class SparqlDatabaseConfiguration
             throw new IllegalArgumentException(
                     "resource class definition conflict for iri class '" + iriClass.getResourceName() + "'");
         }
+    }
+
+
+    /**
+     * Declares that two registered user IRI classes, neither of which is a subclass of the other, may share IRIs. The
+     * declaration concerns exactly these two classes and does not extend to their subclasses, which stay disjoint with
+     * the other class unless declared too. It belongs to the configuration, as whether two classes overlap depends on
+     * the classes registered together, and the configuration supplies it to the class algebra as the
+     * {@link ClassRelations}.
+     *
+     * @param a one user IRI class
+     * @param b the other user IRI class
+     * @throws IllegalArgumentException if a class is not registered, or the classes are equal or related
+     */
+    public void addIriClassOverlap(UserIriClass a, UserIriClass b)
+    {
+        for(UserIriClass iriClass : List.of(a, b))
+            if(!iriClass.equals(iriClassMap.get(iriClass.getResourceName())))
+                throw new IllegalArgumentException("iri class '" + iriClass.getResourceName() + "' is not registered");
+
+        if(a.isSubclassOf(b) || b.isSubclassOf(a))
+            throw new IllegalArgumentException("iri classes '" + a.getResourceName() + "' and '" + b.getResourceName()
+                    + "' are equal or related, so they overlap anyway");
+
+        iriClassOverlaps.computeIfAbsent(a, _ -> new HashSet<>()).add(b);
+        iriClassOverlaps.computeIfAbsent(b, _ -> new HashSet<>()).add(a);
+    }
+
+
+    /**
+     * True if the two user IRI classes, which are neither equal nor related, are declared to share IRIs by
+     * {@link #addIriClassOverlap(UserIriClass, UserIriClass)}. The configuration is passed as the
+     * {@link ClassRelations} to the class algebra wherever disjointness is decided.
+     */
+    @Override
+    public boolean mayOverlap(UserIriClass a, UserIriClass b)
+    {
+        Set<UserIriClass> overlaps = iriClassOverlaps.get(a);
+
+        return overlaps != null && overlaps.contains(b);
     }
 
 
@@ -927,6 +979,10 @@ public class SparqlDatabaseConfiguration
 
         for(UserIriClass iriClass : other.getIriClasses())
             addIriClass(iriClass);
+
+        for(Entry<UserIriClass, Set<UserIriClass>> entry : other.iriClassOverlaps.entrySet())
+            for(UserIriClass overlapping : entry.getValue())
+                addIriClassOverlap(entry.getKey(), overlapping);
 
         for(Entry<VirtualTable, VirtualTableDefinition> entry : other.getVirtualTables().entrySet())
             addVirtualTable(entry.getKey(), entry.getValue());

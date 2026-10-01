@@ -75,6 +75,22 @@ public sealed abstract class PrimitiveResourceClass extends ResourceClass
     }
 
 
+    /**
+     * True if no term belongs to both this class and the given one. Two primitive classes are disjoint when neither is
+     * a subclass of the other, unless a class refines the test: two triple term classes may overlap through their
+     * components ({@link TripleTermClass}), and two user IRI classes may overlap when the declarations of the
+     * configuration say so ({@link UserIriClass}). The test is symmetric.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param resClass the resource class
+     * @return true if no term belongs to both this class and the given one, false otherwise
+     */
+    protected boolean isDisjunctWith(ClassRelations relations, PrimitiveResourceClass resClass)
+    {
+        return !isSubclassOf(resClass) && !resClass.isSubclassOf(this);
+    }
+
+
     @Override
     public final List<SqlType> getSqlTypes()
     {
@@ -90,6 +106,36 @@ public sealed abstract class PrimitiveResourceClass extends ResourceClass
     public Set<PrimitiveResourceClass> getSuperClasses()
     {
         return superClasses;
+    }
+
+
+    /**
+     * Class through which values are converted between two primitive classes when neither converts to the other
+     * directly: a minimal class among their common superclasses (the classes themselves included), chosen like the
+     * effective class of a derived class when several are minimal. Every class of RDF terms converts to the box, so two
+     * such classes always have one.
+     *
+     * @param a one class
+     * @param b the other class
+     * @return a minimal common superclass of the classes
+     * @throws IllegalArgumentException if the classes have no common superclass
+     */
+    public static PrimitiveResourceClass getCommonSuperclass(PrimitiveResourceClass a, PrimitiveResourceClass b)
+    {
+        Set<PrimitiveResourceClass> candidates = new HashSet<>(a.superClasses);
+        candidates.add(a);
+
+        Set<PrimitiveResourceClass> others = new HashSet<>(b.superClasses);
+        others.add(b);
+
+        candidates.retainAll(others);
+
+        PrimitiveResourceClass common = DerivedClass.select(DerivedClass.reduceSuperclasses(candidates));
+
+        if(common == null)
+            throw new IllegalArgumentException("classes " + a + " and " + b + " have no common superclass");
+
+        return common;
     }
 
 

@@ -25,6 +25,7 @@ import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
@@ -158,17 +159,18 @@ public abstract class SqlIntercode extends SqlBaseClass
         /**
          * True if the variable is needed in some class overlapping the given one.
          *
+         * @param relations declarations which unrelated user IRI classes may overlap
          * @param var the variable
          * @param resClass the resource class
          * @return true if the variable is needed in some class overlapping the given one, false otherwise
          */
-        public boolean contains(Variable var, ResourceClass resClass)
+        public boolean contains(ClassRelations relations, Variable var, ResourceClass resClass)
         {
             if(!map.containsKey(var))
                 return false;
 
             for(ResourceClass r : map.get(var))
-                if(!ResourceClass.areDisjunct(r, resClass))
+                if(!ResourceClass.areDisjunct(relations, r, resClass))
                     return true;
 
             return false;
@@ -178,12 +180,13 @@ public abstract class SqlIntercode extends SqlBaseClass
         /**
          * True if restricting the bindings would drop a variable or the columns of some class.
          *
+         * @param relations declarations which unrelated user IRI classes may overlap
          * @param bindings the variable bindings
          * @return true if restricting the bindings would drop a variable or the columns of some class, false otherwise
          */
-        public boolean canBeOptimized(VariableBindings bindings)
+        public boolean canBeOptimized(ClassRelations relations, VariableBindings bindings)
         {
-            VariableBindings opt = bindings.restrict(this);
+            VariableBindings opt = bindings.restrict(relations, this);
 
             for(VariableBinding binding : bindings.getValues())
             {
@@ -239,14 +242,15 @@ public abstract class SqlIntercode extends SqlBaseClass
         /**
          * True if the variable is needed in some class overlapping one of the given ones.
          *
+         * @param relations declarations which unrelated user IRI classes may overlap
          * @param var the variable
          * @param classes the classes
          * @return true if the variable is needed in some class overlapping one of the given ones, false otherwise
          */
-        public boolean contains(Variable var, Set<ResourceClass> classes)
+        public boolean contains(ClassRelations relations, Variable var, Set<ResourceClass> classes)
         {
             for(ResourceClass c : classes)
-                if(contains(var, c))
+                if(contains(relations, var, c))
                     return true;
 
             return false;
@@ -307,12 +311,13 @@ public abstract class SqlIntercode extends SqlBaseClass
         /**
          * True if the bindings materialise exactly what is needed.
          *
+         * @param relations declarations which unrelated user IRI classes may overlap
          * @param bindings the variable bindings
          * @return true if the bindings materialise exactly what is needed, false otherwise
          */
-        public boolean isOptimized(VariableBindings bindings)
+        public boolean isOptimized(ClassRelations relations, VariableBindings bindings)
         {
-            return bindings.restrict(this).equals(bindings);
+            return bindings.restrict(relations, this).equals(bindings);
         }
 
 
@@ -514,11 +519,12 @@ public abstract class SqlIntercode extends SqlBaseClass
      * combinations of one class per child whose classes pairwise overlap. The intersections are pairwise disjoint, as
      * two combinations differ in the class taken from some child, and the classes of one child are disjoint.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param defs bindings of the variable in the children where it is always bound
      * @return classes a variable can take in a join where it is always bound in the given children: the intersections
      *         of the combinations of one class per child whose classes pairwise overlap
      */
-    private static Set<ResourceClass> joinResourceClasses(List<VariableBinding> defs)
+    private static Set<ResourceClass> joinResourceClasses(ClassRelations relations, List<VariableBinding> defs)
     {
         List<Set<ResourceClass>> result = List.of(Set.of());
 
@@ -528,13 +534,13 @@ public abstract class SqlIntercode extends SqlBaseClass
 
             for(ResourceClass resClass : def.getClasses())
                 for(Set<ResourceClass> set : result)
-                    if(set.stream().allMatch(c -> !ResourceClass.areDisjunct(c, resClass)))
+                    if(set.stream().allMatch(c -> !ResourceClass.areDisjunct(relations, c, resClass)))
                         nextResult.add(Stream.concat(set.stream(), Stream.of(resClass)).collect(toSet()));
 
             result = nextResult;
         }
 
-        return result.stream().map(s -> intersect(s)).collect(toSet());
+        return result.stream().map(s -> intersect(relations, s)).collect(toSet());
     }
 
 
@@ -543,11 +549,12 @@ public abstract class SqlIntercode extends SqlBaseClass
      * classes are merged into their union, so that the classes are pairwise disjoint and every class of a child is a
      * subclass of one of them.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param defs bindings of the variable in the children where it is bound
      * @return classes a variable can take in a union of the given children: the classes of the children, where
      *         overlapping classes are merged into their union
      */
-    protected static Set<ResourceClass> unionResourceClasses(List<VariableBinding> defs)
+    protected static Set<ResourceClass> unionResourceClasses(ClassRelations relations, List<VariableBinding> defs)
     {
         Set<ResourceClass> result = new HashSet<>();
 
@@ -559,7 +566,7 @@ public abstract class SqlIntercode extends SqlBaseClass
                 group.add(resClass);
 
                 for(ResourceClass other : result)
-                    if(!ResourceClass.areDisjunct(other, resClass))
+                    if(!ResourceClass.areDisjunct(relations, other, resClass))
                         group.add(other);
 
                 result.removeAll(group);
@@ -587,6 +594,8 @@ public abstract class SqlIntercode extends SqlBaseClass
     protected static VariableBindings getJoinVariableBindings(Request request, List<VariableBindings> allVars,
             List<? extends Table> tables, Restrictions restrictions, Map<Column, Column> map)
     {
+        ClassRelations relations = request.getConfiguration();
+
         Map<Column, Column> columnMap = new HashMap<>();
 
         VariableBindings bindings = new VariableBindings();
@@ -599,7 +608,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             if(defs.stream().anyMatch(v -> !v.canBeNull()))
             {
                 defs = defs.stream().filter(v -> !v.canBeNull()).toList();
-                Set<ResourceClass> resClasses = joinResourceClasses(defs);
+                Set<ResourceClass> resClasses = joinResourceClasses(relations, defs);
 
                 if(resClasses.isEmpty())
                     return new VariableBindings();
@@ -614,7 +623,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             }
             else
             {
-                Set<ResourceClass> resClasses = unionResourceClasses(defs);
+                Set<ResourceClass> resClasses = unionResourceClasses(relations, defs);
                 VariableBinding binding = createVariableBinding(request, variable, resClasses, vars, tables, columnMap,
                         true);
 
@@ -624,7 +633,7 @@ public abstract class SqlIntercode extends SqlBaseClass
 
         columnMap.entrySet().forEach(e -> map.put(e.getValue(), e.getKey()));
 
-        return bindings.restrict(restrictions);
+        return bindings.restrict(relations, restrictions);
     }
 
 
@@ -645,6 +654,8 @@ public abstract class SqlIntercode extends SqlBaseClass
             Set<ResourceClass> resClasses, List<VariableBinding> vars, List<? extends Table> tables,
             Map<Column, Column> columnMap, boolean canBeNull)
     {
+        ClassRelations relations = request.getConfiguration();
+
         VariableBinding variableBinding = new VariableBinding(variable, canBeNull);
 
         if(!canBeNull)
@@ -657,10 +668,10 @@ public abstract class SqlIntercode extends SqlBaseClass
                 {
                     VariableBinding binding = vars.get(i);
 
-                    if(binding == null || binding.canBeNull() || !binding.contains(resClass))
+                    if(binding == null || binding.canBeNull() || !binding.contains(relations, resClass))
                         continue;
 
-                    mappings.add(binding.deriveMapping(resClass, tables.get(i)));
+                    mappings.add(binding.deriveMapping(relations, resClass, tables.get(i)));
                 }
 
                 if(mappings.stream().anyMatch(m -> m == null))
@@ -695,7 +706,7 @@ public abstract class SqlIntercode extends SqlBaseClass
                     if(binding == null)
                         continue;
 
-                    for(ResourceClass specClass : binding.getCompatibleClasses(resClass))
+                    for(ResourceClass specClass : binding.getCompatibleClasses(relations, resClass))
                     {
                         List<Column> columns = toTableColumns(table, binding.getMapping(specClass));
                         variants.add(specClass.toGeneralClass(resClass, columns, true));
@@ -831,13 +842,15 @@ public abstract class SqlIntercode extends SqlBaseClass
     /**
      * True if the shared variables need no join condition: all are always bound to identical constant columns.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param left bindings of the left side
      * @param right bindings of the right side
      * @return true if the shared variables need no join condition, false otherwise
      */
-    public static boolean isJoinConditionAlwaysTrue(VariableBindings left, VariableBindings right)
+    public static boolean isJoinConditionAlwaysTrue(ClassRelations relations, VariableBindings left,
+            VariableBindings right)
     {
-        for(VariableBindingPair pair : VariableBindingPair.getPairs(left, right))
+        for(VariableBindingPair pair : VariableBindingPair.getPairs(relations, left, right))
         {
             VariableBinding leftBinding = pair.getLeftVariableBinding();
             VariableBinding rightBinding = pair.getRightVariableBinding();
@@ -876,17 +889,19 @@ public abstract class SqlIntercode extends SqlBaseClass
     /**
      * SQL condition joining every pair of children on their shared variables, or null if none is needed.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param vars the variables
      * @param tables the tables
      * @return SQL condition joining every pair of children on their shared variables, or null if none is needed
      */
-    public static String generateJoinCondition(List<VariableBindings> vars, List<? extends Table> tables)
+    public static String generateJoinCondition(ClassRelations relations, List<VariableBindings> vars,
+            List<? extends Table> tables)
     {
         int size = vars.size();
 
         List<String> conditions = IntStream.range(0, size)
-                .mapToObj(i -> IntStream.range(i + 1, size)
-                        .mapToObj(j -> generateJoinCondition(vars.get(i), vars.get(j), tables.get(i), tables.get(j))))
+                .mapToObj(i -> IntStream.range(i + 1, size).mapToObj(
+                        j -> generateJoinCondition(relations, vars.get(i), vars.get(j), tables.get(i), tables.get(j))))
                 .flatMap(c -> c).filter(c -> c != null).toList();
 
         if(conditions.isEmpty())
@@ -900,6 +915,7 @@ public abstract class SqlIntercode extends SqlBaseClass
      * SQL condition that every shared variable is compatible on both sides (equal values after conversion to a common
      * class, or unbound on either side), or null if it always holds.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param left bindings of the left side
      * @param right bindings of the right side
      * @param leftTable the left table
@@ -907,12 +923,12 @@ public abstract class SqlIntercode extends SqlBaseClass
      * @return SQL condition that every shared variable is compatible on both sides (equal values after conversion to a
      *         common class, or unbound on either side), or null if it always holds
      */
-    public static String generateJoinCondition(VariableBindings left, VariableBindings right, Table leftTable,
-            Table rightTable)
+    public static String generateJoinCondition(ClassRelations relations, VariableBindings left, VariableBindings right,
+            Table leftTable, Table rightTable)
     {
         Set<String> join = new HashSet<>();
 
-        for(VariableBindingPair pair : VariableBindingPair.getPairs(left, right))
+        for(VariableBindingPair pair : VariableBindingPair.getPairs(relations, left, right))
         {
             String condition = generateJoinCondition(pair, leftTable, rightTable);
 
@@ -931,19 +947,21 @@ public abstract class SqlIntercode extends SqlBaseClass
      * SQL condition that one variable is compatible on both sides, or null if it always holds (also when the variable
      * is bound on one side only).
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param leftBinding the variable binding
      * @param rightBinding the variable binding
      * @param leftTable the left table
      * @param rightTable the right table
      * @return SQL condition that one variable is compatible on both sides, or null if it always holds
      */
-    public static String generateJoinCondition(VariableBinding leftBinding, VariableBinding rightBinding,
-            Table leftTable, Table rightTable)
+    public static String generateJoinCondition(ClassRelations relations, VariableBinding leftBinding,
+            VariableBinding rightBinding, Table leftTable, Table rightTable)
     {
         if(leftBinding == null || rightBinding == null)
             return null;
 
-        return generateJoinCondition(new VariableBindingPair(leftBinding, rightBinding), leftTable, rightTable);
+        return generateJoinCondition(new VariableBindingPair(relations, leftBinding, rightBinding), leftTable,
+                rightTable);
     }
 
 
@@ -1055,31 +1073,33 @@ public abstract class SqlIntercode extends SqlBaseClass
      * Restrictions for a join child on top of the parent's: its variables shared with the other side are needed in the
      * classes compatible with that side (in all classes when the variable may be unbound).
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param bindings the variable bindings
      * @param other bindings of the other side
      * @param restrictions what the parent needs of the variables
      * @return restrictions for a join child on top of the parent's: its variables shared with the other side are needed
      *         in the classes compatible with that side (in all classes when the variable may be unbound)
      */
-    public static Restrictions getJoinRestrictions(VariableBindings bindings, VariableBindings other,
-            Restrictions restrictions)
+    public static Restrictions getJoinRestrictions(ClassRelations relations, VariableBindings bindings,
+            VariableBindings other, Restrictions restrictions)
     {
-        return getJoinRestrictions(bindings, Set.of(other), restrictions);
+        return getJoinRestrictions(relations, bindings, Set.of(other), restrictions);
     }
 
 
     /**
      * Restrictions for a join child against several other children, see
-     * {@link #getJoinRestrictions(VariableBindings, VariableBindings, Restrictions)}.
+     * {@link #getJoinRestrictions(ClassRelations, VariableBindings, VariableBindings, Restrictions)}.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param bindings the variable bindings
      * @param others bindings of the other children
      * @param restrictions what the parent needs of the variables
      * @return restrictions for a join child against several other children, see
-     *         {@link #getJoinRestrictions(VariableBindings, VariableBindings, Restrictions)}
+     *         {@link #getJoinRestrictions(ClassRelations, VariableBindings, VariableBindings, Restrictions)}
      */
-    protected static Restrictions getJoinRestrictions(VariableBindings bindings, Collection<VariableBindings> others,
-            Restrictions restrictions)
+    protected static Restrictions getJoinRestrictions(ClassRelations relations, VariableBindings bindings,
+            Collection<VariableBindings> others, Restrictions restrictions)
     {
         Restrictions joinRestrictions = new Restrictions();
 
@@ -1101,7 +1121,7 @@ public abstract class SqlIntercode extends SqlBaseClass
                     Set<ResourceClass> set = new HashSet<>();
 
                     for(ResourceClass rc : binding.getMappings().keySet())
-                        if(vars.stream().anyMatch(v -> !ResourceClass.areDisjunct(rc, v.getClasses())))
+                        if(vars.stream().anyMatch(v -> !ResourceClass.areDisjunct(relations, rc, v.getClasses())))
                             set.add(rc);
 
                     joinRestrictions.set(variable, set);
@@ -1117,11 +1137,12 @@ public abstract class SqlIntercode extends SqlBaseClass
      * False if a variable is always bound in several children with disjoint classes or different constants, so the join
      * is empty.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param childs the child nodes
      * @return false if a variable is always bound in several children with disjoint classes or different constants, so
      *         the join is empty, true otherwise
      */
-    protected static boolean isJoinable(List<SqlIntercode> childs)
+    protected static boolean isJoinable(ClassRelations relations, List<SqlIntercode> childs)
     {
         List<VariableBindings> allVars = childs.stream().map(c -> c.getVariableBindings()).toList();
 
@@ -1132,7 +1153,7 @@ public abstract class SqlIntercode extends SqlBaseClass
 
             if(uvars.size() > 1)
             {
-                Set<ResourceClass> resClasses = joinResourceClasses(uvars);
+                Set<ResourceClass> resClasses = joinResourceClasses(relations, uvars);
 
                 if(resClasses.isEmpty())
                     return false;
@@ -1164,18 +1185,19 @@ public abstract class SqlIntercode extends SqlBaseClass
      * False if some shared variable can never match between a join component of the left and a join component of the
      * right subtree (see {@link VariableBindingPair#isJoinable}).
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param left bindings of the left side
      * @param right bindings of the right side
      * @return false if some shared variable can never match between a join component of the left and a join component
      *         of the right subtree (see {@link VariableBindingPair#isJoinable}), true otherwise
      */
-    protected static boolean isJoinable(SqlIntercode left, SqlIntercode right)
+    protected static boolean isJoinable(ClassRelations relations, SqlIntercode left, SqlIntercode right)
     {
         for(SqlIntercode l : getJoinList(left))
         {
             for(SqlIntercode r : getJoinList(right))
             {
-                List<VariableBindingPair> pairs = VariableBindingPair.getPairs(l.getVariableBindings(),
+                List<VariableBindingPair> pairs = VariableBindingPair.getPairs(relations, l.getVariableBindings(),
                         r.getVariableBindings());
 
                 if(pairs.stream().anyMatch(p -> !p.isJoinable()))

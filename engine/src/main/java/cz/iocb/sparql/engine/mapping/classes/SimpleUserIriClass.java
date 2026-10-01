@@ -3,7 +3,8 @@ package cz.iocb.sparql.engine.mapping.classes;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
-import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.intersect;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.subtract;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
@@ -82,7 +83,8 @@ public abstract class SimpleUserIriClass extends UserIriClass
 
         assert isSubclassOf(sourceClass);
 
-        boolean check = !checkOptional && !intersect(superClass, iri).equals(this);
+        // the check is needless when every IRI of the superclass belongs to this class
+        boolean check = !checkOptional && !superClass.isSubclassOf(unionize(this, subtract(box, iri)));
 
         if(sourceClass.equals(box))
             return List.of(generateInverseFunction(expression("sparql.rdfbox_get_iri(%s)", columns.get(0)), check));

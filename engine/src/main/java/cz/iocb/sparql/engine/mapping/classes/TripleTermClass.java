@@ -186,15 +186,17 @@ public final class TripleTermClass extends PrimitiveResourceClass
 
 
     /**
-     * True if no triple term belongs to both classes, i.e. some pair of their components is disjoint.
-     *
-     * @param other the other triple term class
-     * @return true if no triple term belongs to both classes, false otherwise
+     * True if no term belongs to both classes: for another triple term class, when some pair of their components is
+     * disjoint; otherwise when the classes are unrelated.
      */
-    public boolean isDisjunctWith(TripleTermClass other)
+    @Override
+    protected boolean isDisjunctWith(ClassRelations relations, PrimitiveResourceClass resClass)
     {
-        return areDisjunct(subject, other.subject) || areDisjunct(predicate, other.predicate)
-                || areDisjunct(object, other.object);
+        if(resClass instanceof TripleTermClass other)
+            return areDisjunct(relations, subject, other.subject) || areDisjunct(relations, predicate, other.predicate)
+                    || areDisjunct(relations, object, other.object);
+
+        return super.isDisjunctWith(relations, resClass);
     }
 
 

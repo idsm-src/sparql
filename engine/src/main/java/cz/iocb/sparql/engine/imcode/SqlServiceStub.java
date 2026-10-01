@@ -36,6 +36,7 @@ import org.xml.sax.helpers.DefaultHandler;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.error.MessageType;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.rdf.BlankNode;
@@ -545,6 +546,8 @@ public final class SqlServiceStub extends SqlIntercode
             Map<String, Variable> serviceVariables, SqlIntercode context, StrBlankNodeInSegmentClass blankNodeClass,
             boolean silent, Restrictions restrictions, SharedState state)
     {
+        ClassRelations relations = request.getConfiguration();
+
         Set<ResourceClass> resourceClasses = new HashSet<>();
         resourceClasses.add(unsupportedIri);
         resourceClasses.add(unsupportedType);
@@ -586,14 +589,16 @@ public final class SqlServiceStub extends SqlIntercode
             }
         }
 
-        return new SqlServiceStub(bindings.restrict(restrictions), name, serviceCode, serviceVariables, context,
-                blankNodeClass, silent, state);
+        return new SqlServiceStub(bindings.restrict(relations, restrictions), name, serviceCode, serviceVariables,
+                context, blankNodeClass, silent, state);
     }
 
 
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         if(evalServices)
             return eval(request, context, restrictions);
 
@@ -613,7 +618,7 @@ public final class SqlServiceStub extends SqlIntercode
         {
             VariableBinding binding = optContext.getVariableBindings().get(new Variable(variable.getName()));
 
-            if(binding == null || binding.getCompatibleClasses(iri).isEmpty())
+            if(binding == null || binding.getCompatibleClasses(relations, iri).isEmpty())
                 return SqlNoSolution.get();
         }
 
@@ -629,7 +634,7 @@ public final class SqlServiceStub extends SqlIntercode
         }
 
 
-        if(optContext == context && restrictions.isOptimized(bindings))
+        if(optContext == context && restrictions.isOptimized(relations, bindings))
             return this;
 
         return create(request, name, serviceCode, serviceVariables, optContext, blankNodeClass, silent, restrictions,

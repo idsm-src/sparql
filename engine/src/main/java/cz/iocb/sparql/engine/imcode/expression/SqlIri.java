@@ -8,6 +8,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.request.Request;
@@ -63,16 +64,18 @@ public final class SqlIri extends SqlExpressionIntercode
      */
     private static SqlExpressionIntercode create(Request request, Iri iri, Restriction restriction)
     {
+        ClassRelations relations = request.getConfiguration();
+
         ResourceClass resClass = request.getIriClass(iri);
 
-        List<Column> columns = restriction.contains(resClass) ? request.getColumns(resClass, iri) : null;
+        List<Column> columns = restriction.contains(relations, resClass) ? request.getColumns(resClass, iri) : null;
 
         return new SqlIri(iri, singletonMap(resClass, columns));
     }
 
 
     @Override
-    public Restrictions getRequirements()
+    public Restrictions getRequirements(ClassRelations relations)
     {
         return new Restrictions();
     }
@@ -82,7 +85,7 @@ public final class SqlIri extends SqlExpressionIntercode
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
-        if(restriction.isOptimized(variableBinding))
+        if(restriction.isOptimized(request.getConfiguration(), variableBinding))
             return this;
 
         return create(request, iri, restriction);

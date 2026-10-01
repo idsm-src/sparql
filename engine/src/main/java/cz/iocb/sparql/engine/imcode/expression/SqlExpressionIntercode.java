@@ -33,6 +33,7 @@ import cz.iocb.sparql.engine.mapping.classes.BooleanBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.BooleanClass;
 import cz.iocb.sparql.engine.mapping.classes.ByteBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.ByteClass;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateCompositeClass;
 import cz.iocb.sparql.engine.mapping.classes.DateScalarClass;
 import cz.iocb.sparql.engine.mapping.classes.DateTimeCompositeClass;
@@ -157,51 +158,56 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         /**
          * True if some needed class overlaps the given one.
          *
+         * @param relations declarations which unrelated user IRI classes may overlap
          * @param resClass the resource class
          * @return true if some needed class overlaps the given one, false otherwise
          */
-        public boolean contains(ResourceClass resClass)
+        public boolean contains(ClassRelations relations, ResourceClass resClass)
         {
-            return set.stream().anyMatch(r -> !areDisjunct(r, resClass));
+            return set.stream().anyMatch(r -> !areDisjunct(relations, r, resClass));
         }
 
 
         /**
          * True if some needed class overlaps one of the given ones.
          *
+         * @param relations declarations which unrelated user IRI classes may overlap
          * @param resClasses the resource classes
          * @return true if some needed class overlaps one of the given ones, false otherwise
          */
-        public boolean contains(Set<ResourceClass> resClasses)
+        public boolean contains(ClassRelations relations, Set<ResourceClass> resClasses)
         {
-            return resClasses.stream().anyMatch(r -> contains(r));
+            return resClasses.stream().anyMatch(r -> contains(relations, r));
         }
 
 
         /**
          * True if the binding materialises exactly the needed classes.
          *
+         * @param relations declarations which unrelated user IRI classes may overlap
          * @param binding the variable binding
          * @return true if the binding materialises exactly the needed classes, false otherwise
          */
-        public boolean isOptimized(VariableBinding binding)
+        public boolean isOptimized(ClassRelations relations, VariableBinding binding)
         {
-            return restrict(binding.getMappings()).equals(binding.getMappings());
+            return restrict(relations, binding.getMappings()).equals(binding.getMappings());
         }
 
 
         /**
          * The mappings with the columns of unneeded classes set to null.
          *
+         * @param relations declarations which unrelated user IRI classes may overlap
          * @param mappings columns per resource class
          * @return the mappings with the columns of unneeded classes set to null
          */
-        public Map<ResourceClass, List<Column>> restrict(Map<ResourceClass, List<Column>> mappings)
+        public Map<ResourceClass, List<Column>> restrict(ClassRelations relations,
+                Map<ResourceClass, List<Column>> mappings)
         {
             Map<ResourceClass, List<Column>> result = new HashMap<>();
 
             for(Entry<ResourceClass, List<Column>> e : mappings.entrySet())
-                result.put(e.getKey(), contains(e.getKey()) ? e.getValue() : null);
+                result.put(e.getKey(), contains(relations, e.getKey()) ? e.getValue() : null);
 
             return result;
         }
@@ -242,9 +248,10 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     /**
      * Variables (with classes) the expression needs from its bindings.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @return variables (with classes) the expression needs from its bindings
      */
-    public abstract Restrictions getRequirements();
+    public abstract Restrictions getRequirements(ClassRelations relations);
 
 
     /**
@@ -288,13 +295,14 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      * True if some class overlapping the given ones is computed by an SQL expression rather than a plain column or
      * constant.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param resClasses the resource classes
      * @return true if some class overlapping the given ones is computed by an SQL expression rather than a plain column
      *         or constant, false otherwise
      */
-    public boolean hasExpressionColumn(Set<ResourceClass> resClasses)
+    public boolean hasExpressionColumn(ClassRelations relations, Set<ResourceClass> resClasses)
     {
-        return resClasses.stream().anyMatch(r -> hasExpressionColumn(r));
+        return resClasses.stream().anyMatch(r -> hasExpressionColumn(relations, r));
     }
 
 
@@ -302,14 +310,16 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      * True if some class overlapping the given one is computed by an SQL expression rather than a plain column or
      * constant, in which case its evaluation should not be duplicated.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param resClass the resource class
      * @return true if some class overlapping the given one is computed by an SQL expression rather than a plain column
      *         or constant, in which case its evaluation should not be duplicated, false otherwise
      */
-    public boolean hasExpressionColumn(ResourceClass resClass)
+    public boolean hasExpressionColumn(ClassRelations relations, ResourceClass resClass)
     {
         for(Entry<ResourceClass, List<Column>> e : variableBinding.getMappings().entrySet())
-            if(!areDisjunct(resClass, e.getKey()) && e.getValue().stream().anyMatch(c -> c instanceof ExpressionColumn))
+            if(!areDisjunct(relations, resClass, e.getKey())
+                    && e.getValue().stream().anyMatch(c -> c instanceof ExpressionColumn))
                 return true;
 
         return false;
@@ -320,15 +330,16 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      * True if the value in {@code sourceClass} can be converted to {@code targetClass} without evaluating an SQL
      * expression more than once.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param sourceClass the class to convert from
      * @param targetClass the class to convert to
      * @return true if the value in {@code sourceClass} can be converted to {@code targetClass} without evaluating an
      *         SQL expression more than once, false otherwise
      */
-    public boolean canSafelyGeneralize(ResourceClass sourceClass, ResourceClass targetClass)
+    public boolean canSafelyGeneralize(ClassRelations relations, ResourceClass sourceClass, ResourceClass targetClass)
     {
         return sourceClass.getEffectiveClass().equals(targetClass) || sourceClass.isSubclassOf(targetClass)
-                && (!hasExpressionColumn(sourceClass) || targetClass.getColumnCount() == 1);
+                && (!hasExpressionColumn(relations, sourceClass) || targetClass.getColumnCount() == 1);
     }
 
 
@@ -446,22 +457,23 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      * classes are unioned (stored in {@code unionClass} when given), and results outside the restriction get null
      * combinations.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param arguments the arguments
      * @param map argument class combinations per result class
      * @param restriction the result classes the parent needs
      * @param unionClass class storing the union of overlapping results, or null
      * @return grouped argument class combinations per result class, null where the result is not needed
      */
-    protected static Map<ResourceClass, Set<List<Set<ResourceClass>>>> processResultMap(
+    protected static Map<ResourceClass, Set<List<Set<ResourceClass>>>> processResultMap(ClassRelations relations,
             List<SqlExpressionIntercode> arguments, Map<ResourceClass, Set<List<ResourceClass>>> map,
             Restriction restriction, PrimitiveResourceClass unionClass)
     {
         record Input(ResourceClass result, List<ResourceClass> params)
         {
-            public static boolean areInConflict(List<SqlExpressionIntercode> arguments, Restriction restriction,
-                    Input l, Input r)
+            public static boolean areInConflict(ClassRelations relations, List<SqlExpressionIntercode> arguments,
+                    Restriction restriction, Input l, Input r)
             {
-                if(!restriction.contains(l.result) || !restriction.contains(r.result))
+                if(!restriction.contains(relations, l.result) || !restriction.contains(relations, r.result))
                     return false;
 
                 for(int i = 0; i < arguments.size(); i++)
@@ -470,7 +482,8 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                     ResourceClass lc = l.params.get(i);
                     ResourceClass rc = l.params.get(i);
 
-                    if(!areDisjunct(lc, rc) && (arg.hasExpressionColumn(lc) || arg.hasExpressionColumn(lc)))
+                    if(!areDisjunct(relations, lc, rc)
+                            && (arg.hasExpressionColumn(relations, lc) || arg.hasExpressionColumn(relations, lc)))
                         return true;
                 }
 
@@ -485,7 +498,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                 inputs.add(new Input(e.getKey(), c));
 
         Collection<Set<Input>> groupParameters = UnionFind.getDisjunctEntries(inputs,
-                (l, r) -> Input.areInConflict(arguments, restriction, l, r));
+                (l, r) -> Input.areInConflict(relations, arguments, restriction, l, r));
 
 
         record Midle(Set<ResourceClass> result, List<Set<ResourceClass>> params)
@@ -515,8 +528,8 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
 
         Collection<Set<Midle>> groupResults = UnionFind.getDisjunctEntries(middles,
-                (l, r) -> !areDisjunct(l.result, r.result) && restriction.contains(l.result)
-                        && restriction.contains(r.result));
+                (l, r) -> !areDisjunct(relations, l.result, r.result) && restriction.contains(relations, l.result)
+                        && restriction.contains(relations, r.result));
 
         Map<ResourceClass, Set<List<Set<ResourceClass>>>> output = new HashMap<>();
 
@@ -531,7 +544,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                 params.add(e.params);
             }
 
-            if(!restriction.contains(result))
+            if(!restriction.contains(relations, result))
                 params = null;
 
             if(result.size() == 1)
@@ -548,18 +561,19 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
     /**
      * Groups the possible results without a fixed union class, see
-     * {@link #processResultMap(List, Map, Restriction, PrimitiveResourceClass)}.
+     * {@link #processResultMap(ClassRelations, List, Map, Restriction, PrimitiveResourceClass)}.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param arguments the arguments
      * @param map argument class combinations per result class
      * @param restriction the result classes the parent needs
      * @return grouped argument class combinations per result class, null where the result is not needed
      */
-    protected static Map<ResourceClass, Set<List<Set<ResourceClass>>>> processResultMap(
+    protected static Map<ResourceClass, Set<List<Set<ResourceClass>>>> processResultMap(ClassRelations relations,
             List<SqlExpressionIntercode> arguments, Map<ResourceClass, Set<List<ResourceClass>>> map,
             Restriction restriction)
     {
-        return processResultMap(arguments, map, restriction, null);
+        return processResultMap(relations, arguments, map, restriction, null);
     }
 
 
@@ -671,24 +685,26 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     /**
      * SQL condition that the value has no value of the given class.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param resClass the resource class
      * @return SQL condition that the value has no value of the given class
      */
-    public String getIsNull(ResourceClass resClass)
+    public String getIsNull(ClassRelations relations, ResourceClass resClass)
     {
-        return variableBinding.getIsNull(resClass);
+        return variableBinding.getIsNull(relations, resClass);
     }
 
 
     /**
      * SQL condition that the value has a value of the given class.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param resClass the resource class
      * @return SQL condition that the value has a value of the given class
      */
-    public String getIsNotNull(ResourceClass resClass)
+    public String getIsNotNull(ClassRelations relations, ResourceClass resClass)
     {
-        return variableBinding.getIsNotNull(resClass);
+        return variableBinding.getIsNotNull(relations, resClass);
     }
 
 
@@ -706,12 +722,13 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     /**
      * Expression yielding the string value when the value belongs to one of the string literal classes.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param resClasses the resource classes
      * @return expression yielding the string value when the value belongs to one of the string literal classes
      */
-    protected Column getStringLiteral(Set<ResourceClass> resClasses)
+    protected Column getStringLiteral(ClassRelations relations, Set<ResourceClass> resClasses)
     {
-        return variableBinding.getStringLiteral(resClasses);
+        return variableBinding.getStringLiteral(relations, resClasses);
     }
 
 
@@ -742,14 +759,16 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
 
     /**
-     * Columns of the value converted to the class, see {@link VariableBinding#deriveMapping(ResourceClass)}.
+     * Columns of the value converted to the class, see
+     * {@link VariableBinding#deriveMapping(ClassRelations, ResourceClass)}.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param resClass the resource class
-     * @return columns of the value converted to the class, see {@link VariableBinding#deriveMapping(ResourceClass)}
+     * @return columns of the value converted to the class
      */
-    public List<Column> get(ResourceClass resClass)
+    public List<Column> get(ClassRelations relations, ResourceClass resClass)
     {
-        return variableBinding.deriveMapping(resClass);
+        return variableBinding.deriveMapping(relations, resClass);
     }
 
 

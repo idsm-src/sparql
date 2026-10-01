@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Objects;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBindings;
@@ -50,23 +51,26 @@ public final class SqlUnaryLogical extends SqlUnary implements SqlBooleanExpress
     /**
      * Negation of a boolean operand.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operand the operand
      * @return negation of a boolean operand
      */
-    public static SqlExpressionIntercode create(SqlExpressionIntercode operand)
+    public static SqlExpressionIntercode create(ClassRelations relations, SqlExpressionIntercode operand)
     {
-        return create(operand, Restriction.ALL);
+        return create(relations, operand, Restriction.ALL);
     }
 
 
     /**
      * Negation materialising only when needed; constants are folded.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operand the operand
      * @param restriction the result classes the parent needs
      * @return negation materialising only when needed; constants are folded
      */
-    public static SqlExpressionIntercode create(SqlExpressionIntercode operand, Restriction restriction)
+    public static SqlExpressionIntercode create(ClassRelations relations, SqlExpressionIntercode operand,
+            Restriction restriction)
     {
         if(operand.equals(SqlNull.get()))
             return SqlNull.get();
@@ -85,7 +89,7 @@ public final class SqlUnaryLogical extends SqlUnary implements SqlBooleanExpress
         if(operand instanceof SqlBooleanExpression e && e.isTrueOrError())
             value = FALSE_OR_ERROR;
 
-        List<Column> columns = restriction.contains(xsdBoolean) ? translate(operand) : null;
+        List<Column> columns = restriction.contains(relations, xsdBoolean) ? translate(relations, operand) : null;
         Map<ResourceClass, List<Column>> mappings = singletonMap(xsdBoolean, columns);
 
         return new SqlUnaryLogical(operand, mappings, operand.canBeNull(), value);
@@ -95,12 +99,14 @@ public final class SqlUnaryLogical extends SqlUnary implements SqlBooleanExpress
     /**
      * SQL negating the boolean value of the operand.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operand the operand
      * @return SQL negating the boolean value of the operand
      */
-    private static List<Column> translate(SqlExpressionIntercode operand)
+    private static List<Column> translate(ClassRelations relations, SqlExpressionIntercode operand)
     {
-        return List.of(new ExpressionColumn("(not " + operand.get(genBoolean).get(0) + ")", operand.canBeNull()));
+        return List.of(
+                new ExpressionColumn("(not " + operand.get(relations, genBoolean).get(0) + ")", operand.canBeNull()));
     }
 
 
@@ -115,9 +121,11 @@ public final class SqlUnaryLogical extends SqlUnary implements SqlBooleanExpress
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         Restriction operandRestriction = new Restriction();
 
-        if(restriction.contains(xsdBoolean))
+        if(restriction.contains(relations, xsdBoolean))
             operandRestriction.add(genBoolean);
 
         SqlExpressionIntercode optOperand = operand.optimize(request, bindings, operandRestriction, evalServices);
@@ -125,7 +133,7 @@ public final class SqlUnaryLogical extends SqlUnary implements SqlBooleanExpress
         if(optOperand == operand)
             return this;
 
-        return create(optOperand, restriction);
+        return create(relations, optOperand, restriction);
     }
 
 

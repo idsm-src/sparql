@@ -15,6 +15,7 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
@@ -67,6 +68,8 @@ public final class SqlUnion extends SqlIntercode
      */
     public static SqlIntercode union(Request request, List<SqlIntercode> branches)
     {
+        ClassRelations relations = request.getConfiguration();
+
         /* special cases */
 
         branches = branches.stream().filter(i -> !i.equals(SqlNoSolution.get())).toList();
@@ -88,7 +91,7 @@ public final class SqlUnion extends SqlIntercode
             List<VariableBinding> defs = branches.stream().map(b -> b.getVariableBindings().get(var))
                     .filter(Objects::nonNull).toList();
 
-            classes.put(var, unionResourceClasses(defs));
+            classes.put(var, unionResourceClasses(relations, defs));
         }
 
 
@@ -122,7 +125,7 @@ public final class SqlUnion extends SqlIntercode
             for(ResourceClass resourceClass : entry.getValue())
             {
                 if(uvars.stream().filter(Objects::nonNull).flatMap(v -> v.getMappings().entrySet().stream())
-                        .anyMatch(r -> isNull(r.getValue()) && !areDisjunct(r.getKey(), resourceClass)))
+                        .anyMatch(r -> isNull(r.getValue()) && !areDisjunct(relations, r.getKey(), resourceClass)))
                 {
                     variableBinding.addMapping(resourceClass, null);
                     continue;
@@ -144,7 +147,7 @@ public final class SqlUnion extends SqlIntercode
                     }
                     else
                     {
-                        List<Column> c = binding.deriveMapping(resourceClass);
+                        List<Column> c = binding.deriveMapping(relations, resourceClass);
 
                         for(int i = 0; i < resourceClass.getColumnCount(); i++)
                             cols.get(i).add(c.get(i));

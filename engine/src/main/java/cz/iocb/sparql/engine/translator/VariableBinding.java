@@ -31,6 +31,7 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 
@@ -161,12 +162,13 @@ public class VariableBinding
     /**
      * True if some class of the variable overlaps with the given class.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param resClass the resource class
      * @return true if some class of the variable overlaps with the given class, false otherwise
      */
-    public boolean contains(ResourceClass resClass)
+    public boolean contains(ClassRelations relations, ResourceClass resClass)
     {
-        return mappings.keySet().stream().anyMatch(r -> !ResourceClass.areDisjunct(r, resClass));
+        return mappings.keySet().stream().anyMatch(r -> !ResourceClass.areDisjunct(relations, r, resClass));
     }
 
 
@@ -220,11 +222,12 @@ public class VariableBinding
      * stored columns when the class is present, otherwise a COALESCE over the conversions of all overlapping classes,
      * or NULL constants when no class overlaps. Returns null when a needed class has no materialised columns.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param targetClass the class to convert to
      * @param table the table
      * @return the derived columns, or null when a needed class has no materialised columns
      */
-    public List<Column> deriveMapping(ResourceClass targetClass, Table table)
+    public List<Column> deriveMapping(ClassRelations relations, ResourceClass targetClass, Table table)
     {
         if(mappings.containsKey(targetClass))
             return toTableColumns(table, mappings.get(targetClass));
@@ -234,7 +237,7 @@ public class VariableBinding
 
         for(Entry<ResourceClass, List<Column>> map : mappings.entrySet())
         {
-            if(!ResourceClass.areDisjunct(targetClass, map.getKey()))
+            if(!ResourceClass.areDisjunct(relations, targetClass, map.getKey()))
             {
                 ResourceClass sourceClass = map.getKey();
                 List<Column> cols = toTableColumns(table, map.getValue());
@@ -247,7 +250,7 @@ public class VariableBinding
                 else if(targetClass.isSubclassOf(sourceClass.getEffectiveClass()))
                     variants.add(targetClass.fromGeneralClass(sourceClass, cols, false));
                 else
-                    throw new UnsupportedOperationException();
+                    variants.add(sourceClass.toClass(targetClass, cols, canBeNull));
             }
         }
 
@@ -281,14 +284,15 @@ public class VariableBinding
 
 
     /**
-     * Same as {@link #deriveMapping(ResourceClass, Table)} without table qualification.
+     * Same as {@link #deriveMapping(ClassRelations, ResourceClass, Table)} without table qualification.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param targetClass the class to convert to
      * @return the derived columns, or null when a needed class has no materialised columns
      */
-    public List<Column> deriveMapping(ResourceClass targetClass)
+    public List<Column> deriveMapping(ClassRelations relations, ResourceClass targetClass)
     {
-        return deriveMapping(targetClass, null);
+        return deriveMapping(relations, targetClass, null);
     }
 
 
@@ -467,24 +471,26 @@ public class VariableBinding
     /**
      * SQL condition that the variable has no value of the given class, tested on the witness column of the class.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param resClass the resource class
      * @return SQL condition that the variable has no value of the given class
      */
-    public String getIsNull(ResourceClass resClass)
+    public String getIsNull(ClassRelations relations, ResourceClass resClass)
     {
-        return and(Stream.of(getIsNull(resClass, deriveMapping(resClass), null)));
+        return and(Stream.of(getIsNull(resClass, deriveMapping(relations, resClass), null)));
     }
 
 
     /**
      * SQL condition that the variable has a value of the given class, tested on the witness column of the class.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param resClass the resource class
      * @return SQL condition that the variable has a value of the given class
      */
-    public String getIsNotNull(ResourceClass resClass)
+    public String getIsNotNull(ClassRelations relations, ResourceClass resClass)
     {
-        return or(Stream.of(getIsNotNull(resClass, deriveMapping(resClass), null)));
+        return or(Stream.of(getIsNotNull(resClass, deriveMapping(relations, resClass), null)));
     }
 
 
@@ -523,11 +529,12 @@ public class VariableBinding
     /**
      * Expression yielding the string value of the variable when it belongs to one of the given string literal classes.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param resClasses the resource classes
      * @return expression yielding the string value of the variable when it belongs to one of the given string literal
      *         classes
      */
-    public Column getStringLiteral(Set<ResourceClass> resClasses)
+    public Column getStringLiteral(ClassRelations relations, Set<ResourceClass> resClasses)
     {
         boolean literalCanBeNull = canBeNull || mappings.size() > 1;
 
@@ -535,7 +542,7 @@ public class VariableBinding
 
         for(ResourceClass resClass : resClasses)
         {
-            List<Column> columns = deriveMapping(resClass);
+            List<Column> columns = deriveMapping(relations, resClass);
 
             if(isString(resClass))
                 variants.add(resClass.toClass(xsdString, columns, literalCanBeNull).get(0));
@@ -571,7 +578,8 @@ public class VariableBinding
         ResourceClass base = Stream.concat(numericBaseClasses.stream(), Stream.of(box))
                 .filter(r -> source.isSubclassOf(r)).findFirst().orElseThrow(IllegalArgumentException::new);
 
-        Column value = deriveMapping(base).get(0);
+        // the base class is built-in, so the declarations about user IRI classes cannot matter
+        Column value = deriveMapping(ClassRelations.NONE, base).get(0);
 
         if(base.equals(box))
             return new ExpressionColumn("sparql.rdfbox_promote_to_" + getLiteralClassName(target) + "(" + value + ")");
@@ -610,15 +618,16 @@ public class VariableBinding
     /**
      * Classes of the variable that overlap with the given class.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param resClass the resource class
      * @return classes of the variable that overlap with the given class
      */
-    public final Set<ResourceClass> getCompatibleClasses(ResourceClass resClass)
+    public final Set<ResourceClass> getCompatibleClasses(ClassRelations relations, ResourceClass resClass)
     {
         Set<ResourceClass> result = new HashSet<>();
 
         for(ResourceClass r : mappings.keySet())
-            if(!ResourceClass.areDisjunct(r, resClass))
+            if(!ResourceClass.areDisjunct(relations, r, resClass))
                 result.add(r);
 
         return result;

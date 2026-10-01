@@ -6,6 +6,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 
@@ -48,11 +49,11 @@ public abstract class SqlBinary extends SqlExpressionIntercode
 
 
     @Override
-    public Restrictions getRequirements()
+    public Restrictions getRequirements(ClassRelations relations)
     {
         Restrictions restrictions = new Restrictions();
-        restrictions.add(left.getRequirements());
-        restrictions.add(right.getRequirements());
+        restrictions.add(left.getRequirements(relations));
+        restrictions.add(right.getRequirements(relations));
 
         return restrictions;
     }

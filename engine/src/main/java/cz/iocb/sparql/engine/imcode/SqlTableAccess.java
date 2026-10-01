@@ -24,6 +24,7 @@ import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
@@ -603,12 +604,13 @@ public final class SqlTableAccess extends SqlIntercode
      * Columns on which two accesses to the same table are equated through their shared variables; empty if the tables
      * differ or the variables are not joined in a single class.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param left the left access
      * @param right the right access
      * @return columns on which two accesses to the same table are equated through their shared variables; empty if the
      *         tables differ or the variables are not joined in a single class
      */
-    static Set<Column> getJoinColumns(SqlTableAccess left, SqlTableAccess right)
+    static Set<Column> getJoinColumns(ClassRelations relations, SqlTableAccess left, SqlTableAccess right)
     {
         // only the same tables can by merged
         if(!Objects.equals(left.table, right.table))
@@ -617,7 +619,7 @@ public final class SqlTableAccess extends SqlIntercode
 
         Set<Column> columns = new HashSet<>();
 
-        for(VariableBindingPair pair : VariableBindingPair.getPairs(left.internal, right.internal))
+        for(VariableBindingPair pair : VariableBindingPair.getPairs(relations, left.internal, right.internal))
         {
             VariableBinding leftBinding = pair.getLeftVariableBinding();
             VariableBinding rightBinding = pair.getRightVariableBinding();
@@ -668,14 +670,16 @@ public final class SqlTableAccess extends SqlIntercode
     /**
      * True if the shared columns of two accesses to the same table contain a key of the table.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param schema the database schema
      * @param left the left access
      * @param right the right access
      * @return true if the shared columns of two accesses to the same table contain a key of the table, false otherwise
      */
-    private static boolean canBeJoinedByPrimaryKey(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
+    private static boolean canBeJoinedByPrimaryKey(ClassRelations relations, DatabaseSchema schema, SqlTableAccess left,
+            SqlTableAccess right)
     {
-        Set<Column> columns = left.getKnownNotNull(schema, getJoinColumns(left, right));
+        Set<Column> columns = left.getKnownNotNull(schema, getJoinColumns(relations, left, right));
 
         return schema.getCompatibleKey(left.table, columns) != null;
     }
@@ -685,16 +689,17 @@ public final class SqlTableAccess extends SqlIntercode
      * Pairs of parent and child columns equated through shared variables; empty if the variables are not joined in a
      * single class.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param parent access to the referenced table
      * @param child access to the referencing table
      * @return pairs of parent and child columns equated through shared variables; empty if the variables are not joined
      *         in a single class
      */
-    static Set<ColumnPair> getJoinColumnPairs(SqlTableAccess parent, SqlTableAccess child)
+    static Set<ColumnPair> getJoinColumnPairs(ClassRelations relations, SqlTableAccess parent, SqlTableAccess child)
     {
         Set<ColumnPair> columns = new HashSet<>();
 
-        for(VariableBindingPair pair : VariableBindingPair.getPairs(parent.internal, child.internal))
+        for(VariableBindingPair pair : VariableBindingPair.getPairs(relations, parent.internal, child.internal))
         {
             VariableBinding parentBinding = pair.getLeftVariableBinding();
             VariableBinding childBinding = pair.getRightVariableBinding();
@@ -746,14 +751,15 @@ public final class SqlTableAccess extends SqlIntercode
      * Foreign key allowing the parent access to be merged into the child access (no expressions, no deduplication
      * request, parent columns covered), or null.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param schema the database schema
      * @param parent access to the referenced table
      * @param child access to the referencing table
      * @return foreign key allowing the parent access to be merged into the child access (no expressions, no
      *         deduplication request, parent columns covered), or null
      */
-    private static Set<ColumnPair> canBeJoinedByForeignKey(DatabaseSchema schema, SqlTableAccess parent,
-            SqlTableAccess child)
+    private static Set<ColumnPair> canBeJoinedByForeignKey(ClassRelations relations, DatabaseSchema schema,
+            SqlTableAccess parent, SqlTableAccess child)
     {
         if(schema.getForeignKeys(parent.table, child.table).isEmpty())
             return null;
@@ -766,7 +772,7 @@ public final class SqlTableAccess extends SqlIntercode
             return null;
 
         // the parent is dropped, which requires that each child row has the referenced parent row
-        Set<ColumnPair> columns = getJoinColumnPairs(parent, child).stream()
+        Set<ColumnPair> columns = getJoinColumnPairs(relations, parent, child).stream()
                 .filter(p -> child.isKnownNotNull(schema, p.getRight())).collect(toSet());
 
         Set<Column> parentColumns = new HashSet<>();
@@ -809,14 +815,15 @@ public final class SqlTableAccess extends SqlIntercode
      * Foreign key allowing a distinct union of the parent and child accesses to be merged (each parent row has exactly
      * one child row), or null.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param schema the database schema
      * @param parent access to the referenced table
      * @param child access to the referencing table
      * @return foreign key allowing a distinct union of the parent and child accesses to be merged (each parent row has
      *         exactly one child row), or null
      */
-    private static Set<ColumnPair> canBeDistinctUnionizedByForeignKey(DatabaseSchema schema, SqlTableAccess parent,
-            SqlTableAccess child)
+    private static Set<ColumnPair> canBeDistinctUnionizedByForeignKey(ClassRelations relations, DatabaseSchema schema,
+            SqlTableAccess parent, SqlTableAccess child)
     {
         if(parent.table == null || child.table == null || schema.getForeignKeys(parent.table, child.table).isEmpty())
             return null;
@@ -836,7 +843,7 @@ public final class SqlTableAccess extends SqlIntercode
 
         Set<ColumnPair> columns = new HashSet<>();
 
-        for(VariableBindingPair pair : VariableBindingPair.getPairs(parent.internal, child.internal))
+        for(VariableBindingPair pair : VariableBindingPair.getPairs(relations, parent.internal, child.internal))
         {
             VariableBinding parentBinding = pair.getLeftVariableBinding();
             VariableBinding childBinding = pair.getRightVariableBinding();
@@ -869,14 +876,16 @@ public final class SqlTableAccess extends SqlIntercode
      * True if a left join of two accesses to the same table on a key can be merged: at most one extra not-null
      * condition on the right side and no other right-side conditions.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param schema the database schema
      * @param left the left access
      * @param right the right access
      * @return true if a left join of two accesses to the same table on a key can be merged, false otherwise
      */
-    private static boolean canBeLeftJoinedByPrimaryKey(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
+    private static boolean canBeLeftJoinedByPrimaryKey(ClassRelations relations, DatabaseSchema schema,
+            SqlTableAccess left, SqlTableAccess right)
     {
-        if(!canBeJoinedByPrimaryKey(schema, left, right))
+        if(!canBeJoinedByPrimaryKey(relations, schema, left, right))
             return false;
 
         Set<Column> extraNotNulls = new HashSet<>(right.conditions.getIsNotNull());
@@ -915,7 +924,7 @@ public final class SqlTableAccess extends SqlIntercode
         // condition added by the join
         Condition joinCondition = new Condition();
 
-        for(VariableBindingPair pair : VariableBindingPair.getPairs(left.internal, right.internal))
+        for(VariableBindingPair pair : VariableBindingPair.getPairs(relations, left.internal, right.internal))
         {
             VariableBinding leftBinding = pair.getLeftVariableBinding();
             VariableBinding rightBinding = pair.getRightVariableBinding();
@@ -946,18 +955,20 @@ public final class SqlTableAccess extends SqlIntercode
     /**
      * Merges the VALUES into the access as conditions.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param left the left access
      * @param right the VALUES node
      * @param restrictions what the parent needs of the variables
      * @return the merged access
      */
-    private static SqlIntercode joinWithValues(SqlTableAccess left, SqlValues right, Restrictions restrictions)
+    private static SqlIntercode joinWithValues(ClassRelations relations, SqlTableAccess left, SqlValues right,
+            Restrictions restrictions)
     {
         Conditions conditions = Conditions.and(left.conditions,
                 right.asConditions(left.schema, left.table, left.getVariableBindings()));
 
-        return create(left.schema, left.table, conditions, left.internal.restrict(restrictions), left.reduced,
-                left.distinctColumns);
+        return create(left.schema, left.table, conditions, left.internal.restrict(relations, restrictions),
+                left.reduced, left.distinctColumns);
     }
 
 
@@ -970,15 +981,16 @@ public final class SqlTableAccess extends SqlIntercode
      * not decided by the row of the other access itself: another row with the same join values may satisfy the
      * conditions while that row does not.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param access the other access
      * @param distinct the deduplicated access
      * @param distinctColumns columns over which deduplication is requested
      * @return true if the distinct access can be merged without changing the multiplicities, false otherwise
      */
-    static boolean canBeJoinedByDistinctColumns(SqlTableAccess access, SqlTableAccess distinct,
-            Set<Column> distinctColumns)
+    static boolean canBeJoinedByDistinctColumns(ClassRelations relations, SqlTableAccess access,
+            SqlTableAccess distinct, Set<Column> distinctColumns)
     {
-        Set<Column> joinColumns = getJoinColumns(distinct, access);
+        Set<Column> joinColumns = getJoinColumns(relations, distinct, access);
 
         if(!joinColumns.containsAll(distinctColumns))
             return false;
@@ -995,30 +1007,34 @@ public final class SqlTableAccess extends SqlIntercode
 
     /**
      * Returns whether the distinct access is deduplicated over its own distinct columns and can be merged into the
-     * other access, see {@link #canBeJoinedByDistinctColumns(SqlTableAccess, SqlTableAccess, Set)}.
+     * other access, see {@link #canBeJoinedByDistinctColumns(ClassRelations, SqlTableAccess, SqlTableAccess, Set)}.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param access the other access
      * @param distinct the deduplicated access
      * @return true if the distinct access can be merged without changing the multiplicities, false otherwise
      */
-    private static boolean canBeJoinedByDistinctColumns(SqlTableAccess access, SqlTableAccess distinct)
+    private static boolean canBeJoinedByDistinctColumns(ClassRelations relations, SqlTableAccess access,
+            SqlTableAccess distinct)
     {
         return !distinct.distinctColumns.isEmpty()
-                && canBeJoinedByDistinctColumns(access, distinct, distinct.distinctColumns);
+                && canBeJoinedByDistinctColumns(relations, access, distinct, distinct.distinctColumns);
     }
 
 
     /**
      * Merges two accesses to the same table joined on a key into one access.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param left the left access
      * @param right the right access
      * @param restrictions what the parent needs of the variables
      * @return the merged access
      */
-    static SqlIntercode joinByPrimaryKey(SqlTableAccess left, SqlTableAccess right, Restrictions restrictions)
+    static SqlIntercode joinByPrimaryKey(ClassRelations relations, SqlTableAccess left, SqlTableAccess right,
+            Restrictions restrictions)
     {
-        return join(left, right, restrictions, union(left.distinctColumns, right.distinctColumns));
+        return join(relations, left, right, restrictions, union(left.distinctColumns, right.distinctColumns));
     }
 
 
@@ -1026,14 +1042,16 @@ public final class SqlTableAccess extends SqlIntercode
      * Merges the distinct access into the other access to the same table, see {@link #canBeJoinedByDistinctColumns}.
      * The result keeps the multiplicities of the other access, including its deduplication request.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param access the other access
      * @param distinct the deduplicated access
      * @param restrictions what the parent needs of the variables
      * @return the merged access
      */
-    static SqlIntercode joinByDistinctColumns(SqlTableAccess access, SqlTableAccess distinct, Restrictions restrictions)
+    static SqlIntercode joinByDistinctColumns(ClassRelations relations, SqlTableAccess access, SqlTableAccess distinct,
+            Restrictions restrictions)
     {
-        return join(access, distinct, restrictions, access.distinctColumns);
+        return join(relations, access, distinct, restrictions, access.distinctColumns);
     }
 
 
@@ -1041,14 +1059,15 @@ public final class SqlTableAccess extends SqlIntercode
      * Merges two accesses to the same table: their conditions are conjoined with the equalities of the shared
      * variables; no solution when contradictory.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param left the left access
      * @param right the right access
      * @param restrictions what the parent needs of the variables
      * @param distinctColumns columns over which deduplication is requested
      * @return the merged access, or no solution when the conditions contradict
      */
-    private static SqlIntercode join(SqlTableAccess left, SqlTableAccess right, Restrictions restrictions,
-            Set<Column> distinctColumns)
+    private static SqlIntercode join(ClassRelations relations, SqlTableAccess left, SqlTableAccess right,
+            Restrictions restrictions, Set<Column> distinctColumns)
     {
         Condition joinCondition = new Condition();
         VariableBindings bindings = new VariableBindings(left.internal);
@@ -1057,7 +1076,7 @@ public final class SqlTableAccess extends SqlIntercode
             if(left.internal.get(var) == null)
                 bindings.add(right.internal.get(var));
 
-        for(VariableBindingPair pair : VariableBindingPair.getPairs(left.internal, right.internal))
+        for(VariableBindingPair pair : VariableBindingPair.getPairs(relations, left.internal, right.internal))
         {
             VariableBinding leftBinding = pair.getLeftVariableBinding();
             VariableBinding rightBinding = pair.getRightVariableBinding();
@@ -1075,7 +1094,7 @@ public final class SqlTableAccess extends SqlIntercode
             }
         }
 
-        bindings = bindings.restrict(restrictions);
+        bindings = bindings.restrict(relations, restrictions);
 
         Conditions conditions = Conditions.and(left.conditions, right.conditions);
         conditions = Conditions.and(conditions, joinCondition);
@@ -1091,14 +1110,15 @@ public final class SqlTableAccess extends SqlIntercode
     /**
      * Merges the parent access into the child access along the foreign key, so the parent table is not accessed at all.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param parent access to the referenced table
      * @param child access to the referencing table
      * @param key the foreign key
      * @param restrictions what the parent needs of the variables
      * @return the merged access
      */
-    static SqlIntercode joinByForeignKey(SqlTableAccess parent, SqlTableAccess child, Set<ColumnPair> key,
-            Restrictions restrictions)
+    static SqlIntercode joinByForeignKey(ClassRelations relations, SqlTableAccess parent, SqlTableAccess child,
+            Set<ColumnPair> key, Restrictions restrictions)
     {
         Map<Column, Column> map = new HashMap<>();
 
@@ -1114,7 +1134,7 @@ public final class SqlTableAccess extends SqlIntercode
             if(child.internal.get(var) == null)
                 bindings.add(remap(map, parent.internal.get(var)));
 
-        for(VariableBindingPair pair : VariableBindingPair.getPairs(child.internal, parent.internal))
+        for(VariableBindingPair pair : VariableBindingPair.getPairs(relations, child.internal, parent.internal))
         {
             VariableBinding childBinding = pair.getLeftVariableBinding();
             VariableBinding parentBinding = pair.getRightVariableBinding();
@@ -1134,7 +1154,7 @@ public final class SqlTableAccess extends SqlIntercode
             }
         }
 
-        bindings = bindings.restrict(restrictions);
+        bindings = bindings.restrict(relations, restrictions);
 
         Conditions conditions = Conditions.and(child.conditions, remap(map, parent.conditions));
         conditions = Conditions.and(conditions, joinCondition);
@@ -1152,13 +1172,14 @@ public final class SqlTableAccess extends SqlIntercode
      * Merges a left join of two accesses to the same table on a key: right-side variables become nullable, an extra
      * not-null condition of the right side becomes a CASE guarding its columns.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param left the left access
      * @param right the right access
      * @param restrictions what the parent needs of the variables
      * @return the merged access
      */
-    private static SqlTableAccess leftJoinByPrimaryKey(SqlTableAccess left, SqlTableAccess right,
-            Restrictions restrictions)
+    private static SqlTableAccess leftJoinByPrimaryKey(ClassRelations relations, SqlTableAccess left,
+            SqlTableAccess right, Restrictions restrictions)
     {
         Set<Column> extraNotNulls = new HashSet<>(right.conditions.getIsNotNull());
         extraNotNulls.removeAll(left.conditions.getIsNotNull());
@@ -1197,7 +1218,7 @@ public final class SqlTableAccess extends SqlIntercode
             }
         }
 
-        bindings = bindings.restrict(restrictions);
+        bindings = bindings.restrict(relations, restrictions);
 
         return new SqlTableAccess(left.schema, left.table, conditions, bindings, left.reduced && right.reduced,
                 union(left.distinctColumns, right.distinctColumns));
@@ -1274,17 +1295,18 @@ public final class SqlTableAccess extends SqlIntercode
      * Merges a VALUES node into the access as conditions when its rows are distinct and bound in a single class, or
      * returns null.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param schema the database schema
      * @param left the left access
      * @param right the VALUES node
      * @param mergeRestrictions what the parent needs of the variables
      * @return the merged access, or null
      */
-    public static SqlIntercode tryReduceJoinWithValues(DatabaseSchema schema, SqlTableAccess left, SqlValues right,
-            Restrictions mergeRestrictions)
+    public static SqlIntercode tryReduceJoinWithValues(ClassRelations relations, DatabaseSchema schema,
+            SqlTableAccess left, SqlValues right, Restrictions mergeRestrictions)
     {
         if(SqlTableAccess.canBeJoinedWithValues(schema, left, right))
-            return joinWithValues(left, right, mergeRestrictions);
+            return joinWithValues(relations, left, right, mergeRestrictions);
 
         return null;
     }
@@ -1294,36 +1316,37 @@ public final class SqlTableAccess extends SqlIntercode
      * Merges the two accesses into one when a foreign key, a shared key or declared distinct columns allow it; null
      * otherwise.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param schema the database schema
      * @param left the left access
      * @param right the right access
      * @param restrictions what the parent needs of the variables
      * @return the merged access, or null
      */
-    public static SqlIntercode tryReduceJoin(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right,
-            Restrictions restrictions)
+    public static SqlIntercode tryReduceJoin(ClassRelations relations, DatabaseSchema schema, SqlTableAccess left,
+            SqlTableAccess right, Restrictions restrictions)
     {
-        Set<ColumnPair> dropLeft = SqlTableAccess.canBeJoinedByForeignKey(schema, left, right);
+        Set<ColumnPair> dropLeft = SqlTableAccess.canBeJoinedByForeignKey(relations, schema, left, right);
 
         if(dropLeft != null)
-            return SqlTableAccess.joinByForeignKey(left, right, dropLeft, restrictions);
+            return SqlTableAccess.joinByForeignKey(relations, left, right, dropLeft, restrictions);
 
 
-        Set<ColumnPair> dropRight = SqlTableAccess.canBeJoinedByForeignKey(schema, right, left);
+        Set<ColumnPair> dropRight = SqlTableAccess.canBeJoinedByForeignKey(relations, schema, right, left);
 
         if(dropRight != null)
-            return SqlTableAccess.joinByForeignKey(right, left, dropRight, restrictions);
+            return SqlTableAccess.joinByForeignKey(relations, right, left, dropRight, restrictions);
 
 
-        if(SqlTableAccess.canBeJoinedByPrimaryKey(schema, left, right))
-            return SqlTableAccess.joinByPrimaryKey(left, right, restrictions);
+        if(SqlTableAccess.canBeJoinedByPrimaryKey(relations, schema, left, right))
+            return SqlTableAccess.joinByPrimaryKey(relations, left, right, restrictions);
 
 
-        if(SqlTableAccess.canBeJoinedByDistinctColumns(left, right))
-            return SqlTableAccess.joinByDistinctColumns(left, right, restrictions);
+        if(SqlTableAccess.canBeJoinedByDistinctColumns(relations, left, right))
+            return SqlTableAccess.joinByDistinctColumns(relations, left, right, restrictions);
 
-        if(SqlTableAccess.canBeJoinedByDistinctColumns(right, left))
-            return SqlTableAccess.joinByDistinctColumns(right, left, restrictions);
+        if(SqlTableAccess.canBeJoinedByDistinctColumns(relations, right, left))
+            return SqlTableAccess.joinByDistinctColumns(relations, right, left, restrictions);
 
         return null;
     }
@@ -1332,17 +1355,18 @@ public final class SqlTableAccess extends SqlIntercode
     /**
      * Merges a left join of two accesses to the same table on a key into one access; null otherwise.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param schema the database schema
      * @param left the left access
      * @param right the right access
      * @param restrictions what the parent needs of the variables
      * @return the merged access, or null
      */
-    public static SqlIntercode tryReduceLeftJoin(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right,
-            Restrictions restrictions)
+    public static SqlIntercode tryReduceLeftJoin(ClassRelations relations, DatabaseSchema schema, SqlTableAccess left,
+            SqlTableAccess right, Restrictions restrictions)
     {
-        if(SqlTableAccess.canBeLeftJoinedByPrimaryKey(schema, left, right))
-            return SqlTableAccess.leftJoinByPrimaryKey(left, right, restrictions);
+        if(SqlTableAccess.canBeLeftJoinedByPrimaryKey(relations, schema, left, right))
+            return SqlTableAccess.leftJoinByPrimaryKey(relations, left, right, restrictions);
 
         return null;
     }
@@ -1351,19 +1375,21 @@ public final class SqlTableAccess extends SqlIntercode
     /**
      * Merges a distinct union of two accesses related by a foreign key into one access; null otherwise.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param schema the database schema
      * @param left the left access
      * @param right the right access
      * @return the merged access, or null
      */
-    public static SqlIntercode tryReduceDistinctUnion(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
+    public static SqlIntercode tryReduceDistinctUnion(ClassRelations relations, DatabaseSchema schema,
+            SqlTableAccess left, SqlTableAccess right)
     {
-        Set<ColumnPair> dropRight = SqlTableAccess.canBeDistinctUnionizedByForeignKey(schema, left, right);
+        Set<ColumnPair> dropRight = SqlTableAccess.canBeDistinctUnionizedByForeignKey(relations, schema, left, right);
 
         if(dropRight != null)
             return SqlTableAccess.distinctUnionizeByForeignKey(left, right, dropRight);
 
-        Set<ColumnPair> dropLeft = SqlTableAccess.canBeDistinctUnionizedByForeignKey(schema, right, left);
+        Set<ColumnPair> dropLeft = SqlTableAccess.canBeDistinctUnionizedByForeignKey(relations, schema, right, left);
 
         if(dropLeft != null)
             return SqlTableAccess.distinctUnionizeByForeignKey(right, left, dropLeft);
@@ -1544,10 +1570,12 @@ public final class SqlTableAccess extends SqlIntercode
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         if(conditions.isFalse())
             return SqlNoSolution.get();
 
-        VariableBindings optimizedBindings = internal.restrict(restrictions);
+        VariableBindings optimizedBindings = internal.restrict(relations, restrictions);
 
         Set<Column> optimizedDistinct = distinctColumns;
 

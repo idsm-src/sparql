@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Objects;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBindings;
@@ -122,29 +123,31 @@ public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpre
     /**
      * Logical expression over boolean operands.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operator the operator
      * @param left the left operand
      * @param right the right operand
      * @return logical expression over boolean operands
      */
-    public static SqlExpressionIntercode create(LogicalOperator operator, SqlExpressionIntercode left,
-            SqlExpressionIntercode right)
+    public static SqlExpressionIntercode create(ClassRelations relations, LogicalOperator operator,
+            SqlExpressionIntercode left, SqlExpressionIntercode right)
     {
-        return create(operator, left, right, Restriction.ALL);
+        return create(relations, operator, left, right, Restriction.ALL);
     }
 
 
     /**
      * Logical expression materialising only the needed result; constant operands are folded.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operator the operator
      * @param left the left operand
      * @param right the right operand
      * @param restriction the result classes the parent needs
      * @return logical expression materialising only the needed result; constant operands are folded
      */
-    private static SqlExpressionIntercode create(LogicalOperator operator, SqlExpressionIntercode left,
-            SqlExpressionIntercode right, Restriction restriction)
+    private static SqlExpressionIntercode create(ClassRelations relations, LogicalOperator operator,
+            SqlExpressionIntercode left, SqlExpressionIntercode right, Restriction restriction)
     {
         if(left.equals(SqlNull.get()) && right.equals(SqlNull.get()))
             return SqlNull.get();
@@ -195,7 +198,8 @@ public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpre
                 value = TRUE_OR_ERROR;
         }
 
-        List<Column> columns = restriction.contains(xsdBoolean) ? translate(operator, left, right) : null;
+        List<Column> columns = restriction.contains(relations, xsdBoolean) ?
+                translate(relations, operator, left, right) : null;
         Map<ResourceClass, List<Column>> mappings = singletonMap(xsdBoolean, columns);
 
         return new SqlBinaryLogical(operator, left, right, mappings, left.canBeNull() || right.canBeNull(), value);
@@ -205,17 +209,17 @@ public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpre
     /**
      * SQL applying the {@code sparql.*} operator to the boolean values of the operands.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operator the operator
      * @param left the left operand
      * @param right the right operand
      * @return SQL applying the {@code sparql.*} operator to the boolean values of the operands
      */
-    private static List<Column> translate(LogicalOperator operator, SqlExpressionIntercode left,
-            SqlExpressionIntercode right)
+    private static List<Column> translate(ClassRelations relations, LogicalOperator operator,
+            SqlExpressionIntercode left, SqlExpressionIntercode right)
     {
-        return List.of(new ExpressionColumn(
-                "(" + left.get(genBoolean).get(0) + " " + operator.getName() + " " + right.get(genBoolean).get(0) + ")",
-                left.canBeNull() || right.canBeNull()));
+        return List.of(new ExpressionColumn("(" + left.get(relations, genBoolean).get(0) + " " + operator.getName()
+                + " " + right.get(relations, genBoolean).get(0) + ")", left.canBeNull() || right.canBeNull()));
     }
 
 
@@ -230,9 +234,11 @@ public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpre
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         Restriction operandRestriction = new Restriction();
 
-        if(restriction.contains(xsdBoolean))
+        if(restriction.contains(relations, xsdBoolean))
             operandRestriction.add(genBoolean);
 
         SqlExpressionIntercode optLeft = left.optimize(request, bindings, operandRestriction, evalServices);
@@ -241,7 +247,7 @@ public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpre
         if(optLeft == left && optRight == getRight())
             return this;
 
-        return create(operator, optLeft, optRight, restriction);
+        return create(relations, operator, optLeft, optRight, restriction);
     }
 
 

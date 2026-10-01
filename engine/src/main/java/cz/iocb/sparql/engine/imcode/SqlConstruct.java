@@ -28,6 +28,7 @@ import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Iri;
@@ -321,6 +322,8 @@ public final class SqlConstruct extends SqlIntercode
     protected static SqlIntercode construct(Request request, List<Template> templates, SqlIntercode child,
             AtomicInteger bnOffset)
     {
+        ClassRelations relations = request.getConfiguration();
+
         List<VariableBindings> branches = new ArrayList<>(templates.size());
         Map<BlankNodeTemplate, ResourceClass> bnClasses = new HashMap<>();
 
@@ -344,7 +347,7 @@ public final class SqlConstruct extends SqlIntercode
         {
             List<VariableBinding> defs = branches.stream().map(b -> b.get(var)).filter(Objects::nonNull).toList();
 
-            classes.put(var, unionResourceClasses(defs));
+            classes.put(var, unionResourceClasses(relations, defs));
         }
 
 
@@ -367,7 +370,7 @@ public final class SqlConstruct extends SqlIntercode
             for(ResourceClass resourceClass : entry.getValue())
             {
                 if(vars.stream().filter(Objects::nonNull).flatMap(v -> v.getMappings().entrySet().stream())
-                        .anyMatch(r -> isNull(r.getValue()) && !areDisjunct(r.getKey(), resourceClass)))
+                        .anyMatch(r -> isNull(r.getValue()) && !areDisjunct(relations, r.getKey(), resourceClass)))
                 {
                     variableBinding.addMapping(resourceClass, null);
                     continue;
@@ -389,7 +392,7 @@ public final class SqlConstruct extends SqlIntercode
                     }
                     else
                     {
-                        List<Column> c = binding.deriveMapping(resourceClass);
+                        List<Column> c = binding.deriveMapping(relations, resourceClass);
 
                         for(int i = 0; i < resourceClass.getColumnCount(); i++)
                             cols.get(i).add(c.get(i));

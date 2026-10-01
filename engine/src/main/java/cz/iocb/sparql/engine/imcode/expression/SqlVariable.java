@@ -8,6 +8,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
@@ -46,33 +47,37 @@ public final class SqlVariable extends SqlExpressionIntercode
     /**
      * Reference to the variable of the binding; NULL for a null binding.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param binding the variable binding
      * @return reference to the variable of the binding; NULL for a null binding
      */
-    public static SqlExpressionIntercode create(VariableBinding binding)
+    public static SqlExpressionIntercode create(ClassRelations relations, VariableBinding binding)
     {
-        return create(binding, Restriction.ALL);
+        return create(relations, binding, Restriction.ALL);
     }
 
 
     /**
      * Reference materialising only the needed classes.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param binding the variable binding
      * @param restriction the result classes the parent needs
      * @return reference materialising only the needed classes
      */
-    private static SqlExpressionIntercode create(VariableBinding binding, Restriction restriction)
+    private static SqlExpressionIntercode create(ClassRelations relations, VariableBinding binding,
+            Restriction restriction)
     {
         if(binding == null)
             return SqlNull.get();
 
-        return new SqlVariable(binding.getVariable(), restriction.restrict(binding.getMappings()), binding.canBeNull());
+        return new SqlVariable(binding.getVariable(), restriction.restrict(relations, binding.getMappings()),
+                binding.canBeNull());
     }
 
 
     @Override
-    public Restrictions getRequirements()
+    public Restrictions getRequirements(ClassRelations relations)
     {
         Restrictions restrictions = new Restrictions();
 
@@ -88,16 +93,18 @@ public final class SqlVariable extends SqlExpressionIntercode
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         VariableBinding binding = bindings.get(variable);
 
         if(binding == null)
             return SqlNull.get();
 
 
-        if(variableBinding.equals(binding) && restriction.isOptimized(variableBinding))
+        if(variableBinding.equals(binding) && restriction.isOptimized(relations, variableBinding))
             return this;
 
-        return create(binding, restriction);
+        return create(relations, binding, restriction);
     }
 
 

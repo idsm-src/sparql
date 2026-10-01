@@ -16,6 +16,7 @@ import cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.Multiset;
@@ -81,7 +82,7 @@ public final class SqlFilter extends SqlIntercode
     protected static SqlIntercode filter(Request request, List<SqlExpressionIntercode> conditions, SqlIntercode child,
             Restrictions restrictions)
     {
-        VariableBindings bindings = child.getVariableBindings().restrict(restrictions);
+        VariableBindings bindings = child.getVariableBindings().restrict(request.getConfiguration(), restrictions);
 
         return new SqlFilter(bindings, child, conditions);
     }
@@ -90,6 +91,8 @@ public final class SqlFilter extends SqlIntercode
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         SqlIntercode optChild = child;
         List<SqlExpressionIntercode> optCnds = conditions;
 
@@ -98,7 +101,7 @@ public final class SqlFilter extends SqlIntercode
         Restrictions childRestrictions = new Restrictions(restrictions);
 
         for(SqlExpressionIntercode cnd : optCnds)
-            childRestrictions.add(cnd.getRequirements());
+            childRestrictions.add(cnd.getRequirements(relations));
 
         while(true)
         {
@@ -124,7 +127,7 @@ public final class SqlFilter extends SqlIntercode
 
             boolean newChildReduced = reduced && optCnds.stream().allMatch(r -> r.isDeterministic());
             Restrictions newChildRestrictions = new Restrictions(restrictions);
-            newOptCnds.forEach(c -> newChildRestrictions.add(c.getRequirements()));
+            newOptCnds.forEach(c -> newChildRestrictions.add(c.getRequirements(relations)));
 
             if(newChildReduced == childReduced && newChildRestrictions.equals(childRestrictions))
                 break;
@@ -168,7 +171,7 @@ public final class SqlFilter extends SqlIntercode
         }
 
 
-        if(optCnds.equals(conditions) && optChild == child && restrictions.isOptimized(bindings))
+        if(optCnds.equals(conditions) && optChild == child && restrictions.isOptimized(relations, bindings))
             return this;
 
         return filter(request, optCnds, optChild, restrictions);
@@ -178,6 +181,8 @@ public final class SqlFilter extends SqlIntercode
     @Override
     public String translate(Request request)
     {
+        ClassRelations relations = request.getConfiguration();
+
         StringBuilder builder = new StringBuilder();
 
         builder.append("SELECT ");
@@ -195,7 +200,8 @@ public final class SqlFilter extends SqlIntercode
 
         builder.append(" WHERE ");
 
-        builder.append(conditions.stream().map(cnd -> cnd.get(xsdBoolean).get(0).toString()).collect(joining(" AND ")));
+        builder.append(conditions.stream().map(cnd -> cnd.get(relations, xsdBoolean).get(0).toString())
+                .collect(joining(" AND ")));
 
         return builder.toString();
     }

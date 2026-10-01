@@ -17,6 +17,7 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
@@ -85,8 +86,10 @@ public final class SqlDistinct extends SqlIntercode
     protected static SqlIntercode create(Request request, SqlIntercode child, Set<Variable> distinctVariables,
             Restrictions restrictions)
     {
-        var variables = child.getVariableBindings().restrict(new Restrictions(distinctVariables))
-                .restrict(restrictions);
+        ClassRelations relations = request.getConfiguration();
+
+        var variables = child.getVariableBindings().restrict(relations, new Restrictions(distinctVariables))
+                .restrict(relations, restrictions);
         return new SqlDistinct(variables, child, distinctVariables);
     }
 
@@ -94,6 +97,8 @@ public final class SqlDistinct extends SqlIntercode
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         SqlIntercode optChild = child.optimize(request, new Restrictions(distinctVariables), true, evalServices);
 
 
@@ -155,7 +160,7 @@ public final class SqlDistinct extends SqlIntercode
         }
 
 
-        if(optChild == child && restrictions.isOptimized(bindings))
+        if(optChild == child && restrictions.isOptimized(relations, bindings))
             return this;
 
         return create(request, optChild, distinctVariables, restrictions);
@@ -165,9 +170,11 @@ public final class SqlDistinct extends SqlIntercode
     @Override
     public String translate(Request request)
     {
+        ClassRelations relations = request.getConfiguration();
+
         SqlIntercode child = this.child;
         Restrictions restrictions = new Restrictions(distinctVariables);
-        VariableBindings bindings = child.getVariableBindings().restrict(restrictions);
+        VariableBindings bindings = child.getVariableBindings().restrict(relations, restrictions);
 
         Set<Variable> stringLiterals = new HashSet<>();
 
@@ -178,7 +185,7 @@ public final class SqlDistinct extends SqlIntercode
 
         for(Variable var : stringLiterals)
             child = SqlBind.bind(request, new Variable("#hash_" + var), SqlBuiltinCall.create(request, "_strhash",
-                    false, List.of(SqlVariable.create(child.getVariable(var)))), child);
+                    false, List.of(SqlVariable.create(relations, child.getVariable(var)))), child);
 
 
         StringBuilder builder = new StringBuilder();
@@ -198,7 +205,8 @@ public final class SqlDistinct extends SqlIntercode
 
         builder.append(" GROUP BY ");
 
-        Set<Column> groupColumns = child.getVariableBindings().restrict(restrictions).getNonConstantColumns();
+        Set<Column> groupColumns = child.getVariableBindings().restrict(relations, restrictions)
+                .getNonConstantColumns();
 
         Set<Column> hashColumns = new HashSet<>();
 
@@ -231,6 +239,8 @@ public final class SqlDistinct extends SqlIntercode
     protected static List<SqlIntercode> expandUnionByResourceClasses(Request request, SqlUnion union,
             Set<Variable> distinctVariables)
     {
+        ClassRelations relations = request.getConfiguration();
+
         List<Pair<List<Set<ResourceClass>>, List<SqlIntercode>>> sorts = new ArrayList<>();
 
         for(SqlIntercode child : union.getChilds())
@@ -250,7 +260,7 @@ public final class SqlDistinct extends SqlIntercode
                 if(binding != null)
                     for(ResourceClass varResourceClass : binding.getClasses())
                         for(ResourceClass unionResourceClass : unionBinding.getClasses())
-                            if(!ResourceClass.areDisjunct(varResourceClass, unionResourceClass))
+                            if(!ResourceClass.areDisjunct(relations, varResourceClass, unionResourceClass))
                                 classes.add(unionResourceClass);
 
                 newKey.add(classes);
@@ -372,6 +382,8 @@ public final class SqlDistinct extends SqlIntercode
      */
     private static SqlIntercode reduceDistinctUnion(Request request, SqlUnion union, DatabaseSchema schema)
     {
+        ClassRelations relations = request.getConfiguration();
+
         List<SqlIntercode> optChilds = new ArrayList<>(union.getChilds());
 
         for(int i = 0; i < optChilds.size(); i++)
@@ -382,7 +394,7 @@ public final class SqlDistinct extends SqlIntercode
                 {
                     if(optChilds.get(j) instanceof SqlTableAccess right)
                     {
-                        SqlIntercode merged = SqlTableAccess.tryReduceDistinctUnion(schema, left, right);
+                        SqlIntercode merged = SqlTableAccess.tryReduceDistinctUnion(relations, schema, left, right);
 
                         if(merged != null)
                         {

@@ -1,12 +1,18 @@
 package cz.iocb.sparql.engine.translator;
 
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.intersect;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.translator.TermGenerator.getIri;
 import static cz.iocb.sparql.engine.translator.TermGenerator.getTerm;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
@@ -36,11 +42,12 @@ import cz.iocb.sparql.engine.mapping.InternalNodeMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping.JoinColumns;
 import cz.iocb.sparql.engine.mapping.ParametrisedIriMapping;
-import cz.iocb.sparql.engine.mapping.ParametrisedMapping;
 import cz.iocb.sparql.engine.mapping.QuadMapping;
 import cz.iocb.sparql.engine.mapping.SingleTableQuadMapping;
 import cz.iocb.sparql.engine.mapping.TermMapping;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.InternalResourceClass;
+import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.model.IriNode;
 import cz.iocb.sparql.engine.model.VarOrIri;
@@ -451,7 +458,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             SqlIntercode union = SqlUnion.union(request, List.of(subjects, objects));
 
             SqlIntercode bind = SqlBind.bind(request, objectVar,
-                    SqlVariable.create(union.getVariableBindings().get(subjectVar)), union);
+                    SqlVariable.create(request.getConfiguration(), union.getVariableBindings().get(subjectVar)), union);
 
             return SqlDistinct.create(request, bind, distinctVariables);
         }
@@ -569,8 +576,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     /**
-     * Table access binding the mapped terms: constants become conditions, repeated variables become equalities, and
-     * mapped columns of variables are exposed as bindings.
+     * Table access binding the mapped terms: constants become conditions, repeated variables become equalities (see
+     * {@link #bindVariable}), and mapped columns of variables are exposed as bindings.
      *
      * @param request the current request
      * @param table the table
@@ -587,6 +594,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
         Condition condition = new Condition();
         VariableBindings bindings = new VariableBindings();
+        Map<Variable, List<TermMapping>> variables = new LinkedHashMap<>();
 
         for(MappedTerm map : maps)
         {
@@ -596,45 +604,28 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             if(term == null)
                 continue;
 
-            if(!(term instanceof Variable) && mapping instanceof ConstantMapping)
+            if(term instanceof Variable variable)
+            {
+                variables.computeIfAbsent(variable, _ -> new ArrayList<>()).add(mapping);
+                continue;
+            }
+
+            if(mapping instanceof ConstantMapping)
                 continue; //NOTE: already checked
 
             ResourceClass resourceClass = mapping.getResourceClass(request);
             List<Column> columns = mapping.getColumns(request);
 
-            // the term is present when its determining columns are not null; the optional ones may be null
-            for(int i = 0; i < columns.size(); i++)
-                if(!resourceClass.isOptionalColumn(i) && schema.isNullableColumn(table, columns.get(i)))
-                    condition.addIsNotNull(columns.get(i));
+            addPresenceConditions(schema, table, condition, resourceClass, columns);
 
-            if(term instanceof Variable variable)
-            {
-                VariableBinding other = bindings.get(variable);
-
-                if(other == null)
-                {
-                    bindings.add(new VariableBinding(variable, resourceClass, columns, false));
-                }
-                else if(other.getClasses().iterator().next().equals(resourceClass))
-                {
-                    List<Column> current = other.getMapping(resourceClass);
-                    condition.addAreEqual(columns, current,
-                            SqlTableAccess.needsNullSafeEquality(schema, table, resourceClass, columns, current));
-                }
-                else
-                {
-                    //FIXME: common (general) classes cannot be used in mappings
-                    assert ResourceClass.areDisjunct(other.getClasses().iterator().next(), resourceClass);
-                    return SqlNoSolution.get();
-                }
-            }
-            else if(mapping instanceof ParametrisedMapping)
-            {
-                List<Column> values = request.getColumns(mapping.getResourceClass(request), term);
-                condition.addAreEqual(columns, values,
-                        SqlTableAccess.needsNullSafeEquality(schema, table, resourceClass, columns, values));
-            }
+            List<Column> values = request.getColumns(resourceClass, term);
+            condition.addAreEqual(columns, values,
+                    SqlTableAccess.needsNullSafeEquality(schema, table, resourceClass, columns, values));
         }
+
+        for(Entry<Variable, List<TermMapping>> entry : variables.entrySet())
+            if(!bindVariable(request, table, entry.getKey(), entry.getValue(), condition, bindings))
+                return SqlNoSolution.get();
 
         Set<Column> distinctColumns = Set.of();
 
@@ -647,6 +638,132 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
         return SqlTableAccess.create(request, table, Conditions.and(extraCondition, condition), bindings, false,
                 distinctColumns);
+    }
+
+
+    /**
+     * Requires the mapped term to be present: its determining columns must not be null when the table allows it (the
+     * optional columns may be null, see {@link ResourceClass#isOptionalColumn}).
+     *
+     * @param schema the database schema
+     * @param table the table
+     * @param condition the condition to extend
+     * @param resourceClass class of the mapped term
+     * @param columns the mapped columns
+     */
+    private static void addPresenceConditions(DatabaseSchema schema, SourceTable table, Condition condition,
+            ResourceClass resourceClass, List<Column> columns)
+    {
+        for(int i = 0; i < columns.size(); i++)
+            if(!resourceClass.isOptionalColumn(i) && schema.isNullableColumn(table, columns.get(i)))
+                condition.addIsNotNull(columns.get(i));
+    }
+
+
+    /**
+     * Binds a variable mapped at one or more positions of the table and requires every position to hold the same term.
+     * When some position is mapped to a constant, the variable denotes that term: the constants of all such positions
+     * have to agree, every column mapping has to hold the term (compared with the term in the class of the mapping),
+     * and the variable is bound to the constant. Otherwise the mappings are ordered by class, so that neighbours of the
+     * same class are compared directly and neighbours of different classes in the union of their classes (converting to
+     * a more general class is always possible), and the variable is bound in the intersection of the classes, taking
+     * the columns of a mapping whose class is the effective class of the intersection.
+     *
+     * @param request the current request
+     * @param table the table
+     * @param variable the variable
+     * @param mappings mappings of the positions of the variable
+     * @param condition the condition to extend
+     * @param bindings the bindings to extend
+     * @return true if the positions can hold the same term, false if the pattern has no solution
+     */
+    private static boolean bindVariable(Request request, SourceTable table, Variable variable,
+            List<TermMapping> mappings, Condition condition, VariableBindings bindings)
+    {
+        ClassRelations relations = request.getConfiguration();
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+
+        for(TermMapping mapping : mappings)
+            addPresenceConditions(schema, table, condition, mapping.getResourceClass(request),
+                    mapping.getColumns(request));
+
+        List<ConstantMapping> constants = mappings.stream().filter(m -> m instanceof ConstantMapping)
+                .map(m -> (ConstantMapping) m).toList();
+
+        if(!constants.isEmpty())
+        {
+            ConstantMapping constant = constants.getFirst();
+            RdfTerm term = constant.getValue();
+
+            if(constants.stream().anyMatch(c -> !c.getValue().equals(term)))
+                return false;
+
+            for(TermMapping mapping : mappings)
+            {
+                if(mapping instanceof ConstantMapping)
+                    continue;
+
+                if(!mapping.match(request, term))
+                    return false;
+
+                ResourceClass resourceClass = mapping.getResourceClass(request);
+                List<Column> columns = mapping.getColumns(request);
+                List<Column> values = request.getColumns(resourceClass, term);
+
+                condition.addAreEqual(columns, values,
+                        SqlTableAccess.needsNullSafeEquality(schema, table, resourceClass, columns, values));
+            }
+
+            bindings.add(new VariableBinding(variable, constant.getResourceClass(request), constant.getColumns(request),
+                    false));
+
+            return true;
+        }
+
+        List<TermMapping> ordered = new ArrayList<>(mappings);
+        ordered.sort(Comparator.comparing(m -> m.getResourceClass(request).getResourceName()));
+
+        Set<ResourceClass> classes = new HashSet<>();
+
+        for(TermMapping mapping : ordered)
+            classes.add(mapping.getResourceClass(request));
+
+        for(ResourceClass resourceClass : classes)
+            for(ResourceClass other : classes)
+                if(!resourceClass.equals(other) && ResourceClass.areDisjunct(relations, resourceClass, other))
+                    return false;
+
+        for(int i = 1; i < ordered.size(); i++)
+        {
+            ResourceClass previousClass = ordered.get(i - 1).getResourceClass(request);
+            ResourceClass currentClass = ordered.get(i).getResourceClass(request);
+            List<Column> previous = ordered.get(i - 1).getColumns(request);
+            List<Column> current = ordered.get(i).getColumns(request);
+
+            if(!previousClass.equals(currentClass))
+            {
+                ResourceClass unionClass = unionize(previousClass, currentClass);
+                previous = previousClass.toGeneralClass(unionClass, previous, true);
+                current = currentClass.toGeneralClass(unionClass, current, true);
+                previousClass = unionClass;
+            }
+
+            condition.addAreEqual(previous, current,
+                    SqlTableAccess.needsNullSafeEquality(schema, table, previousClass, previous, current));
+        }
+
+        ResourceClass joinClass = intersect(relations, classes);
+        PrimitiveResourceClass effectiveClass = joinClass.getEffectiveClass();
+
+        TermMapping base = ordered.stream().filter(m -> m.getResourceClass(request).equals(effectiveClass)).findFirst()
+                .orElse(ordered.getFirst());
+
+        List<Column> columns = base.getResourceClass(request).equals(effectiveClass) ? base.getColumns(request) :
+                joinClass.fromGeneralClass(base.getResourceClass(request), base.getColumns(request), true);
+
+        bindings.add(new VariableBinding(variable, joinClass, columns, false));
+
+        return true;
     }
 
 
@@ -669,7 +786,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         SqlExpressionIntercode compare = SqlBuiltinCall.create(request, "sameterm", false, List.of(expr1, expr2));
 
         if(not)
-            return SqlUnaryLogical.create(compare);
+            return SqlUnaryLogical.create(request.getConfiguration(), compare);
         else
             return compare;
     }
@@ -687,7 +804,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         return switch(term)
         {
-            case Variable variable -> SqlVariable.create(bindings.get(variable));
+            case Variable variable -> SqlVariable.create(request.getConfiguration(), bindings.get(variable));
             case Iri iri -> SqlIri.create(request, iri);
             case Literal literal -> SqlLiteral.create(request, literal);
             default -> null;

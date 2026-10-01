@@ -11,6 +11,12 @@ import cz.iocb.sparql.engine.database.SqlType;
 
 /**
  * IRI class defined by a deployment: IRIs of a recognisable shape whose identifying part is stored in native columns.
+ * Two user IRI classes may be related (one a subclass of the other) or disjoint, and they may also overlap when the
+ * configuration declares the pair as sharing IRIs
+ * ({@link cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration#addIriClassOverlap(UserIriClass, UserIriClass)});
+ * the declarations ({@link ClassRelations}) are not kept by the classes, as they depend on the classes registered
+ * together, but are supplied to the operations deciding disjointness. An IRI belonging to several classes gets their
+ * intersection as its class.
  */
 public non-sealed abstract class UserIriClass extends IriClass
 {
@@ -35,6 +41,23 @@ public non-sealed abstract class UserIriClass extends IriClass
      *         needed, 2 when it always is
      */
     public abstract int getCheckCost();
+
+
+    /**
+     * True if the classes are unrelated and the declarations do not let them overlap
+     * ({@link ClassRelations#mayOverlap}). A class other than a user IRI class is disjoint with this class whenever
+     * they are unrelated: the unsupported IRI class holds the IRIs of no user class, and the classes of other kinds of
+     * terms hold no IRI.
+     */
+    @Override
+    protected final boolean isDisjunctWith(ClassRelations relations, PrimitiveResourceClass resClass)
+    {
+        if(!super.isDisjunctWith(relations, resClass))
+            return false;
+
+        return !(resClass instanceof UserIriClass other) || !relations.mayOverlap(this, other);
+    }
+
 
 
     /**

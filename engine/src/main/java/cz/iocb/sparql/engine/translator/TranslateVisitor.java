@@ -69,6 +69,7 @@ import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping;
 import cz.iocb.sparql.engine.mapping.QuadMapping;
 import cz.iocb.sparql.engine.mapping.SingleTableQuadMapping;
 import cz.iocb.sparql.engine.mapping.TermMapping;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
@@ -237,6 +238,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(DescribeQuery describeQuery)
     {
+        ClassRelations relations = request.getConfiguration();
+
         prologue = describeQuery.getPrologue();
 
         setDatasets(describeQuery.getSelect().getDataSets());
@@ -267,7 +270,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             else
             {
                 Variable variable = getVariable((VariableNode) resource);
-                SqlExpressionIntercode expression = SqlVariable.create(select.getVariable(variable));
+                SqlExpressionIntercode expression = SqlVariable.create(relations, select.getVariable(variable));
 
                 SqlExpressionIntercode filter = SqlBuiltinCall.create(request, "bound", false, List.of(expression));
                 SqlIntercode source = SqlFilter.filter(request, List.of(filter), select);
@@ -292,6 +295,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(ConstructQuery constructQuery)
     {
+        ClassRelations relations = request.getConfiguration();
+
         prologue = constructQuery.getPrologue();
 
         setDatasets(constructQuery.getSelect().getDataSets());
@@ -309,11 +314,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         SqlIntercode construct = SqlConstruct.construct(request, templates, source);
 
-        SqlIntercode filter = SqlFilter.filter(request,
-                List.of(SqlBuiltinCall.create(request, "isiri", false,
-                        List.of(SqlVariable.create(construct.getVariable(PREDICATE.getVariable())))),
-                        SqlUnaryLogical.create(SqlBuiltinCall.create(request, "isliteral", false,
-                                List.of(SqlVariable.create(construct.getVariable(SUBJECT.getVariable())))))),
+        SqlIntercode filter = SqlFilter.filter(request, List.of(
+                SqlBuiltinCall.create(request, "isiri", false,
+                        List.of(SqlVariable.create(relations, construct.getVariable(PREDICATE.getVariable())))),
+                SqlUnaryLogical.create(relations,
+                        SqlBuiltinCall.create(request, "isliteral", false,
+                                List.of(SqlVariable.create(relations, construct.getVariable(SUBJECT.getVariable())))))),
                 construct);
 
         return SqlSelect.createTopLevel(request, SqlConstruct.getColumns(),
@@ -975,8 +981,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             for(Filter filter : optionalFilters)
             {
                 ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(request, bindings, this);
-                SqlExpressionIntercode expression = SqlEffectiveBooleanValue
-                        .create(visitor.visitElement(filter.getConstraint()));
+                SqlExpressionIntercode expression = SqlEffectiveBooleanValue.create(request.getConfiguration(),
+                        visitor.visitElement(filter.getConstraint()));
 
                 if(!expression.equals(trueValue))
                     conditions.add(expression);
@@ -1040,8 +1046,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         {
             ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(request,
                     groupPattern.getVariableBindings(), this);
-            SqlExpressionIntercode expression = SqlEffectiveBooleanValue
-                    .create(visitor.visitElement(filter.getConstraint()));
+            SqlExpressionIntercode expression = SqlEffectiveBooleanValue.create(request.getConfiguration(),
+                    visitor.visitElement(filter.getConstraint()));
 
             filterExpressions.add(expression);
         }
@@ -1387,7 +1393,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 return null;
 
             if(offset != null || limit != null || !order.isEmpty())
-                imcode = imcode.addExternalLimits(offset, limit, order);
+                imcode = imcode.addExternalLimits(request.getConfiguration(), offset, limit, order);
 
             return imcode;
         }

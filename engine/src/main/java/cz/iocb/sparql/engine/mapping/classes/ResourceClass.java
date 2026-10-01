@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.mapping.classes;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -144,24 +145,59 @@ public sealed abstract class ResourceClass permits PrimitiveResourceClass, Deriv
 
 
     /**
-     * Convert the given columns of this resource class into the columns of the selected target resource class.
+     * Convert the given columns of this resource class into the columns of the selected target resource class: by
+     * {@link #toGeneralClass} when the target is a superclass, by {@link #fromGeneralClass} when it is a subclass, and
+     * through a common superclass of the effective classes otherwise, checking the representability, so that a value
+     * outside the target class (also every value of a class disjoint with it) yields NULL columns.
      *
      * @param targetClass the resource class to which is converted
      * @param columns the columns representing values of this resource class
      * @param canBeNull if true, a generated column cannot be a constant column
      * @return the columns representing values the target resource class
-     *
      */
     public List<Column> toClass(ResourceClass targetClass, List<Column> columns, boolean canBeNull)
     {
         if(this.equals(targetClass))
             return columns;
-        if(this.isSubclassOf(targetClass))
+        else if(this.isSubclassOf(targetClass))
             return toGeneralClass(targetClass, columns, canBeNull);
         else if(targetClass.isSubclassOf(this))
             return targetClass.fromGeneralClass(this, columns, false);
-        else
-            throw new IllegalArgumentException();
+
+        PrimitiveResourceClass common = PrimitiveResourceClass.getCommonSuperclass(getEffectiveClass(),
+                targetClass.getEffectiveClass());
+
+        return targetClass.fromGeneralClass(common, toGeneralClass(common, columns, canBeNull), false);
+    }
+
+
+    /**
+     * Columns of the target primitive class representing the value given in the columns of the source primitive class:
+     * converted directly when one class is a subclass of the other, and through a common superclass otherwise. Unless
+     * {@code checkOptional}, a value outside the target class yields NULL columns.
+     *
+     * @param source class of the given columns
+     * @param target the class to convert to
+     * @param columns the columns representing the value in the source class
+     * @param canBeNull if true, a generated column cannot be a constant column
+     * @param checkOptional indicates whether the representability check may be skipped
+     * @return the columns representing the value in the target class
+     */
+    static List<Column> convert(PrimitiveResourceClass source, PrimitiveResourceClass target, List<Column> columns,
+            boolean canBeNull, boolean checkOptional)
+    {
+        if(source.equals(target))
+            return columns;
+
+        if(source.isSubclassOf(target))
+            return source.toGeneralClass(target, columns, canBeNull);
+
+        if(target.isSubclassOf(source))
+            return target.fromGeneralClass(source, columns, checkOptional);
+
+        PrimitiveResourceClass common = PrimitiveResourceClass.getCommonSuperclass(source, target);
+
+        return target.fromGeneralClass(common, source.toGeneralClass(common, columns, canBeNull), checkOptional);
     }
 
 
@@ -195,49 +231,123 @@ public sealed abstract class ResourceClass permits PrimitiveResourceClass, Deriv
 
 
     /**
-     * True if no term belongs to both classes: two triple term classes are disjoint when some pair of their components
-     * is, two other primitive classes when neither is a subclass of the other, and derived classes by their normal
-     * forms.
+     * True if no term belongs to both classes: two primitive classes decide by
+     * {@link PrimitiveResourceClass#isDisjunctWith} (unrelated classes are disjoint, except for two triple term classes
+     * with overlapping components and two user IRI classes the declarations let overlap), derived classes by their
+     * normal forms. The declarations of the configuration have to be supplied, as the classes do not keep them; when
+     * user IRI classes occur in at most one operand, the result does not depend on them and
+     * {@link #areDisjunct(ResourceClass, ResourceClass)} serves.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param a one operand
      * @param b the other operand
      * @return true if no term belongs to both classes, false otherwise
      */
+    public static boolean areDisjunct(ClassRelations relations, ResourceClass a, ResourceClass b)
+    {
+        if(a instanceof PrimitiveResourceClass pa && b instanceof PrimitiveResourceClass pb)
+            return pa.isDisjunctWith(relations, pb);
+
+        return DerivedClass.areDisjunct(relations, a, b);
+    }
+
+
+    /**
+     * Disjointness of classes that cannot depend on the declarations of a configuration, see
+     * {@link #areDisjunct(ClassRelations, ResourceClass, ResourceClass)}: user IRI classes may occur in at most one
+     * operand, as only two of them on opposite sides could be declared to overlap. The built-in classes, and the
+     * predicates of {@link BuiltinClasses} testing against them, therefore need no declarations.
+     *
+     * @param a one operand
+     * @param b the other operand
+     * @return true if no term belongs to both classes, false otherwise
+     * @throws IllegalArgumentException if user IRI classes occur in both operands
+     */
     public static boolean areDisjunct(ResourceClass a, ResourceClass b)
     {
-        if(a instanceof TripleTermClass ta && b instanceof TripleTermClass tb)
-            return ta.isDisjunctWith(tb);
+        checkIndependence(List.of(a), List.of(b));
 
-        if(a instanceof PrimitiveResourceClass pa && b instanceof PrimitiveResourceClass pb)
-            return !pa.isSubclassOf(pb) && !pb.isSubclassOf(pa);
+        return areDisjunct(ClassRelations.NONE, a, b);
+    }
 
-        return DerivedClass.areDisjunct(a, b);
+
+    /**
+     * True if {@code resClass} is disjoint with every class of the set, see
+     * {@link #areDisjunct(ResourceClass, ResourceClass)}.
+     *
+     * @param resClass the resource class
+     * @param resClasses the resource classes
+     * @return true if {@code resClass} is disjoint with every class of the set, false otherwise
+     * @throws IllegalArgumentException if user IRI classes occur on both sides
+     */
+    public static boolean areDisjunct(ResourceClass resClass, Set<ResourceClass> resClasses)
+    {
+        checkIndependence(List.of(resClass), resClasses);
+
+        return areDisjunct(ClassRelations.NONE, resClass, resClasses);
+    }
+
+
+    /**
+     * True if every class of the first set is disjoint with every class of the second one, see
+     * {@link #areDisjunct(ResourceClass, ResourceClass)}.
+     *
+     * @param classes1 the first set of classes
+     * @param classes2 the second set of classes
+     * @return true if every class of the first set is disjoint with every class of the second one, false otherwise
+     * @throws IllegalArgumentException if user IRI classes occur on both sides
+     */
+    public static boolean areDisjunct(Set<ResourceClass> classes1, Set<ResourceClass> classes2)
+    {
+        checkIndependence(classes1, classes2);
+
+        return areDisjunct(ClassRelations.NONE, classes1, classes2);
+    }
+
+
+    /**
+     * Checks that the declarations of a configuration cannot influence the disjointness of the classes of the two
+     * sides: user IRI classes occur on at most one of them.
+     *
+     * @param side1 classes of one side
+     * @param side2 classes of the other side
+     * @throws IllegalArgumentException if user IRI classes occur on both sides
+     */
+    private static void checkIndependence(Collection<ResourceClass> side1, Collection<ResourceClass> side2)
+    {
+        if(side1.stream().anyMatch(c -> !DerivedClass.getUserIriClasses(c).isEmpty())
+                && side2.stream().anyMatch(c -> !DerivedClass.getUserIriClasses(c).isEmpty()))
+            throw new IllegalArgumentException("the disjointness of " + side1 + " and " + side2
+                    + " depends on the declarations of the configuration, which have to be supplied");
     }
 
 
     /**
      * True if {@code resClass} is disjoint with every class of the set.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param resClass the resource class
      * @param resClasses the resource classes
      * @return true if {@code resClass} is disjoint with every class of the set, false otherwise
      */
-    public static boolean areDisjunct(ResourceClass resClass, Set<ResourceClass> resClasses)
+    public static boolean areDisjunct(ClassRelations relations, ResourceClass resClass, Set<ResourceClass> resClasses)
     {
-        return resClasses.stream().allMatch(c -> areDisjunct(resClass, c));
+        return resClasses.stream().allMatch(c -> areDisjunct(relations, resClass, c));
     }
 
 
     /**
      * True if every class of the first set is disjoint with every class of the second one.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param classes1 the first set of classes
      * @param classes2 the second set of classes
      * @return true if every class of the first set is disjoint with every class of the second one, false otherwise
      */
-    public static boolean areDisjunct(Set<ResourceClass> classes1, Set<ResourceClass> classes2)
+    public static boolean areDisjunct(ClassRelations relations, Set<ResourceClass> classes1,
+            Set<ResourceClass> classes2)
     {
-        return classes1.stream().allMatch(c1 -> ResourceClass.areDisjunct(c1, classes2));
+        return classes1.stream().allMatch(c1 -> ResourceClass.areDisjunct(relations, c1, classes2));
     }
 
 

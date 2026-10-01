@@ -10,6 +10,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 
@@ -49,11 +50,12 @@ public class VariableBindings
      * Bindings narrowed to what the parent needs: variables outside the restrictions are dropped, and the columns of
      * classes the parent does not need are set to null (the class stays known).
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param restrictions what the parent needs of the variables
      * @return bindings narrowed to what the parent needs: variables outside the restrictions are dropped, and the
      *         columns of classes the parent does not need are set to null (the class stays known)
      */
-    public VariableBindings restrict(Restrictions restrictions)
+    public VariableBindings restrict(ClassRelations relations, Restrictions restrictions)
     {
         VariableBindings result = new VariableBindings();
 
@@ -71,7 +73,7 @@ public class VariableBindings
                     continue;
 
                 for(Entry<ResourceClass, List<Column>> e : entry.getValue().getMappings().entrySet())
-                    if(restrictions.contains(entry.getKey(), e.getKey()))
+                    if(restrictions.contains(relations, entry.getKey(), e.getKey()))
                         map.put(e.getKey(), e.getValue());
                     else
                         map.put(e.getKey(), null);

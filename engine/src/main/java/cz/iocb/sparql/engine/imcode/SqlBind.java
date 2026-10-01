@@ -17,6 +17,7 @@ import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
@@ -116,7 +117,7 @@ public final class SqlBind extends SqlIntercode
         }
 
 
-        VariableBindings bindings = child.getVariableBindings().restrict(restrictions);
+        VariableBindings bindings = child.getVariableBindings().restrict(request.getConfiguration(), restrictions);
         bindings.add(new VariableBinding(variable, columns, expression.canBeNull()));
 
         return new SqlBind(bindings, variable, expression, child);
@@ -126,6 +127,8 @@ public final class SqlBind extends SqlIntercode
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         SqlExpressionIntercode optExpression = expression;
         SqlIntercode optChild = child;
 
@@ -137,14 +140,14 @@ public final class SqlBind extends SqlIntercode
         while(true)
         {
             boolean optReduced = reduced && optExpression.isDeterministic();
-            Restrictions expressionRequirements = optExpression.getRequirements();
+            Restrictions expressionRequirements = optExpression.getRequirements(relations);
             Restrictions childRestrictions = new Restrictions(restrictions, expressionRequirements);
 
             optChild = optChild.optimize(request, childRestrictions, optReduced, evalServices);
             optExpression = optExpression.optimize(request, optChild.getVariableBindings(), varRestriction,
                     evalServices);
 
-            if(optExpression.getRequirements().equals(expressionRequirements))
+            if(optExpression.getRequirements(relations).equals(expressionRequirements))
                 break;
         }
 
@@ -152,7 +155,8 @@ public final class SqlBind extends SqlIntercode
         if(optChild.equals(SqlNoSolution.get()))
             return SqlNoSolution.get();
 
-        if(optExpression.equals(SqlNull.get()) || !restrictions.contains(variable, optExpression.getResourceClasses()))
+        if(optExpression.equals(SqlNull.get())
+                || !restrictions.contains(relations, variable, optExpression.getResourceClasses()))
             return optChild.optimize(request, restrictions, reduced, false);
 
         if(optChild instanceof SqlUnion union)
@@ -182,7 +186,7 @@ public final class SqlBind extends SqlIntercode
         }
 
 
-        if(optExpression == expression && optChild == child && restrictions.isOptimized(bindings))
+        if(optExpression == expression && optChild == child && restrictions.isOptimized(relations, bindings))
             return this;
 
         return bind(request, variable, optExpression, optChild, restrictions);

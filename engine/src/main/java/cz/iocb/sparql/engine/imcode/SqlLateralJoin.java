@@ -15,6 +15,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBinding;
@@ -154,7 +155,8 @@ public final class SqlLateralJoin extends SqlIntercode
             Restrictions requirements)
     {
         //NOTE: the right side may refer to the bindings returned by getLateralVariableBindings() for these arguments
-        return lateralJoin(request, left, right, table, left.getVariableBindings().restrict(requirements), null);
+        return lateralJoin(request, left, right, table,
+                left.getVariableBindings().restrict(request.getConfiguration(), requirements), null);
     }
 
 
@@ -194,20 +196,21 @@ public final class SqlLateralJoin extends SqlIntercode
      * Bindings of the left side as seen by the right side: its columns addressed through the lateral alias, restricted
      * to the requirements.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param table alias through which the right side refers to the left side
      * @param left the left side
      * @param requirements variables and classes the right side refers to
      * @return bindings of the left side as seen by the right side: its columns addressed through the lateral alias,
      *         restricted to the requirements
      */
-    public static VariableBindings getLateralVariableBindings(AliasTable table, SqlIntercode left,
-            Restrictions requirements)
+    public static VariableBindings getLateralVariableBindings(ClassRelations relations, AliasTable table,
+            SqlIntercode left, Restrictions requirements)
     {
         //NOTE: the returned bindings refer to the current solution of the left side through the given alias
 
         VariableBindings result = new VariableBindings();
 
-        for(VariableBinding variableBinding : left.getVariableBindings().restrict(requirements).getValues())
+        for(VariableBinding variableBinding : left.getVariableBindings().restrict(relations, requirements).getValues())
         {
             VariableBinding binding = new VariableBinding(variableBinding.getVariable(), variableBinding.canBeNull());
 
@@ -243,15 +246,17 @@ public final class SqlLateralJoin extends SqlIntercode
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         SqlIntercode optLeft = left;
         SqlIntercode optRight = right;
 
         Restrictions leftBaseRestrictions = new Restrictions(restrictions, requirements);
 
         boolean leftReduced = reduced && optRight.isDeterministic();
-        Restrictions leftRestrictions = getJoinRestrictions(optLeft.getVariableBindings(),
+        Restrictions leftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
                 optRight.getVariableBindings(), leftBaseRestrictions);
-        Restrictions rightRestrictions = getJoinRestrictions(optRight.getVariableBindings(),
+        Restrictions rightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
                 optLeft.getVariableBindings(), restrictions);
 
 
@@ -265,7 +270,7 @@ public final class SqlLateralJoin extends SqlIntercode
                 List<SqlIntercode> unionList = new ArrayList<>();
 
                 for(SqlIntercode child : union.getChilds())
-                    if(isJoinable(optLeft, child))
+                    if(isJoinable(relations, optLeft, child))
                         unionList.add(child);
 
                 if(!unionList.equals(union.getChilds()))
@@ -275,9 +280,9 @@ public final class SqlLateralJoin extends SqlIntercode
 
 
             boolean newLeftReduced = reduced && optRight.isDeterministic();
-            Restrictions newLeftRestrictions = getJoinRestrictions(optLeft.getVariableBindings(),
+            Restrictions newLeftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
                     optRight.getVariableBindings(), leftBaseRestrictions);
-            Restrictions newRightRestrictions = getJoinRestrictions(optRight.getVariableBindings(),
+            Restrictions newRightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
                     optLeft.getVariableBindings(), restrictions);
 
 
@@ -294,7 +299,7 @@ public final class SqlLateralJoin extends SqlIntercode
         if(optLeft.equals(SqlNoSolution.get()) || optRight.equals(SqlNoSolution.get()))
             return SqlNoSolution.get();
 
-        if(!isJoinable(optLeft, optRight))
+        if(!isJoinable(relations, optLeft, optRight))
             return SqlNoSolution.get();
 
         if(optRight.equals(SqlEmptySolution.get()))
@@ -312,7 +317,7 @@ public final class SqlLateralJoin extends SqlIntercode
         }
 
 
-        if(optLeft == left && optRight == right && restrictions.isOptimized(bindings))
+        if(optLeft == left && optRight == right && restrictions.isOptimized(relations, bindings))
             return this;
 
         return lateralJoin(request, optLeft, optRight, table, lateral, restrictions);
@@ -322,6 +327,8 @@ public final class SqlLateralJoin extends SqlIntercode
     @Override
     public String translate(Request request)
     {
+        ClassRelations relations = request.getConfiguration();
+
         StringBuilder builder = new StringBuilder();
 
         Set<Column> columns = bindings.getNonConstantColumns();
@@ -344,8 +351,8 @@ public final class SqlLateralJoin extends SqlIntercode
         builder.append(") AS ");
         builder.append(rightTable);
 
-        String condition = generateJoinCondition(left.getVariableBindings(), right.getVariableBindings(), table,
-                rightTable);
+        String condition = generateJoinCondition(relations, left.getVariableBindings(), right.getVariableBindings(),
+                table, rightTable);
 
         if(condition != null)
         {
@@ -366,6 +373,8 @@ public final class SqlLateralJoin extends SqlIntercode
      */
     private void translateLeft(Request request, StringBuilder builder)
     {
+        ClassRelations relations = request.getConfiguration();
+
         /* NOTE: If the optimized left side no longer provides some column that was exposed to the right side when the
          * join was created, it is wrapped into a projection that supplies the column from what the left side provides
          * now (a value of a compatible class, a constant, or null).
@@ -385,7 +394,7 @@ public final class SqlLateralJoin extends SqlIntercode
                 if(exposed == null)
                     continue;
 
-                List<Column> provided = current == null ? null : current.deriveMapping(resClass);
+                List<Column> provided = current == null ? null : current.deriveMapping(relations, resClass);
 
                 for(int i = 0; i < resClass.getColumnCount(); i++)
                 {

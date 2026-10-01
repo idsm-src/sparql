@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBindings;
@@ -129,21 +130,23 @@ public final class SqlBinaryArithmetic extends SqlBinary
     /**
      * Arithmetic expression over the operands.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operator the operator
      * @param left the left operand
      * @param right the right operand
      * @return arithmetic expression over the operands
      */
-    public static SqlExpressionIntercode create(ArithmeticOperator operator, SqlExpressionIntercode left,
-            SqlExpressionIntercode right)
+    public static SqlExpressionIntercode create(ClassRelations relations, ArithmeticOperator operator,
+            SqlExpressionIntercode left, SqlExpressionIntercode right)
     {
-        return create(operator, left, right, Restriction.ALL);
+        return create(relations, operator, left, right, Restriction.ALL);
     }
 
 
     /**
      * Arithmetic expression materialising only the needed result classes; NULL when no operand classes are numeric.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operator the operator
      * @param left the left operand
      * @param right the right operand
@@ -151,8 +154,8 @@ public final class SqlBinaryArithmetic extends SqlBinary
      * @return arithmetic expression materialising only the needed result classes; NULL when no operand classes are
      *         numeric
      */
-    private static SqlExpressionIntercode create(ArithmeticOperator operator, SqlExpressionIntercode left,
-            SqlExpressionIntercode right, Restriction restriction)
+    private static SqlExpressionIntercode create(ClassRelations relations, ArithmeticOperator operator,
+            SqlExpressionIntercode left, SqlExpressionIntercode right, Restriction restriction)
     {
         Map<ResourceClass, Set<List<ResourceClass>>> map = new HashMap<>();
 
@@ -194,13 +197,14 @@ public final class SqlBinaryArithmetic extends SqlBinary
 
 
         List<SqlExpressionIntercode> operands = List.of(left, right);
-        Map<ResourceClass, Set<List<Set<ResourceClass>>>> resMap = processResultMap(operands, map, restriction, box);
+        Map<ResourceClass, Set<List<Set<ResourceClass>>>> resMap = processResultMap(relations, operands, map,
+                restriction, box);
 
         Map<ResourceClass, List<Column>> mappings = new HashMap<>();
 
         for(Entry<ResourceClass, Set<List<Set<ResourceClass>>>> e : resMap.entrySet())
-            mappings.put(e.getKey(),
-                    e.getValue() == null ? null : translate(operator, e.getKey(), e.getValue(), left, right));
+            mappings.put(e.getKey(), e.getValue() == null ? null :
+                    translate(relations, operator, e.getKey(), e.getValue(), left, right));
 
         return new SqlBinaryArithmetic(operator, left, right, mappings, canBeNull);
     }
@@ -210,6 +214,7 @@ public final class SqlBinaryArithmetic extends SqlBinary
      * SQL computing the result in the class from the operands promoted to it, one variant per combination of argument
      * classes.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param operator the operator
      * @param resultClass the result class
      * @param variants combinations of argument classes
@@ -218,8 +223,9 @@ public final class SqlBinaryArithmetic extends SqlBinary
      * @return SQL computing the result in the class from the operands promoted to it, one variant per combination of
      *         argument classes
      */
-    private static List<Column> translate(ArithmeticOperator operator, ResourceClass resultClass,
-            Set<List<Set<ResourceClass>>> variants, SqlExpressionIntercode left, SqlExpressionIntercode right)
+    private static List<Column> translate(ClassRelations relations, ArithmeticOperator operator,
+            ResourceClass resultClass, Set<List<Set<ResourceClass>>> variants, SqlExpressionIntercode left,
+            SqlExpressionIntercode right)
     {
         Set<Column> cols = new HashSet<>();
 
@@ -237,8 +243,8 @@ public final class SqlBinaryArithmetic extends SqlBinary
         {
             for(List<Set<ResourceClass>> variant : variants)
             {
-                Column cl = left.get(unionize(variant.get(0), box)).get(0);
-                Column cr = right.get(unionize(variant.get(1), box)).get(0);
+                Column cl = left.get(relations, unionize(variant.get(0), box)).get(0);
+                Column cr = right.get(relations, unionize(variant.get(1), box)).get(0);
 
                 cols.add(new ExpressionColumn("(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")"));
             }
@@ -252,22 +258,24 @@ public final class SqlBinaryArithmetic extends SqlBinary
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         List<ResourceClass> results = List.of(xsdDouble, xsdFloat, xsdDecimal, xsdInteger);
 
         Restriction operandRestriction = new Restriction();
 
         // the operands promoted to a result class are all the classes not following it in the promotion order
         for(int i = 0; i < results.size(); i++)
-            if(restriction.contains(results.get(i)))
+            if(restriction.contains(relations, results.get(i)))
                 operandRestriction.add(numericBaseClasses.subList(0, numericBaseClasses.size() - i));
 
         SqlExpressionIntercode optLeft = left.optimize(request, bindings, operandRestriction, evalServices);
         SqlExpressionIntercode optRight = right.optimize(request, bindings, operandRestriction, evalServices);
 
-        if(optLeft == left && optRight == right && restriction.isOptimized(variableBinding))
+        if(optLeft == left && optRight == right && restriction.isOptimized(relations, variableBinding))
             return this;
 
-        return create(operator, optLeft, optRight, restriction);
+        return create(relations, operator, optLeft, optRight, restriction);
     }
 
 
