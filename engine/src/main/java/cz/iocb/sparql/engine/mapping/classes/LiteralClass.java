@@ -1,6 +1,5 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
@@ -10,6 +9,7 @@ import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -60,39 +60,40 @@ public sealed abstract class LiteralClass extends PrimitiveResourceClass permits
     /**
      * True if the literal has the datatype of this class and is representable in it.
      *
-     * @param statement database statement used for lookups in the database
+     * @param request the current request
      * @param literal the literal
      * @return true if the literal has the datatype of this class and is representable in it, false otherwise
      */
-    public abstract boolean match(Statement statement, Literal literal);
+    public abstract boolean match(Request request, Literal literal);
 
 
     /**
      * Constant columns representing the literal.
      *
+     * @param request the current request
      * @param literal the literal
      * @return the constant columns
      */
-    public abstract List<Column> toColumns(Literal literal);
+    public abstract List<Column> toColumns(Request request, Literal literal);
 
 
     @Override
-    public final boolean match(Statement statement, RdfTerm term)
+    public final boolean match(Request request, RdfTerm term)
     {
         return switch(term)
         {
             case Variable _ -> true;
-            case Literal literal -> match(statement, literal);
+            case Literal literal -> match(request, literal);
             default -> false;
         };
     }
 
 
     @Override
-    public final List<Column> toColumns(Statement statement, RdfTerm term)
+    public final List<Column> toColumns(Request request, RdfTerm term)
     {
         if(term instanceof Literal literal)
-            return toColumns(literal);
+            return toColumns(request, literal);
         else
             throw new IllegalArgumentException();
     }

@@ -3,7 +3,6 @@ package cz.iocb.sparql.engine.mapping.classes;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -18,6 +17,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -784,10 +784,10 @@ public final class DerivedClass extends ResourceClass
 
 
     @Override
-    public boolean match(Statement statement, RdfTerm term)
+    public boolean match(Request request, RdfTerm term)
     {
         return terms.stream()
-                .anyMatch(t -> t.entrySet().stream().allMatch(e -> e.getKey().match(statement, term) == e.getValue()));
+                .anyMatch(t -> t.entrySet().stream().allMatch(e -> e.getKey().match(request, term) == e.getValue()));
     }
 
 
@@ -799,9 +799,9 @@ public final class DerivedClass extends ResourceClass
 
 
     @Override
-    public List<Column> toColumns(Statement statement, RdfTerm term)
+    public List<Column> toColumns(Request request, RdfTerm term)
     {
-        return effectiveClass.toColumns(statement, term);
+        return effectiveClass.toColumns(request, term);
     }
 
 

@@ -6,17 +6,18 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUserType;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
 /**
  * Canonical literals of any user datatype: a {@code sparql.ubox} value and the datatype IRI; the result class of
- * canonical user literals. Not usable for matching constants.
+ * canonical user literals. A constant matches it when the class the request assigns to it
+ * ({@link Request#getLiteralClass}) is a subclass of this one, and its columns are converted from that class.
  */
 public final class UserLiteralCompositeClass extends BaseLiteralClass
 {
@@ -37,16 +38,21 @@ public final class UserLiteralCompositeClass extends BaseLiteralClass
 
 
     @Override
-    public boolean match(Statement statement, Literal literal)
+    public boolean match(Request request, Literal literal)
     {
-        throw new IllegalArgumentException();
+        return request.getLiteralClass(literal).isSubclassOf(this);
     }
 
 
     @Override
-    public List<Column> toColumns(Literal literal)
+    public List<Column> toColumns(Request request, Literal literal)
     {
-        throw new IllegalArgumentException();
+        ResourceClass resClass = request.getLiteralClass(literal);
+
+        if(!resClass.isSubclassOf(this))
+            throw new IllegalArgumentException();
+
+        return resClass.toGeneralClass(this, resClass.toColumns(request, literal), false);
     }
 
 

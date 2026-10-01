@@ -8,7 +8,6 @@ import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
 import static java.util.stream.Collectors.joining;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -20,6 +19,7 @@ import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -140,14 +140,14 @@ public class GenericUserIriClass extends UserIriClass
 
 
     @Override
-    public boolean match(Statement statement, Iri iri)
+    public boolean match(Request request, Iri iri)
     {
         Matcher matcher = pattern.matcher(iri.getValue());
 
         if(matcher.matches())
-            return sqlCheck != SqlCheck.IF_MATCH || check(statement, iri);
+            return sqlCheck != SqlCheck.IF_MATCH || check(request, iri);
         else
-            return sqlCheck == SqlCheck.IF_NOT_MATCH && check(statement, iri);
+            return sqlCheck == SqlCheck.IF_NOT_MATCH && check(request, iri);
     }
 
 
@@ -159,15 +159,15 @@ public class GenericUserIriClass extends UserIriClass
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Iri iri)
+    public List<Column> toColumns(Request request, Iri iri)
     {
-        assert match(statement, iri);
+        assert match(request, iri);
 
         try
         {
             String sql = sqlQuery.replace("?", string(iri.getValue()));
 
-            try(ResultSet result = statement.executeQuery(sql))
+            try(ResultSet result = request.getStatement().executeQuery(sql))
             {
                 result.next();
 
@@ -247,17 +247,17 @@ public class GenericUserIriClass extends UserIriClass
     /**
      * True if all inverse functions return non-null for the IRI.
      *
-     * @param statement database statement used for lookups in the database
+     * @param request the current request
      * @param iri the IRI
      * @return true if all inverse functions return non-null for the IRI, false otherwise
      */
-    private boolean check(Statement statement, Iri iri)
+    private boolean check(Request request, Iri iri)
     {
         try
         {
             String sql = sqlQuery.replace("?", string(iri.getValue()));
 
-            try(ResultSet result = statement.executeQuery(sql))
+            try(ResultSet result = request.getStatement().executeQuery(sql))
             {
                 result.next();
 

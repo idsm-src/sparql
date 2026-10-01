@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
@@ -9,6 +8,7 @@ import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -34,21 +34,21 @@ public sealed abstract class IriClass extends PrimitiveResourceClass
     /**
      * True if the IRI belongs to this class; may consult the database.
      *
-     * @param statement database statement used for lookups in the database
+     * @param request the current request
      * @param iri the IRI
      * @return true if the IRI belongs to this class, false otherwise
      */
-    public abstract boolean match(Statement statement, Iri iri);
+    public abstract boolean match(Request request, Iri iri);
 
 
     /**
      * Constant columns representing the IRI; may consult the database.
      *
-     * @param statement database statement used for lookups in the database
+     * @param request the current request
      * @param iri the IRI
      * @return the constant columns
      */
-    public abstract List<Column> toColumns(Statement statement, Iri iri);
+    public abstract List<Column> toColumns(Request request, Iri iri);
 
 
     /**
@@ -70,22 +70,22 @@ public sealed abstract class IriClass extends PrimitiveResourceClass
 
 
     @Override
-    public final boolean match(Statement statement, RdfTerm term)
+    public final boolean match(Request request, RdfTerm term)
     {
         return switch(term)
         {
             case Variable _ -> true;
-            case Iri iri -> match(statement, iri);
+            case Iri iri -> match(request, iri);
             default -> false;
         };
     }
 
 
     @Override
-    public final List<Column> toColumns(Statement statement, RdfTerm term)
+    public final List<Column> toColumns(Request request, RdfTerm term)
     {
         if(term instanceof Iri iri)
-            return toColumns(statement, iri);
+            return toColumns(request, iri);
         else
             throw new IllegalArgumentException();
     }

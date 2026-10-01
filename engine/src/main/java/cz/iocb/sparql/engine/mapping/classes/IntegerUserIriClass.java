@@ -8,13 +8,13 @@ import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
 import static java.lang.String.format;
 import java.math.BigInteger;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -156,16 +156,16 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public boolean match(Statement statement, Iri iri)
+    public boolean match(Request request, Iri iri)
     {
         return pattern.matcher(iri.getValue()).matches();
     }
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Iri iri)
+    public List<Column> toColumns(Request request, Iri iri)
     {
-        assert match(statement, iri);
+        assert match(request, iri);
 
         String value = iri.getValue();
 

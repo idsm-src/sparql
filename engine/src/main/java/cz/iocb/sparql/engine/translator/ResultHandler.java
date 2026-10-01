@@ -124,7 +124,7 @@ public abstract class ResultHandler implements AutoCloseable
         {
             UserIriClass resClass = it.next();
 
-            if(resClass.match(request.getStatement(), iri))
+            if(resClass.match(request, iri))
             {
                 if(!resClass.equals(iriClasses.getFirst()))
                 {
@@ -179,7 +179,7 @@ public abstract class ResultHandler implements AutoCloseable
         if(resClass instanceof IriClass iriClass && term instanceof Iri iri)
             return getColumns(request, iriClass, iri);
 
-        return resClass.toColumns(request.getStatement(), term);
+        return resClass.toColumns(request, term);
     }
 
 
@@ -198,9 +198,10 @@ public abstract class ResultHandler implements AutoCloseable
         if(columns != null)
             return columns;
 
+        columns = iriClass.toColumns(request, iri);
         iriCache.storeToCache(iri, iriClass, columns);
 
-        return iriClass.toColumns(request.getStatement(), iri);
+        return columns;
     }
 
 

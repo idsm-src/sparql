@@ -10,6 +10,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -51,7 +52,7 @@ public sealed abstract class SimpleLiteralBaseClass extends BaseLiteralClass
 
 
     @Override
-    public List<Column> toColumns(Literal literal)
+    public List<Column> toColumns(Request request, Literal literal)
     {
         return List.of(constant(datatype.getCanonicalLexicalForm(literal.getValue()), sqlTypes.get(0)),
                 getLexicalColumn(literal));

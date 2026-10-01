@@ -5,19 +5,19 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ValueColumn;
 import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
 /**
- * IRIs that belong to no user IRI class, stored as full text. It is never matched against terms directly (the request
- * assigns it when detection by the user classes fails), and a value of a more general class can be narrowed to it only
- * when representability need not be checked.
+ * IRIs that belong to no user IRI class, stored as full text. An IRI matches it when the detection by the user classes
+ * of the configuration ({@link Request#getIriClass}) falls back to it, and a value of a more general class can be
+ * narrowed to it only when representability need not be checked.
  */
 public final class UnsupportedIriClass extends IriClass
 {
@@ -31,9 +31,9 @@ public final class UnsupportedIriClass extends IriClass
 
 
     @Override
-    public boolean match(Statement statement, Iri iri)
+    public boolean match(Request request, Iri iri)
     {
-        throw new IllegalArgumentException();
+        return equals(request.getIriClass(iri));
     }
 
 
@@ -48,7 +48,7 @@ public final class UnsupportedIriClass extends IriClass
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Iri iri)
+    public List<Column> toColumns(Request request, Iri iri)
     {
         return List.of(constant(iri.getValue(), VARCHAR));
     }

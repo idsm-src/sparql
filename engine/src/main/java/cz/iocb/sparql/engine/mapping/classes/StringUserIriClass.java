@@ -4,7 +4,6 @@ import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -12,6 +11,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.ValueColumn;
 import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -155,16 +155,16 @@ public class StringUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public boolean match(Statement statement, Iri iri)
+    public boolean match(Request request, Iri iri)
     {
         return pattern.matcher(iri.getValue()).matches();
     }
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Iri iri)
+    public List<Column> toColumns(Request request, Iri iri)
     {
-        assert match(statement, iri);
+        assert match(request, iri);
 
         String value = iri.getValue();
         String id = value.substring(prefix.length(), value.length() - (suffix != null ? suffix.length() : 0));

@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intBlankNode;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
@@ -10,6 +9,7 @@ import cz.iocb.sparql.engine.rdf.BlankNode;
 import cz.iocb.sparql.engine.rdf.IntBlankNode;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -44,11 +44,11 @@ public sealed abstract class IntBlankNodeClass extends BlankNodeClass
     /**
      * True if the blank node belongs to this class.
      *
-     * @param statement database statement used for lookups in the database
+     * @param request the current request
      * @param term the RDF term
      * @return true if the blank node belongs to this class, false otherwise
      */
-    public abstract boolean match(Statement statement, IntBlankNode term);
+    public abstract boolean match(Request request, IntBlankNode term);
 
 
     @Override
@@ -59,12 +59,12 @@ public sealed abstract class IntBlankNodeClass extends BlankNodeClass
 
 
     @Override
-    public final boolean match(Statement statement, RdfTerm term)
+    public final boolean match(Request request, RdfTerm term)
     {
         return switch(term)
         {
             case Variable _ -> true;
-            case IntBlankNode bnode -> match(statement, bnode);
+            case IntBlankNode bnode -> match(request, bnode);
             default -> false;
         };
     }

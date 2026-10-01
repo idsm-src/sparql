@@ -2,7 +2,6 @@ package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static java.util.stream.Collectors.toSet;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -14,6 +13,7 @@ import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.ColumnMap;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -59,23 +59,25 @@ public sealed abstract class ResourceClass permits PrimitiveResourceClass, Deriv
 
 
     /**
-     * Check if the given RDF term can be represented in this resource class.
+     * Check if the given RDF term can be represented in this resource class; the configuration and the database of the
+     * request are consulted when the class alone cannot decide.
      *
-     * @param statement database statement
+     * @param request the current request
      * @param term RDF term
      * @return true the RDF term can be represented in this resource class, false otherwise
      */
-    public abstract boolean match(Statement statement, RdfTerm term);
+    public abstract boolean match(Request request, RdfTerm term);
 
 
     /**
-     * Create list of columns that represent the given RDF term.
+     * Create list of columns that represent the given RDF term; the configuration and the database of the request are
+     * consulted when the class alone cannot build them.
      *
-     * @param statement database statement
+     * @param request the current request
      * @param term RDF term
      * @return list of columns representing the term value
      */
-    public abstract List<Column> toColumns(Statement statement, RdfTerm term);
+    public abstract List<Column> toColumns(Request request, RdfTerm term);
 
 
     /**

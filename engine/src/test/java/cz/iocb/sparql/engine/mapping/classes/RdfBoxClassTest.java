@@ -29,17 +29,14 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsign
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedLongType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedShortType;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.List;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import cz.iocb.sparql.engine.Database;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.rdf.DirLangStringLiteral;
@@ -52,14 +49,15 @@ import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.StrBlankNode;
 import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
-import cz.iocb.sparql.engine.request.RdfBoxParser;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
 /**
- * Tests of {@link RdfBoxClass} as a result class: a term boxed from its most specific built-in class and printed by the
- * database is decoded back to the same term, and a user literal box, which needs a configured datatype, is decoded to
- * the expected literal.
+ * Tests of {@link RdfBoxClass} as a result class and as the class of boxed constants: a term boxed from its most
+ * specific built-in class and printed by the database is decoded back to the same term, a user literal box, which needs
+ * a configured datatype, is decoded to the expected literal, and the columns the class builds for a constant through
+ * the request evaluate to the term.
  */
 public class RdfBoxClassTest
 {
@@ -70,6 +68,22 @@ public class RdfBoxClassTest
             xsdIntegerType, xsdNonPositiveIntegerType, xsdNegativeIntegerType, xsdNonNegativeIntegerType,
             xsdPositiveIntegerType, xsdDecimalType, xsdFloatType, xsdDoubleType, xsdDateTimeType, xsdDateType,
             xsdDayTimeDurationType, xsdStringType, rdfLangStringType, rdfDirLangStringType);
+
+    private static Request request;
+
+
+    @BeforeAll
+    static void init() throws SQLException
+    {
+        request = TestRequest.create();
+    }
+
+
+    @AfterAll
+    static void close() throws SQLException
+    {
+        request.close();
+    }
 
 
     static Stream<Arguments> roundTripArguments()
@@ -162,6 +176,27 @@ public class RdfBoxClassTest
 
 
     /**
+     * The round-trip terms other than triple terms, which the request cannot classify yet, together with constants of
+     * the user datatypes and the user IRI class of the test configuration.
+     */
+    static Stream<Arguments> toColumnsArguments()
+    {
+        Iri intIri = UserDatatypes.intDatatype.getTypeIri();
+
+        return Stream.concat(roundTripArguments().filter(a -> !(a.get()[0] instanceof TripleTerm)), Stream.of(
+        // @formatter:off
+            Arguments.of(new TypedLiteral("42", intIri)),
+            Arguments.of(new TypedLiteral("+042", intIri)),
+            Arguments.of(new TypedLiteral("x", intIri)),
+            Arguments.of(new Iri(TestRequest.prefix + "42")),
+            Arguments.of(new Iri(TestRequest.prefix + "42/7")),
+            Arguments.of(new Iri(TestRequest.prefix + "x"))
+        // @formatter:on
+        ));
+    }
+
+
+    /**
      * Most specific built-in class of the term, as {@code Request.getResourceClass} would select it for a configuration
      * without user datatypes.
      */
@@ -182,29 +217,14 @@ public class RdfBoxClassTest
     }
 
 
-    /**
-     * Evaluates the SQL expression and decodes the printed box.
-     */
-    private static RdfTerm evaluate(String expression) throws SQLException
-    {
-        try(Connection connection = Database.getPool().getConnection();
-                Statement statement = connection.createStatement();
-                ResultSet result = statement.executeQuery("SELECT " + expression))
-        {
-            assertTrue(result.next());
-            return RdfBoxParser.parse(result.getString(1));
-        }
-    }
-
-
     @ParameterizedTest(name = "{0}")
     @MethodSource("roundTripArguments")
     void roundTripTest(RdfTerm term) throws SQLException
     {
         ResourceClass resClass = getResourceClass(term);
-        Column column = resClass.toGeneralClass(box, resClass.toColumns(null, term), false).get(0);
+        Column column = resClass.toGeneralClass(box, resClass.toColumns(request, term), false).get(0);
 
-        assertEquals(term, evaluate(column.toString()));
+        assertEquals(term, TestRequest.evaluate(request, column.toString()));
     }
 
 
@@ -212,6 +232,16 @@ public class RdfBoxClassTest
     @MethodSource("userLiteralArguments")
     void userLiteralTest(String expression, RdfTerm expected) throws SQLException
     {
-        assertEquals(expected, evaluate(expression));
+        assertEquals(expected, TestRequest.evaluate(request, expression));
+    }
+
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("toColumnsArguments")
+    void toColumnsTest(RdfTerm term) throws SQLException
+    {
+        Column column = box.toColumns(request, term).get(0);
+
+        assertEquals(term, TestRequest.evaluate(request, column.toString()));
     }
 }

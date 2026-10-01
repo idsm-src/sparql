@@ -1,12 +1,12 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -41,14 +41,14 @@ public final class InternalResourceClass extends PrimitiveResourceClass
 
 
     @Override
-    public boolean match(Statement statement, RdfTerm term)
+    public boolean match(Request request, RdfTerm term)
     {
         throw new IllegalArgumentException();
     }
 
 
     @Override
-    public List<Column> toColumns(Statement statement, RdfTerm term)
+    public List<Column> toColumns(Request request, RdfTerm term)
     {
         throw new IllegalArgumentException();
     }

@@ -6,7 +6,6 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -17,6 +16,7 @@ import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
 import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -52,14 +52,14 @@ public class OptionalSuffixIriClass extends UserIriClass
 
 
     @Override
-    public boolean match(Statement statement, Iri iri)
+    public boolean match(Request request, Iri iri)
     {
         return pattern.matcher(iri.getValue()).matches();
     }
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Iri iri)
+    public List<Column> toColumns(Request request, Iri iri)
     {
         Matcher matcher = pattern.matcher(iri.getValue());
 

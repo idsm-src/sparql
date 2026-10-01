@@ -8,6 +8,7 @@ import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.datatypes.DayTimeDurationDatatype;
 import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -26,7 +27,7 @@ public final class DayTimeDurationClass extends SimpleLiteralClass
 
 
     @Override
-    public List<Column> toColumns(Literal literal)
+    public List<Column> toColumns(Request request, Literal literal)
     {
         return List.of(
                 constant(DayTimeDurationDatatype.parseValue(literal.getValue()).toBigIntegerExact(), sqlTypes.get(0)));

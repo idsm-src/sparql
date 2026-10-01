@@ -6,11 +6,11 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.strScalarBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.rdf.StrBlankNode;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -30,7 +30,7 @@ public final class StrBlankNodeCompositeClass extends StrBlankNodeClass
 
 
     @Override
-    public boolean match(Statement statement, StrBlankNode term)
+    public boolean match(Request request, StrBlankNode term)
     {
         return true;
     }

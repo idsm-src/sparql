@@ -11,7 +11,6 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDate
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateType;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -20,6 +19,7 @@ import java.util.concurrent.ConcurrentMap;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.datatypes.DateDatatype;
 import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -79,14 +79,14 @@ public final class DateInZoneClass extends CanonicalLiteralClass implements Date
 
 
     @Override
-    public boolean match(Statement statement, Literal literal)
+    public boolean match(Request request, Literal literal)
     {
-        return super.match(statement, literal) && DateDatatype.getZone(literal) == zone;
+        return super.match(request, literal) && DateDatatype.getZone(literal) == zone;
     }
 
 
     @Override
-    public List<Column> toColumns(Literal literal)
+    public List<Column> toColumns(Request request, Literal literal)
     {
         return List.of(constant(DateDatatype.getDate(literal), sqlTypes.get(0)));
     }

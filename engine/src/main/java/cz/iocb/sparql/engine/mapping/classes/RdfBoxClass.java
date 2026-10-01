@@ -1,11 +1,12 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.Variable;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -34,22 +35,28 @@ public final class RdfBoxClass extends PrimitiveResourceClass
 
 
     @Override
-    public boolean match(Statement statement, RdfTerm term)
+    public boolean match(Request request, RdfTerm term)
     {
         return true;
     }
 
 
     /**
-     * Not supported: a constant is boxed from its most specific class, which only the request knows
-     * ({@code Request.getResourceClass}), by converting its columns to the box with {@link #toGeneralClass}.
+     * Boxes the constant from its most specific class, which the request determines from its configuration
+     * ({@link Request#getResourceClass}), by converting the columns of that class to the box.
      *
-     * @throws UnsupportedOperationException always
+     * @throws IllegalArgumentException if the term is a variable
+     * @throws UnsupportedOperationException for a triple term, which the request cannot classify yet
      */
     @Override
-    public List<Column> toColumns(Statement statement, RdfTerm term)
+    public List<Column> toColumns(Request request, RdfTerm term)
     {
-        throw new UnsupportedOperationException();
+        if(term instanceof Variable)
+            throw new IllegalArgumentException();
+
+        ResourceClass resClass = request.getResourceClass(term);
+
+        return resClass.toGeneralClass(this, request.getColumns(resClass, term), false);
     }
 
 

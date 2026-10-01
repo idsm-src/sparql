@@ -1,11 +1,11 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import java.sql.Statement;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -77,16 +77,16 @@ public non-sealed class SubsetLiteralClass extends CanonicalLiteralClass
      * must belong to the original class as well.
      */
     @Override
-    public boolean match(Statement statement, Literal literal)
+    public boolean match(Request request, Literal literal)
     {
-        return original.match(statement, literal);
+        return original.match(request, literal);
     }
 
 
     @Override
-    public final List<Column> toColumns(Literal literal)
+    public final List<Column> toColumns(Request request, Literal literal)
     {
-        return original.toColumns(literal);
+        return original.toColumns(request, literal);
     }
 
 

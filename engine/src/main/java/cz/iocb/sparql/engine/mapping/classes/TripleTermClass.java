@@ -3,7 +3,6 @@ package cz.iocb.sparql.engine.mapping.classes;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -12,6 +11,7 @@ import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -210,29 +210,29 @@ public final class TripleTermClass extends PrimitiveResourceClass
 
 
     @Override
-    public boolean match(Statement statement, RdfTerm term)
+    public boolean match(Request request, RdfTerm term)
     {
         return switch(term)
         {
             case Variable _ -> true;
-            case TripleTerm triple -> subject.match(statement, triple.getSubject())
-                    && predicate.match(statement, triple.getPredicate()) && object.match(statement, triple.getObject());
+            case TripleTerm triple -> subject.match(request, triple.getSubject())
+                    && predicate.match(request, triple.getPredicate()) && object.match(request, triple.getObject());
             default -> false;
         };
     }
 
 
     @Override
-    public List<Column> toColumns(Statement statement, RdfTerm term)
+    public List<Column> toColumns(Request request, RdfTerm term)
     {
         if(!(term instanceof TripleTerm triple))
             throw new IllegalArgumentException();
 
         List<Column> columns = new ArrayList<>(getColumnCount());
 
-        columns.addAll(subject.toColumns(statement, triple.getSubject()));
-        columns.addAll(predicate.toColumns(statement, triple.getPredicate()));
-        columns.addAll(object.toColumns(statement, triple.getObject()));
+        columns.addAll(subject.toColumns(request, triple.getSubject()));
+        columns.addAll(predicate.toColumns(request, triple.getPredicate()));
+        columns.addAll(object.toColumns(request, triple.getObject()));
 
         return columns;
     }

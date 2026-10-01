@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -38,7 +39,7 @@ public final class DateScalarClass extends CanonicalLiteralClass
 
 
     @Override
-    public List<Column> toColumns(Literal literal)
+    public List<Column> toColumns(Request request, Literal literal)
     {
         return List.of(constant(xsdDateType.getCanonicalLexicalForm(literal.getValue()), sqlTypes.get(0)));
     }

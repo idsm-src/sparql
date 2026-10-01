@@ -7,7 +7,6 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfRtlLangStr
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.rdfDirLangStringType;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -17,6 +16,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.rdf.DirLangStringLiteral;
 import cz.iocb.sparql.engine.rdf.DirLangStringLiteral.Direction;
 import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -106,9 +106,9 @@ public final class DirLangStringWithTagClass extends CanonicalLiteralClass
 
 
     @Override
-    public boolean match(Statement statement, Literal literal)
+    public boolean match(Request request, Literal literal)
     {
-        if(!super.match(statement, literal))
+        if(!super.match(request, literal))
             return false;
 
         return literal instanceof DirLangStringLiteral dirLiteral && dirLiteral.getDirection() == direction
@@ -117,7 +117,7 @@ public final class DirLangStringWithTagClass extends CanonicalLiteralClass
 
 
     @Override
-    public List<Column> toColumns(Literal literal)
+    public List<Column> toColumns(Request request, Literal literal)
     {
         return List.of(constant(literal.getValue(), VARCHAR));
     }

@@ -8,12 +8,14 @@ import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
 /**
  * Literals of datatypes unknown to the configuration, or with an invalid lexical form, stored as the lexical value and
- * the datatype IRI text.
+ * the datatype IRI text. A literal matches it when the classification by the request ({@link Request#getLiteralClass})
+ * yields this class.
  */
 public final class UnsupportedLiteralClass extends BaseLiteralClass
 {
@@ -34,7 +36,14 @@ public final class UnsupportedLiteralClass extends BaseLiteralClass
 
 
     @Override
-    public List<Column> toColumns(Literal literal)
+    public boolean match(Request request, Literal literal)
+    {
+        return equals(request.getLiteralClass(literal));
+    }
+
+
+    @Override
+    public List<Column> toColumns(Request request, Literal literal)
     {
         return List.of(constant(literal.getValue(), VARCHAR), constant(literal.getType().getValue(), VARCHAR));
     }

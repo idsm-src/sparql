@@ -6,7 +6,6 @@ import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Objects;
 import cz.iocb.sparql.engine.database.Column;
@@ -14,6 +13,7 @@ import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -57,22 +57,22 @@ public class ListUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Iri iri)
+    public List<Column> toColumns(Request request, Iri iri)
     {
-        assert match(statement, iri);
+        assert match(request, iri);
 
         return List.of(constant(iri.getValue(), VARCHAR));
     }
 
 
     @Override
-    public boolean match(Statement statement, Iri iri)
+    public boolean match(Request request, Iri iri)
     {
         try
         {
             String sql = sqlQuery.replace("?", string(iri.getValue()));
 
-            try(ResultSet result = statement.executeQuery(sql))
+            try(ResultSet result = request.getStatement().executeQuery(sql))
             {
                 return result.next();
             }

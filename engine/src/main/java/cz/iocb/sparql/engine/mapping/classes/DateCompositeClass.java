@@ -15,6 +15,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.datatypes.DateDatatype;
 import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -40,7 +41,7 @@ public final class DateCompositeClass extends CanonicalLiteralClass
 
 
     @Override
-    public List<Column> toColumns(Literal literal)
+    public List<Column> toColumns(Request request, Literal literal)
     {
         return List.of(constant(DateDatatype.getDate(literal), sqlTypes.get(0)),
                 constant(DateDatatype.getZone(literal), sqlTypes.get(1)));

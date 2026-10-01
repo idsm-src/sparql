@@ -862,7 +862,7 @@ public class Request implements AutoCloseable
             return iriClass;
 
         iriClass = detectIriClass(value);
-        List<Column> columns = iriClass.toColumns(statement, value);
+        List<Column> columns = iriClass.toColumns(this, value);
         iriCache.storeToCache(value, iriClass, columns);
 
         return iriClass;
@@ -916,7 +916,7 @@ public class Request implements AutoCloseable
     private ResourceClass detectIriClass(Iri value)
     {
         for(UserIriClass iriClass : getConfiguration().getIriClasses())
-            if(iriClass.match(getStatement(), value))
+            if(iriClass.match(this, value))
                 return iriClass;
 
         return BuiltinClasses.unsupportedIri;
@@ -950,12 +950,12 @@ public class Request implements AutoCloseable
             if(set != null && set.contains(iriClass))
                 return false;
 
-            if(iriClass.match(getStatement(), iri))
+            if(iriClass.match(this, iri))
             {
                 if(set != null)
                     missmatches.remove(iri);
 
-                List<Column> columns = iriClass.toColumns(statement, iri);
+                List<Column> columns = iriClass.toColumns(this, iri);
                 iriCache.storeToCache(iri, iriClass, columns);
 
                 return true;
@@ -974,7 +974,7 @@ public class Request implements AutoCloseable
             }
         }
 
-        return resClass.match(getStatement(), term);
+        return resClass.match(this, term);
     }
 
 
@@ -990,7 +990,7 @@ public class Request implements AutoCloseable
         if(resClass instanceof IriClass iriClass && term instanceof Iri iri)
             return getColumns(iriClass, iri);
 
-        return resClass.toColumns(getStatement(), term);
+        return resClass.toColumns(this, term);
     }
 
 
@@ -1013,9 +1013,10 @@ public class Request implements AutoCloseable
         if(columns != null)
             return columns;
 
+        columns = iriClass.toColumns(this, iri);
         iriCache.storeToCache(iri, iriClass, columns);
 
-        return iriClass.toColumns(getStatement(), iri);
+        return columns;
     }
 
 

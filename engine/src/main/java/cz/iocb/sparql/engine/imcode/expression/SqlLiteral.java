@@ -97,14 +97,14 @@ public final class SqlLiteral extends SqlExpressionIntercode
             return falseValue;
 
         ResourceClass resClass = request.getLiteralClass(literal);
-        List<Column> columns = resClass.toColumns(request.getStatement(), literal);
+        List<Column> columns = resClass.toColumns(request, literal);
 
         return new SqlLiteral(literal, singletonMap(resClass, columns));
     }
 
 
     /**
-     * Constant literal expression in the given class.
+     * Constant literal expression in the given class, which has to build the columns without a request.
      *
      * @param literal the literal
      * @param resClass the resource class
@@ -112,7 +112,7 @@ public final class SqlLiteral extends SqlExpressionIntercode
      */
     private static SqlLiteral create(Literal literal, LiteralClass resClass)
     {
-        List<Column> columns = resClass.toColumns(literal);
+        List<Column> columns = resClass.toColumns(null, literal);
 
         return new SqlLiteral(literal, singletonMap(resClass, columns));
     }

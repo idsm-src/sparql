@@ -13,6 +13,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.datatypes.DateTimeDatatype;
 import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -32,7 +33,7 @@ public final class DateTimeCompositeBaseClass extends BaseLiteralClass
 
 
     @Override
-    public List<Column> toColumns(Literal literal)
+    public List<Column> toColumns(Request request, Literal literal)
     {
         return List.of(constant(DateTimeDatatype.getDateTime(literal), sqlTypes.get(0)),
                 constant(DateTimeDatatype.getZone(literal), sqlTypes.get(1)), getLexicalColumn(literal));

@@ -5,7 +5,6 @@ import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -15,6 +14,7 @@ import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -230,7 +230,7 @@ public class MapUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public boolean match(Statement statement, Iri iri)
+    public boolean match(Request request, Iri iri)
     {
         if(!pattern.matcher(iri.getValue()).matches())
             return false;
@@ -239,7 +239,7 @@ public class MapUserIriClass extends SimpleUserIriClass
         {
             String sql = sqlQuery.replace("?", string(iri.getValue()));
 
-            try(ResultSet result = statement.executeQuery(sql))
+            try(ResultSet result = request.getStatement().executeQuery(sql))
             {
                 return result.next();
             }
@@ -252,15 +252,15 @@ public class MapUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Iri iri)
+    public List<Column> toColumns(Request request, Iri iri)
     {
-        assert match(statement, iri);
+        assert match(request, iri);
 
         try
         {
             String sql = sqlQuery.replace("?", string(iri.getValue()));
 
-            try(ResultSet result = statement.executeQuery(sql))
+            try(ResultSet result = request.getStatement().executeQuery(sql))
             {
                 if(result.next())
                     return List.of(constant(result.getString(1), sqlTypes.get(0)));

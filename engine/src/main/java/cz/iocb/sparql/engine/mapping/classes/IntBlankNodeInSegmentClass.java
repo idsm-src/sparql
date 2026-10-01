@@ -6,11 +6,11 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intScalarBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.rdf.IntBlankNode;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -40,7 +40,7 @@ public final class IntBlankNodeInSegmentClass extends IntBlankNodeClass
 
 
     @Override
-    public boolean match(Statement statement, IntBlankNode term)
+    public boolean match(Request request, IntBlankNode term)
     {
         return term.getSegment() == segment;
     }
