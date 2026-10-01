@@ -29,6 +29,10 @@ import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
+import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.sparql.engine.imcode.expression.SqlNull;
+import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -45,7 +49,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 /**
  * Instantiates the templates of a CONSTRUCT or DESCRIBE query for every solution of the child, producing the columns
  * subject, predicate and object as a union over the templates; blank nodes of the templates get labels unique per
- * solution and template. Templates that cannot be instantiated (an unbound or literal subject) are dropped.
+ * solution and template. Templates that cannot be instantiated (an unbound or literal subject, a triple term outside
+ * the object position) are dropped; a triple term of a template is built from its components like by the function
+ * TRIPLE, so a solution in which a component is unbound or of a wrong kind produces no triple.
  */
 public final class SqlConstruct extends SqlIntercode
 {
@@ -216,6 +222,25 @@ public final class SqlConstruct extends SqlIntercode
         public VariableTemplate(Variable variable)
         {
             super(variable);
+        }
+    }
+
+
+    /**
+     * Triple term of a template, whose subject, predicate and object are template positions themselves (so a variable
+     * or a blank node may occur inside); it produces a term only as an object and only when its components produce an
+     * RDF triple.
+     */
+    public static class TripleTermTemplate extends RdfTermTemplate<Template>
+    {
+        /**
+         * Creates the template position.
+         *
+         * @param template templates of the components
+         */
+        public TripleTermTemplate(Template template)
+        {
+            super(template);
         }
     }
 
@@ -475,7 +500,8 @@ public final class SqlConstruct extends SqlIntercode
             return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
         }
 
-        if(optTemplates.size() == 1 && optChild instanceof SqlTableAccess acc)
+        if(optTemplates.size() == 1 && optChild instanceof SqlTableAccess acc
+                && !hasVariableInTripleTerm(optTemplates.get(0)))
         {
             Template template = optTemplates.get(0);
 
@@ -595,7 +621,8 @@ public final class SqlConstruct extends SqlIntercode
 
 
     /**
-     * Restrictions for the child: each template variable in the classes usable at its positions.
+     * Restrictions for the child: each template variable in the classes usable at its positions, inside triple terms
+     * too.
      *
      * @param templates the triple templates
      * @param bindings the variable bindings
@@ -606,11 +633,28 @@ public final class SqlConstruct extends SqlIntercode
         Restrictions restrictions = new Restrictions();
 
         for(Template template : templates)
-            for(ConstructColumn column : ConstructColumn.values())
-                if(template.get(column) instanceof VariableTemplate var)
-                    restrictions.add(var.getValue(), filterResourceClasses(column, bindings.get(var.getValue())));
+            addTemplateRestrictions(restrictions, template, bindings);
 
         return restrictions;
+    }
+
+
+    /**
+     * Adds the restrictions of the variables of the template, see {@link #getTemplateRestrictions}.
+     *
+     * @param restrictions the restrictions to extend
+     * @param template the triple template
+     * @param bindings the variable bindings
+     */
+    private static void addTemplateRestrictions(Restrictions restrictions, Template template, VariableBindings bindings)
+    {
+        for(ConstructColumn column : ConstructColumn.values())
+        {
+            if(template.get(column) instanceof VariableTemplate var)
+                restrictions.add(var.getValue(), filterResourceClasses(column, bindings.get(var.getValue())));
+            else if(template.get(column) instanceof TripleTermTemplate triple)
+                addTemplateRestrictions(restrictions, triple.getValue(), bindings);
+        }
     }
 
 
@@ -667,7 +711,8 @@ public final class SqlConstruct extends SqlIntercode
 
 
     /**
-     * True if the position can produce a term: literals only as objects, variables bound to a suitable class.
+     * True if the position can produce a term: literals and triple terms only as objects (the components of a triple
+     * term being positions of a valid triple themselves), variables bound to a suitable class.
      *
      * @param column the output column
      * @param rdfTermTemplate the template position
@@ -708,6 +753,11 @@ public final class SqlConstruct extends SqlIntercode
                 return false;
             }
 
+            case TripleTermTemplate triple ->
+            {
+                return column == OBJECT && isValidTemplate(triple.getValue(), child);
+            }
+
             default ->
             {
                 throw new IllegalArgumentException();
@@ -718,7 +768,8 @@ public final class SqlConstruct extends SqlIntercode
 
     /**
      * Binding of the output column for the template position: constant columns for IRIs and literals, a blank node
-     * built from the row number for blank node templates, the variable's usable classes otherwise.
+     * built from the row number for blank node templates, the variable's usable classes for variables, and for a triple
+     * term the term built from the bindings of its components like by the function TRIPLE.
      *
      * @param request the current request
      * @param column the output column
@@ -727,7 +778,8 @@ public final class SqlConstruct extends SqlIntercode
      * @param bnResourceClasses classes assigned to the template blank nodes so far
      * @param child the child node
      * @return binding of the output column for the template position: constant columns for IRIs and literals, a blank
-     *         node built from the row number for blank node templates, the variable's usable classes otherwise
+     *         node built from the row number for blank node templates, the variable's usable classes for variables, and
+     *         for a triple term the term built from the bindings of its components like by the function TRIPLE
      */
     private static VariableBinding getVariableBinding(Request request, ConstructColumn column,
             RdfTermTemplate<?> rdfTermTemplate, AtomicInteger bnOffset,
@@ -786,11 +838,76 @@ public final class SqlConstruct extends SqlIntercode
                 return new VariableBinding(column.getVariable(), mappings, canBeNull);
             }
 
+            case TripleTermTemplate triple ->
+            {
+                if(column != OBJECT)
+                    return null;
+
+                Template template = triple.getValue();
+                List<SqlExpressionIntercode> components = new ArrayList<>(ConstructColumn.values().length);
+
+                for(ConstructColumn position : ConstructColumn.values())
+                {
+                    VariableBinding component = getVariableBinding(request, position, template.get(position), bnOffset,
+                            bnResourceClasses, child);
+
+                    if(component == null)
+                        return null;
+
+                    components.add(SqlVariable.create(request.getConfiguration(), component));
+                }
+
+                SqlExpressionIntercode term = SqlBuiltinCall.create(request, "triple", false, components);
+
+                if(term.equals(SqlNull.get()))
+                    return null;
+
+                return new VariableBinding(column.getVariable(), term.getMappings(), term.canBeNull());
+            }
+
             default ->
             {
                 return null;
             }
         }
+    }
+
+
+    /**
+     * True if some triple term of the template contains a variable (which the table access shortcut does not map to the
+     * columns of the table).
+     *
+     * @param template the triple template
+     * @return true if some triple term of the template contains a variable, false otherwise
+     */
+    private static boolean hasVariableInTripleTerm(Template template)
+    {
+        for(ConstructColumn column : ConstructColumn.values())
+            if(template.get(column) instanceof TripleTermTemplate triple && hasVariable(triple.getValue()))
+                return true;
+
+        return false;
+    }
+
+
+    /**
+     * True if some position of the template, inside its triple terms too, is a variable.
+     *
+     * @param template the triple template
+     * @return true if some position of the template, inside its triple terms too, is a variable
+     */
+    private static boolean hasVariable(Template template)
+    {
+        for(ConstructColumn column : ConstructColumn.values())
+        {
+            if(template.get(column) instanceof VariableTemplate)
+                return true;
+
+            if(template.get(column) instanceof TripleTermTemplate triple && hasVariable(triple.getValue()))
+                return true;
+        }
+
+        return false;
     }
 
 
@@ -868,24 +985,41 @@ public final class SqlConstruct extends SqlIntercode
         {
             indentInfo(builder, indent, true);
 
-            for(ConstructColumn column : ConstructColumn.values())
-            {
-                if(column != ConstructColumn.SUBJECT)
-                    builder.append(" ");
-
-                builder.append(switch(template.get(column))
-                {
-                    case LiteralTemplate literal -> literal.getValue();
-                    case IriTemplate iri -> iri.getValue().toString();
-                    case BlankNodeTemplate bnode -> "_:" + bnode.getValue();
-                    case VariableTemplate variable -> "?" + variable.getValue();
-                    default -> throw new IllegalArgumentException();
-                });
-            }
+            builder.append(describe(template));
         }
 
         indentChild(builder, indent, true);
         child.generateExplanation(builder, getIndent(indent, true));
+    }
+
+
+    /**
+     * SPARQL-like rendering of the template.
+     *
+     * @param template the triple template
+     * @return SPARQL-like rendering of the template
+     */
+    private static String describe(Template template)
+    {
+        StringBuilder builder = new StringBuilder();
+
+        for(ConstructColumn column : ConstructColumn.values())
+        {
+            if(column != ConstructColumn.SUBJECT)
+                builder.append(" ");
+
+            builder.append(switch(template.get(column))
+            {
+                case LiteralTemplate literal -> literal.getValue().toString();
+                case IriTemplate iri -> iri.getValue().toString();
+                case BlankNodeTemplate bnode -> "_:" + bnode.getValue();
+                case VariableTemplate variable -> "?" + variable.getValue();
+                case TripleTermTemplate triple -> "<<( " + describe(triple.getValue()) + " )>>";
+                default -> throw new IllegalArgumentException();
+            });
+        }
+
+        return builder.toString();
     }
 
 

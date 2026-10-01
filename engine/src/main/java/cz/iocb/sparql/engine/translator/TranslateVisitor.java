@@ -38,6 +38,7 @@ import cz.iocb.sparql.engine.imcode.SqlConstruct.IriTemplate;
 import cz.iocb.sparql.engine.imcode.SqlConstruct.LiteralTemplate;
 import cz.iocb.sparql.engine.imcode.SqlConstruct.RdfTermTemplate;
 import cz.iocb.sparql.engine.imcode.SqlConstruct.Template;
+import cz.iocb.sparql.engine.imcode.SqlConstruct.TripleTermTemplate;
 import cz.iocb.sparql.engine.imcode.SqlConstruct.VariableTemplate;
 import cz.iocb.sparql.engine.imcode.SqlDistinct;
 import cz.iocb.sparql.engine.imcode.SqlEmptySolution;
@@ -115,6 +116,7 @@ import cz.iocb.sparql.engine.model.pattern.Values.ValuesList;
 import cz.iocb.sparql.engine.model.triple.BlankNode;
 import cz.iocb.sparql.engine.model.triple.Node;
 import cz.iocb.sparql.engine.model.triple.Triple;
+import cz.iocb.sparql.engine.model.triple.TripleTermNode;
 import cz.iocb.sparql.engine.model.triple.Verb;
 import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 import cz.iocb.sparql.engine.rdf.Iri;
@@ -315,11 +317,15 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         SqlIntercode construct = SqlConstruct.construct(request, templates, source);
 
+        // the subject of a produced triple has to be an IRI or a blank node, its predicate an IRI
         SqlIntercode filter = SqlFilter.filter(request, List.of(
                 SqlBuiltinCall.create(request, "isiri", false,
                         List.of(SqlVariable.create(relations, construct.getVariable(PREDICATE.getVariable())))),
                 SqlUnaryLogical.create(relations,
                         SqlBuiltinCall.create(request, "isliteral", false,
+                                List.of(SqlVariable.create(relations, construct.getVariable(SUBJECT.getVariable()))))),
+                SqlUnaryLogical.create(relations,
+                        SqlBuiltinCall.create(request, "istriple", false,
                                 List.of(SqlVariable.create(relations, construct.getVariable(SUBJECT.getVariable())))))),
                 construct);
 
@@ -342,6 +348,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             case LiteralNode literal -> new LiteralTemplate(getLiteral(literal));
             case VariableNode var -> new VariableTemplate(getVariable(var));
             case BlankNode bnode -> new BlankNodeTemplate(bnode.getName());
+            case TripleTermNode triple -> new TripleTermTemplate(new Template(createTemplate(triple.getSubject()),
+                    createTemplate(triple.getPredicate()), createTemplate(triple.getObject())));
             default -> throw new IllegalArgumentException();
         };
     }

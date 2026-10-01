@@ -6,6 +6,8 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdString
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,9 +18,11 @@ import org.junit.jupiter.api.Test;
 import cz.iocb.sparql.engine.Database;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
+import cz.iocb.sparql.engine.rdf.BlankNode;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.StrBlankNode;
 import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.Engine;
@@ -33,7 +37,8 @@ import cz.iocb.sparql.engine.translator.ServiceException;
  * Queries over triple terms given by VALUES or built by expressions, run against an empty configuration: the functions
  * TRIPLE, SUBJECT, PREDICATE, OBJECT and isTRIPLE applied to triple terms kept in their own classes and to triple terms
  * stored in the box, the triple term shorthand of expressions, nested triple terms, the comparisons {@code =},
- * {@code !=}, {@code <} and IN, sameTerm and ORDER BY.
+ * {@code !=}, {@code <} and IN, sameTerm, ORDER BY, and the triple terms, reified triples and annotations of CONSTRUCT
+ * templates.
  */
 public class TripleTermFunctionTest
 {
@@ -45,6 +50,12 @@ public class TripleTermFunctionTest
     private static final Iri e = iri("e");
     private static final Iri p = iri("p");
     private static final Iri x = iri("x");
+    private static final Iri o = iri("o");
+    private static final Iri q = iri("q");
+    private static final Iri r = iri("r");
+    private static final Iri s = iri("s");
+    private static final Iri reifies = new Iri("http://www.w3.org/1999/02/22-rdf-syntax-ns#reifies");
+    private static final StrBlankNode bnode = new StrBlankNode("", 0);
     private static final TypedLiteral lit = new TypedLiteral("lit", xsdStringIri);
     private static final TypedLiteral one = new TypedLiteral("1", xsdIntegerIri);
     private static final TypedLiteral two = new TypedLiteral("2", xsdIntegerIri);
@@ -121,6 +132,36 @@ public class TripleTermFunctionTest
     private static TripleTerm triple(RdfTerm subject, RdfTerm predicate, RdfTerm object)
     {
         return new TripleTerm(subject, predicate, object);
+    }
+
+
+    /**
+     * The rows with the labels of their blank nodes erased, inside triple terms too.
+     *
+     * @param rows the rows
+     * @return the rows with the labels of their blank nodes erased
+     */
+    private static List<List<RdfTerm>> erase(List<List<RdfTerm>> rows)
+    {
+        return rows.stream().map(row -> row.stream().map(TripleTermFunctionTest::erase).toList()).toList();
+    }
+
+
+    /**
+     * The term with the labels of its blank nodes erased, inside triple terms too.
+     *
+     * @param term the term
+     * @return the term with the labels of its blank nodes erased
+     */
+    private static RdfTerm erase(RdfTerm term)
+    {
+        return switch(term)
+        {
+            case BlankNode _ -> bnode;
+            case TripleTerm triple -> triple(erase(triple.getSubject()), erase(triple.getPredicate()),
+                    erase(triple.getObject()));
+            case null, default -> term;
+        };
     }
 
 
@@ -319,5 +360,76 @@ public class TripleTermFunctionTest
 
         assertThat(execute(query.formatted("DESC")),
                 contains(row(triple(b, p, one)), row(triple(a, p, two)), row(triple(a, p, one)), row(lit), row(x)));
+    }
+
+
+    @Test
+    @DisplayName("a triple term of a CONSTRUCT template is built from its components, nested ones included")
+    void constructTripleTerm() throws Exception
+    {
+        assertThat(execute("""
+                CONSTRUCT { ?s :p <<( ?s :q ?o )>> } WHERE {
+                  VALUES (?s ?o) { (:a 1) (:b "lit") }
+                }"""), containsInAnyOrder(row(a, p, triple(a, q, one)), row(b, p, triple(b, q, lit))));
+
+        assertThat(execute("""
+                CONSTRUCT { :s :p <<( :a :q <<( ?s :r ?o )>> )>> } WHERE {
+                  VALUES (?s ?o) { (:a 1) }
+                }"""), containsInAnyOrder(row(s, p, triple(a, q, triple(a, r, one)))));
+    }
+
+
+    @Test
+    @DisplayName("a reified triple or an annotation of a CONSTRUCT template produces the reifying triples")
+    void constructReifiedTriple() throws Exception
+    {
+        List<List<RdfTerm>> annotated = execute("""
+                CONSTRUCT { ?s :p ?o {| :by :me |} } WHERE {
+                  VALUES (?s ?o) { (:a 1) }
+                }""");
+
+        assertThat(erase(annotated), containsInAnyOrder(row(a, p, one), row(bnode, reifies, triple(a, p, one)),
+                row(bnode, iri("by"), iri("me"))));
+
+        assertEquals(1,
+                annotated.stream().map(row -> row.get(0)).filter(t -> t instanceof BlankNode).distinct().count());
+
+        List<List<RdfTerm>> reified = execute("""
+                CONSTRUCT { << :a :b ?o >> :src :x } WHERE {
+                  VALUES ?o { 1 }
+                }""");
+
+        assertThat(erase(reified),
+                containsInAnyOrder(row(bnode, reifies, triple(a, b, one)), row(bnode, iri("src"), x)));
+
+        assertInstanceOf(BlankNode.class, reified.get(0).get(0));
+        assertEquals(reified.get(0).get(0), reified.get(1).get(0));
+    }
+
+
+    @Test
+    @DisplayName("a template produces no triple for a triple term with an unbound or invalid component or in the "
+            + "subject position")
+    void constructInvalidTripleTerms() throws Exception
+    {
+        assertThat(execute("""
+                CONSTRUCT { :s :p <<( ?x :q :o )>> } WHERE {
+                  VALUES ?x { :a "lit" UNDEF }
+                }"""), containsInAnyOrder(row(s, p, triple(a, q, o))));
+
+        assertThat(execute("""
+                CONSTRUCT { <<( :a :b :c )>> :p :o . :s :p <<( <<( :a :b :c )>> :q :o )>> . :s :p :o } WHERE {
+                }"""), containsInAnyOrder(row(s, p, o)));
+
+        assertThat(execute("""
+                CONSTRUCT { ?t :p :o . :s :q ?t } WHERE {
+                  VALUES ?t { <<( :a :b 1 )>> :x }
+                }"""), containsInAnyOrder(row(s, q, triple(a, b, one)), row(s, q, x), row(x, p, o)));
+
+        assertThat(execute("""
+                CONSTRUCT { ?b :p :o } WHERE {
+                  VALUES ?c { true false }
+                  BIND(IF(?c, <<( :a :b 1 )>>, :x) AS ?b)
+                }"""), containsInAnyOrder(row(x, p, o)));
     }
 }
