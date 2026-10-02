@@ -433,7 +433,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
     @Override
     public ExistsExpression visitExistsFunction(ExistsFunctionContext ctx)
     {
-        scopes.addScope();
+        scopes.addExistsScope();
 
         try
         {
@@ -452,7 +452,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
     @Override
     public ExistsExpression visitNotExistsFunction(NotExistsFunctionContext ctx)
     {
-        scopes.addScope();
+        scopes.addExistsScope();
 
         try
         {

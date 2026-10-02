@@ -104,7 +104,7 @@ public final class SqlLateralJoin extends SqlIntercode
         this.right = right;
         this.table = table;
         this.lateral = lateral;
-        this.requirements = getRequirements(lateral);
+        this.requirements = getLateralRequirements(lateral);
         this.columnMap = columnMap;
     }
 
@@ -181,7 +181,7 @@ public final class SqlLateralJoin extends SqlIntercode
          * lateral join evaluates it again for every solution of the left side.
          */
 
-        if(getRequirements(lateral).getNames().isEmpty() && right.isDeterministic())
+        if(getLateralRequirements(lateral).getNames().isEmpty() && right.isDeterministic())
             return SqlJoin.join(request, List.of(left, right), restrictions);
 
         Map<Column, Column> map = new HashMap<>();
@@ -225,12 +225,13 @@ public final class SqlLateralJoin extends SqlIntercode
 
 
     /**
-     * Variables and classes referred to through non-constant columns of the exposed bindings.
+     * Variables and classes referred to through non-constant columns of the exposed bindings, i.e. what the side
+     * exposing them has to provide.
      *
-     * @param lateral left-side bindings exposed to the right side
+     * @param lateral exposed bindings
      * @return variables and classes referred to through non-constant columns of the exposed bindings
      */
-    private static Restrictions getRequirements(VariableBindings lateral)
+    public static Restrictions getLateralRequirements(VariableBindings lateral)
     {
         Restrictions requirements = new Restrictions();
 
@@ -240,6 +241,52 @@ public final class SqlLateralJoin extends SqlIntercode
                     requirements.add(binding.getVariable(), entry.getKey());
 
         return requirements;
+    }
+
+
+    /**
+     * Value of every non-constant exposed column as the current bindings of the exposing side provide it: the column of
+     * the same class converted from what the side provides now (a compatible class or a constant), or NULL when the
+     * variable or the class is gone.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param lateral exposed bindings
+     * @param current current bindings of the exposing side
+     * @return value of every non-constant exposed column as the current bindings of the exposing side provide it
+     */
+    public static Map<Column, Column> getLateralValues(ClassRelations relations, VariableBindings lateral,
+            VariableBindings current)
+    {
+        Map<Column, Column> values = new HashMap<>();
+
+        for(VariableBinding binding : lateral.getValues())
+        {
+            VariableBinding provided = current.get(binding.getVariable());
+
+            for(Entry<ResourceClass, List<Column>> entry : binding.getMappings().entrySet())
+            {
+                ResourceClass resClass = entry.getKey();
+                List<Column> exposed = entry.getValue();
+
+                if(exposed == null)
+                    continue;
+
+                List<Column> columns = provided == null ? null : provided.deriveMapping(relations, resClass);
+
+                for(int i = 0; i < resClass.getColumnCount(); i++)
+                {
+                    Column column = exposed.get(i);
+
+                    if(column instanceof ConstantColumn)
+                        continue;
+
+                    values.put(column,
+                            columns != null ? columns.get(i) : new NullColumn(resClass.getSqlTypes().get(i)));
+                }
+            }
+        }
+
+        return values;
     }
 
 
@@ -382,34 +429,9 @@ public final class SqlLateralJoin extends SqlIntercode
 
         Map<Column, Column> supplements = new HashMap<>();
 
-        for(VariableBinding binding : lateral.getValues())
-        {
-            VariableBinding current = left.getVariableBindings().get(binding.getVariable());
-
-            for(Entry<ResourceClass, List<Column>> entry : binding.getMappings().entrySet())
-            {
-                ResourceClass resClass = entry.getKey();
-                List<Column> exposed = entry.getValue();
-
-                if(exposed == null)
-                    continue;
-
-                List<Column> provided = current == null ? null : current.deriveMapping(relations, resClass);
-
-                for(int i = 0; i < resClass.getColumnCount(); i++)
-                {
-                    Column column = exposed.get(i);
-
-                    if(column instanceof ConstantColumn)
-                        continue;
-
-                    Column value = provided != null ? provided.get(i) : new NullColumn(resClass.getSqlTypes().get(i));
-
-                    if(!value.equals(column))
-                        supplements.put(column, value);
-                }
-            }
-        }
+        for(Entry<Column, Column> entry : getLateralValues(relations, lateral, left.getVariableBindings()).entrySet())
+            if(!entry.getValue().equals(entry.getKey()))
+                supplements.put(entry.getKey(), entry.getValue());
 
 
         if(supplements.isEmpty())

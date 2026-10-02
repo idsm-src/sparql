@@ -18,14 +18,12 @@ import static cz.iocb.sparql.engine.translator.TermGenerator.getLiteral;
 import static cz.iocb.sparql.engine.translator.TermGenerator.getVariable;
 import java.util.LinkedList;
 import java.util.List;
-import cz.iocb.sparql.engine.imcode.SqlIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryArithmetic;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical;
 import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
 import cz.iocb.sparql.engine.imcode.expression.SqlCast;
 import cz.iocb.sparql.engine.imcode.expression.SqlEffectiveBooleanValue;
-import cz.iocb.sparql.engine.imcode.expression.SqlExists;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlFunctionCall;
 import cz.iocb.sparql.engine.imcode.expression.SqlInExpression;
@@ -207,8 +205,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     @Override
     public SqlExpressionIntercode visit(ExistsExpression existsExpression)
     {
-        SqlIntercode pattern = parent.translateExistsPattern(existsExpression.getPattern());
-        return SqlExists.create(request, existsExpression.isNegated(), pattern, bindings);
+        return parent.translateExists(existsExpression, bindings);
     }
 
 

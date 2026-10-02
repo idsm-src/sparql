@@ -42,6 +42,7 @@ import cz.iocb.sparql.engine.imcode.SqlConstruct.RdfTermTemplate;
 import cz.iocb.sparql.engine.imcode.SqlConstruct.Template;
 import cz.iocb.sparql.engine.imcode.SqlConstruct.TripleTermTemplate;
 import cz.iocb.sparql.engine.imcode.SqlConstruct.VariableTemplate;
+import cz.iocb.sparql.engine.imcode.SqlContextSolution;
 import cz.iocb.sparql.engine.imcode.SqlDistinct;
 import cz.iocb.sparql.engine.imcode.SqlEmptySolution;
 import cz.iocb.sparql.engine.imcode.SqlFilter;
@@ -98,6 +99,7 @@ import cz.iocb.sparql.engine.model.VariableNode;
 import cz.iocb.sparql.engine.model.VariableOrBlankNode;
 import cz.iocb.sparql.engine.model.base.Range;
 import cz.iocb.sparql.engine.model.expression.BuiltInCallExpression;
+import cz.iocb.sparql.engine.model.expression.ExistsExpression;
 import cz.iocb.sparql.engine.model.expression.Expression;
 import cz.iocb.sparql.engine.model.expression.LiteralNode;
 import cz.iocb.sparql.engine.model.pattern.Bind;
@@ -175,6 +177,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private final Map<Variable, SqlExpressionIntercode> lateralGraphs = new HashMap<>();
 
     /**
+     * Context solutions of the EXISTS patterns being translated, innermost last (the empty solution at the bottom): the
+     * solution every group graph pattern starts from (see {@link #translateExists}).
+     */
+    private final Stack<SqlIntercode> contextSolutions = new Stack<>();
+
+    /**
      * Configuration of the endpoint.
      */
     private final SparqlDatabaseConfiguration configuration;
@@ -214,6 +222,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         serviceRestrictions.add(configuration.getServiceIri());
         graphRestrictions.add(null);
+        contextSolutions.add(SqlEmptySolution.get());
     }
 
 
@@ -608,8 +617,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(GroupGraph groupGraph)
     {
-        SqlIntercode translatedGroupGraphPattern = translatePatternList(groupGraph.getPatterns(),
-                SqlEmptySolution.get());
+        SqlIntercode translatedGroupGraphPattern = translatePatternList(groupGraph.getPatterns(), getContextSolution());
 
         return translatedGroupGraphPattern;
     }
@@ -626,7 +634,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
          */
         if(graph.getName() instanceof VariableNode graphNode && !isGraphWitnessed(graph, graphTerm))
             return translatePerGraph(getVariable(graphNode),
-                    () -> restrictToCurrentGraph(visitElement(graph.getPattern())));
+                    () -> restrictToCurrentGraph(translateGroupGraphPattern(graph.getPattern())));
 
         SqlIntercode quads = null;
 
@@ -667,7 +675,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         graphRestrictions.push(graphTerm);
 
-        SqlIntercode translatedPattern = visitElement(graph.getPattern());
+        SqlIntercode translatedPattern = translateGroupGraphPattern(graph.getPattern());
 
         graphRestrictions.pop();
 
@@ -683,7 +691,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             //NOTE: a witnessed pattern binds the variable in every solution; otherwise it is evaluated per graph
             if(binding == null || binding.canBeNull())
-                return translatePerGraph(var, () -> restrictToCurrentGraph(visitElement(graph.getPattern())));
+                return translatePerGraph(var,
+                        () -> restrictToCurrentGraph(translateGroupGraphPattern(graph.getPattern())));
         }
         else if(!isGraphWitnessed(graph, graphTerm))
         {
@@ -793,15 +802,90 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     /**
-     * Translates the pattern of an EXISTS expression; in an evaluation per graph, it is restricted to the graph of the
-     * current solution.
+     * Translates an EXISTS expression evaluated for the solutions of the given bindings. Following SPARQL 1.2, the
+     * pattern is evaluated for the current solution: every group graph pattern inside it starts from the context
+     * solution ({@link SqlContextSolution}), which binds the variables of the current solution the pattern refers to,
+     * so the pattern is joined with the current solution wherever it binds a shared variable and its filters and binds
+     * see the current values. Besides the variables mentioned in the pattern, the graph variable in effect is exposed,
+     * because the triples of the pattern bind it; when the pattern contains a MINUS, all variables are, because the
+     * sides of the MINUS share the variables of the current solution. In an evaluation per graph, the pattern is
+     * restricted to the graph of the current solution.
+     *
+     * @param exists the EXISTS expression
+     * @param bindings bindings of the solutions the expression is evaluated for
+     * @return the resulting expression
+     */
+    SqlExpressionIntercode translateExists(ExistsExpression exists, VariableBindings bindings)
+    {
+        GraphPattern pattern = exists.getPattern();
+
+        Set<Variable> mentioned = new HashSet<>();
+        boolean[] hasMinus = new boolean[1];
+
+        new ElementVisitor<Void>()
+        {
+            @Override
+            public Void visit(VariableNode variable)
+            {
+                mentioned.add(getVariable(variable));
+                return null;
+            }
+
+            @Override
+            public Void visit(Minus minus)
+            {
+                hasMinus[0] = true;
+                return super.visit(minus);
+            }
+        }.visitElement(pattern);
+
+        if(getGraph() instanceof Variable graph)
+            mentioned.add(graph);
+
+        Set<Variable> exposed = hasMinus[0] ? bindings.getVariables() : mentioned;
+
+        SqlIntercode context = SqlContextSolution.create(request, request.createLateralTable(), bindings, exposed);
+
+        contextSolutions.push(context);
+
+        SqlIntercode translated = restrictToCurrentGraph(translateGroupGraphPattern(pattern));
+
+        contextSolutions.pop();
+
+        if(context instanceof SqlContextSolution solution)
+            return SqlExists.create(request, exists.isNegated(), translated, bindings, solution);
+
+        return SqlExists.create(request, exists.isNegated(), translated, bindings);
+    }
+
+
+    /**
+     * Context solution of the innermost EXISTS pattern being translated: the solution every group graph pattern starts
+     * from. Outside an EXISTS pattern, it is the empty solution.
+     *
+     * @return context solution of the innermost EXISTS pattern being translated
+     */
+    private SqlIntercode getContextSolution()
+    {
+        return contextSolutions.peek();
+    }
+
+
+    /**
+     * Translates a pattern standing in the syntax for a group graph pattern: a group starts from the context solution
+     * itself (see {@link #visit(GroupGraph)}), whereas a sub-select standing for the whole group is joined with it.
      *
      * @param pattern the pattern
      * @return the resulting intermediate code
      */
-    SqlIntercode translateExistsPattern(GraphPattern pattern)
+    private SqlIntercode translateGroupGraphPattern(GraphPattern pattern)
     {
-        return restrictToCurrentGraph(visitElement(pattern));
+        SqlIntercode translated = visitElement(pattern);
+
+        if(pattern instanceof GroupGraph || getContextSolution().equals(SqlEmptySolution.get()))
+            return translated;
+
+        return SqlJoin.join(request, getContextSolution(), translated);
     }
 
 
@@ -935,7 +1019,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(Union union)
     {
-        return SqlUnion.union(request, union.getPatterns().stream().map(p -> visitElement(p)).toList());
+        return SqlUnion.union(request, union.getPatterns().stream().map(p -> translateGroupGraphPattern(p)).toList());
     }
 
 
@@ -1046,11 +1130,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                             optionalPatterns.add(subpattern);
                     }
 
-                    translatedPattern = translatePatternList(optionalPatterns, SqlEmptySolution.get());
+                    translatedPattern = translatePatternList(optionalPatterns, getContextSolution());
                 }
                 else
                 {
-                    translatedPattern = optionalPattern.accept(this);
+                    translatedPattern = translateGroupGraphPattern(optionalPattern);
                 }
 
                 translatedGroupPattern = translateLeftJoin(translatedGroupPattern,
@@ -1133,7 +1217,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      */
     private SqlIntercode translateMinus(Minus pattern, SqlIntercode translatedGroupPattern)
     {
-        SqlIntercode minusPattern = restrictToCurrentGraph(visitElement(pattern.getPattern()));
+        SqlIntercode minusPattern = restrictToCurrentGraph(translateGroupGraphPattern(pattern.getPattern()));
 
         /* NOTE: Inside GRAPH ?g, both sides are evaluated in the same graph, which the triples of both bind to the
          * graph variable, but the variable is no variable of their solutions and so does not count as shared.
@@ -1145,7 +1229,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     /**
-     * Applies a BIND to the group pattern.
+     * Applies a BIND to the group pattern. A variable the group binds already, which the syntax allows only for a
+     * variable of the current solution of an EXISTS pattern, is not rebound: the value is bound to a fresh variable
+     * merged into it, so it has to agree with the current value where both are bound.
      *
      * @param bind the BIND pattern
      * @param translatedGroupPattern code of the patterns so far
@@ -1158,6 +1244,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(request,
                 translatedGroupPattern.getVariableBindings(), this);
         SqlExpressionIntercode expression = visitor.visitElement(bind.getExpression());
+
+        if(translatedGroupPattern.getVariableBindings().get(var) != null)
+        {
+            Variable value = createVariable(variablePrefix);
+
+            return SqlMerge.create(request, var, value,
+                    SqlBind.bind(request, value, expression, translatedGroupPattern));
+        }
 
         return SqlBind.bind(request, var, expression, translatedGroupPattern);
     }
@@ -1466,7 +1560,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         Map<String, Variable> serviceVariables = service.getPattern().getVariablesInScope().stream()
                 .collect(toMap(e -> e.getName(), e -> getVariable(e)));
 
-        if(request.isServiceReorderEnabled())
+        /* NOTE: The context solution of an EXISTS pattern refers to the current solution of the filter, so a call
+         * cannot be evaluated for a context containing it; the call is evaluated by itself and joined afterwards.
+         */
+        if(request.isServiceReorderEnabled() || !getContextSolution().equals(SqlEmptySolution.get()))
         {
             SqlIntercode call = SqlServiceStub.create(request, name, serviceCode, serviceVariables,
                     SqlEmptySolution.get(), new StrBlankNodeInSegmentClass(--serviceId), service.isSilent());

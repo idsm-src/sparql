@@ -35,14 +35,22 @@ public class VariableScopes
         Set<String> variables = new HashSet<>();
 
         /**
+         * Whether the scope is the scope of an EXISTS pattern, which is evaluated for the current solution of the
+         * enclosing scopes.
+         */
+        boolean exists;
+
+        /**
          * Creates the scope; leading {@code ?} or {@code $} are stripped from the transient names.
          *
          * @param name the scope name
          * @param transientNames variable names shared with the enclosing scopes
+         * @param exists whether the scope is the scope of an EXISTS pattern
          */
-        public Scope(String name, Set<String> transientNames)
+        public Scope(String name, Set<String> transientNames, boolean exists)
         {
             this.name = name;
+            this.exists = exists;
 
             if(transientNames != null)
             {
@@ -77,17 +85,28 @@ public class VariableScopes
      */
     public VariableScopes()
     {
-        scopes.add(new Scope("", new HashSet<>()));
+        scopes.add(new Scope("", new HashSet<>(), false));
     }
 
 
     /**
-     * Opens a nested scope (for MINUS and EXISTS): variables already bound in enclosing scopes stay visible, variables
-     * first bound inside are local to it.
+     * Opens a nested scope (for MINUS): variables already bound in enclosing scopes stay visible, variables first bound
+     * inside are local to it.
      */
     public void addScope()
     {
-        scopes.push(new Scope("ctx" + id++, null));
+        scopes.push(new Scope("ctx" + id++, null, false));
+    }
+
+
+    /**
+     * Opens the nested scope of an EXISTS pattern: like {@link #addScope()}, but the pattern is evaluated for the
+     * current solution of the enclosing scopes, so the variables bound in them stay visible even inside a sub-select
+     * nested in the pattern that does not project them (see {@link #addToScope(String, boolean)}).
+     */
+    public void addExistsScope()
+    {
+        scopes.push(new Scope("ctx" + id++, null, true));
     }
 
 
@@ -99,7 +118,7 @@ public class VariableScopes
      */
     public void addScope(Set<String> transientNames)
     {
-        scopes.push(new Scope("ctx" + id++, transientNames));
+        scopes.push(new Scope("ctx" + id++, transientNames, false));
     }
 
 
@@ -116,7 +135,9 @@ public class VariableScopes
      * Resolves the variable {@code name} (leading {@code ?} or {@code $} is ignored) to the name of the scope it is
      * bound in, binding it in the innermost scope if it is not bound yet. With {@code asPrivate}, an unbound variable
      * is instead given a fresh unique scope without being bound, so it stays unbound for later occurrences (used for
-     * variables in expressions).
+     * variables in expressions). A variable hidden by the projection of a sub-select is still a variable of the current
+     * solution of an EXISTS pattern the sub-select is nested in, which binds the variables of the scopes enclosing the
+     * pattern: those scopes are searched as well.
      *
      * @param name the variable name
      * @param asPrivate whether an unbound variable gets a private scope
@@ -127,13 +148,19 @@ public class VariableScopes
         if(name.startsWith("$") || name.startsWith("?"))
             name = name.substring(1);
 
-        for(Scope scope : scopes)
+        for(int i = 0; i < scopes.size(); i++)
         {
+            Scope scope = scopes.get(i);
+
             if(scope.variables.contains(name))
                 return scope.name;
 
             if(scope.transientNames != null && !scope.transientNames.contains(name))
-                break;
+            {
+                //NOTE: continue outside the EXISTS pattern the sub-select is nested in, if there is any
+                while(i < scopes.size() && !scopes.get(i).exists)
+                    i++;
+            }
         }
 
         if(asPrivate)

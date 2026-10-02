@@ -6,37 +6,41 @@ import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static java.util.Collections.singletonMap;
 import static java.util.stream.Collectors.joining;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
-import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.imcode.SqlContextSolution;
 import cz.iocb.sparql.engine.imcode.SqlEmptySolution;
 import cz.iocb.sparql.engine.imcode.SqlIntercode;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
+import cz.iocb.sparql.engine.imcode.SqlLateralJoin;
 import cz.iocb.sparql.engine.imcode.SqlNoSolution;
-import cz.iocb.sparql.engine.imcode.SqlUnion;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
-import cz.iocb.sparql.engine.translator.VariableBinding;
 import cz.iocb.sparql.engine.translator.VariableBindingPair;
 import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
 /**
- * EXISTS and NOT EXISTS: true if the pattern, joined with the current solution through the shared variables of the
- * given bindings, has a solution.
+ * EXISTS and NOT EXISTS: true if the pattern, evaluated for the current solution of the surrounding bindings, has a
+ * solution. The pattern refers to the current solution through its context solution (see {@link SqlContextSolution}):
+ * the expression supplies the exposed columns of the current solution under an alias, and the pattern is evaluated
+ * laterally for them. Without a context solution, the pattern is independent of the current solution.
  */
 public final class SqlExists extends SqlExpressionIntercode
 {
+    /**
+     * Alias of the pattern.
+     */
+    private static final AliasTable patternTable = new AliasTable("tab");
+
     /**
      * True for NOT EXISTS.
      */
@@ -52,6 +56,11 @@ public final class SqlExists extends SqlExpressionIntercode
      */
     private final VariableBindings bindings;
 
+    /**
+     * Context solution the pattern refers to, as created for the pattern (with all exposed columns), or null.
+     */
+    private final SqlContextSolution context;
+
 
     /**
      * Creates the expression; it is deterministic if the pattern is.
@@ -60,57 +69,83 @@ public final class SqlExists extends SqlExpressionIntercode
      * @param pattern the tested pattern
      * @param mappings columns per resource class
      * @param bindings the variable bindings
+     * @param context context solution the pattern refers to, or null
      */
     protected SqlExists(boolean negated, SqlIntercode pattern, Map<ResourceClass, List<Column>> mappings,
-            VariableBindings bindings)
+            VariableBindings bindings, SqlContextSolution context)
     {
         super(mappings, false, pattern.isDeterministic());
 
         this.negated = negated;
         this.pattern = pattern;
         this.bindings = bindings;
+        this.context = context;
 
-        this.referencedVariables.addAll(pattern.getVariableBindings().getVariables());
+        if(context != null)
+            this.referencedVariables.addAll(context.getVariableBindings().getVariables());
     }
 
 
     /**
-     * Existence test of the pattern within the given surrounding bindings.
+     * Existence test of a pattern independent of the surrounding bindings.
      *
      * @param request the current request
      * @param negated whether the test is negated
      * @param pattern the tested pattern
      * @param bindings the variable bindings
-     * @return existence test of the pattern within the given surrounding bindings
+     * @return existence test of a pattern independent of the surrounding bindings
      */
     public static SqlExpressionIntercode create(Request request, boolean negated, SqlIntercode pattern,
             VariableBindings bindings)
     {
-        return create(request, negated, pattern, bindings, Restriction.ALL);
+        return create(request, negated, pattern, bindings, null, Restriction.ALL);
     }
 
 
     /**
-     * Existence test materialising only when needed; a pattern without solutions makes it constant.
+     * Existence test of a pattern evaluated for the current solution of the surrounding bindings, which the pattern
+     * refers to through the context solution.
      *
      * @param request the current request
      * @param negated whether the test is negated
      * @param pattern the tested pattern
      * @param bindings the variable bindings
-     * @param restriction the result classes the parent needs
-     * @return existence test materialising only when needed; a pattern without solutions makes it constant
+     * @param context context solution the pattern refers to
+     * @return existence test of a pattern evaluated for the current solution of the surrounding bindings
      */
     public static SqlExpressionIntercode create(Request request, boolean negated, SqlIntercode pattern,
-            VariableBindings bindings, Restriction restriction)
+            VariableBindings bindings, SqlContextSolution context)
+    {
+        return create(request, negated, pattern, bindings, context, Restriction.ALL);
+    }
+
+
+    /**
+     * Existence test materialising only when needed; a pattern without solutions or with the single solution makes it
+     * constant.
+     *
+     * @param request the current request
+     * @param negated whether the test is negated
+     * @param pattern the tested pattern
+     * @param bindings the variable bindings
+     * @param context context solution the pattern refers to, or null
+     * @param restriction the result classes the parent needs
+     * @return existence test materialising only when needed; a pattern without solutions or with the single solution
+     *         makes it constant
+     */
+    public static SqlExpressionIntercode create(Request request, boolean negated, SqlIntercode pattern,
+            VariableBindings bindings, SqlContextSolution context, Restriction restriction)
     {
         ClassRelations relations = request.getConfiguration();
 
         if(pattern.equals(SqlNoSolution.get()))
             return negated ? trueValue : falseValue;
 
-        if(pattern.equals(SqlEmptySolution.get()))
+        //NOTE: the context solution is a single solution like the empty one
+        if(pattern.equals(SqlEmptySolution.get()) || pattern instanceof SqlContextSolution)
             return negated ? falseValue : trueValue;
 
+        //NOTE: a solution of the pattern agrees with the current solution on the shared variables
         List<VariableBindingPair> pairs = VariableBindingPair.getPairs(relations, pattern.getVariableBindings(),
                 bindings);
 
@@ -119,19 +154,22 @@ public final class SqlExists extends SqlExpressionIntercode
 
 
         if(!restriction.contains(relations, xsdBoolean))
-            return new SqlExists(negated, pattern, singletonMap(xsdBoolean, null), bindings);
+            return new SqlExists(negated, pattern, singletonMap(xsdBoolean, null), bindings, context);
 
 
-        List<Column> result = translate(request, negated, pattern, bindings);
+        List<Column> result = translate(request, negated, pattern, bindings, context);
 
-        return new SqlExists(negated, pattern, singletonMap(xsdBoolean, result), bindings);
+        return new SqlExists(negated, pattern, singletonMap(xsdBoolean, result), bindings, context);
     }
 
 
     @Override
     public Restrictions getRequirements(ClassRelations relations)
     {
-        return SqlIntercode.getJoinRestrictions(relations, bindings, pattern.getVariableBindings(), new Restrictions());
+        if(context == null)
+            return new Restrictions();
+
+        return SqlLateralJoin.getLateralRequirements(context.getVariableBindings());
     }
 
 
@@ -139,114 +177,56 @@ public final class SqlExists extends SqlExpressionIntercode
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
-        ClassRelations relations = request.getConfiguration();
-
-        SqlIntercode optPattern = pattern;
-
-        Restrictions restrictions = SqlIntercode.getJoinRestrictions(relations, optPattern.getVariableBindings(),
-                bindings, new Restrictions());
-
-        while(true)
-        {
-            optPattern = optPattern.optimize(request, restrictions, true, evalServices);
-
-            if(optPattern instanceof SqlUnion union)
-            {
-                List<SqlIntercode> unionList = new ArrayList<>();
-
-                for(SqlIntercode child : union.getChilds())
-                {
-                    List<VariableBindingPair> pairs = VariableBindingPair.getPairs(relations,
-                            child.getVariableBindings(), bindings);
-
-                    if(pairs.stream().allMatch(p -> p.isJoinable()))
-                        unionList.add(child);
-                }
-
-                optPattern = SqlUnion.union(request, unionList).optimize(request, restrictions, true, evalServices);
-            }
-
-            Restrictions optRestrictions = SqlIntercode.getJoinRestrictions(relations, optPattern.getVariableBindings(),
-                    bindings, new Restrictions());
-
-            if(optRestrictions.equals(restrictions))
-                break;
-
-            restrictions = optRestrictions;
-        }
-
+        //NOTE: only the existence of a solution matters, no column of the pattern is needed
+        SqlIntercode optPattern = pattern.optimize(request, new Restrictions(), true, evalServices);
 
         if(optPattern == pattern && bindings.equals(this.bindings))
             return this;
 
-        return create(request, negated, optPattern, bindings, restriction);
+        return create(request, negated, optPattern, bindings, context, restriction);
     }
 
 
     /**
-     * SQL boolean expression testing the existence of a solution of the pattern compatible with the surrounding
-     * bindings.
+     * SQL boolean expression testing the existence of a solution of the pattern: the pattern is joined laterally to the
+     * exposed columns of the current solution, supplied under their names as the surrounding bindings provide them now.
      *
      * @param request the current request
      * @param negated whether the test is negated
      * @param pattern the tested pattern
      * @param bindings the variable bindings
-     * @return SQL boolean expression testing the existence of a solution of the pattern compatible with the surrounding
-     *         bindings
+     * @param context context solution the pattern refers to, or null
+     * @return SQL boolean expression testing the existence of a solution of the pattern
      */
     public static List<Column> translate(Request request, boolean negated, SqlIntercode pattern,
-            VariableBindings bindings)
+            VariableBindings bindings, SqlContextSolution context)
     {
         ClassRelations relations = request.getConfiguration();
-
-        //NOTE: rename pattern columns to prevent collisions
-
-        Map<Column, Column> map = new HashMap<>();
-        pattern.getVariableBindings().getNonConstantColumns()
-                .forEach(c -> map.put(c, new TableColumn("@cnd" + map.size(), c.getType())));
-
-        VariableBindings cndBindings = new VariableBindings();
-
-        for(VariableBinding binding : pattern.getVariableBindings().getValues())
-        {
-            VariableBinding cndBinding = new VariableBinding(binding.getVariable(), binding.canBeNull());
-
-            for(Entry<ResourceClass, List<Column>> entry : binding.getMappings().entrySet())
-                cndBinding.addMapping(entry.getKey(),
-                        entry.getValue().stream().map(c -> map.containsKey(c) ? map.get(c) : c).toList());
-
-            cndBindings.add(cndBinding);
-        }
-
 
         StringBuilder builder = new StringBuilder();
 
         if(negated)
             builder.append("NOT ");
 
-        builder.append("EXISTS ( SELECT 1 FROM (SELECT ");
+        builder.append("EXISTS (SELECT 1 FROM ");
 
-        Set<Column> columns = pattern.getVariableBindings().getNonConstantColumns();
+        Map<Column, Column> values = context == null ? Map.of() :
+                SqlLateralJoin.getLateralValues(relations, context.getVariableBindings(), bindings);
 
-        if(!columns.isEmpty())
-            builder.append(columns.stream().map(c -> c + " AS " + map.get(c)).collect(joining(", ")));
-        else
-            builder.append("1");
-
-        builder.append(" FROM (");
-
-        builder.append(pattern.translate(request));
-
-        builder.append(") AS tab) AS tabcnd");
-
-        String condition = SqlIntercode.generateJoinCondition(relations, cndBindings, bindings, null, null);
-
-        if(condition != null)
+        if(!values.isEmpty())
         {
-            builder.append(" WHERE ");
-            builder.append(condition);
+            builder.append("(SELECT ");
+            builder.append(values.entrySet().stream().map(e -> e.getValue() + " AS " + e.getKey()).sorted()
+                    .collect(joining(", ")));
+            builder.append(") AS ");
+            builder.append(context.getLateralTable());
+            builder.append(" CROSS JOIN LATERAL ");
         }
 
+        builder.append("(");
+        builder.append(pattern.translate(request));
+        builder.append(") AS ");
+        builder.append(patternTable);
         builder.append(")");
 
         return List.of(new ExpressionColumn(builder.toString(), BOOL, false));
@@ -264,6 +244,15 @@ public final class SqlExists extends SqlExpressionIntercode
             builder.append("not ");
 
         builder.append("exists");
+
+        if(context != null)
+        {
+            indentInfo(builder, existsIndent, true);
+            builder.append(context.getLateralTable());
+            builder.append(" using ");
+            builder.append(context.getVariableBindings().getVariables().stream().map(Object::toString).sorted()
+                    .collect(joining(", ")));
+        }
 
         indentChild(builder, existsIndent, true);
         pattern.generateExplanation(builder, getIndent(existsIndent, true));
@@ -293,6 +282,9 @@ public final class SqlExists extends SqlExpressionIntercode
         if(!Objects.equals(bindings, imcode.bindings))
             return false;
 
+        if(!Objects.equals(context, imcode.context))
+            return false;
+
         return true;
     }
 
@@ -307,6 +299,6 @@ public final class SqlExists extends SqlExpressionIntercode
     @Override
     protected int getHashCode()
     {
-        return Objects.hash(negated, pattern);
+        return Objects.hash(negated, pattern, context);
     }
 }
