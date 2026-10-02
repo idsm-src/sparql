@@ -786,7 +786,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         variants.add(
                                 new ExpressionColumn("NULLIF(" + argument.getIsNull(relations, r) + ", true)", BOOL));
                     else
-                        variants.add(new ExpressionColumn(getBoxTestFunction(function) + "("
+                        variants.add(new ExpressionColumn("sparql." + function + "_rdfbox("
                                 + argument.get(relations, unionize(Set.of(r), box)).get(0) + ")", BOOL));
                 }
 
@@ -1276,7 +1276,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         Column col = argClass
                                 .toGeneralClass(xsdString, argument.get(relations, argClass), partCanBeBull).get(0);
 
-                        builder.append("sparql.iri_string(" + base + ", " + col + ")");
+                        builder.append("sparql." + function + "_string(" + base + ", " + col + ")");
                     }
                     else if(hasIri(argClass) && !hasString(argClass))
                     {
@@ -1292,7 +1292,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         Column col = argClass.toGeneralClass(boxClass, argument.get(relations, argClass), partCanBeBull)
                                 .get(0);
 
-                        builder.append("sparql.iri_rdfbox(" + base + ", " + col + ")");
+                        builder.append("sparql." + function + "_rdfbox(" + base + ", " + col + ")");
                     }
 
                     if(!builder.isEmpty())
@@ -1589,8 +1589,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                             {
                                 subjectColumns = subjectClass.toGeneralClass(subjectComponent, subjectColumns,
                                         subjectCanBeNull);
-                                conditions.add("(sparql.is_iri_rdfbox(" + subjectColumns.get(0)
-                                        + ") OR sparql.is_blank_rdfbox(" + subjectColumns.get(0) + "))");
+                                conditions.add("(sparql.isiri_rdfbox(" + subjectColumns.get(0)
+                                        + ") OR sparql.isblank_rdfbox(" + subjectColumns.get(0) + "))");
                             }
 
                             List<Column> predicateColumns = predicate.get(relations, predicateClass);
@@ -1604,7 +1604,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                                         predicateColumns, predicateCanBeNull).get(0);
                                 predicateColumns = List
                                         .of(new ExpressionColumn("sparql.rdfbox_get_iri(" + boxed + ")", VARCHAR));
-                                conditions.add("sparql.is_iri_rdfbox(" + boxed + ")");
+                                conditions.add("sparql.isiri_rdfbox(" + boxed + ")");
                             }
 
                             List<Column> objectColumns = object.get(relations, objectClass);
@@ -3205,24 +3205,6 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
         else if(function.equals("haslangdir"))
             return BuiltinClasses::hasDirLanguageTaggedString;
         return null;
-    }
-
-
-    /**
-     * Name of the extension function evaluating the {@code isIRI}-like function on a box.
-     *
-     * @param function lower-case function name
-     * @return name of the extension function evaluating the {@code isIRI}-like function on a box
-     */
-    private static String getBoxTestFunction(String function)
-    {
-        if(function.equals("istriple"))
-            return "sparql.is_tripleterm_rdfbox";
-
-        if(function.startsWith("is"))
-            return "sparql.is_" + function.substring(2).replaceFirst("uri", "iri") + "_rdfbox";
-
-        return "sparql." + function + "_rdfbox";
     }
 
 
