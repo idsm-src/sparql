@@ -3,8 +3,8 @@ package cz.iocb.sparql.testing;
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.apache.tomcat.jdbc.pool.PoolProperties;
 import org.postgresql.Driver;
-import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.images.builder.ImageFromDockerfile;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 
@@ -46,7 +46,7 @@ public class Database
             DockerImageName image = DockerImageName.parse(imageName).asCompatibleSubstituteFor("postgres");
 
             @SuppressWarnings("resource")
-            PostgreSQLContainer<?> container = new PostgreSQLContainer<>(image);
+            PostgreSQLContainer container = new PostgreSQLContainer(image);
             container.setShmSize(1L << 30);
             container.start();
 
