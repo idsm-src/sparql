@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <sparql xmlns="http://www.w3.org/2005/sparql-results#">
   <head>
-    <variable name="C"/>
+    <variable name="a"/>
   </head>
   <results>
     <result>
-      <binding name="C">
-        <literal datatype="http://www.w3.org/2001/XMLSchema#integer">0</literal>
+      <binding name="a">
+        <uri>http://example/a</uri>
       </binding>
     </result>
   </results>

@@ -59,6 +59,11 @@ import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.RDFNode;
 import org.apache.jena.riot.RDFDataMgr;
+import org.apache.jena.sparql.core.Var;
+import org.apache.jena.sparql.engine.binding.Binding;
+import org.apache.jena.sparql.resultset.RDFInput;
+import org.apache.jena.sparql.vocabulary.ResultSetGraphVocab;
+import org.apache.jena.vocabulary.RDF;
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.hamcrest.MatcherAssert;
 import org.hamcrest.Matchers;
@@ -803,13 +808,20 @@ public class SparqlTest
 
 
     /**
-     * Triples of an expected Turtle or N-Triples graph as rows of subject, predicate and object.
+     * Expected result of a Turtle or N-Triples file: the solutions of a result set written in the DAWG result set
+     * vocabulary ({@code rs:ResultSet}, used by some SELECT tests), otherwise the triples of the graph as rows of
+     * subject, predicate and object.
      */
     static ExpectedResult getResultFromTTL(RDFNode result) throws IOException, URISyntaxException
     {
+        Model graph = RDFDataMgr.loadModel(result.asResource().getURI());
+
+        if(graph.contains(null, RDF.type, ResultSetGraphVocab.ResultSet))
+            return getResultFromResultSet(RDFInput.fromRDF(graph));
+
         List<List<RdfTerm>> rows = new ArrayList<>();
 
-        Iterator<Triple> triples = RDFDataMgr.loadModel(result.asResource().getURI()).getGraph().find();
+        Iterator<Triple> triples = graph.getGraph().find();
 
         while(triples.hasNext())
         {
@@ -819,6 +831,29 @@ public class SparqlTest
         }
 
         return new ExpectedResult(null, rows);
+    }
+
+
+    /**
+     * Rows of a Jena result set in the order of its variables; blank nodes lose their label.
+     */
+    static ExpectedResult getResultFromResultSet(ResultSet results)
+    {
+        List<String> variables = results.getResultVars();
+        List<List<RdfTerm>> rows = new ArrayList<>();
+
+        while(results.hasNext())
+        {
+            Binding binding = results.nextBinding();
+            List<RdfTerm> row = new ArrayList<>(variables.size());
+
+            for(String variable : variables)
+                row.add(getTerm(binding.get(Var.alloc(variable)), false));
+
+            rows.add(row);
+        }
+
+        return new ExpectedResult(variables, rows);
     }
 
 
