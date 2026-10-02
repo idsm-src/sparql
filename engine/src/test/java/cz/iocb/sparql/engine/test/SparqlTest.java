@@ -34,15 +34,21 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Deque;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
+import org.apache.jena.graph.Node;
+import org.apache.jena.graph.NodeFactory;
+import org.apache.jena.graph.Triple;
+import org.apache.jena.query.Dataset;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryExecution;
 import org.apache.jena.query.QueryExecutionFactory;
@@ -52,8 +58,7 @@ import org.apache.jena.query.ResultSet;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.RDFNode;
-import org.apache.jena.rdf.model.Statement;
-import org.apache.jena.rdf.model.StmtIterator;
+import org.apache.jena.riot.RDFDataMgr;
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.hamcrest.MatcherAssert;
 import org.hamcrest.Matchers;
@@ -76,6 +81,7 @@ import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.mapping.ConstantBlankNodeMapping;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.ConstantLiteralMapping;
+import cz.iocb.sparql.engine.mapping.ConstantTripleTermMapping;
 import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.CanonicalLiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.DirLangStringWithTagClass;
@@ -96,6 +102,7 @@ import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.StrBlankNode;
 import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
+import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Engine;
 import cz.iocb.sparql.engine.request.LimitExceedException;
 import cz.iocb.sparql.engine.request.Request;
@@ -120,7 +127,16 @@ public class SparqlTest
     /**
      * Quad of the test data as read by Jena; a null graph denotes the default graph.
      */
-    public record Quad(RDFNode graph, RDFNode subject, RDFNode predicate, RDFNode object)
+    public record Quad(Node graph, Node subject, Node predicate, Node object)
+    {
+    }
+
+
+    /**
+     * Expected result of a test: the rows and the variables giving their columns, null for a graph or a boolean whose
+     * rows are compared positionally.
+     */
+    public record ExpectedResult(List<String> variables, List<List<RdfTerm>> rows)
     {
     }
 
@@ -317,7 +333,7 @@ public class SparqlTest
     @DisplayName("Query Evaluation Tests")
     @ParameterizedTest(name = "{0}")
     @MethodSource("getQueryEvaluationTests")
-    void doQueryEvaluationTests(String name, String query, List<Quad> quads, List<List<RdfTerm>> expected)
+    void doQueryEvaluationTests(String name, String query, List<Quad> quads, ExpectedResult expected)
             throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
     {
         SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool, schema, false);
@@ -330,9 +346,9 @@ public class SparqlTest
 
         try(Request request = engine.getRequest())
         {
-            List<List<RdfTerm>> result = getResult(request.execute(query));
+            List<List<RdfTerm>> result = getResult(request.execute(query), expected.variables());
 
-            MatcherAssert.assertThat(result, Matchers.containsInAnyOrder(expected.toArray()));
+            MatcherAssert.assertThat(result, Matchers.containsInAnyOrder(expected.rows().toArray()));
         }
     }
 
@@ -344,7 +360,7 @@ public class SparqlTest
     @DisplayName("Query Evaluation Tests (with subset literals)")
     @ParameterizedTest(name = "{0}")
     @MethodSource("getQueryEvaluationTests")
-    void doQueryEvaluationTestsWithLiteralMap(String name, String query, List<Quad> quads, List<List<RdfTerm>> expected)
+    void doQueryEvaluationTestsWithLiteralMap(String name, String query, List<Quad> quads, ExpectedResult expected)
             throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
     {
         SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool, schema, false);
@@ -358,9 +374,9 @@ public class SparqlTest
 
         try(Request request = engine.getRequest())
         {
-            List<List<RdfTerm>> result = getResult(request.execute(query));
+            List<List<RdfTerm>> result = getResult(request.execute(query), expected.variables());
 
-            MatcherAssert.assertThat(result, Matchers.containsInAnyOrder(expected.toArray()));
+            MatcherAssert.assertThat(result, Matchers.containsInAnyOrder(expected.rows().toArray()));
         }
     }
 
@@ -572,7 +588,7 @@ public class SparqlTest
                 String query = new String(Files.readAllBytes(queryPath));
                 String name = test.get("?NAME").asLiteral().getLexicalForm();
                 List<Quad> data = new ArrayList<>();
-                List<List<RdfTerm>> expected = getResult(test.get("?RESULT"));
+                ExpectedResult expected = getResult(test.get("?RESULT"));
 
                 if(test.get("DATA") != null)
                     data.addAll(getQuads(test.get("DATA"), true));
@@ -646,23 +662,36 @@ public class SparqlTest
 
 
     /**
-     * Quads of a Turtle data file, in the default graph or in the graph named by the file.
+     * Quads of a data file: the triples of its default graph in the default graph or in the graph named by the file,
+     * and the triples of its named graphs (TriG, N-Quads) in those graphs.
      */
     static List<Quad> getQuads(RDFNode data, boolean isDefault)
     {
-        RDFNode graph = isDefault ? null : data;
-
-        Model model = ModelFactory.createDefaultModel();
-        model.read(data.asResource().getURI(), "TTL");
-
+        Dataset dataset = RDFDataMgr.loadDataset(data.asResource().getURI());
         List<Quad> quads = new ArrayList<>();
 
-        StmtIterator it = model.listStatements();
+        Node graph = isDefault ? null : data.asNode();
+        Iterator<Triple> triples = dataset.getDefaultModel().getGraph().find();
 
-        while(it.hasNext())
+        while(triples.hasNext())
         {
-            Statement s = it.nextStatement();
-            quads.add(new Quad(graph, s.getSubject(), s.getPredicate(), s.getObject()));
+            Triple t = triples.next();
+            quads.add(new Quad(graph, t.getSubject(), t.getPredicate(), t.getObject()));
+        }
+
+        Iterator<String> names = dataset.listNames();
+
+        while(names.hasNext())
+        {
+            String name = names.next();
+            Node named = NodeFactory.createURI(name);
+            Iterator<Triple> namedTriples = dataset.getNamedModel(name).getGraph().find();
+
+            while(namedTriples.hasNext())
+            {
+                Triple t = namedTriples.next();
+                quads.add(new Quad(named, t.getSubject(), t.getPredicate(), t.getObject()));
+            }
         }
 
         return quads;
@@ -670,60 +699,58 @@ public class SparqlTest
 
 
     /**
-     * Constant term mapping of a Jena node, see {@link #getMapping(RDFNode, SparqlDatabaseConfiguration, Map)}.
+     * Constant term mapping of a Jena node, see {@link #getMapping(Node, SparqlDatabaseConfiguration, Map)}.
      */
-    static TermMapping getMapping(RDFNode node, SparqlDatabaseConfiguration config)
+    static TermMapping getMapping(Node node, SparqlDatabaseConfiguration config)
     {
         return getMapping(node, config, Map.of());
     }
 
 
     /**
-     * Constant term mapping of a Jena node: file IRIs are shortened to their name, literals get the class their
-     * datatype assigns (replaced according to {@code map}), blank nodes the test blank node class; null for a null
-     * node.
+     * Constant term mapping of a Jena node (see {@link #getTerm}): literals get the class their datatype assigns
+     * (replaced according to {@code map}), blank nodes the test blank node class, the class of a triple term is
+     * detected by the request; null for a null node.
      */
-    static TermMapping getMapping(RDFNode node, SparqlDatabaseConfiguration config,
-            Map<ResourceClass, ResourceClass> map)
+    static TermMapping getMapping(Node node, SparqlDatabaseConfiguration config, Map<ResourceClass, ResourceClass> map)
     {
         if(node == null)
         {
             return null;
         }
-        else if(node.isURIResource())
+        else if(node.isURI())
         {
-            return new ConstantIriMapping(new Iri(node.asResource().getURI().replaceFirst("file://.*/", "")));
+            return new ConstantIriMapping((Iri) getTerm(node, true));
         }
-        else if(node.isLiteral() && node.asLiteral().getLanguage().isEmpty())
+        else if(node.isLiteral() && node.getLiteralBaseDirection() != null)
         {
-            Iri iri = new Iri(node.asLiteral().getDatatypeURI());
+            DirLangStringLiteral literal = (DirLangStringLiteral) getTerm(node, true);
+            LiteralClass literalClass = DirLangStringWithTagClass.get(literal.getDirection(), literal.getTag());
 
-            Datatype datatype = config.getDatatype(iri);
+            return new ConstantLiteralMapping(literalClass, literal);
+        }
+        else if(node.isLiteral() && !node.getLiteralLanguage().isEmpty())
+        {
+            LangStringLiteral literal = (LangStringLiteral) getTerm(node, true);
+            LiteralClass literalClass = LangStringWithTagClass.get(literal.getTag());
 
-            TypedLiteral literal = new TypedLiteral(node.asLiteral().getLexicalForm(), iri);
+            return new ConstantLiteralMapping(literalClass, literal);
+        }
+        else if(node.isLiteral())
+        {
+            TypedLiteral literal = (TypedLiteral) getTerm(node, true);
+            Datatype datatype = config.getDatatype(literal.getType());
             ResourceClass literalClass = datatype == null ? unsupportedType : datatype.getResourceClass(literal);
 
             return new ConstantLiteralMapping(map.getOrDefault(literalClass, literalClass), literal);
         }
-        else if(node.isLiteral() && node.asLiteral().getBaseDirection() != null)
+        else if(node.isBlank())
         {
-            Direction direction = Direction.fromText(node.asLiteral().getBaseDirection());
-            LiteralClass literalClass = DirLangStringWithTagClass.get(direction, node.asLiteral().getLanguage());
-
-            return new ConstantLiteralMapping(literalClass, new DirLangStringLiteral(node.asLiteral().getLexicalForm(),
-                    node.asLiteral().getLanguage(), direction));
+            return new ConstantBlankNodeMapping((StrBlankNode) getTerm(node, true), bnodeClass);
         }
-        else if(node.isLiteral() && !node.asLiteral().getLanguage().isEmpty())
+        else if(node.isTripleTerm())
         {
-            LiteralClass literalClass = LangStringWithTagClass.get(node.asLiteral().getLanguage());
-
-            return new ConstantLiteralMapping(literalClass,
-                    new LangStringLiteral(node.asLiteral().getLexicalForm(), node.asLiteral().getLanguage()));
-        }
-        else if(node.isAnon())
-        {
-            return new ConstantBlankNodeMapping(
-                    new StrBlankNode(node.asResource().getId().getLabelString(), bnodeClass.getSegment()), bnodeClass);
+            return new ConstantTripleTermMapping((TripleTerm) getTerm(node, true));
         }
 
         return null;
@@ -731,9 +758,39 @@ public class SparqlTest
 
 
     /**
-     * Expected rows of a test, read from a Turtle graph or a SPARQL XML or JSON result file.
+     * Engine term of a Jena node: file IRIs are shortened to their name, blank nodes keep their label (in the test
+     * blank node segment) when {@code keepLabels}, which the data need, or lose it, as the labels of expected results
+     * are not compared; the components of a triple term are converted recursively.
      */
-    static List<List<RdfTerm>> getResult(RDFNode result)
+    static RdfTerm getTerm(Node node, boolean keepLabels)
+    {
+        if(node == null)
+            return null;
+        else if(node.isURI())
+            return new Iri(node.getURI().replaceFirst("file://.*/", ""));
+        else if(node.isLiteral() && node.getLiteralBaseDirection() != null)
+            return new DirLangStringLiteral(node.getLiteralLexicalForm(), node.getLiteralLanguage(),
+                    Direction.fromText(node.getLiteralBaseDirection().direction()));
+        else if(node.isLiteral() && !node.getLiteralLanguage().isEmpty())
+            return new LangStringLiteral(node.getLiteralLexicalForm(), node.getLiteralLanguage());
+        else if(node.isLiteral())
+            return new TypedLiteral(node.getLiteralLexicalForm(), new Iri(node.getLiteralDatatypeURI()));
+        else if(node.isBlank())
+            return keepLabels ? new StrBlankNode(node.getBlankNodeLabel(), bnodeClass.getSegment()) :
+                    new StrBlankNode("", 0);
+        else if(node.isTripleTerm())
+            return new TripleTerm(getTerm(node.getTriple().getSubject(), keepLabels),
+                    getTerm(node.getTriple().getPredicate(), keepLabels),
+                    getTerm(node.getTriple().getObject(), keepLabels));
+
+        return null;
+    }
+
+
+    /**
+     * Expected result of a test, read from a Turtle graph or a SPARQL XML or JSON result file.
+     */
+    static ExpectedResult getResult(RDFNode result)
             throws ParserConfigurationException, SAXException, IOException, URISyntaxException
     {
         if(result.toString().endsWith(".ttl"))
@@ -748,54 +805,29 @@ public class SparqlTest
     /**
      * Triples of an expected Turtle graph as rows of subject, predicate and object.
      */
-    static List<List<RdfTerm>> getResultFromTTL(RDFNode result) throws IOException, URISyntaxException
+    static ExpectedResult getResultFromTTL(RDFNode result) throws IOException, URISyntaxException
     {
-        List<List<RdfTerm>> results = new ArrayList<>();
+        List<List<RdfTerm>> rows = new ArrayList<>();
 
-        Model model = ModelFactory.createDefaultModel();
-        model.read(result.asResource().getURI(), "TTL");
+        Iterator<Triple> triples = RDFDataMgr.loadModel(result.asResource().getURI()).getGraph().find();
 
-        StmtIterator it = model.listStatements();
-
-        while(it.hasNext())
+        while(triples.hasNext())
         {
-            Statement s = it.nextStatement();
-            results.add(List.of(getNode(s.getSubject()), getNode(s.getPredicate()), getNode(s.getObject())));
+            Triple t = triples.next();
+            rows.add(List.of(getTerm(t.getSubject(), false), getTerm(t.getPredicate(), false),
+                    getTerm(t.getObject(), false)));
         }
 
-        return results;
-    }
-
-
-    /**
-     * Engine term of a Jena node; blank nodes lose their label since labels are not compared.
-     */
-    static RdfTerm getNode(RDFNode node)
-    {
-        if(node == null)
-            return null;
-        else if(node.isURIResource())
-            return new Iri(node.asResource().getURI().replaceFirst("file://.*/", ""));
-        else if(node.isLiteral() && node.asLiteral().getLanguage().isEmpty())
-            return new TypedLiteral(node.asLiteral().getLexicalForm(), new Iri(node.asLiteral().getDatatypeURI()));
-        else if(node.isLiteral() && node.asLiteral().getBaseDirection() != null)
-            return new DirLangStringLiteral(node.asLiteral().getLexicalForm(), node.asLiteral().getLanguage(),
-                    Direction.fromText(node.asLiteral().getBaseDirection()));
-        else if(node.isLiteral() && !node.asLiteral().getLanguage().isEmpty())
-            return new LangStringLiteral(node.asLiteral().getLexicalForm(), node.asLiteral().getLanguage());
-        else if(node.isAnon())
-            return new StrBlankNode("", 0);
-
-        return null;
+        return new ExpectedResult(null, rows);
     }
 
 
     /**
      * Rows of an expected SPARQL JSON result; an ASK result becomes a single boolean row.
      */
-    static List<List<RdfTerm>> getResultFromJSON(RDFNode result) throws IOException, URISyntaxException
+    static ExpectedResult getResultFromJSON(RDFNode result) throws IOException, URISyntaxException
     {
-        List<List<RdfTerm>> results = new ArrayList<>();
+        List<List<RdfTerm>> rows = new ArrayList<>();
 
         JsonNode root;
 
@@ -808,9 +840,9 @@ public class SparqlTest
         {
             List<RdfTerm> row = new ArrayList<>(1);
             row.add(new TypedLiteral(root.get("boolean").asText(), BuiltinDatatypes.xsdBooleanType.getTypeIri()));
-            results.add(row);
+            rows.add(row);
 
-            return results;
+            return new ExpectedResult(null, rows);
         }
 
         List<String> variables = new ArrayList<>();
@@ -825,10 +857,10 @@ public class SparqlTest
             for(String variable : variables)
                 row.add(getNode(binding.get(variable)));
 
-            results.add(row);
+            rows.add(row);
         }
 
-        return results;
+        return new ExpectedResult(variables, rows);
     }
 
 
@@ -869,12 +901,13 @@ public class SparqlTest
 
 
     /**
-     * Rows of an expected SPARQL XML result; an ASK result becomes a single boolean row.
+     * Rows of an expected SPARQL XML result; an ASK result becomes a single boolean row, triple terms are read
+     * recursively.
      */
-    static List<List<RdfTerm>> getResultFromXML(RDFNode result)
+    static ExpectedResult getResultFromXML(RDFNode result)
             throws ParserConfigurationException, SAXException, IOException, URISyntaxException
     {
-        List<List<RdfTerm>> results = new ArrayList<>();
+        List<List<RdfTerm>> rows = new ArrayList<>();
 
         List<String> variables = new LinkedList<>();
 
@@ -883,11 +916,22 @@ public class SparqlTest
 
         DefaultHandler handler = new DefaultHandler()
         {
-            List<RdfTerm> result;
+            /**
+             * Triple term being read: its components and the position of the component being read.
+             */
+            class Frame
+            {
+                RdfTerm[] components = new RdfTerm[3];
+                int position;
+            }
+
+            List<RdfTerm> row;
             int varIndex;
             StringBuilder data;
             String datatype;
             String lang;
+            String direction;
+            Deque<Frame> triples = new ArrayDeque<>();
 
             @Override
             public void startElement(String uri, String localName, String qName, Attributes attributes)
@@ -899,12 +943,12 @@ public class SparqlTest
                 }
                 else if(qName.equalsIgnoreCase("result"))
                 {
-                    result = new ArrayList<>(variables.size());
+                    row = new ArrayList<>(variables.size());
 
                     for(int i = 0; i < variables.size(); i++)
-                        result.add(null);
+                        row.add(null);
 
-                    results.add(result);
+                    rows.add(row);
                 }
                 else if(qName.equalsIgnoreCase("binding"))
                 {
@@ -917,6 +961,7 @@ public class SparqlTest
                     if(lang != null)
                         lang = lang.toLowerCase();
 
+                    direction = attributes.getValue("its:dir");
                     datatype = attributes.getValue("datatype");
                     data = new StringBuilder();
                 }
@@ -926,11 +971,27 @@ public class SparqlTest
                 }
                 else if(qName.equalsIgnoreCase("boolean"))
                 {
-                    result = new ArrayList<>(1);
-                    result.add(null);
-                    results.add(result);
+                    row = new ArrayList<>(1);
+                    row.add(null);
+                    rows.add(row);
                     varIndex = 0;
                     data = new StringBuilder();
+                }
+                else if(qName.equalsIgnoreCase("triple"))
+                {
+                    triples.push(new Frame());
+                }
+                else if(qName.equalsIgnoreCase("subject") && !triples.isEmpty())
+                {
+                    triples.peek().position = 0;
+                }
+                else if(qName.equalsIgnoreCase("predicate") && !triples.isEmpty())
+                {
+                    triples.peek().position = 1;
+                }
+                else if(qName.equalsIgnoreCase("object") && !triples.isEmpty())
+                {
+                    triples.peek().position = 2;
                 }
             }
 
@@ -942,22 +1003,50 @@ public class SparqlTest
 
                 RdfTerm term = null;
 
-                if(qName.equalsIgnoreCase("boolean"))
+                if(qName.equalsIgnoreCase("triple"))
+                {
+                    Frame frame = triples.pop();
+                    term = new TripleTerm(frame.components[0], frame.components[1], frame.components[2]);
+                }
+                else if(qName.equalsIgnoreCase("boolean"))
+                {
                     term = new TypedLiteral(data.toString(), BuiltinDatatypes.xsdBooleanType.getTypeIri());
+                }
                 else if(qName.equalsIgnoreCase("uri"))
+                {
                     term = new Iri(data.toString());
+                }
                 else if(qName.equalsIgnoreCase("bnode"))
-                    term = new StrBlankNode("" /*data.toString()*/, 0);
+                {
+                    term = new StrBlankNode("", 0);
+                }
                 else if(!qName.equalsIgnoreCase("literal"))
+                {
                     return;
+                }
+                else if(direction != null)
+                {
+                    term = new DirLangStringLiteral(data.toString(), lang, Direction.fromText(direction));
+                }
                 else if(lang != null)
+                {
                     term = new LangStringLiteral(data.toString(), lang);
+                }
                 else if(datatype != null)
+                {
                     term = new TypedLiteral(data.toString(), new Iri(datatype));
+                }
                 else
+                {
                     term = new TypedLiteral(data.toString(), BuiltinDatatypes.xsdStringType.getTypeIri());
+                }
 
-                result.set(varIndex, term);
+                data = null;
+
+                if(!triples.isEmpty())
+                    triples.peek().components[triples.peek().position] = term;
+                else
+                    row.set(varIndex, term);
             }
 
             @Override
@@ -970,13 +1059,10 @@ public class SparqlTest
 
         saxParser.parse((new URI(result.asResource().getURI())).toURL().openStream(), handler);
 
-        return results;
+        return new ExpectedResult(variables.isEmpty() ? null : variables, rows);
     }
 
 
-    /**
-     * Rows of an engine result.
-     */
     /**
      * The term with the labels of its blank nodes erased, inside triple terms too, so that it compares equal to the
      * expected term.
@@ -993,28 +1079,51 @@ public class SparqlTest
     }
 
 
-    private List<List<RdfTerm>> getResult(Result it) throws SQLException
+    /**
+     * Rows of an engine result with the labels of blank nodes erased, in the order of the given variables when they are
+     * given (the files of the W3C tests list the variables of {@code SELECT *} in another order than the engine
+     * projects them), otherwise as projected.
+     */
+    private static List<List<RdfTerm>> getResult(Result it, List<String> variables) throws SQLException
     {
         List<List<RdfTerm>> result = new ArrayList<>();
 
         if(it.getHeads().isEmpty())
         {
             while(it.next())
-            {
                 result.add(new ArrayList<>());
+
+            return result;
+        }
+
+        int[] order = null;
+
+        if(variables != null)
+        {
+            Map<Variable, Integer> indexes = it.getVariableIndexes();
+            order = new int[variables.size()];
+
+            for(int i = 0; i < order.length; i++)
+            {
+                Integer index = indexes.get(new Variable(variables.get(i)));
+
+                if(index == null)
+                    throw new AssertionError("variable " + variables.get(i) + " is not projected");
+
+                order[i] = index;
             }
         }
-        else
+
+        while(it.next())
         {
-            while(it.next())
-            {
-                RdfTerm[] row = it.getRow();
+            RdfTerm[] row = it.getRow();
+            int size = order == null ? row.length : order.length;
+            List<RdfTerm> terms = new ArrayList<>(size);
 
-                for(int i = 0; i < row.length; i++)
-                    row[i] = eraseBlankNodeLabels(row[i]);
+            for(int i = 0; i < size; i++)
+                terms.add(eraseBlankNodeLabels(row[order == null ? i : order[i]]));
 
-                result.add(Arrays.asList(row));
-            }
+            result.add(terms);
         }
 
         return result;

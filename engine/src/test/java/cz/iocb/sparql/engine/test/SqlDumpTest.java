@@ -11,10 +11,8 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.jena.rdf.model.AnonId;
-import org.apache.jena.rdf.model.Model;
-import org.apache.jena.rdf.model.ModelFactory;
-import org.apache.jena.rdf.model.RDFNode;
+import org.apache.jena.graph.Node;
+import org.apache.jena.graph.NodeFactory;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -43,7 +41,6 @@ import cz.iocb.sparql.engine.translator.TranslateVisitor;
 @EnabledIfSystemProperty(named = "sqldump.file", matches = ".+")
 public class SqlDumpTest
 {
-    private static final Model bnodes = ModelFactory.createDefaultModel();
 
 
     @BeforeAll
@@ -91,7 +88,7 @@ public class SqlDumpTest
         List<Quad> sorted = new ArrayList<>(quads);
         sorted.sort(Comparator.comparing(q -> key(q, false)));
 
-        Map<String, RDFNode> labels = new HashMap<>();
+        Map<String, Node> labels = new HashMap<>();
         List<Quad> result = new ArrayList<>();
 
         for(Quad quad : sorted)
@@ -111,25 +108,38 @@ public class SqlDumpTest
     }
 
 
-    private static String key(RDFNode node, boolean withLabels)
+    private static String key(Node node, boolean withLabels)
     {
         if(node == null)
             return "";
 
-        if(node.isAnon())
-            return withLabels ? "_:" + node.asResource().getId().getLabelString() : "_:";
+        if(node.isBlank())
+            return withLabels ? "_:" + node.getBlankNodeLabel() : "_:";
+
+        if(node.isTripleTerm())
+            return "<<( " + key(node.getTriple().getSubject(), withLabels) + " "
+                    + key(node.getTriple().getPredicate(), withLabels) + " "
+                    + key(node.getTriple().getObject(), withLabels) + " )>>";
 
         return node.toString();
     }
 
 
-    private static RDFNode normalize(Map<String, RDFNode> labels, RDFNode node)
+    private static Node normalize(Map<String, Node> labels, Node node)
     {
-        if(node == null || !node.isAnon())
-            return node;
+        if(node == null)
+            return null;
 
-        return labels.computeIfAbsent(node.asResource().getId().getLabelString(),
-                _ -> bnodes.createResource(AnonId.create("b" + labels.size())));
+        if(node.isBlank())
+            return labels.computeIfAbsent(node.getBlankNodeLabel(),
+                    _ -> NodeFactory.createBlankNode("b" + labels.size()));
+
+        if(node.isTripleTerm())
+            return NodeFactory.createTripleTerm(normalize(labels, node.getTriple().getSubject()),
+                    normalize(labels, node.getTriple().getPredicate()),
+                    normalize(labels, node.getTriple().getObject()));
+
+        return node;
     }
 
 

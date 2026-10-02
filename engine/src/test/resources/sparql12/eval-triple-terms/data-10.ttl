@@ -1,0 +1,8 @@
+PREFIX :       <http://example/>
+PREFIX xsd:    <http://www.w3.org/2001/XMLSchema#>
+
+:s0 :p <<( :s :p :o )>> .
+:s1 :p <<( :s :p "o" )>> .
+:s2 :p <<( :s :p 1 )>> .
+:s3 :p <<( :s :p "true"^^xsd:boolean )>> .
+:s4 :p <<( :s :p <<( :st :pt :ot )>> )>> .
