@@ -788,12 +788,12 @@ public class SparqlTest
 
 
     /**
-     * Expected result of a test, read from a Turtle graph or a SPARQL XML or JSON result file.
+     * Expected result of a test, read from a Turtle or N-Triples graph or a SPARQL XML or JSON result file.
      */
     static ExpectedResult getResult(RDFNode result)
             throws ParserConfigurationException, SAXException, IOException, URISyntaxException
     {
-        if(result.toString().endsWith(".ttl"))
+        if(result.toString().endsWith(".ttl") || result.toString().endsWith(".nt"))
             return getResultFromTTL(result);
         else if(result.toString().endsWith(".srj"))
             return getResultFromJSON(result);
@@ -803,7 +803,7 @@ public class SparqlTest
 
 
     /**
-     * Triples of an expected Turtle graph as rows of subject, predicate and object.
+     * Triples of an expected Turtle or N-Triples graph as rows of subject, predicate and object.
      */
     static ExpectedResult getResultFromTTL(RDFNode result) throws IOException, URISyntaxException
     {

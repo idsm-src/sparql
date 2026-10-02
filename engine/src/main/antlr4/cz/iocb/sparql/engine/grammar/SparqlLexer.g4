@@ -273,7 +273,7 @@ EXISTS : ('E'|'e')('X'|'x')('I'|'i')('S'|'s')('T'|'t')('S'|'s');
 SEPARATOR : ('S'|'s')('E'|'e')('P'|'p')('A'|'a')('R'|'r')('A'|'a')('T'|'t')('O'|'o')('R'|'r');
 
 IRIREF
-    : '<' (~('<' | '>' | '"' | '{' | '}' | '|' | '^' | '`' | '\\' | '\u0000'..'\u0020'))* '>'
+    : '<' (~('<' | '>' | '"' | '{' | '}' | '|' | '^' | '`' | '\\' | '\u0000'..'\u0020') | UCHAR)* '>'
     ;
 
 PNAME_NS : PN_PREFIX? ':';
@@ -313,13 +313,16 @@ DOUBLE_NEGATIVE : MINUS_SIGN DOUBLE;
 fragment
 EXPONENT : ('e'|'E') SIGN? DIGIT+;
 
-STRING_LITERAL1 : '\'' (~('\'' | '\\' | '\n' | '\r') | ECHAR)* '\'';
+STRING_LITERAL1 : '\'' (~('\'' | '\\' | '\n' | '\r') | ECHAR | UCHAR)* '\'';
 
-STRING_LITERAL2 : '"' (~('"' | '\\' | '\n' | '\r') | ECHAR)* '"';
+STRING_LITERAL2 : '"' (~('"' | '\\' | '\n' | '\r') | ECHAR | UCHAR)* '"';
 
-STRING_LITERAL_LONG1 : '\'\'\'' (('\'' | '\'\'')? (~('\''|'\\') | ECHAR))* '\'\'\'';
+STRING_LITERAL_LONG1 : '\'\'\'' (('\'' | '\'\'')? (~('\''|'\\') | ECHAR | UCHAR))* '\'\'\'';
 
-STRING_LITERAL_LONG2 : '"""' (('"' | '""')? (~('"'|'\\') | ECHAR))* '"""';
+STRING_LITERAL_LONG2 : '"""' (('"' | '""')? (~('"'|'\\') | ECHAR | UCHAR))* '"""';
+
+fragment
+UCHAR : '\\u' HEX HEX HEX HEX | '\\U' HEX HEX HEX HEX HEX HEX HEX HEX;
 
 fragment
 ECHAR : '\\' ('t' | 'b' | 'n' | 'r' | 'f' | '\\' | '"' | '\'');
@@ -364,7 +367,7 @@ fragment
 PERCENT : '%' HEX HEX;
 
 fragment
-HEX : DIGIT | 'A'..'F' | 'a'..'z';
+HEX : DIGIT | 'A'..'F' | 'a'..'f';
 
 fragment
 PN_LOCAL_ESC : '\\' ( '_' | '~' | '.' | '-' | '!' | '$' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | ';' | '=' | '/' | '?' | '#' | '@' | '%' );    	

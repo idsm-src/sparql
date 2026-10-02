@@ -51,10 +51,44 @@ public class LiteralVisitor extends BaseVisitor<LiteralNode>
     }
 
 
+    /**
+     * Thrown by {@link #unescape} for a numeric escape sequence that denotes a surrogate or a code point beyond
+     * U+10FFFF; the message is the escape sequence.
+     */
+    public static class InvalidEscapeException extends IllegalArgumentException
+    {
+        /**
+         * Serialization version.
+         */
+        private static final long serialVersionUID = 1L;
+
+        /**
+         * Creates the exception.
+         *
+         * @param escape the escape sequence
+         */
+        public InvalidEscapeException(String escape)
+        {
+            super(escape);
+        }
+    }
+
+
     @Override
     public LiteralNode visitRdfLiteral(RdfLiteralContext ctx)
     {
-        String value = unquote(ctx.string().getText());
+        String value;
+
+        try
+        {
+            value = unquote(ctx.string().getText());
+        }
+        catch(InvalidEscapeException e)
+        {
+            messages.add(new TranslateMessage(MessageType.invalidUnicodeEscape, Range.compute(ctx.string()),
+                    e.getMessage()));
+            value = "";
+        }
 
         if(containsInvalidSurrogatePairs(value))
             messages.add(new TranslateMessage(MessageType.partialSurrogatePair, Range.compute(ctx.string())));
@@ -97,24 +131,63 @@ public class LiteralVisitor extends BaseVisitor<LiteralNode>
 
 
     /**
-     * Resolves the {@code ECHAR} escapes of a string body.
+     * Resolves the {@code ECHAR} and numeric ({@code UCHAR}) escape sequences of an IRI or a string body in one pass
+     * from left to right, so that the characters an escape produces are not scanned again (as in Turtle).
      *
-     * @param text the string body
+     * @param text the text with the escapes
      * @return the text with the escapes resolved
+     * @throws InvalidEscapeException if a numeric escape denotes a surrogate or a code point beyond U+10FFFF
      */
-    private static String unescape(String text)
+    public static String unescape(String text)
     {
-        // [160] ECHAR ::= '\' [tbnrf\"']
-        return text.replace("\\t", "\t").replace("\\b", "\b").replace("\\n", "\n").replace("\\r", "\r")
-                .replace("\\\"", "\"").replace("\\'", "'");
+        StringBuilder builder = new StringBuilder(text.length());
+
+        for(int i = 0; i < text.length(); i++)
+        {
+            char ch = text.charAt(i);
+
+            if(ch != '\\')
+            {
+                builder.append(ch);
+                continue;
+            }
+
+            char escape = text.charAt(++i);
+
+            switch(escape)
+            {
+                case 't' -> builder.append('\t');
+                case 'b' -> builder.append('\b');
+                case 'n' -> builder.append('\n');
+                case 'r' -> builder.append('\r');
+                case 'f' -> builder.append('\f');
+                case 'u', 'U' ->
+                {
+                    int length = escape == 'u' ? 4 : 8;
+                    String sequence = text.substring(i - 1, i + 1 + length);
+                    long codePoint = Long.parseLong(text.substring(i + 1, i + 1 + length), 16);
+
+                    if(codePoint >= Character.MIN_SURROGATE && codePoint <= Character.MAX_SURROGATE
+                            || codePoint > Character.MAX_CODE_POINT)
+                        throw new InvalidEscapeException(sequence);
+
+                    builder.appendCodePoint((int) codePoint);
+                    i += length;
+                }
+                default -> builder.append(escape);
+            }
+        }
+
+        return builder.toString();
     }
 
 
     /**
-     * Strips the surrounding quotes (single, double or triple) and resolves the {@code ECHAR} escapes.
+     * Strips the surrounding quotes (single, double or triple) and resolves the escapes, see {@link #unescape}.
      *
      * @param text the quoted string
      * @return the unquoted text with the escapes resolved
+     * @throws InvalidEscapeException if a numeric escape denotes a surrogate or a code point beyond U+10FFFF
      */
     public static String unquote(String text)
     {

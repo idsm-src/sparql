@@ -40,50 +40,15 @@ public class Parser
 
 
     /**
-     * Parses a SPARQL query and returns its parse tree. Unicode escapes (&#92;uXXXX and &#92;UXXXXXXXX) are resolved
-     * before lexing; syntax errors are reported as messages, not thrown.
+     * Parses a SPARQL query and returns its parse tree. The escape sequences of IRIs and strings are resolved by the
+     * visitors building the syntax tree, as SPARQL 1.2 processes them during parsing (so that they cannot occur in
+     * prefixed names, variables or keywords); syntax errors are reported as messages, not thrown.
      *
      * @param query the query text
      * @return the parse tree
      */
     public ParserRuleContext parse(String query)
     {
-        StringBuilder builder = new StringBuilder();
-
-        for(int i = 0; i < query.length() - 1; i++)
-        {
-            if(query.charAt(i) == '\\' && query.charAt(i + 1) == 'u')
-            {
-                String substr = query.substring(i + 2, i + 6);
-
-                if(substr.matches("^[0-9a-fA-F]{4}$"))
-                {
-                    builder.append((char) Integer.parseInt(substr, 16));
-
-                    i += 5;
-                    continue;
-                }
-            }
-            else if(query.charAt(i) == '\\' && query.charAt(i + 1) == 'U')
-            {
-                String substr = query.substring(i + 2, i + 10);
-
-                if(substr.matches("^(000[0-9a-fA-F]{5})|(0010[0-9a-fA-F]{4})$"))
-                {
-                    builder.appendCodePoint(Integer.parseInt(substr, 16));
-
-                    i += 9;
-                    continue;
-                }
-            }
-
-            builder.append(query.charAt(i));
-        }
-
-        builder.append(query.charAt(query.length() - 1));
-        query = builder.toString();
-
-
         return parse(CharStreams.fromString(query));
     }
 

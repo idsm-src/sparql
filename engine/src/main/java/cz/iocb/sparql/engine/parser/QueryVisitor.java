@@ -134,6 +134,7 @@ import cz.iocb.sparql.engine.model.triple.TripleTermNode;
 import cz.iocb.sparql.engine.model.triple.Verb;
 import cz.iocb.sparql.engine.model.visitor.ComplexElementVisitor;
 import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
+import cz.iocb.sparql.engine.parser.LiteralVisitor.InvalidEscapeException;
 import cz.iocb.sparql.engine.rdf.Iri;
 
 
@@ -718,9 +719,16 @@ public class QueryVisitor extends BaseVisitor<Query>
             for(Projection projection : select.getProjections())
             {
                 if(projection.getExpression() != null)
+                {
                     checkExpressionForGroupedSolutions(projection.getExpression(), groupVars);
+
+                    // a variable bound by a projection expression is usable by the following ones
+                    groupVars.add(projection.getVariable().getName());
+                }
                 else
+                {
                     checkExpressionForGroupedSolutions(projection.getVariable(), groupVars);
+                }
             }
         }
 
@@ -737,7 +745,23 @@ public class QueryVisitor extends BaseVisitor<Query>
         }
 
 
-        Set<VariableNode> inScopeVariables = new HashSet<>(select.getPattern().getVariablesInScope());
+        // the projection expressions see the variables of the pattern, or, in a grouped select, only the grouped ones
+        Set<VariableNode> inScopeVariables = new HashSet<>();
+
+        if(select.isInAggregateMode())
+        {
+            for(GroupCondition groupCondition : select.getGroupByConditions())
+            {
+                if(groupCondition.getVariable() != null)
+                    inScopeVariables.add(groupCondition.getVariable());
+                else if(groupCondition.getExpression() instanceof VariableNode variable)
+                    inScopeVariables.add(variable);
+            }
+        }
+        else
+        {
+            inScopeVariables.addAll(select.getPattern().getVariablesInScope());
+        }
 
         for(Projection projection : select.getProjections())
         {
@@ -1019,8 +1043,8 @@ class PrologueVisitor extends BaseVisitor<Void>
     @Override
     public Void visitBaseDecl(BaseDeclContext ctx)
     {
-        String uri = ctx.IRIREF().getText();
-        uri = uri.substring(1, uri.length() - 1);
+        Range range = Range.compute(ctx.IRIREF().getSymbol(), ctx.IRIREF().getSymbol());
+        String uri = IriVisitor.unescapeIri(ctx.IRIREF().getText(), messages, range);
 
         try
         {
@@ -1029,7 +1053,6 @@ class PrologueVisitor extends BaseVisitor<Void>
         }
         catch(URISyntaxException e)
         {
-            Range range = Range.compute(ctx.IRIREF().getSymbol(), ctx.IRIREF().getSymbol());
             messages.add(new TranslateMessage(MessageType.malformedIri, range));
         }
 
@@ -1055,7 +1078,18 @@ class PrologueVisitor extends BaseVisitor<Void>
     @Override
     public Void visitVersionDecl(VersionDeclContext ctx)
     {
-        String version = LiteralVisitor.unquote(ctx.versionSpecifier().getText());
+        String version;
+
+        try
+        {
+            version = LiteralVisitor.unquote(ctx.versionSpecifier().getText());
+        }
+        catch(InvalidEscapeException e)
+        {
+            messages.add(new TranslateMessage(MessageType.invalidUnicodeEscape, Range.compute(ctx.versionSpecifier()),
+                    e.getMessage()));
+            version = "";
+        }
 
         if(!version.equals("1.2") && !version.equals("1.2-basic") && !version.equals("1.1"))
             messages.add(new TranslateMessage(MessageType.unknownVersionLabel, Range.compute(ctx.versionSpecifier()),
@@ -2123,7 +2157,7 @@ class PatternVisitor extends BaseVisitor<Pattern>
         Set<VariableNode> valueVariables = new HashSet<>();
 
         for(VariableNode var : variables)
-            if(valueVariables.contains(var))
+            if(!valueVariables.add(var))
                 messages.add(new TranslateMessage(MessageType.repeatOfValuesVariable, var.getRange(), var.getName()));
 
 
@@ -2256,8 +2290,8 @@ class IriVisitor extends BaseVisitor<IriNode>
      */
     public String parseUri(TerminalNode iriRef, Prologue prologue)
     {
-        String uri = iriRef.getText();
-        uri = uri.substring(1, uri.length() - 1);
+        Range range = Range.compute(iriRef.getSymbol(), iriRef.getSymbol());
+        String uri = unescapeIri(iriRef.getText(), messages, range);
 
         try
         {
@@ -2266,11 +2300,35 @@ class IriVisitor extends BaseVisitor<IriNode>
         }
         catch(URISyntaxException e)
         {
-            Range range = Range.compute(iriRef.getSymbol(), iriRef.getSymbol());
             messages.add(new TranslateMessage(MessageType.malformedIri, range));
         }
 
         return uri;
+    }
+
+
+    /**
+     * Strips the angle brackets of an IRI reference and resolves its numeric escape sequences; an invalid escape is
+     * reported and left as it is.
+     *
+     * @param iriRef text of the IRIREF token
+     * @param messages the message list to append to
+     * @param range the source range of the token
+     * @return the IRI text
+     */
+    public static String unescapeIri(String iriRef, List<TranslateMessage> messages, Range range)
+    {
+        String uri = iriRef.substring(1, iriRef.length() - 1);
+
+        try
+        {
+            return LiteralVisitor.unescape(uri);
+        }
+        catch(InvalidEscapeException e)
+        {
+            messages.add(new TranslateMessage(MessageType.invalidUnicodeEscape, range, e.getMessage()));
+            return uri;
+        }
     }
 
 

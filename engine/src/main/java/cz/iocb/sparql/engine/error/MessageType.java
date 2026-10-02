@@ -259,6 +259,11 @@ public enum MessageType
     partialSurrogatePair(ERROR, "Literal contains a codepoint that is half of a surrogate pair"),
 
     /**
+     * A numeric escape sequence of an IRI or a string denotes a surrogate or a code point beyond U+10FFFF.
+     */
+    invalidUnicodeEscape(ERROR, "Escape sequence '%s' does not denote a valid Unicode code point"),
+
+    /**
      * The base direction of a language-tagged literal is neither {@code ltr} nor {@code rtl}.
      */
     invalidBaseDirection(ERROR, "Base direction '%s' is not valid, it must be either 'ltr' or 'rtl'."),

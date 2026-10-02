@@ -62,6 +62,7 @@ import cz.iocb.sparql.engine.model.expression.LiteralNode;
 import cz.iocb.sparql.engine.model.expression.UnaryExpression;
 import cz.iocb.sparql.engine.model.triple.Node;
 import cz.iocb.sparql.engine.model.triple.TripleTermNode;
+import cz.iocb.sparql.engine.parser.LiteralVisitor.InvalidEscapeException;
 import cz.iocb.sparql.engine.rdf.Iri;
 
 
@@ -777,8 +778,22 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
         result.add(expressionVisitor.visit(ctx.expression()));
 
         if(ctx.string() != null)
-            result.add(withRange(new LiteralNode(LiteralVisitor.unquote(ctx.string().getText()),
-                    new IriNode(xsdStringIri.getValue())), ctx.string()));
+        {
+            String separator;
+
+            try
+            {
+                separator = LiteralVisitor.unquote(ctx.string().getText());
+            }
+            catch(InvalidEscapeException e)
+            {
+                messages.add(new TranslateMessage(MessageType.invalidUnicodeEscape, Range.compute(ctx.string()),
+                        e.getMessage()));
+                separator = "";
+            }
+
+            result.add(withRange(new LiteralNode(separator, new IriNode(xsdStringIri.getValue())), ctx.string()));
+        }
 
         return result;
     }
