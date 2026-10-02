@@ -1076,9 +1076,9 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
-     * Adds the quads of the SPARQL 1.1 service description (features, result formats, extension functions and procedure
-     * properties) to the description graph. Requires the {@code rdf}, {@code sd}, {@code ent} and {@code format}
-     * prefixes.
+     * Adds the quads of the SPARQL 1.2 service description (features, the supported language with its versions, result
+     * formats, extension functions and procedure properties) to the description graph; the SPARQL 1.1 language term is
+     * kept for older clients. Requires the {@code rdf}, {@code sd}, {@code ent} and {@code format} prefixes.
      */
     public void addBasicServiceDescription()
     {
@@ -1098,7 +1098,12 @@ public class SparqlDatabaseConfiguration implements ClassRelations
             addQuadMapping(graph, endpoint, createIriMapping("sd:feature"), createIriMapping("sd:UnionDefaultGraph"));
 
         addQuadMapping(graph, endpoint, createIriMapping("sd:defaultEntailmentRegime"), createIriMapping("ent:Simple"));
+        addQuadMapping(graph, endpoint, createIriMapping("sd:supportedLanguage"), createIriMapping("sd:SPARQLQuery"));
         addQuadMapping(graph, endpoint, createIriMapping("sd:supportedLanguage"), createIriMapping("sd:SPARQL11Query"));
+
+        for(String version : List.of("1.2", "1.2-basic", "1.1"))
+            addQuadMapping(graph, endpoint, createIriMapping("sd:supportedVersion"),
+                    createIriMapping("<http://www.w3.org/ns/sparql#version-" + version + ">"));
 
         addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"),
                 createIriMapping("format:SPARQL_Results_XML"));
