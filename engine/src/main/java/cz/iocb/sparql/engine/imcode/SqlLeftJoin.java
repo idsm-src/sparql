@@ -204,7 +204,7 @@ public final class SqlLeftJoin extends SqlIntercode
                 if(cols == null)
                     binding.addMapping(resClass, null);
                 else if(joinBindings != null)
-                    binding.addMapping(resClass, cols.stream().map(c -> map.get(c)).toList());
+                    binding.addMapping(resClass, cols.stream().map(c -> map.getOrDefault(c, c)).toList());
                 else
                     binding.addMapping(resClass, cols.stream().map(c -> c.fromTable(leftTable)).toList());
             }
