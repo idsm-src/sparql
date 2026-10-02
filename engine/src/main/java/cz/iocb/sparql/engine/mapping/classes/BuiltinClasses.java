@@ -1104,6 +1104,18 @@ public class BuiltinClasses
 
 
     /**
+     * True if some value of the class may be an unsupported literal.
+     *
+     * @param resClass the resource class
+     * @return true if some value of the class may be an unsupported literal, false otherwise
+     */
+    public static boolean hasUnsupportedLiteral(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, unsupportedType);
+    }
+
+
+    /**
      * True if some value of the class may be a xsd:boolean.
      *
      * @param resClass the resource class

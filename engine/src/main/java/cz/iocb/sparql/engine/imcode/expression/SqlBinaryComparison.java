@@ -24,6 +24,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasTripleTerm;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasUnsupportedLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDateTime;
@@ -38,6 +39,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isRepresentab
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isRepresentableAsLong;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isRepresentableAsShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isUnsupportedLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
@@ -77,8 +79,11 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 /**
  * Comparison of two terms following the SPARQL operator mapping: numeric, boolean, string, date and date-time
- * comparison and RDF term equality, triple terms being compared by their components; comparing incompatible types is an
- * error. Dates and date-times of different timezones are compared through their common representation.
+ * comparison, and the equality of RDF terms as the function sameValue() of SPARQL 1.2 defines it: triple terms are
+ * compared by their components, literals of different handled datatypes are different values, and a literal of an
+ * unknown datatype or an ill-typed one equals the same term only and is an error otherwise; ordering comparisons of
+ * incompatible types are errors. Dates and date-times of different timezones are compared through their common
+ * representation.
  */
 public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanExpression
 {
@@ -247,12 +252,12 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
         DATE,
 
         /**
-         * Comparison of arbitrary literals through the box.
+         * Equality of literals of the unsupported class: the same term is equal, anything else is an error.
          */
         LITERAL,
 
         /**
-         * Direct SQL comparison of the columns (strings, references).
+         * Direct SQL comparison of the columns (strings, references, literals of one handled datatype).
          */
         DIRECT,
 
@@ -471,8 +476,19 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                     areComparable(relations, operator, lt.getPredicate(), rt.getPredicate()),
                     areComparable(relations, operator, lt.getObject(), rt.getObject()));
 
-        if(isLiteral(l) && isLiteral(r) && areDisjunct(relations, l, r))
-            return ComparisonType.NULL;
+        if(isLiteral(l) && isLiteral(r))
+        {
+            // sameValue() of SPARQL 1.2: literals of two different handled datatypes are different values and literals
+            // of the same handled datatype compare by value, whereas a literal of an unknown datatype or an ill-typed
+            // one, both of the unsupported class, equals the same term only and is an error otherwise
+            if(isUnsupportedLiteral(l) || isUnsupportedLiteral(r))
+                return areDisjunct(relations, l, r) ? ComparisonType.NULL : ComparisonType.FULL;
+
+            if(hasUnsupportedLiteral(l) || hasUnsupportedLiteral(r))
+                return ComparisonType.FULL;
+
+            return areDisjunct(relations, l, r) ? ComparisonType.DIFFERENT : ComparisonType.NOT_NULL;
+        }
 
         if(hasLiteral(l) && hasLiteral(r))
             return ComparisonType.FULL;
@@ -489,30 +505,32 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
 
 
     /**
-     * Outcome of comparing two triple terms given the outcomes of comparing their components: an error of a component
-     * is an error of the whole, otherwise the terms are equal when all components are.
+     * Outcome of comparing two triple terms given the outcomes of comparing their components, combined by the
+     * three-valued {@code &&} of the SPARQL 1.2 operator mapping: a component that is never equal makes the terms never
+     * equal whatever the other components do, otherwise a possible error of a component is a possible error of the
+     * whole.
      *
      * @param components outcomes of comparing the components
      * @return outcome of comparing two triple terms given the outcomes of comparing their components
      */
     private static ComparisonType combineComponentComparisons(ComparisonType... components)
     {
-        boolean full = false;
-        boolean different = false;
+        boolean allErrors = true;
+        boolean noErrors = true;
 
         for(ComparisonType component : components)
         {
-            if(component == ComparisonType.NULL)
-                return ComparisonType.NULL;
+            if(component == ComparisonType.DIFFERENT)
+                return ComparisonType.DIFFERENT;
 
-            full |= component == ComparisonType.FULL;
-            different |= component == ComparisonType.DIFFERENT;
+            allErrors &= component == ComparisonType.NULL;
+            noErrors &= component == ComparisonType.NOT_NULL;
         }
 
-        if(full)
-            return ComparisonType.FULL;
+        if(allErrors)
+            return ComparisonType.NULL;
 
-        return different ? ComparisonType.DIFFERENT : ComparisonType.NOT_NULL;
+        return noErrors ? ComparisonType.NOT_NULL : ComparisonType.FULL;
     }
 
 
@@ -594,8 +612,12 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             return ComparisonMode.BOX;
         else if(hasString(left) && hasString(right))
             return ComparisonMode.BOX;
+        else if(isLiteral(left) && isLiteral(right) && ResourceClass.areDisjunct(relations, left, right))
+            return isUnsupportedLiteral(left) || isUnsupportedLiteral(right) ? ComparisonMode.NULL :
+                    ComparisonMode.DIFF;
         else if(isLiteral(left) && isLiteral(right))
-            return ResourceClass.areDisjunct(relations, left, right) ? ComparisonMode.NULL : ComparisonMode.LITERAL;
+            return isUnsupportedLiteral(left) || isUnsupportedLiteral(right) ? ComparisonMode.LITERAL :
+                    ComparisonMode.DIRECT;
         else if(!hasLiteral(left) && !hasLiteral(right))
             return ResourceClass.areDisjunct(relations, left, right) ? ComparisonMode.DIFF : ComparisonMode.DIRECT;
         else
@@ -759,8 +781,9 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
 
             case TRIPLE_TERM ->
             {
-                // the terms are compared component by component: they are equal when all components are, and an
-                // error of a component is an error of the whole, as in sameValue() of SPARQL 1.2
+                // the operator mapping of SPARQL 1.2: (A.subject = B.subject) && (A.predicate = B.predicate) &&
+                // (A.object = B.object), the three-valued && of SPARQL being the AND of SQL, so that a component that
+                // differs decides even when another one is an error
                 List<String> parts = new ArrayList<>();
                 boolean different = false;
 
@@ -778,16 +801,14 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                         parts.add(comparison.get(relations, xsdBoolean).get(0).toString());
                 }
 
-                // a sum of the parts cast to integers is NULL when a part is, which an AND would not be
                 String equality;
 
-                if(parts.isEmpty())
-                    equality = different ? "false" : "true";
-                else if(different)
-                    equality = parts.stream().map(c -> "(" + c + ")::int").collect(joining(" + ", "(", " < 0)"));
+                if(different)
+                    equality = "false";
+                else if(parts.isEmpty())
+                    equality = "true";
                 else
-                    equality = parts.stream().map(c -> "(" + c + ")::int")
-                            .collect(joining(" + ", "(", " = " + parts.size() + ")"));
+                    equality = parts.stream().collect(joining(" AND ", "(", ")"));
 
                 yield operator == EQUAL ? equality : "NOT " + equality;
             }
