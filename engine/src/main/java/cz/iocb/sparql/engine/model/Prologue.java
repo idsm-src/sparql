@@ -18,6 +18,11 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 public class Prologue extends BaseElement
 {
     /**
+     * The SPARQL version labels of SPARQL 1.2 Query (section 4.4.1): {@code 1.2}, {@code 1.2-basic} and {@code 1.1}.
+     */
+    public static final List<String> versionLabels = List.of("1.2", "1.2-basic", "1.1");
+
+    /**
      * BASE IRI, empty when not declared.
      */
     private String base;

@@ -22,6 +22,11 @@ public enum MessageType
     unsupportedUpdateCommand(ERROR, "SPARQL Update operations are not supported."),
 
     /**
+     * The version given by the protocol is not one of the SPARQL version labels.
+     */
+    unsupportedVersion(ERROR, "version '%s' is not supported"),
+
+    /**
      * A VALUES row has a different number of values than there are variables.
      */
     wrongNumberOfValues(ERROR, "The number of variables doesn't match the number of values."),
@@ -297,7 +302,12 @@ public enum MessageType
     /**
      * The label of a VERSION declaration is not one of the SPARQL version labels.
      */
-    unknownVersionLabel(WARNING, "version label '%s' is not recognized");
+    unknownVersionLabel(WARNING, "version label '%s' is not recognized"),
+
+    /**
+     * The version given by the protocol differs from the one declared by the query.
+     */
+    versionMismatch(WARNING, "version '%s' of the protocol differs from the declared version '%s'");
 
 
     /**

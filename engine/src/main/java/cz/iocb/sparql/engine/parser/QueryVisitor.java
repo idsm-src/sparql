@@ -1091,7 +1091,7 @@ class PrologueVisitor extends BaseVisitor<Void>
             version = "";
         }
 
-        if(!version.equals("1.2") && !version.equals("1.2-basic") && !version.equals("1.1"))
+        if(!Prologue.versionLabels.contains(version))
             messages.add(new TranslateMessage(MessageType.unknownVersionLabel, Range.compute(ctx.versionSpecifier()),
                     version));
 

@@ -1,6 +1,5 @@
-package cz.iocb.sparql.engine;
+package cz.iocb.sparql.testing;
 
-import java.nio.file.Paths;
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.apache.tomcat.jdbc.pool.PoolProperties;
 import org.postgresql.Driver;
@@ -11,10 +10,12 @@ import org.testcontainers.utility.DockerImageName;
 
 
 /**
- * Test database shared by all engine tests: a PostgreSQL 16 container built from {@code src/test/resources/docker},
- * which clones and compiles the pgsparql extension from the public {@code next} branch on GitHub and loads the NeXtProt
- * test schemas. Local, unpushed changes of pgsparql are therefore not visible to the tests. The container is started
- * once per JUnit launcher session by {@link DatabaseLauncherSessionListener}.
+ * Test database shared by the tests of the engine and of the endpoint: a PostgreSQL 16 container built from the
+ * {@code docker} directory of the resources of this module, which clones and compiles the pgsparql extension from the
+ * public {@code next} branch on GitHub and loads the NeXtProt test schemas. Local, unpushed changes of pgsparql are
+ * therefore not visible to the tests. The container is started once per JUnit launcher session by
+ * {@link DatabaseLauncherSessionListener}, which this module registers in {@code META-INF/services}, so that every
+ * module depending on this one gets the database.
  */
 public class Database
 {
@@ -25,6 +26,14 @@ public class Database
 
 
     /**
+     * Not instantiable: the database is shared through the static methods.
+     */
+    private Database()
+    {
+    }
+
+
+    /**
      * Builds the image (without cache, so the latest pgsparql is fetched) and starts the container on first call; later
      * calls are no-ops.
      */
@@ -32,9 +41,7 @@ public class Database
     {
         if(connectionPool == null)
         {
-            String dockerPath = "src/test/resources/docker";
-            String imageName = new ImageFromDockerfile("sparql-test", false)
-                    .withFileFromPath(".", Paths.get(dockerPath))
+            String imageName = new ImageFromDockerfile("sparql-test", false).withFileFromClasspath(".", "docker")
                     .withBuildImageCmdModifier(cmd -> cmd.withNoCache(true)).get();
             DockerImageName image = DockerImageName.parse(imageName).asCompatibleSubstituteFor("postgres");
 
@@ -66,6 +73,8 @@ public class Database
 
     /**
      * Pool connected to the test database, valid after {@link #start}.
+     *
+     * @return pool connected to the test database
      */
     public static DataSource getPool()
     {

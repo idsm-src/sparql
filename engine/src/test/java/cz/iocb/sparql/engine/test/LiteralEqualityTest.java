@@ -10,7 +10,6 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import cz.iocb.sparql.engine.Database;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
@@ -20,6 +19,7 @@ import cz.iocb.sparql.engine.request.LimitExceedException;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.request.Result;
 import cz.iocb.sparql.engine.translator.ServiceException;
+import cz.iocb.sparql.testing.Database;
 
 
 

@@ -19,7 +19,6 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import cz.iocb.sparql.engine.Database;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -38,6 +37,7 @@ import cz.iocb.sparql.engine.request.Request.PreparedQuery;
 import cz.iocb.sparql.engine.request.Result;
 import cz.iocb.sparql.engine.translator.ServiceException;
 import cz.iocb.sparql.engine.translator.TranslateVisitor;
+import cz.iocb.sparql.testing.Database;
 
 
 

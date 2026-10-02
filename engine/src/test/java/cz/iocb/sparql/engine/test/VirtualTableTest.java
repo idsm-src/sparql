@@ -23,7 +23,6 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import cz.iocb.sparql.engine.Database;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
@@ -45,6 +44,7 @@ import cz.iocb.sparql.engine.request.LimitExceedException;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.request.Result;
 import cz.iocb.sparql.engine.translator.ServiceException;
+import cz.iocb.sparql.testing.Database;
 
 
 

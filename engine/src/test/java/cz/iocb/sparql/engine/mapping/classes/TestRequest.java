@@ -3,12 +3,12 @@ package cz.iocb.sparql.engine.mapping.classes;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import cz.iocb.sparql.engine.Database;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.request.RdfBoxParser;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.test.OptionalSuffixIriClass;
+import cz.iocb.sparql.testing.Database;
 
 
 

@@ -22,12 +22,12 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import cz.iocb.sparql.engine.Database;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
+import cz.iocb.sparql.testing.Database;
 
 
 

@@ -20,6 +20,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.error.MessageCategory;
+import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.error.TranslateMessage;
 import cz.iocb.sparql.engine.imcode.SqlSelect;
@@ -36,6 +37,7 @@ import cz.iocb.sparql.engine.model.AskQuery;
 import cz.iocb.sparql.engine.model.ConstructQuery;
 import cz.iocb.sparql.engine.model.DataSet;
 import cz.iocb.sparql.engine.model.DescribeQuery;
+import cz.iocb.sparql.engine.model.Prologue;
 import cz.iocb.sparql.engine.model.Query;
 import cz.iocb.sparql.engine.model.Select;
 import cz.iocb.sparql.engine.model.SelectQuery;
@@ -88,6 +90,11 @@ public class Request implements AutoCloseable
         private final List<TranslateMessage> messages;
 
         /**
+         * Version label in effect: the one given by the protocol, else the one declared by the query; null when none.
+         */
+        private final String version;
+
+        /**
          * Form of the query.
          */
         private final ResultType type;
@@ -99,15 +106,17 @@ public class Request implements AutoCloseable
          * @param dataSets dataset clauses given by the protocol, or null
          * @param syntaxTree the parsed query
          * @param messages messages collected during parsing
+         * @param version version label in effect, or null
          * @throws TranslateExceptions if the query has errors
          */
-        public PreparedQuery(String query, List<DataSet> dataSets, Query syntaxTree, List<TranslateMessage> messages)
-                throws TranslateExceptions
+        public PreparedQuery(String query, List<DataSet> dataSets, Query syntaxTree, List<TranslateMessage> messages,
+                String version) throws TranslateExceptions
         {
             this.query = query;
             this.dataSets = dataSets;
             this.syntaxTree = syntaxTree;
             this.messages = messages;
+            this.version = version;
 
             this.type = switch(syntaxTree)
             {
@@ -172,6 +181,17 @@ public class Request implements AutoCloseable
         public final ResultType getResultType()
         {
             return type;
+        }
+
+
+        /**
+         * Version label in effect: the one given by the protocol, else the one declared by the query; null when none.
+         *
+         * @return version label in effect, or null
+         */
+        public final String getVersion()
+        {
+            return version;
         }
     }
 
@@ -331,6 +351,24 @@ public class Request implements AutoCloseable
      */
     public PreparedQuery prepareQuery(String query, List<DataSet> dataSets) throws TranslateExceptions
     {
+        return prepareQuery(query, dataSets, null);
+    }
+
+
+    /**
+     * Parses and checks the query; {@code dataSets} (protocol default-graph-uri and named-graph-uri parameters)
+     * override the FROM clauses of the query, and {@code version} (protocol version parameter) takes precedence over
+     * the VERSION declaration of the query, a difference being a warning; a version that is not a SPARQL version label
+     * is an error.
+     *
+     * @param query the query text
+     * @param dataSets the dataset clauses, or null
+     * @param version the version label given by the protocol, or null
+     * @return the prepared query
+     * @throws TranslateExceptions if the query has errors
+     */
+    public PreparedQuery prepareQuery(String query, List<DataSet> dataSets, String version) throws TranslateExceptions
+    {
         try
         {
             MDC.put("sparql", query);
@@ -347,10 +385,20 @@ public class Request implements AutoCloseable
 
             checkForErrors(messages);
 
+            String declared = syntaxTree.getPrologue().getVersion();
+            String effective = version != null ? version : declared;
+
+            if(version != null && !Prologue.versionLabels.contains(version))
+                messages.add(new TranslateMessage(MessageType.unsupportedVersion, null, version));
+            else if(version != null && declared != null && !declared.equals(version))
+                messages.add(new TranslateMessage(MessageType.versionMismatch, null, version, declared));
+
+            checkForErrors(messages);
+
             if(dataSets != null && !dataSets.isEmpty())
                 syntaxTree.getSelect().setDataSets(dataSets);
 
-            return new PreparedQuery(query, dataSets, syntaxTree, messages);
+            return new PreparedQuery(query, dataSets, syntaxTree, messages, effective);
         }
         catch(TranslateExceptions e)
         {

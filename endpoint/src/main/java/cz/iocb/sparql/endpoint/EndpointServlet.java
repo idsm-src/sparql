@@ -54,11 +54,15 @@ import cz.iocb.sparql.engine.request.Result.ResultType;
 
 
 /**
- * SPARQL 1.1 protocol endpoint. Queries arrive by GET or by POST (URL-encoded form or {@code application/sparql-query})
- * and the result is serialised in the format chosen from the {@code format} parameter or the Accept header. A GET
- * without a query serves the bundled YASGUI page to browsers and the service description otherwise; {@code ?info}
- * returns a JSON summary of prefixes, properties and classes. Init parameters: {@code resource} (JNDI name of the
- * configuration), {@code fetch-size}, {@code timeout} and {@code max-timeout} (seconds), {@code sql-query-size-limit}.
+ * SPARQL 1.2 protocol endpoint. Queries arrive by GET or by POST (URL-encoded form or {@code application/sparql-query})
+ * with the optional {@code version} parameter (a parameter of the media type for the direct POST), and the result is
+ * serialised in the format chosen from the {@code format} parameter or the Accept header. When the request announces
+ * SPARQL 1.2 (by the parameter, by the VERSION declaration or by the {@code version} parameter of an accepted media
+ * type), the result announces RDF 1.2 too: by the {@code version} member of the JSON head, by the VERSION directive of
+ * Turtle, TriG, N-Triples and N-Quads, and by the {@code version} parameter of their media types. A GET without a query
+ * serves the bundled YASGUI page to browsers and the service description otherwise; {@code ?info} returns a JSON
+ * summary of prefixes, properties and classes. Init parameters: {@code resource} (JNDI name of the configuration),
+ * {@code fetch-size}, {@code timeout} and {@code max-timeout} (seconds), {@code sql-query-size-limit}.
  */
 public class EndpointServlet extends HttpServlet
 {
@@ -183,6 +187,17 @@ public class EndpointServlet extends HttpServlet
         {
             return mime;
         }
+
+
+        /**
+         * True if the media type has the optional {@code version} parameter announcing RDF 1.2 features.
+         *
+         * @return true if the media type has the optional {@code version} parameter, false otherwise
+         */
+        public boolean hasVersionParameter()
+        {
+            return this == SPARQL_JSON || this == TURTLE || this == TRIG || this == NTRIPLES || this == NQUADS;
+        }
     }
 
 
@@ -248,6 +263,18 @@ public class EndpointServlet extends HttpServlet
      */
     public EndpointServlet()
     {
+    }
+
+
+    /**
+     * Creates the servlet over the engine with the default limits, without {@link #init} (for tests).
+     *
+     * @param engine the engine
+     */
+    EndpointServlet(Engine engine)
+    {
+        this.engine = engine;
+        this.sparqlConfig = engine.getConfig();
     }
 
 
@@ -323,15 +350,17 @@ public class EndpointServlet extends HttpServlet
             String query = req.getParameter("query");
             String[] defaultGraphs = req.getParameterValues("default-graph-uri");
             String[] namedGraphs = req.getParameterValues("named-graph-uri");
+            String[] versions = req.getParameterValues("version");
 
             if(query == null)
             {
                 query = sparqlConfig.getServiceDescriptionQuery();
                 defaultGraphs = null;
                 namedGraphs = null;
+                versions = null;
             }
 
-            process(req, res, query, defaultGraphs, namedGraphs, getTimeout(req), sqlSizeLimit);
+            process(req, res, query, defaultGraphs, namedGraphs, versions, getTimeout(req), sqlSizeLimit);
         }
     }
 
@@ -347,14 +376,25 @@ public class EndpointServlet extends HttpServlet
         String query = null;
         String[] defaultGraphs = req.getParameterValues("default-graph-uri");
         String[] namedGraphs = req.getParameterValues("named-graph-uri");
+        String[] versions = req.getParameterValues("version");
 
         if(req.getContentType() != null && req.getContentType().matches("application/x-www-form-urlencoded.*"))
+        {
             query = req.getParameter("query");
+        }
         else if(req.getContentType() != null && req.getContentType().matches("application/sparql-query.*"))
+        {
             query = new String(req.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
 
+            // the direct POST gives the version as a parameter of the media type
+            String version = getMediaTypeParameter(req.getContentType(), "version");
 
-        process(req, res, query, defaultGraphs, namedGraphs, getTimeout(req), sqlSizeLimit);
+            if(version != null)
+                versions = new String[] { version };
+        }
+
+
+        process(req, res, query, defaultGraphs, namedGraphs, versions, getTimeout(req), sqlSizeLimit);
     }
 
 
@@ -376,6 +416,78 @@ public class EndpointServlet extends HttpServlet
 
         if(filename != null)
             res.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+    }
+
+
+    /**
+     * Value of a parameter of a media type (for example {@code version} of
+     * {@code application/sparql-query;version=1.2}), without the quotes of a quoted value; null when the parameter is
+     * absent.
+     *
+     * @param mediaType the media type with its parameters
+     * @param name the parameter name
+     * @return value of the parameter, or null when it is absent
+     */
+    private static String getMediaTypeParameter(String mediaType, String name)
+    {
+        String[] parts = mediaType.split("[\t ]*;[\t ]*");
+
+        for(int i = 1; i < parts.length; i++)
+        {
+            int separator = parts[i].indexOf('=');
+
+            if(separator > 0 && parts[i].substring(0, separator).trim().equalsIgnoreCase(name))
+            {
+                String value = parts[i].substring(separator + 1).trim();
+
+                if(value.length() > 1 && value.startsWith("\"") && value.endsWith("\""))
+                    value = value.substring(1, value.length() - 1);
+
+                return value;
+            }
+        }
+
+        return null;
+    }
+
+
+    /**
+     * True if the label announces SPARQL 1.2 ({@code 1.2} or {@code 1.2-basic}).
+     *
+     * @param version the version label, or null
+     * @return true if the label announces SPARQL 1.2, false otherwise
+     */
+    private static boolean isVersion12(String version)
+    {
+        return "1.2".equals(version) || "1.2-basic".equals(version);
+    }
+
+
+    /**
+     * True if the Accept header lists the media type of the format (or any media type) with the parameter
+     * {@code version=1.2}.
+     *
+     * @param req the HTTP request
+     * @param format the output type
+     * @return true if the Accept header lists the media type of the format with the parameter {@code version=1.2}
+     */
+    private static boolean acceptsVersion12(HttpServletRequest req, OutputType format)
+    {
+        String accept = req.getHeader("accept");
+
+        if(accept == null)
+            return false;
+
+        for(String value : accept.split("[\t ]*,[\t ]*"))
+        {
+            String mime = value.split("[\t ]*;[\t ]*")[0].replaceAll("[\t ]", "");
+
+            if(mime.equals(format.getMime()) || mime.equals("*/*"))
+                if("1.2".equals(getMediaTypeParameter(value, "version")))
+                    return true;
+        }
+
+        return false;
     }
 
 
@@ -432,6 +544,13 @@ public class EndpointServlet extends HttpServlet
             builder.append((hasParam++ == 0 ? "&" : "?") + "timeout=" + URLEncoder.encode(timeout, UTF_8));
 
 
+        String[] versions = req.getParameterValues("version");
+
+        if(versions != null)
+            for(String v : versions)
+                builder.append((hasParam++ == 0 ? "&" : "?") + "version=" + URLEncoder.encode(v, UTF_8));
+
+
         String[] defaultGraphUris = req.getParameterValues("default-graph-uri");
 
         if(defaultGraphUris != null)
@@ -465,22 +584,25 @@ public class EndpointServlet extends HttpServlet
      * @param query the query text
      * @param defaultGraphs IRIs of the default graphs given by the protocol, or null
      * @param namedGraphs IRIs of the named graphs given by the protocol, or null
+     * @param versions version labels given by the protocol (at most one is valid), or null
      * @param timeout time limit in nanoseconds, 0 for none
      * @param sqlSizeLimit maximum length of the generated SQL, 0 for none
      * @throws IOException on output errors
      */
     private void process(HttpServletRequest req, HttpServletResponse res, String query, String[] defaultGraphs,
-            String[] namedGraphs, long timeout, int sqlSizeLimit) throws IOException
+            String[] namedGraphs, String[] versions, long timeout, int sqlSizeLimit) throws IOException
     {
         try
         {
             MDC.put("request", getRequestString(req));
 
-            if(query == null)
+            if(query == null || versions != null && versions.length > 1)
             {
                 res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 return;
             }
+
+            String version = versions != null ? versions[0] : null;
 
 
             List<DataSet> dataSets = new ArrayList<>();
@@ -527,14 +649,18 @@ public class EndpointServlet extends HttpServlet
 
             try(Request request = engine.getRequest(serviceReorder))
             {
-                PreparedQuery preparedQuery = request.prepareQuery(query, dataSets);
+                PreparedQuery preparedQuery = request.prepareQuery(query, dataSets, version);
                 OutputType format = detectOutputType(req, preparedQuery.getResultType());
                 List<Variable> order = format == RDF_JSON ? List.of(SUBJECT.getVariable(), PREDICATE.getVariable()) :
                         List.of();
 
+                // RDF 1.2 is announced in the result when the request announced SPARQL 1.2 or accepted RDF 1.2
+                boolean announce = isVersion12(preparedQuery.getVersion()) || acceptsVersion12(req, format);
+
                 try(Result result = request.execute(preparedQuery, order, 0, limit, fetchSize, timeout, sqlSizeLimit))
                 {
-                    res.setContentType(format.getMime());
+                    res.setContentType(announce && format.hasVersionParameter() ? format.getMime() + ";version=1.2" :
+                            format.getMime());
 
                     switch(result.getResultType())
                     {
@@ -542,7 +668,7 @@ public class EndpointServlet extends HttpServlet
                             switch(format)
                             {
                                 case SPARQL_JSON:
-                                    writeAskJson(res.getWriter(), result, includeWarnings);
+                                    writeAskJson(res.getWriter(), result, includeWarnings, announce);
                                     break;
                                 case SPARQL_XML:
                                     writeAskXml(res.getWriter(), result, includeWarnings);
@@ -565,7 +691,7 @@ public class EndpointServlet extends HttpServlet
                             switch(format)
                             {
                                 case SPARQL_JSON:
-                                    writeSelectJson(res.getWriter(), result, includeWarnings);
+                                    writeSelectJson(res.getWriter(), result, includeWarnings, announce);
                                     break;
                                 case SPARQL_XML:
                                     writeSelectXml(res.getWriter(), result, includeWarnings);
@@ -594,11 +720,12 @@ public class EndpointServlet extends HttpServlet
                                     break;
                                 case TURTLE:
                                 case TRIG:
-                                    writeGraphTurtle(res.getWriter(), result, engine.getConfig().getPrefixes());
+                                    writeGraphTurtle(res.getWriter(), result, engine.getConfig().getPrefixes(),
+                                            announce);
                                     break;
                                 case NTRIPLES:
                                 case NQUADS:
-                                    writeGraphTriples(res.getWriter(), result);
+                                    writeGraphTriples(res.getWriter(), result, announce);
                                     break;
                                 case TSV:
                                     writeGraphTsv(res.getWriter(), result);
@@ -631,7 +758,8 @@ public class EndpointServlet extends HttpServlet
             PrintWriter out = res.getWriter();
 
             for(TranslateMessage message : e.getMessages())
-                out.println(message.getCategory().getText() + ": " + message.getRange() + " " + message.getMessage());
+                out.println(message.getCategory().getText() + ": "
+                        + (message.getRange() != null ? message.getRange() + " " : "") + message.getMessage());
         }
         catch(LimitExceedException e)
         {
@@ -1104,11 +1232,12 @@ public class EndpointServlet extends HttpServlet
      * @param out the output writer
      * @param result the result to write
      * @param includeWarnings whether to include the statement warnings
+     * @param announceVersion whether to announce RDF 1.2 by the {@code version} member of the head
      * @throws IOException on output errors
      * @throws SQLException on database errors
      */
-    private static void writeSelectJson(PrintWriter out, Result result, boolean includeWarnings)
-            throws IOException, SQLException
+    private static void writeSelectJson(PrintWriter out, Result result, boolean includeWarnings,
+            boolean announceVersion) throws IOException, SQLException
     {
         out.print("{\n\t\"head\": { \"vars\": [ ");
 
@@ -1126,7 +1255,7 @@ public class EndpointServlet extends HttpServlet
             out.print('"');
         }
 
-        out.println(" ]},\n\t\"results\": { \"bindings\": [");
+        out.println(" ]" + (announceVersion ? ", \"version\": \"1.2\"" : "") + " },\n\t\"results\": { \"bindings\": [");
 
 
         boolean hasResult = false;
@@ -1309,16 +1438,17 @@ public class EndpointServlet extends HttpServlet
      * @param out the output writer
      * @param result the result to write
      * @param includeWarnings whether to include the statement warnings
+     * @param announceVersion whether to announce RDF 1.2 by the {@code version} member of the head
      * @throws IOException on output errors
      * @throws SQLException on database errors
      */
-    private static void writeAskJson(PrintWriter out, Result result, boolean includeWarnings)
+    private static void writeAskJson(PrintWriter out, Result result, boolean includeWarnings, boolean announceVersion)
             throws IOException, SQLException
     {
         result.next();
 
         out.println("{");
-        out.println("\t\"head\": { },");
+        out.println("\t\"head\": { " + (announceVersion ? "\"version\": \"1.2\" " : "") + "},");
         out.println("\t\"boolean\": " + ((Literal) result.get(0)).getValue());
         out.println("}");
     }
@@ -1591,12 +1721,16 @@ public class EndpointServlet extends HttpServlet
      * @param out the output writer
      * @param result the result to write
      * @param systemPrefixes prefixes for abbreviating IRIs
+     * @param announceVersion whether to announce RDF 1.2 by the VERSION directive
      * @throws IOException on output errors
      * @throws SQLException on database errors
      */
-    private static void writeGraphTurtle(PrintWriter out, Result result, Map<String, String> systemPrefixes)
-            throws IOException, SQLException
+    private static void writeGraphTurtle(PrintWriter out, Result result, Map<String, String> systemPrefixes,
+            boolean announceVersion) throws IOException, SQLException
     {
+        if(announceVersion)
+            out.println("VERSION \"1.2\"");
+
         Map<String, String> prefixes = new HashMap<>();
 
         RdfTerm subject = null;
@@ -1644,11 +1778,16 @@ public class EndpointServlet extends HttpServlet
      *
      * @param out the output writer
      * @param result the result to write
+     * @param announceVersion whether to announce RDF 1.2 by the VERSION directive
      * @throws IOException on output errors
      * @throws SQLException on database errors
      */
-    private static void writeGraphTriples(PrintWriter out, Result result) throws IOException, SQLException
+    private static void writeGraphTriples(PrintWriter out, Result result, boolean announceVersion)
+            throws IOException, SQLException
     {
+        if(announceVersion)
+            out.println("VERSION \"1.2\"");
+
         while(result.next())
         {
             writeTripleNode(out, result.get(0));

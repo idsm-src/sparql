@@ -10,6 +10,7 @@
   	<module>engine</module>
   	<module>endpoint</module>
   	<module>ryu</module>
+  	<module>testing</module>
   </modules>
 
   <properties>

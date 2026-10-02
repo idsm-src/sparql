@@ -74,7 +74,6 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import cz.iocb.sparql.engine.Database;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
@@ -111,6 +110,7 @@ import cz.iocb.sparql.engine.translator.ServiceException;
 import cz.iocb.sparql.nextprot.combined.NeXtProtCombinedConfiguration;
 import cz.iocb.sparql.nextprot.integer.NeXtProtIntegerConfiguration;
 import cz.iocb.sparql.nextprot.string.NeXtProtStringConfiguration;
+import cz.iocb.sparql.testing.Database;
 
 
 
