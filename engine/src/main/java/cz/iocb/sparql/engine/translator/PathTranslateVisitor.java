@@ -241,9 +241,20 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(RepeatedPath repeatedPath)
     {
-        //TODO: SPARQL 1.2
-        if(subject instanceof TripleTerm s && s.hasVariable() || object instanceof TripleTerm o && o.hasVariable())
-            throw new UnsupportedOperationException("triple terms with variables are not supported in repeated paths");
+        // a triple term pattern with variables at an end is matched against the end node bound to a fresh variable:
+        // the path is translated between plain terms, which keeps its solutions distinct, and the match then binds the
+        // variables of the pattern from the node
+        if(subject instanceof TripleTerm pattern && pattern.hasVariable())
+        {
+            Variable node = parent.createVariable(variablePrefix);
+            return matchTripleTerm(pattern, node, visitElement(repeatedPath, node, object));
+        }
+
+        if(object instanceof TripleTerm pattern && pattern.hasVariable())
+        {
+            Variable node = parent.createVariable(variablePrefix);
+            return matchTripleTerm(pattern, node, visitElement(repeatedPath, subject, node));
+        }
 
         Set<Variable> distinct = Stream.of(subject, object).filter(e -> e instanceof Variable).map(e -> (Variable) e)
                 .collect(toSet());
@@ -496,6 +507,67 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
             return SqlFilter.filter(request, List.of(filter), child);
         }
+    }
+
+
+    /**
+     * Matches a triple term pattern against the values of a variable: the solutions whose value is not a triple term
+     * are dropped, and the components of the pattern are matched against the components of the value (see
+     * {@link #matchTerm}).
+     *
+     * @param pattern the triple term pattern
+     * @param variable the variable holding the values
+     * @param intercode the solutions binding the variable
+     * @return the solutions matching the pattern, with the variables of the pattern bound
+     */
+    private SqlIntercode matchTripleTerm(TripleTerm pattern, Variable variable, SqlIntercode intercode)
+    {
+        ClassRelations relations = request.getConfiguration();
+
+        SqlExpressionIntercode value = SqlVariable.create(relations, intercode.getVariableBindings().get(variable));
+        SqlExpressionIntercode isTriple = SqlBuiltinCall.create(request, "istriple", false, List.of(value));
+        intercode = SqlFilter.filter(request, List.of(isTriple), intercode);
+
+        List<RdfTerm> terms = List.of(pattern.getSubject(), pattern.getPredicate(), pattern.getObject());
+
+        for(Component component : Component.values())
+        {
+            SqlExpressionIntercode node = SqlVariable.create(relations, intercode.getVariableBindings().get(variable));
+            SqlExpressionIntercode part = SqlBuiltinCall.create(request, component.name().toLowerCase(), false,
+                    List.of(node));
+
+            intercode = matchTerm(terms.get(component.ordinal()), part, intercode);
+        }
+
+        return intercode;
+    }
+
+
+    /**
+     * Matches a term of a pattern against the value of an expression: an unbound variable is bound to the value, a
+     * triple term pattern with variables is matched against the value bound to a fresh variable, and any other term (a
+     * constant or a bound variable) must be the same term as the value.
+     *
+     * @param term the term of the pattern
+     * @param expression the expression giving the value
+     * @param intercode the solutions the expression is evaluated over
+     * @return the solutions matching the term
+     */
+    private SqlIntercode matchTerm(RdfTerm term, SqlExpressionIntercode expression, SqlIntercode intercode)
+    {
+        if(term instanceof Variable variable && intercode.getVariableBindings().get(variable) == null)
+            return SqlBind.bind(request, variable, expression, intercode);
+
+        if(term instanceof TripleTerm pattern && pattern.hasVariable())
+        {
+            Variable node = parent.createVariable(variablePrefix);
+            return matchTripleTerm(pattern, node, SqlBind.bind(request, node, expression, intercode));
+        }
+
+        SqlExpressionIntercode value = getExpression(request, term, intercode.getVariableBindings());
+        SqlExpressionIntercode same = SqlBuiltinCall.create(request, "sameterm", false, List.of(value, expression));
+
+        return SqlFilter.filter(request, List.of(same), intercode);
     }
 
 

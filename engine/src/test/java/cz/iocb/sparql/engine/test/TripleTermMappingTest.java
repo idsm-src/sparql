@@ -306,4 +306,54 @@ public class TripleTermMappingTest
                 containsInAnyOrder(row(reifier(1), x), row(reifier(3), triple(c, p, y)), row(reifier(5), a),
                         row(reifier(10), new TypedLiteral("5", xsdIntIri))));
     }
+
+
+    @Test
+    @DisplayName("a triple term pattern at the end of a repeated path is matched against the end node")
+    void repeatedPathEnd() throws Exception
+    {
+        TypedLiteral five = new TypedLiteral("5", xsdIntIri);
+
+        assertThat(execute("SELECT ?r ?p ?o WHERE { ?r rdf:reifies+ <<( :a ?p ?o )>> }"),
+                containsInAnyOrder(row(reifier(1), p, x), row(reifier(3), q, triple(c, p, y)), row(reifier(5), p, a),
+                        row(reifier(10), p, five)));
+
+        assertThat(execute("SELECT ?r ?s WHERE { ?r rdf:reifies+ <<( ?s :p ?s )>> }"),
+                containsInAnyOrder(row(reifier(5), a)));
+
+        assertThat(execute("SELECT ?r ?s ?p ?o WHERE { ?r rdf:reifies+ <<( :a :q <<( ?s ?p ?o )>> )>> }"),
+                containsInAnyOrder(row(reifier(3), c, p, y)));
+
+        assertThat(execute("SELECT ?r WHERE { ?r rdf:reifies+ <<( ?s ?p ?o )>> }"),
+                containsInAnyOrder(row(reifier(1)), row(reifier(2)), row(reifier(3)), row(reifier(5)), row(reifier(10)),
+                        row(reifier(11)), row(reifier(100))));
+    }
+
+
+    @Test
+    @DisplayName("a triple term pattern at the start of a repeated path is matched against the start node")
+    void repeatedPathStart() throws Exception
+    {
+        assertThat(execute("SELECT ?p ?o ?r WHERE { <<( :a ?p ?o )>> (^rdf:reifies)+ ?r }"),
+                containsInAnyOrder(row(p, x, reifier(1)), row(q, triple(c, p, y), reifier(3)), row(p, a, reifier(5)),
+                        row(p, new TypedLiteral("5", xsdIntIri), reifier(10))));
+    }
+
+
+    @Test
+    @DisplayName("the zero-length path of * and ? binds a triple term pattern to the matching nodes of the graph")
+    void zeroLengthPath() throws Exception
+    {
+        TypedLiteral one = new TypedLiteral("1", xsdIntegerIri);
+        TypedLiteral five = new TypedLiteral("5", xsdIntIri);
+
+        assertThat(execute("SELECT ?r ?s ?o WHERE { ?r rdf:reifies* <<( ?s :p ?o )>> }"),
+                containsInAnyOrder(row(reifier(1), a, x), row(reifier(2), b, one), row(reifier(5), a, a),
+                        row(reifier(10), a, five), row(reifier(100), d, z), row(triple(a, p, x), a, x),
+                        row(triple(b, p, one), b, one), row(triple(a, p, a), a, a), row(triple(a, p, five), a, five),
+                        row(triple(d, p, z), d, z)));
+
+        assertThat(execute("SELECT ?r ?p ?o WHERE { ?r rdf:reifies? <<( :b ?p ?o )>> }"),
+                containsInAnyOrder(row(reifier(2), p, one), row(triple(b, p, one), p, one)));
+    }
 }
