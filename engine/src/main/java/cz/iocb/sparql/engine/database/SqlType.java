@@ -225,9 +225,10 @@ public class SqlType
 
     /**
      * SQL condition that two not-null values of the type are identical, i.e. represent the same RDF term part. The
-     * default is the {@code =} operator of the type; a type whose {@code =} is coarser than the identity (or not
-     * hashable or mergeable) may use another operator. The conditions are parenthesised, so that they can be combined
-     * with any operator.
+     * default is the {@code =} operator of the type; for {@code sparql.rdfbox}, whose {@code =} is the value equality
+     * of the terms, it is the operator {@code @=} of its operator classes, which is the identity of the terms and is
+     * therefore usable in merge and hash joins. The conditions are parenthesised, so that they can be combined with any
+     * operator.
      *
      * @param left the left value
      * @param right the right value
@@ -235,34 +236,45 @@ public class SqlType
      */
     public String equal(Column left, Column right)
     {
+        if(equals(RDFBOX))
+            return "(" + left + " operator(sparql.@=) " + right + ")";
+
         return "(" + left + " = " + right + ")";
     }
 
 
     /**
-     * SQL condition that two values of the type are identical or both NULL, the null-safe variant of
+     * SQL condition that two nullable values of the type are identical or both NULL, the null-safe variant of
      * {@link #equal(Column, Column)}.
      *
      * @param left the left value
      * @param right the right value
-     * @return SQL condition that two values of the type are identical or both NULL
+     * @return SQL condition that two nullable values of the type are identical or both NULL
      */
     public String notDistinct(Column left, Column right)
     {
+        if(equals(RDFBOX))
+            return "COALESCE(" + left + " operator(sparql.@=) " + right + ", " + left + " IS NULL AND " + right
+                    + " IS NULL)";
+
         return "(" + left + " IS NOT DISTINCT FROM " + right + ")";
     }
 
 
     /**
-     * SQL condition that two values of the type are not identical, or exactly one of them is NULL, the negation of
+     * SQL condition that two nullable values of the type differ or exactly one of them is NULL, the negation of
      * {@link #notDistinct(Column, Column)}.
      *
      * @param left the left value
      * @param right the right value
-     * @return SQL condition that two values of the type are not identical, or exactly one of them is NULL
+     * @return SQL condition that two nullable values of the type differ or exactly one of them is NULL
      */
     public String distinct(Column left, Column right)
     {
+        if(equals(RDFBOX))
+            return "(NOT COALESCE(" + left + " operator(sparql.@=) " + right + ", " + left + " IS NULL AND " + right
+                    + " IS NULL))";
+
         return "(" + left + " IS DISTINCT FROM " + right + ")";
     }
 
@@ -277,41 +289,10 @@ public class SqlType
      */
     public String notEqual(Column left, Column right)
     {
+        if(equals(RDFBOX))
+            return "(" + left + " operator(sparql.@<>) " + right + ")";
+
         return "(" + left + " != " + right + ")";
-    }
-
-
-    /**
-     * SQL condition that the columns hold the same term, the identity of the type. For {@code sparql.rdfbox} it is the
-     * operator {@code ===}, while {@link #equal} keeps the value equality {@code =} of the box, on which the join
-     * conditions rely as the only mergeable operator of the type.
-     *
-     * @param left the left column
-     * @param right the right column
-     * @return SQL condition that the columns hold the same term
-     */
-    public String same(Column left, Column right)
-    {
-        if(equals(RDFBOX))
-            return "(" + left + " operator(sparql.===) " + right + ")";
-
-        return equal(left, right);
-    }
-
-
-    /**
-     * SQL condition that the columns hold different terms, the negation of {@link #same}.
-     *
-     * @param left the left column
-     * @param right the right column
-     * @return SQL condition that the columns hold different terms
-     */
-    public String notSame(Column left, Column right)
-    {
-        if(equals(RDFBOX))
-            return "NOT (" + left + " operator(sparql.===) " + right + ")";
-
-        return notEqual(left, right);
     }
 
 

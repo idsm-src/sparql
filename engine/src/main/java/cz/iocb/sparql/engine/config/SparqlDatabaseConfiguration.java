@@ -63,12 +63,14 @@ import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.database.VirtualTableDefinition;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.ConstantLiteralMapping;
+import cz.iocb.sparql.engine.mapping.ConstantTripleTermMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping.JoinColumns;
 import cz.iocb.sparql.engine.mapping.ParametrisedBlankNodeMapping;
 import cz.iocb.sparql.engine.mapping.ParametrisedIriMapping;
 import cz.iocb.sparql.engine.mapping.ParametrisedLiteralMapping;
 import cz.iocb.sparql.engine.mapping.ParametrisedMapping;
+import cz.iocb.sparql.engine.mapping.ParametrisedTermMapping;
 import cz.iocb.sparql.engine.mapping.QuadMapping;
 import cz.iocb.sparql.engine.mapping.SingleTableQuadMapping;
 import cz.iocb.sparql.engine.mapping.TermMapping;
@@ -85,6 +87,7 @@ import cz.iocb.sparql.engine.mapping.extension.ProcedureDefinition;
 import cz.iocb.sparql.engine.mapping.extension.ResultDefinition;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.IriCache;
 import info.adams.ryu.RyuDouble;
@@ -532,6 +535,46 @@ public class SparqlDatabaseConfiguration implements ClassRelations
         }
 
         return createIriMapping(new Iri(iri));
+    }
+
+
+    /**
+     * Column-based mapping of a class without a mapping of its own, the box or a triple term class, over the given
+     * column specifications (see {@link #getColumns(ResourceClass, String...)}).
+     *
+     * @param resourceClass the resource class
+     * @param columns the columns
+     * @return column-based mapping of the class over the given column specifications
+     */
+    public TermMapping createTermMapping(ResourceClass resourceClass, String... columns)
+    {
+        return new ParametrisedTermMapping(resourceClass, getColumns(resourceClass, columns));
+    }
+
+
+    /**
+     * Column-based mapping of a class without a mapping of its own, the box or a triple term class, over the given
+     * columns.
+     *
+     * @param resourceClass the resource class
+     * @param columns the columns
+     * @return column-based mapping of the class over the given columns
+     */
+    public TermMapping createTermMapping(ResourceClass resourceClass, List<Column> columns)
+    {
+        return new ParametrisedTermMapping(resourceClass, columns);
+    }
+
+
+    /**
+     * Constant triple term mapping whose class and columns are detected lazily.
+     *
+     * @param term the triple term
+     * @return constant triple term mapping whose class and columns are detected lazily
+     */
+    public ConstantTripleTermMapping createTripleTermMapping(TripleTerm term)
+    {
+        return new ConstantTripleTermMapping(term);
     }
 
 

@@ -5,6 +5,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ColumnPair;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 
@@ -46,13 +47,35 @@ public abstract class ConstantMapping extends TermMapping
     }
 
 
+    /**
+     * True if the term matches the fixed term: a variable matches anything, a triple term matches a triple term
+     * component by component (so the variables inside a triple term of a pattern unify with the components), another
+     * term by equality.
+     */
     @Override
     public boolean match(Request request, RdfTerm term)
     {
-        if(term instanceof Variable)
+        return matches(term, value);
+    }
+
+
+    /**
+     * True if the pattern term matches the value, see {@link #match}.
+     *
+     * @param pattern the pattern term
+     * @param value the value
+     * @return true if the pattern term matches the value, false otherwise
+     */
+    private static boolean matches(RdfTerm pattern, RdfTerm value)
+    {
+        if(pattern instanceof Variable)
             return true;
 
-        return value.equals(term);
+        if(pattern instanceof TripleTerm p && value instanceof TripleTerm v)
+            return matches(p.getSubject(), v.getSubject()) && matches(p.getPredicate(), v.getPredicate())
+                    && matches(p.getObject(), v.getObject());
+
+        return value.equals(pattern);
     }
 
 

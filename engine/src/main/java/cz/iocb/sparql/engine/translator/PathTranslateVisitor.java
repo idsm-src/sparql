@@ -1,5 +1,11 @@
 package cz.iocb.sparql.engine.translator;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasTripleTerm;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.intersect;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.translator.TermGenerator.getIri;
@@ -49,6 +55,8 @@ import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.InternalResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.mapping.classes.TripleTermClass;
+import cz.iocb.sparql.engine.mapping.classes.TripleTermClass.Component;
 import cz.iocb.sparql.engine.model.IriNode;
 import cz.iocb.sparql.engine.model.VarOrIri;
 import cz.iocb.sparql.engine.model.VariableNode;
@@ -66,6 +74,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 
@@ -232,6 +241,10 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(RepeatedPath repeatedPath)
     {
+        //TODO: SPARQL 1.2
+        if(subject instanceof TripleTerm s && s.hasVariable() || object instanceof TripleTerm o && o.hasVariable())
+            throw new UnsupportedOperationException("triple terms with variables are not supported in repeated paths");
+
         Set<Variable> distinct = Stream.of(subject, object).filter(e -> e instanceof Variable).map(e -> (Variable) e)
                 .collect(toSet());
 
@@ -597,7 +610,13 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         VariableBindings bindings = new VariableBindings();
         Map<Variable, List<TermMapping>> variables = new LinkedHashMap<>();
 
+        List<MappedTerm> expanded = new ArrayList<>();
+
         for(MappedTerm map : maps)
+            if(!expand(request, map, expanded))
+                return SqlNoSolution.get();
+
+        for(MappedTerm map : expanded)
         {
             RdfTerm term = map.term();
             TermMapping mapping = map.mapping();
@@ -616,10 +635,14 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
             ResourceClass resourceClass = mapping.getResourceClass(request);
             List<Column> columns = mapping.getColumns(request);
+            List<Column> values = request.getColumns(resourceClass, term);
+
+            // a component of a decomposed constant triple term holds the (already matched) term itself
+            if(columns.equals(values))
+                continue;
 
             addPresenceConditions(schema, table, condition, resourceClass, columns);
 
-            List<Column> values = request.getColumns(resourceClass, term);
             condition.addAreEqual(columns, values,
                     SqlTableAccess.needsNullSafeEquality(schema, table, resourceClass, columns, values));
         }
@@ -639,6 +662,60 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
         return SqlTableAccess.create(request, table, Conditions.and(extraCondition, condition), bindings, false,
                 distinctColumns);
+    }
+
+
+    /**
+     * Adds the mapped term to the list; a triple term containing variables is decomposed into its components mapped to
+     * the parts of the mapping, recursively: the columns of the components of a triple term class, or, for boxed triple
+     * terms, the components extracted from the box by {@code sparql.rdfbox_get_tripleterm_*}, which are NULL when the
+     * box holds another kind of term, so that the presence conditions exclude such rows.
+     *
+     * @param request the current request
+     * @param map the mapped term
+     * @param expanded the list to extend
+     * @return false if the mapping cannot hold the term, true otherwise
+     */
+    private static boolean expand(Request request, MappedTerm map, List<MappedTerm> expanded)
+    {
+        if(!(map.term() instanceof TripleTerm triple) || !triple.hasVariable())
+        {
+            expanded.add(map);
+            return true;
+        }
+
+        ResourceClass resourceClass = map.mapping().getResourceClass(request);
+        List<Column> columns = map.mapping().getColumns(request);
+        List<RdfTerm> terms = List.of(triple.getSubject(), triple.getPredicate(), triple.getObject());
+        List<TermMapping> mappings = new ArrayList<>(terms.size());
+
+        if(resourceClass.getEffectiveClass() instanceof TripleTermClass tripleClass)
+        {
+            for(Component component : Component.values())
+                mappings.add(new InternalNodeMapping(tripleClass.getComponentClass(component),
+                        tripleClass.getComponentColumns(component, columns)));
+        }
+        else if(hasTripleTerm(resourceClass))
+        {
+            Column column = columns.get(0);
+
+            mappings.add(new InternalNodeMapping(box,
+                    List.of(expression(RDFBOX, "sparql.rdfbox_get_tripleterm_subject(%s)", column))));
+            mappings.add(new InternalNodeMapping(iri,
+                    List.of(expression(VARCHAR, "sparql.rdfbox_get_tripleterm_predicate(%s)", column))));
+            mappings.add(new InternalNodeMapping(box,
+                    List.of(expression(RDFBOX, "sparql.rdfbox_get_tripleterm_object(%s)", column))));
+        }
+        else
+        {
+            return false;
+        }
+
+        for(int i = 0; i < terms.size(); i++)
+            if(!expand(request, new MappedTerm(terms.get(i), mappings.get(i)), expanded))
+                return false;
+
+        return true;
     }
 
 
@@ -794,12 +871,14 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     /**
-     * Expression evaluating the term: a variable reference or a constant.
+     * Expression evaluating the term: a variable reference, a constant, or a triple term built from the expressions of
+     * its components like by the function TRIPLE.
      *
      * @param request the current request
      * @param term the RDF term
      * @param bindings the variable bindings
-     * @return expression evaluating the term: a variable reference or a constant
+     * @return expression evaluating the term: a variable reference, a constant, or a triple term built from the
+     *         expressions of its components like by the function TRIPLE
      */
     private static SqlExpressionIntercode getExpression(Request request, RdfTerm term, VariableBindings bindings)
     {
@@ -808,6 +887,10 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             case Variable variable -> SqlVariable.create(request.getConfiguration(), bindings.get(variable));
             case Iri iri -> SqlIri.create(request, iri);
             case Literal literal -> SqlLiteral.create(request, literal);
+            case TripleTerm triple -> SqlBuiltinCall.create(request, "triple", false,
+                    List.of(getExpression(request, triple.getSubject(), bindings),
+                            getExpression(request, triple.getPredicate(), bindings),
+                            getExpression(request, triple.getObject(), bindings)));
             default -> null;
         };
     }

@@ -122,7 +122,6 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
-import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 
@@ -844,10 +843,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         RdfTerm subject = getTerm(triple.getSubject());
         Verb predicate = triple.getPredicate();
         RdfTerm object = getTerm(triple.getObject());
-
-        //TODO: SPARQL 1.2
-        if(subject instanceof TripleTerm s && s.hasVariable() || object instanceof TripleTerm o && o.hasVariable())
-            throw new UnsupportedOperationException("triple terms with variables are not supported in patterns yet");
 
         PathTranslateVisitor pathVisitor = new PathTranslateVisitor(request, this, mappings);
         SqlIntercode translatedPattern = pathVisitor.translate(graph, subject, predicate, object);
