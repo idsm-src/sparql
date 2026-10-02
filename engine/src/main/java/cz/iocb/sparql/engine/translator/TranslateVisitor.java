@@ -22,7 +22,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
+import java.util.function.Supplier;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
+import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
@@ -62,6 +64,7 @@ import cz.iocb.sparql.engine.imcode.expression.SqlEffectiveBooleanValue;
 import cz.iocb.sparql.engine.imcode.expression.SqlExists;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlIri;
+import cz.iocb.sparql.engine.imcode.expression.SqlLateralVariable;
 import cz.iocb.sparql.engine.imcode.expression.SqlLiteral;
 import cz.iocb.sparql.engine.imcode.expression.SqlUnaryLogical;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
@@ -164,6 +167,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      * Enclosing graphs, innermost last (null for the default graph).
      */
     private final Stack<RdfTerm> graphRestrictions = new Stack<>();
+
+    /**
+     * Lateral values of the graphs of the sub-selects being evaluated per graph, by the variable standing for the graph
+     * inside them (see {@link #visit(Select)}).
+     */
+    private final Map<Variable, SqlExpressionIntercode> lateralGraphs = new HashMap<>();
 
     /**
      * Configuration of the endpoint.
@@ -357,6 +366,27 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(Select select)
     {
+        /* NOTE: A sub-select inside GRAPH ?g is evaluated separately in every named graph: its DISTINCT, ORDER BY,
+         * OFFSET, LIMIT and aggregation apply per graph, and an aggregation without GROUP BY has a solution even in a
+         * graph without matching triples. Unless its enclosing pattern is already evaluated that way, the sub-select
+         * is evaluated per graph by itself; the result binds the graph variable of the enclosing clause.
+         */
+        if(select.isSubSelect() && getGraph() instanceof Variable graph && !lateralGraphs.containsKey(graph))
+            return translatePerGraph(graph, () -> translateSelect(select));
+
+        return translateSelect(select);
+    }
+
+
+    /**
+     * Translates the select; in an evaluation per graph, the WHERE clause of a sub-select is restricted to the graph of
+     * the current solution.
+     *
+     * @param select the select
+     * @return the resulting intermediate code
+     */
+    private SqlIntercode translateSelect(Select select)
+    {
         // translate the WHERE clause
         GraphPattern pattern = select.getPattern();
 
@@ -418,7 +448,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
 
-        SqlIntercode translatedWhereClause = visitElement(pattern);
+        SqlIntercode translatedWhereClause = restrictToCurrentGraph(visitElement(pattern));
 
 
         // translate the GROUP BY clause
@@ -563,9 +593,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         for(Projection projection : select.getProjections())
             variables.add(getVariable(projection.getVariable()));
 
-        if(select.isSubSelect() && getGraph() instanceof Variable variable)
-            variables.add(variable);
-
 
         if(select.isSubSelect())
             return SqlSelect.create(request, variables, translatedWhereClause, select.isDistinct(), orderByVariables,
@@ -592,6 +619,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     public SqlIntercode visit(Graph graph)
     {
         RdfTerm graphTerm = getTerm(graph.getName());
+
+        /* NOTE: When not every solution of the pattern comes from a triple of the graph, the pattern does not bind the
+         * graph variable by itself, and a MINUS, OPTIONAL or EXISTS in it whose triples do would be evaluated over all
+         * graphs at once. Such a pattern is evaluated separately in every named graph.
+         */
+        if(graph.getName() instanceof VariableNode graphNode && !isGraphWitnessed(graph, graphTerm))
+            return translatePerGraph(getVariable(graphNode),
+                    () -> restrictToCurrentGraph(visitElement(graph.getPattern())));
 
         SqlIntercode quads = null;
 
@@ -646,16 +681,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             Variable var = getVariable(graphNode);
             VariableBinding binding = translatedPattern.getVariableBindings().get(var);
 
+            //NOTE: a witnessed pattern binds the variable in every solution; otherwise it is evaluated per graph
             if(binding == null || binding.canBeNull())
-            {
-                SqlIntercode graphs = SqlDistinct.create(request, translateGraphQuads(var), Set.of(var));
-
-                /* NOTE: The pattern does not refer to the graphs, but it has to be evaluated again for every graph,
-                 * which matters if it is nondeterministic.
-                 */
-                translatedPattern = SqlLateralJoin.lateralJoin(request, graphs, translatedPattern,
-                        request.createLateralTable(), new Restrictions());
-            }
+                return translatePerGraph(var, () -> restrictToCurrentGraph(visitElement(graph.getPattern())));
         }
         else if(!isGraphWitnessed(graph, graphTerm))
         {
@@ -685,15 +713,109 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     /**
-     * True if every solution of the GRAPH pattern necessarily comes from a triple evaluated in the graph, so the graph
-     * is known to exist; false for patterns like {@code {}}, VALUES or BIND alone, whose graph has to be checked
-     * separately.
+     * Code enumerating the named graphs as solutions of the variable: the distinct graphs of all quads.
+     *
+     * @param variable the variable bound to the graphs
+     * @return code enumerating the named graphs as solutions of the variable
+     */
+    private SqlIntercode translateGraphs(Variable variable)
+    {
+        return SqlDistinct.create(request, translateGraphQuads(variable), Set.of(variable));
+    }
+
+
+    /**
+     * Evaluates the pattern given by the translation separately in every named graph bound to the variable: the graphs
+     * are enumerated, the pattern is translated with a fresh variable standing for the graph of its triples and joined
+     * laterally, evaluated for the graph of the current solution. The lateral value of that graph is remembered in
+     * {@link #lateralGraphs}, and {@link #restrictToCurrentGraph} compares the fresh variable with it wherever the
+     * graph matters: the pattern as a whole, the WHERE clause of a sub-select, the right side of a MINUS or an OPTIONAL
+     * and the pattern of an EXISTS. The result binds the variable to the graph.
+     *
+     * @param variable the graph variable
+     * @param translation translation of the pattern, run with the fresh variable as the graph in effect
+     * @return the resulting intermediate code
+     */
+    private SqlIntercode translatePerGraph(Variable variable, Supplier<SqlIntercode> translation)
+    {
+        SqlIntercode graphs = translateGraphs(variable);
+        VariableBinding graphBinding = graphs.getVariableBindings().get(variable);
+
+        if(graphBinding == null)
+            return SqlNoSolution.get();
+
+        AliasTable lateralTable = request.createLateralTable();
+        Restrictions requirements = new Restrictions(List.of(variable));
+        VariableBindings lateral = SqlLateralJoin.getLateralVariableBindings(request.getConfiguration(), lateralTable,
+                graphs, requirements);
+
+        Variable innerGraph = createVariable("@graph");
+
+        lateralGraphs.put(innerGraph, SqlLateralVariable.create(lateral.get(variable)));
+        graphRestrictions.push(innerGraph);
+
+        SqlIntercode translated = translation.get();
+
+        graphRestrictions.pop();
+        lateralGraphs.remove(innerGraph);
+
+        return SqlLateralJoin.lateralJoin(request, graphs, translated, lateralTable, requirements);
+    }
+
+
+    /**
+     * In an evaluation per graph (see {@link #translatePerGraph}), keeps the solutions of the pattern that hold in the
+     * graph of the current solution: those whose variable of the graph in effect holds the same term, and those binding
+     * no graph, which hold in every graph. Outside such an evaluation, the pattern is returned unchanged.
+     *
+     * @param pattern the pattern
+     * @return solutions of the pattern that hold in the graph of the current solution
+     */
+    private SqlIntercode restrictToCurrentGraph(SqlIntercode pattern)
+    {
+        if(!(getGraph() instanceof Variable graph) || !lateralGraphs.containsKey(graph))
+            return pattern;
+
+        VariableBinding binding = pattern.getVariableBindings().get(graph);
+
+        if(binding == null)
+            return pattern;
+
+        SqlExpressionIntercode condition = SqlBuiltinCall.create(request, "sameterm", false,
+                List.of(SqlVariable.create(request.getConfiguration(), binding), lateralGraphs.get(graph)));
+
+        if(binding.canBeNull())
+            condition = SqlBuiltinCall.create(request, "coalesce", false, List.of(condition, trueValue));
+
+        return SqlFilter.filter(request,
+                List.of(SqlEffectiveBooleanValue.create(request.getConfiguration(), condition)), pattern);
+    }
+
+
+    /**
+     * Translates the pattern of an EXISTS expression; in an evaluation per graph, it is restricted to the graph of the
+     * current solution.
+     *
+     * @param pattern the pattern
+     * @return the resulting intermediate code
+     */
+    SqlIntercode translateExistsPattern(GraphPattern pattern)
+    {
+        return restrictToCurrentGraph(visitElement(pattern));
+    }
+
+
+    /**
+     * True if every solution of the GRAPH pattern necessarily comes from a triple evaluated in the graph, which then
+     * binds a graph variable and is known to exist; false for patterns like {@code {}}, VALUES or BIND alone, which are
+     * evaluated per graph (a variable graph) or have to check that the graph exists (a constant one).
      *
      * @param graph the GRAPH pattern
      * @param graphTerm the graph term
-     * @return true if every solution of the GRAPH pattern necessarily comes from a triple evaluated in the graph, so
-     *         the graph is known to exist; false for patterns like {@code {}}, VALUES or BIND alone, whose graph has to
-     *         be checked separately
+     * @return true if every solution of the GRAPH pattern necessarily comes from a triple evaluated in the graph, which
+     *         then binds a graph variable and is known to exist; false for patterns like {@code {}}, VALUES or BIND
+     *         alone, which are evaluated per graph (a variable graph) or have to check that the graph exists (a
+     *         constant one)
      */
     private boolean isGraphWitnessed(Graph graph, RdfTerm graphTerm)
     {
@@ -931,7 +1053,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     translatedPattern = optionalPattern.accept(this);
                 }
 
-                translatedGroupPattern = translateLeftJoin(translatedGroupPattern, translatedPattern, optionalFilters);
+                translatedGroupPattern = translateLeftJoin(translatedGroupPattern,
+                        restrictToCurrentGraph(translatedPattern), optionalFilters);
             }
             else if(pattern instanceof Minus minus)
             {
@@ -1010,9 +1133,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      */
     private SqlIntercode translateMinus(Minus pattern, SqlIntercode translatedGroupPattern)
     {
-        SqlIntercode minusPattern = visitElement(pattern.getPattern());
+        SqlIntercode minusPattern = restrictToCurrentGraph(visitElement(pattern.getPattern()));
 
-        return SqlMinus.minus(request, translatedGroupPattern, minusPattern);
+        /* NOTE: Inside GRAPH ?g, both sides are evaluated in the same graph, which the triples of both bind to the
+         * graph variable, but the variable is no variable of their solutions and so does not count as shared.
+         */
+        Variable graph = getGraph() instanceof Variable variable ? variable : null;
+
+        return SqlMinus.minus(request, translatedGroupPattern, minusPattern, graph);
     }
 
 

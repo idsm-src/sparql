@@ -44,6 +44,13 @@ public final class SqlMinus extends SqlIntercode
      */
     private final SqlIntercode right;
 
+    /**
+     * Variable of the enclosing GRAPH clause that the triples of both sides bind to their graph, or null. Both sides
+     * are evaluated in the same graph, so the variable has to agree like a shared one, but it is no variable of their
+     * solutions and does not count as the shared variable a removal requires.
+     */
+    private final Variable graph;
+
 
     /**
      * Creates the node.
@@ -51,13 +58,15 @@ public final class SqlMinus extends SqlIntercode
      * @param bindings the variable bindings
      * @param left the left side
      * @param right the right side
+     * @param graph variable of the enclosing GRAPH clause bound by the triples of both sides, or null
      */
-    protected SqlMinus(VariableBindings bindings, SqlIntercode left, SqlIntercode right)
+    protected SqlMinus(VariableBindings bindings, SqlIntercode left, SqlIntercode right, Variable graph)
     {
         super(bindings, left.isDeterministic() && right.isDeterministic());
 
         this.left = left;
         this.right = right;
+        this.graph = graph;
     }
 
 
@@ -71,7 +80,23 @@ public final class SqlMinus extends SqlIntercode
      */
     public static SqlIntercode minus(Request request, SqlIntercode left, SqlIntercode right)
     {
-        return minus(request, left, right, null);
+        return minus(request, left, right, null, null);
+    }
+
+
+    /**
+     * Difference of the two sides evaluated in the graph of the given variable: the variable is required to agree, but
+     * it does not count as a shared variable.
+     *
+     * @param request the current request
+     * @param left the left side
+     * @param right the right side
+     * @param graph variable of the enclosing GRAPH clause bound by the triples of both sides, or null
+     * @return difference of the two sides evaluated in the graph of the given variable
+     */
+    public static SqlIntercode minus(Request request, SqlIntercode left, SqlIntercode right, Variable graph)
+    {
+        return minus(request, left, right, graph, null);
     }
 
 
@@ -81,13 +106,15 @@ public final class SqlMinus extends SqlIntercode
      * @param request the current request
      * @param left the left side
      * @param right the right side
+     * @param graph variable of the enclosing GRAPH clause bound by the triples of both sides, or null
      * @param restrictions what the parent needs of the variables
      * @return difference exposing only what the parent needs
      */
-    protected static SqlIntercode minus(Request request, SqlIntercode left, SqlIntercode right,
+    protected static SqlIntercode minus(Request request, SqlIntercode left, SqlIntercode right, Variable graph,
             Restrictions restrictions)
     {
-        return new SqlMinus(left.getVariableBindings().restrict(request.getConfiguration(), restrictions), left, right);
+        return new SqlMinus(left.getVariableBindings().restrict(request.getConfiguration(), restrictions), left, right,
+                graph);
     }
 
 
@@ -145,7 +172,7 @@ public final class SqlMinus extends SqlIntercode
         for(VariableBindingPair pair : VariableBindingPair.getPairs(relations, optLeft.getVariableBindings(),
                 optRight.getVariableBindings()))
         {
-            if(pair.getLeftVariableBinding() != null && pair.getRightVariableBinding() != null)
+            if(!pair.getVariable().equals(graph))
                 shareVariables = true;
 
             if(!pair.isJoinable())
@@ -160,7 +187,7 @@ public final class SqlMinus extends SqlIntercode
             List<SqlIntercode> childs = new ArrayList<>();
 
             for(SqlIntercode child : union.getChilds())
-                childs.add(minus(request, child, optRight, restrictions));
+                childs.add(minus(request, child, optRight, graph, restrictions));
 
             return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
         }
@@ -169,7 +196,7 @@ public final class SqlMinus extends SqlIntercode
         if(restrictions.isOptimized(relations, bindings) && optLeft == left && optRight == right)
             return this;
 
-        return minus(request, optLeft, optRight, restrictions);
+        return minus(request, optLeft, optRight, graph, restrictions);
     }
 
 
@@ -215,28 +242,28 @@ public final class SqlMinus extends SqlIntercode
 
 
     /**
-     * SQL condition that a right solution removes a left one: the shared variables are compatible and at least one of
-     * them is bound on both sides.
+     * SQL condition that a right solution removes a left one: the shared variables (the graph variable included) are
+     * compatible and at least one of them (the graph variable excluded) is bound on both sides.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param left bindings of the left side
      * @param right bindings of the right side
      * @param leftTable the left table
      * @param rightTable the right table
-     * @return SQL condition that a right solution removes a left one: the shared variables are compatible and at least
-     *         one of them is bound on both sides
+     * @return SQL condition that a right solution removes a left one: the shared variables (the graph variable
+     *         included) are compatible and at least one of them (the graph variable excluded) is bound on both sides
      */
     private String generateCondition(ClassRelations relations, VariableBindings left, VariableBindings right,
             AliasTable leftTable, AliasTable rightTable)
     {
         String joinCondition = generateJoinCondition(relations, left, right, leftTable, rightTable);
 
-        List<VariableBindingPair> pairs = VariableBindingPair.getPairs(relations, left, right);
+        List<VariableBindingPair> pairs = VariableBindingPair.getPairs(relations, left, right).stream()
+                .filter(p -> !p.getVariable().equals(graph)).toList();
 
         for(VariableBindingPair pair : pairs)
-            if(pair.getLeftVariableBinding() != null && pair.getRightVariableBinding() != null)
-                if(!pair.getLeftVariableBinding().canBeNull() && !pair.getRightVariableBinding().canBeNull())
-                    return joinCondition;
+            if(!pair.getLeftVariableBinding().canBeNull() && !pair.getRightVariableBinding().canBeNull())
+                return joinCondition;
 
 
         List<String> condition = new ArrayList<>();
@@ -316,10 +343,28 @@ public final class SqlMinus extends SqlIntercode
     }
 
 
+    /**
+     * Variable of the enclosing GRAPH clause that the triples of both sides bind to their graph, or null.
+     *
+     * @return variable of the enclosing GRAPH clause that the triples of both sides bind to their graph, or null
+     */
+    public final Variable getGraph()
+    {
+        return graph;
+    }
+
+
     @Override
     public void generateExplanation(StringBuilder builder, String indent)
     {
         builder.append("minus");
+
+        if(graph != null)
+        {
+            indentInfo(builder, indent, true);
+            builder.append("in graph ");
+            builder.append(graph);
+        }
 
         indentChild(builder, indent, false);
         left.generateExplanation(builder, getIndent(indent, false));
@@ -347,6 +392,9 @@ public final class SqlMinus extends SqlIntercode
         if(!Objects.equals(right, imcode.right))
             return false;
 
+        if(!Objects.equals(graph, imcode.graph))
+            return false;
+
         return true;
     }
 
@@ -354,6 +402,6 @@ public final class SqlMinus extends SqlIntercode
     @Override
     protected int getHashCode()
     {
-        return Objects.hash(left, right);
+        return Objects.hash(left, right, graph);
     }
 }

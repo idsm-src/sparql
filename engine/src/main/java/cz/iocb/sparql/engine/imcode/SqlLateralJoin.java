@@ -30,11 +30,11 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * The right side refers to the left one through a table alias obtained from Request.createLateralTable(). The alias has
  * to be unique, because the reference crosses the boundaries of nested subqueries and a nested lateral join would
  * otherwise shadow the alias of the outer one. The columns are given to the right side by getLateralVariableBindings()
- * and the same alias and requirements have to be passed to lateralJoin(). The alias and the bindings exposed this way
- * are fixed when the join is created and are kept by all reconstructions of the join during its optimization; if the
- * optimization of the left side removes an exposed column (the variable is proven to be unbound in that class) or turns
- * it into a constant, the translation adds a projection that supplies the column again, so the right side never refers
- * to a missing column.
+ * (an expression of the right side refers to them through SqlLateralVariable) and the same alias and requirements have
+ * to be passed to lateralJoin(). The alias and the bindings exposed this way are fixed when the join is created and are
+ * kept by all reconstructions of the join during its optimization; if the optimization of the left side removes an
+ * exposed column (the variable is proven to be unbound in that class) or turns it into a constant, the translation adds
+ * a projection that supplies the column again, so the right side never refers to a missing column.
  *
  * Variables shared by both sides are joined in the usual way. Unlike in SqlLeftJoin, the right side never introduces
  * nulls, so the nullability of the result follows the same rules as in SqlJoin. Unlike in SqlJoin, the sides can

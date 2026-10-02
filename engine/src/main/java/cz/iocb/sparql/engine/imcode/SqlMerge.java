@@ -144,14 +144,17 @@ public final class SqlMerge extends SqlIntercode
         if(optChild.equals(SqlNoSolution.get()))
             return SqlNoSolution.get();
 
-        if(!(new VariableBindingPair(relations, optChild.getVariable(variable1), optChild.getVariable(variable2)))
-                .isJoinable())
+        VariableBinding binding1 = optChild.getVariable(variable1);
+        VariableBinding binding2 = optChild.getVariable(variable2);
+
+        if(binding1 != null && binding2 != null
+                && !(new VariableBindingPair(relations, binding1, binding2)).isJoinable())
             return SqlNoSolution.get();
 
-        if(optChild.getVariableBindings().get(variable1) == null && !restrictions.containsVar(variable1))
+        if(binding1 == null && !restrictions.containsVar(variable1))
             return optChild.optimize(request, restrictions, reduced, evalServices);
 
-        if(optChild.getVariableBindings().get(variable2) == null)
+        if(binding2 == null)
             return optChild.optimize(request, restrictions, reduced, evalServices);
 
         if(optChild instanceof SqlUnion union)
@@ -208,14 +211,15 @@ public final class SqlMerge extends SqlIntercode
 
 
     /**
-     * Restrictions for the child: the parent's plus the compatibility requirements between the two variables.
+     * Restrictions for the child: the parent's (what it needs of the kept variable is needed of the merged one too,
+     * which supplies it after the renaming) plus the compatibility requirements between the two variables.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param child the child node
      * @param variable1 the variable kept
      * @param variable2 the variable merged into the first one
      * @param restrictions what the parent needs of the variables
-     * @return restrictions for the child: the parent's plus the compatibility requirements between the two variables
+     * @return restrictions for the child
      */
     protected static Restrictions getRestrictions(ClassRelations relations, SqlIntercode child, Variable variable1,
             Variable variable2, Restrictions restrictions)
@@ -224,6 +228,9 @@ public final class SqlMerge extends SqlIntercode
         VariableBinding binding2 = child.getVariable(variable2);
 
         Restrictions result = new Restrictions(restrictions);
+
+        if(restrictions.containsVar(variable1))
+            result.add(variable2, restrictions.get(variable1));
         result.add(getJoinRestrictions(relations, binding1, binding2));
         result.add(getJoinRestrictions(relations, binding2, binding1));
 
