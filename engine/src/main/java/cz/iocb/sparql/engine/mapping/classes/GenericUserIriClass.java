@@ -192,16 +192,20 @@ public class GenericUserIriClass extends UserIriClass
     @Override
     public List<Column> toGeneralClass(ResourceClass superClass, List<Column> columns, boolean canBeNull)
     {
-        if(superClass.equals(this))
+        assert isSubclassOf(superClass);
+
+        ResourceClass targetClass = superClass.getEffectiveClass();
+
+        if(targetClass.equals(this))
             return columns;
 
-        String call = columns.stream().map(Object::toString).collect(joining(", ", function + "(", "))"));
+        String call = columns.stream().map(Object::toString).collect(joining(", ", function + "(", ")"));
 
-        if(superClass.equals(box))
-            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_iri(" + call + ")"));
+        if(targetClass.equals(box))
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_iri(%s)", call));
 
-        if(superClass.equals(iri))
-            return List.of(expression(VARCHAR, call));
+        if(targetClass.equals(iri))
+            return List.of(expression(VARCHAR, "%s", call));
 
         throw new IllegalArgumentException();
     }
@@ -219,11 +223,11 @@ public class GenericUserIriClass extends UserIriClass
 
         if(sourceClass.equals(box))
             return IntStream.range(0, inverseFunction.size()).mapToObj(i -> expression(sqlTypes.get(i),
-                    inverseFunction.get(i) + "(sparql.rdfbox_get_iri(" + columns.get(0) + "))")).toList();
+                    "%s(sparql.rdfbox_get_iri(%s))", inverseFunction.get(i), columns.get(0))).toList();
 
         if(sourceClass.equals(iri))
             return IntStream.range(0, inverseFunction.size())
-                    .mapToObj(i -> expression(sqlTypes.get(i), inverseFunction.get(i) + "(" + columns.get(0) + ")"))
+                    .mapToObj(i -> expression(sqlTypes.get(i), "%s(%s)", inverseFunction.get(i), columns.get(0)))
                     .toList();
 
         throw new IllegalArgumentException();
