@@ -1725,7 +1725,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     if(named.contains(constGraphMapping.getIri()))
                         mappings.add(source);
                 }
-                else
+                else if(graphMap != null)
                 {
                     Set<Iri> validDefaults = defaults.stream().filter(i -> graphMap.match(request, i)).collect(toSet());
 
