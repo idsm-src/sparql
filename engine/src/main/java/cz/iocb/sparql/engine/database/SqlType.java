@@ -225,11 +225,24 @@ public class SqlType
 
 
     /**
+     * True if the type is one of the types of the pgsparql extension ({@code sparql.rdfbox}, {@code sparql.ubox},
+     * {@code sparql.zoneddate} and {@code sparql.zoneddatetime}), whose {@code =} is the value equality and whose
+     * operator classes are built on the identity operators {@code @=} and {@code @<>} of the schema {@code sparql}.
+     *
+     * @return true if the type is one of the types of the pgsparql extension, false otherwise
+     */
+    private boolean hasIdentityOperators()
+    {
+        return equals(RDFBOX) || equals(UBOX) || equals(ZONEDDATE) || equals(ZONEDDATETIME);
+    }
+
+
+    /**
      * SQL condition that two not-null values of the type are identical, i.e. represent the same RDF term part. The
-     * default is the {@code =} operator of the type; for {@code sparql.rdfbox}, whose {@code =} is the value equality
-     * of the terms, it is the operator {@code @=} of its operator classes, which is the identity of the terms and is
-     * therefore usable in merge and hash joins. The conditions are parenthesised, so that they can be combined with any
-     * operator.
+     * default is the {@code =} operator of the type; for the types of the pgsparql extension, whose {@code =} is the
+     * value equality (two date-times in different zones may be equal), it is the operator {@code @=} of their operator
+     * classes, which is the identity and is therefore usable in merge and hash joins. The conditions are parenthesised,
+     * so that they can be combined with any operator.
      *
      * @param left the left value
      * @param right the right value
@@ -237,7 +250,7 @@ public class SqlType
      */
     public String equal(Column left, Column right)
     {
-        if(equals(RDFBOX))
+        if(hasIdentityOperators())
             return "(" + left + " operator(sparql.@=) " + right + ")";
 
         return "(" + left + " = " + right + ")";
@@ -254,7 +267,7 @@ public class SqlType
      */
     public String notDistinct(Column left, Column right)
     {
-        if(equals(RDFBOX))
+        if(hasIdentityOperators())
             return "COALESCE(" + left + " operator(sparql.@=) " + right + ", " + left + " IS NULL AND " + right
                     + " IS NULL)";
 
@@ -272,7 +285,7 @@ public class SqlType
      */
     public String distinct(Column left, Column right)
     {
-        if(equals(RDFBOX))
+        if(hasIdentityOperators())
             return "(NOT COALESCE(" + left + " operator(sparql.@=) " + right + ", " + left + " IS NULL AND " + right
                     + " IS NULL))";
 
@@ -290,7 +303,7 @@ public class SqlType
      */
     public String notEqual(Column left, Column right)
     {
-        if(equals(RDFBOX))
+        if(hasIdentityOperators())
             return "(" + left + " operator(sparql.@<>) " + right + ")";
 
         return "(" + left + " != " + right + ")";
