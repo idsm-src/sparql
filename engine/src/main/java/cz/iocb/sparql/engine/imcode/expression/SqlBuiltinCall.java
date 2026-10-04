@@ -940,7 +940,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     }
                     else if(argumentClass instanceof UserLiteralCompositeClass)
                     {
-                        builder.append(argument.getMapping(argumentClass).get(0));
+                        builder.append("sparql.ubox_as_varchar(" + argument.getMapping(argumentClass).get(0) + ")");
                     }
                     else if(argumentClass instanceof UserLiteralCompositeBaseClass)
                     {
@@ -950,8 +950,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         builder.append("COALESCE(NULLIF(");
                         builder.append(columns.get(2));
                         builder.append(", ''::varchar), ");
+                        builder.append("sparql.ubox_as_varchar(");
                         builder.append(columns.get(0));
-                        builder.append(")");
+                        builder.append("))");
                     }
                     else if(isString(argumentClass))
                     {

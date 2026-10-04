@@ -492,7 +492,8 @@ public class BuiltinClasses
     /**
      * Any literal.
      */
-    public static final ResourceClass literal = unionize(genBoolean, numeric, stringLiteral, temporal, unsupportedType);
+    public static final ResourceClass literal = unionize(genBoolean, numeric, stringLiteral, temporal, genUserType,
+            unsupportedType);
 
     /* numeric base classes, each listed before the classes to which its values are promoted */
 
