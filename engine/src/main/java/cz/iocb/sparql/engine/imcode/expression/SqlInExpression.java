@@ -251,7 +251,7 @@ public final class SqlInExpression extends SqlExpressionIntercode
             builder.append(" FROM (VALUES (");
             builder.append(columnMap.keySet().stream().map(c -> c.toString()).collect(joining(", ")));
             builder.append(")) AS \"tab\"(");
-            builder.append(columnMap.keySet().stream().map(c -> c.toString()).collect(joining(", ")));
+            builder.append(columnMap.values().stream().map(c -> c.toString()).collect(joining(", ")));
             builder.append("))");
 
             List<Column> result = List.of(new ExpressionColumn(builder.toString(), BOOL));

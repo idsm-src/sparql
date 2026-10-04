@@ -480,10 +480,10 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                 {
                     SqlExpressionIntercode arg = arguments.get(i);
                     ResourceClass lc = l.params.get(i);
-                    ResourceClass rc = l.params.get(i);
+                    ResourceClass rc = r.params.get(i);
 
                     if(!areDisjunct(relations, lc, rc)
-                            && (arg.hasExpressionColumn(relations, lc) || arg.hasExpressionColumn(relations, lc)))
+                            && (arg.hasExpressionColumn(relations, lc) || arg.hasExpressionColumn(relations, rc)))
                         return true;
                 }
 
