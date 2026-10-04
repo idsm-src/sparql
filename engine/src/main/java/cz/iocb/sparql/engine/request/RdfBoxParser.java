@@ -234,7 +234,7 @@ public final class RdfBoxParser
             if(quote == '"')
                 return new TypedLiteral(value.toString(), type);
 
-            return new TypedLiteral(userLiteralLexical(text, value.toString()), type);
+            return new TypedLiteral(userLiteralLexical(value.toString()), type);
         }
 
         throw new IllegalArgumentException("invalid rdfbox text: " + text);
@@ -246,12 +246,11 @@ public final class RdfBoxParser
      * lexical form may contain anything while the canonical type name cannot contain a colon outside of double quotes,
      * so the separator is the last colon not enclosed in double quotes.
      *
-     * @param text text form of the box, for error messages
      * @param ubox text form of the ubox value
      * @return the lexical form
      * @throws IllegalArgumentException if the text has no separator
      */
-    private static String userLiteralLexical(String text, String ubox)
+    static String userLiteralLexical(String ubox)
     {
         boolean inQuotes = false;
 
@@ -265,7 +264,7 @@ public final class RdfBoxParser
                 return ubox.substring(0, pos);
         }
 
-        throw new IllegalArgumentException("invalid rdfbox text: " + text);
+        throw new IllegalArgumentException("invalid ubox text: " + ubox);
     }
 
 

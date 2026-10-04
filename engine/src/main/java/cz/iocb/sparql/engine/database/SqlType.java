@@ -87,9 +87,10 @@ public class SqlType
     public static final SqlType RDFBOX = builtin("sparql.rdfbox", String.class);
 
     /**
-     * The boxed user literal value type {@code sparql.ubox} of the pgsparql extension.
+     * The boxed user literal value type {@code sparql.ubox} of the pgsparql extension, read from a result as its text
+     * form ({@code lexical:sqltype}).
      */
-    public static final SqlType UBOX = builtin("sparql.ubox", null);
+    public static final SqlType UBOX = builtin("sparql.ubox", String.class);
 
     /**
      * The {@code sparql.zoneddate} type of the pgsparql extension.

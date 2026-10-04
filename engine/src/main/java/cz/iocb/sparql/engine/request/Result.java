@@ -621,14 +621,14 @@ public class Result implements AutoCloseable
             case UserLiteralCompositeClass _ ->
             {
                 String type = rs.getString(column++);
-                yield new TypedLiteral(value.toString(), new Iri(type));
+                yield new TypedLiteral(RdfBoxParser.userLiteralLexical((String) value), new Iri(type));
             }
 
             case UserLiteralCompositeBaseClass _ ->
             {
                 String type = rs.getString(column++);
                 String lexical = rs.getString(column++);
-                String str = lexical.isEmpty() ? value.toString() : lexical;
+                String str = lexical.isEmpty() ? RdfBoxParser.userLiteralLexical((String) value) : lexical;
                 yield new TypedLiteral(str, new Iri(type));
             }
 
@@ -649,7 +649,8 @@ public class Result implements AutoCloseable
 
     /**
      * Reads the column as the Java class of its SQL type. Text is read through {@link ResultSet#getString}, as the
-     * driver converts only its own types by class, so that the text form of a {@code sparql.rdfbox} can be read too.
+     * driver converts only its own types by class, so that the text forms of {@code sparql.rdfbox} and
+     * {@code sparql.ubox} can be read too.
      *
      * @param rs the result set
      * @param index position of the column
