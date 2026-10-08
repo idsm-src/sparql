@@ -443,6 +443,13 @@ public final class SqlAggregation extends SqlIntercode
 
 
     @Override
+    public String getCollation(Request request, Variable variable, ResourceClass resClass, int index)
+    {
+        return getCollation(request, List.of(child), variable, resClass, index);
+    }
+
+
+    @Override
     public void generateExplanation(StringBuilder builder, String indent)
     {
         builder.append("aggregate");

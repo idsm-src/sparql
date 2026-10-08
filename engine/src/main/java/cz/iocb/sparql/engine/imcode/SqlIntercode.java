@@ -1071,6 +1071,68 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
     /**
+     * Collation of a column of the variable in the solutions as an SQL identifier, or null when the column uses the
+     * default collation of the database or its collation is not known. Only a column of a database table brings another
+     * collation in; the nodes that take the columns over from their children report the collations of the child columns
+     * (see {@link #getCollation(Request, Collection, Variable, ResourceClass, int)}).
+     *
+     * @param request the current request
+     * @param variable the variable
+     * @param resClass a resource class of the variable
+     * @param index position of the column among the columns of the class
+     * @return collation of the column as an SQL identifier, or null when the column uses the default collation of the
+     *         database or its collation is not known
+     */
+    public String getCollation(Request request, Variable variable, ResourceClass resClass, int index)
+    {
+        return null;
+    }
+
+
+    /**
+     * Collation of a column of the variable as the given children deliver it, combined the way PostgreSQL combines the
+     * implicit collations of the inputs of an expression: the default collation gives way to any other one, and two
+     * different other ones have no common collation. A child binding the variable in the class delivers its column of
+     * the class; when the classes of the child are converted to the class instead, a character column of the class may
+     * come from any of their columns.
+     *
+     * @param request the current request
+     * @param childs the child nodes
+     * @param variable the variable
+     * @param resClass a resource class of the variable
+     * @param index position of the column among the columns of the class
+     * @return the common collation as an SQL identifier, or null when the children deliver the default collation, their
+     *         collations are not known, or they differ
+     */
+    protected static String getCollation(Request request, Collection<? extends SqlIntercode> childs, Variable variable,
+            ResourceClass resClass, int index)
+    {
+        ClassRelations relations = request.getConfiguration();
+        SqlType type = resClass.getSqlTypes().get(index);
+        Set<String> collations = new HashSet<>();
+
+        for(SqlIntercode child : childs)
+        {
+            VariableBinding binding = child.getVariable(variable);
+
+            if(binding == null)
+                continue;
+
+            if(binding.containsClass(resClass))
+                collations.add(child.getCollation(request, variable, resClass, index));
+            else if(type.equals(SqlType.VARCHAR) || type.equals(SqlType.TEXT))
+                for(ResourceClass childClass : binding.getCompatibleClasses(relations, resClass))
+                    for(int i = 0; i < childClass.getColumnCount(); i++)
+                        collations.add(child.getCollation(request, variable, childClass, i));
+        }
+
+        collations.remove(null);
+
+        return collations.size() == 1 ? collations.iterator().next() : null;
+    }
+
+
+    /**
      * Restrictions for a join child on top of the parent's: its variables shared with the other side are needed in the
      * classes compatible with that side (in all classes when the variable may be unbound).
      *

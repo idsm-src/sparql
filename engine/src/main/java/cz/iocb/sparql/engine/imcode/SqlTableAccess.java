@@ -1824,6 +1824,19 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     @Override
+    public String getCollation(Request request, Variable variable, ResourceClass resClass, int index)
+    {
+        VariableBinding binding = internal.get(variable);
+        List<Column> columns = binding != null ? binding.getMapping(resClass) : null;
+
+        if(schema == null || columns == null)
+            return null;
+
+        return schema.getCollation(table, columns.get(index));
+    }
+
+
+    @Override
     public void generateExplanation(StringBuilder builder, String indent)
     {
         builder.append("access");

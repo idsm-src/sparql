@@ -347,7 +347,8 @@ public final class SqlRecursive extends SqlIntercode
 
         boolean hasInitSelect = !iv.isEmpty();
 
-        VariableBinding initEndBinding = init.getVariableBindings().get(endBinding.getVariable());
+        Variable endVar = endBinding.getVariable();
+        VariableBinding initEndBinding = init.getVariableBindings().get(endVar);
 
         for(ResourceClass resClass : endVarClasses)
         {
@@ -361,7 +362,22 @@ public final class SqlRecursive extends SqlIntercode
                 appendComma(builder, hasInitSelect);
                 hasInitSelect = true;
 
-                builder.append(columns.get(j));
+                // each column of the non-recursive term has to have the collation of the whole query, which the
+                // recursive term changes when it delivers another collation than the default one
+                String collation = getCollation(request, List.of(next), endVar, resClass, j);
+
+                if(collation != null && !collation.equals(getCollation(request, List.of(init), endVar, resClass, j)))
+                {
+                    builder.append("(");
+                    builder.append(columns.get(j));
+                    builder.append(") COLLATE ");
+                    builder.append(collation);
+                }
+                else
+                {
+                    builder.append(columns.get(j));
+                }
+
                 builder.append(" AS ");
                 builder.append(endBinding.getMapping(resClass).get(j));
             }
@@ -380,7 +396,7 @@ public final class SqlRecursive extends SqlIntercode
 
         boolean hasUnionSelect = !ev.isEmpty();
 
-        VariableBinding nextEndBinding = next.getVariableBindings().get(endBinding.getVariable());
+        VariableBinding nextEndBinding = next.getVariableBindings().get(endVar);
 
         for(ResourceClass resClass : endVarClasses)
         {
@@ -478,6 +494,22 @@ public final class SqlRecursive extends SqlIntercode
     public Set<VirtualTable> getVirtualTables()
     {
         return getVirtualTables(init, next);
+    }
+
+
+    @Override
+    public String getCollation(Request request, Variable variable, ResourceClass resClass, int index)
+    {
+        // the end variable takes the collation of the recursive step when it differs (see translate)
+        if(variable.equals(endBinding.getVariable()))
+        {
+            String collation = getCollation(request, List.of(next), variable, resClass, index);
+
+            if(collation != null)
+                return collation;
+        }
+
+        return getCollation(request, List.of(init), variable, resClass, index);
     }
 
 

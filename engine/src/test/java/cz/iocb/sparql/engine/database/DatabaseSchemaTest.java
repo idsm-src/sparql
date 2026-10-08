@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.database;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -24,7 +25,7 @@ import cz.iocb.sparql.testing.Database;
  * Catalog facts read by {@link DatabaseSchema}: every kind of relation the configuration may map has to report its
  * nullable columns, only a valid full unique index over columns is a key, only a validated foreign key of the
  * referencing table itself (not one of its copies on the partitions of a referenced partitioned table) is a foreign
- * key.
+ * key, and a character column reports its collation unless it is the default one.
  */
 public class DatabaseSchemaTest
 {
@@ -42,7 +43,8 @@ public class DatabaseSchemaTest
     /**
      * Creates the {@code schema_test} schema with a table carrying a partial and an expression unique index, a view, a
      * materialized view, partitioned tables with an invalid and a valid key, a foreign table, foreign keys to and from
-     * partitioned tables and a NOT VALID one, two tables whose names match as patterns, and reads the catalog.
+     * partitioned tables and a NOT VALID one, two tables whose names match as patterns, and a table with character
+     * columns of several collations, and reads the catalog.
      */
     @BeforeAll
     static void init() throws SQLException
@@ -98,6 +100,9 @@ public class DatabaseSchemaTest
             // the names are not patterns: like_a does not stand for likexa
             statement.execute("create table schema_test.like_a (a int not null)");
             statement.execute("create table schema_test.likexa (b int)");
+
+            statement.execute("create table schema_test.collated (id int, plain varchar, coded varchar collate \"C\", "
+                    + "posix text collate \"POSIX\")");
         }
 
         schema = new DatabaseSchema(connectionPool);
@@ -155,6 +160,17 @@ public class DatabaseSchemaTest
     {
         return schema.getForeignKeys(new DatabaseTable("schema_test", parent),
                 new DatabaseTable("schema_test", foreign));
+    }
+
+
+    /**
+     * The collation the catalog reports for the column of the relation, which has to be known.
+     */
+    private static String getCollation(String relation, String column)
+    {
+        DatabaseTable table = new DatabaseTable("schema_test", relation);
+
+        return schema.getCollation(table, Objects.requireNonNull(schema.getColumn(table, column), column));
     }
 
 
@@ -260,5 +276,16 @@ public class DatabaseSchemaTest
         assertFalse(isNullable("like_a", "a"));
         assertNull(schema.getColumn(new DatabaseTable("schema_test", "like_a"), "b"));
         assertTrue(isNullable("likexa", "b"));
+    }
+
+
+    @Test
+    @DisplayName("collations of character columns other than the default one")
+    void collations()
+    {
+        assertNull(getCollation("collated", "id"));
+        assertNull(getCollation("collated", "plain"));
+        assertEquals("\"C\"", getCollation("collated", "coded"));
+        assertEquals("\"POSIX\"", getCollation("collated", "posix"));
     }
 }

@@ -10,6 +10,7 @@ import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBinding;
@@ -340,6 +341,13 @@ public final class SqlMinus extends SqlIntercode
     public Set<VirtualTable> getVirtualTables()
     {
         return getVirtualTables(left, right);
+    }
+
+
+    @Override
+    public String getCollation(Request request, Variable variable, ResourceClass resClass, int index)
+    {
+        return getCollation(request, List.of(left), variable, resClass, index);
     }
 
 

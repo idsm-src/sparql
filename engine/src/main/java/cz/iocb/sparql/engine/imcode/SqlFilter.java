@@ -17,6 +17,7 @@ import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.Multiset;
@@ -249,6 +250,13 @@ public final class SqlFilter extends SqlIntercode
         Set<VirtualTable> tables = getVirtualTables(child);
         tables.addAll(getVirtualTables(conditions));
         return tables;
+    }
+
+
+    @Override
+    public String getCollation(Request request, Variable variable, ResourceClass resClass, int index)
+    {
+        return getCollation(request, List.of(child), variable, resClass, index);
     }
 
 

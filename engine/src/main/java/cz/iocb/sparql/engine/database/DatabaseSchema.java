@@ -46,11 +46,12 @@ public class DatabaseSchema
                 AND n.nspname NOT IN ('pg_catalog', 'information_schema')""";
 
     /**
-     * Catalog query listing every column of a user table or view that has an explicit collation. SPARQL orders and
-     * compares strings by unicode code points, whereas PostgreSQL orders a character column by its collation, so only
-     * the collations that happen to order by code points give the results the specification asks for. The name of a
-     * collation does not say which ones those are (musl, for instance, orders bytewise under every locale name), so the
-     * server is asked directly.
+     * Catalog query listing every column of a user table or view that has a collation, named as an SQL identifier
+     * ({@code "default"} for the default collation of the database). The translator needs the collations of the columns
+     * to keep the collations of a recursive query consistent. Besides, SPARQL orders and compares strings by unicode
+     * code points, whereas PostgreSQL orders a character column by its collation, so only the collations that happen to
+     * order by code points give the results the specification asks for. The name of a collation does not say which ones
+     * those are (musl, for instance, orders bytewise under every locale name), so the server is asked directly.
      */
     private static final String collationQuery = """
             SELECT n.nspname, c.relname, a.attname, a.attcollation::regcollation::text
@@ -260,12 +261,14 @@ public class DatabaseSchema
             for(String[] collatedColumn : collatedColumns)
             {
                 String collation = collatedColumn[3];
-
-                if(checkedCollations.computeIfAbsent(collation, c -> isCodepointCollation(connection, c)))
-                    continue;
-
                 SourceTable table = new DatabaseTable(collatedColumn[0], collatedColumn[1]);
-                addForeignCollation(table, requireColumn(table, collatedColumn[2]), collation);
+                TableColumn column = requireColumn(table, collatedColumn[2]);
+
+                if(!collation.equals("\"default\""))
+                    addCollation(table, column, collation);
+
+                if(!checkedCollations.computeIfAbsent(collation, c -> isCodepointCollation(connection, c)))
+                    addForeignCollation(table, column, collation);
             }
         }
     }
@@ -331,6 +334,9 @@ public class DatabaseSchema
 
         for(Entry<SourceTable, Map<Column, String>> e : other.foreignCollations.entrySet())
             foreignCollations.put(e.getKey(), new HashMap<>(e.getValue()));
+
+        for(Entry<SourceTable, Map<Column, String>> e : other.columnCollations.entrySet())
+            columnCollations.put(e.getKey(), new HashMap<>(e.getValue()));
 
         for(Entry<SourceTable, List<List<Column>>> e : other.primaryKeys.entrySet())
             primaryKeys.put(e.getKey(), new ArrayList<>(e.getValue()));
@@ -548,6 +554,34 @@ public class DatabaseSchema
     public String getForeignCollation(SourceTable table, Column column)
     {
         return foreignCollations.getOrDefault(table, Map.of()).get(column);
+    }
+
+
+    /**
+     * Records that the character column uses another collation than the default one of the database.
+     *
+     * @param table the table
+     * @param column the column
+     * @param collation name of the collation as an SQL identifier, such as {@code "C"}
+     */
+    public void addCollation(SourceTable table, TableColumn column, String collation)
+    {
+        columnCollations.computeIfAbsent(table, _ -> new HashMap<>()).put(column, collation);
+    }
+
+
+    /**
+     * Returns the collation of the given character column as an SQL identifier when it is not the default one of the
+     * database, and null when the column uses the default collation, is not a character column, or is not known.
+     *
+     * @param table the table
+     * @param column the column
+     * @return the collation of the given character column as an SQL identifier when it is not the default one of the
+     *         database, and null otherwise
+     */
+    public String getCollation(SourceTable table, Column column)
+    {
+        return columnCollations.getOrDefault(table, Map.of()).get(column);
     }
 
 

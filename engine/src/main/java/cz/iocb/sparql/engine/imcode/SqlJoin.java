@@ -980,6 +980,13 @@ public final class SqlJoin extends SqlIntercode
 
 
     @Override
+    public String getCollation(Request request, Variable variable, ResourceClass resClass, int index)
+    {
+        return getCollation(request, childs, variable, resClass, index);
+    }
+
+
+    @Override
     public void generateExplanation(StringBuilder builder, String indent)
     {
         builder.append("join");

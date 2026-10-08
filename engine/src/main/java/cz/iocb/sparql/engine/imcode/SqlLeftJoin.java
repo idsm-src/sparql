@@ -22,6 +22,7 @@ import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restrictio
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBinding;
 import cz.iocb.sparql.engine.translator.VariableBindings;
@@ -456,6 +457,13 @@ public final class SqlLeftJoin extends SqlIntercode
         Set<VirtualTable> tables = getVirtualTables(left, right);
         tables.addAll(getVirtualTables(conditions));
         return tables;
+    }
+
+
+    @Override
+    public String getCollation(Request request, Variable variable, ResourceClass resClass, int index)
+    {
+        return getCollation(request, List.of(left, right), variable, resClass, index);
     }
 
 
