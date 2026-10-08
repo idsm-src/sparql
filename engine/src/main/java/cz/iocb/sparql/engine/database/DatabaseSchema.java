@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.database;
 
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -20,21 +19,23 @@ import cz.iocb.sparql.engine.database.VirtualTableDefinition.UnjoinableColumns;
 
 /**
  * Catalog facts about the source tables used by the optimiser and the translator: the columns with their SQL types,
- * nullable columns, unique keys, foreign keys, column pairs known never to join, and character columns with a collation
- * that does not order by code points. The facts about database tables are read from the JDBC metadata and the
- * PostgreSQL catalog (or filled in by hand); the facts about virtual tables are merged in from their definitions by
- * {@link #addVirtualTable}.
+ * nullable columns, unique keys, foreign keys, column pairs known never to join, the collations of the character
+ * columns that do not use the default one, and character columns with a collation that does not order by code points.
+ * The facts about database tables are read from the PostgreSQL catalog (or filled in by hand); the facts about virtual
+ * tables are merged in from their definitions by {@link #addVirtualTable}.
  */
 public class DatabaseSchema
 {
     /**
-     * Catalog query listing every column of a user table or view with the schema and the name of its type. The type is
+     * Catalog query listing every column of a user table, view, materialized view, partitioned or foreign table with
+     * the schema and the name of its type, and whether it is declared NOT NULL (directly or by its domain). The type is
      * named the way a configuration names it (see {@link SqlType#of}): by the bare name of a type of the
      * {@code pg_catalog} or {@code public} schema, which is the canonical name of a built-in type, and schema-qualified
      * otherwise.
      */
     private static final String columnTypeQuery = """
-            SELECT n.nspname, c.relname, a.attname, tn.nspname, t.typname
+            SELECT n.nspname, c.relname, a.attname, tn.nspname, t.typname,
+                a.attnotnull OR (t.typtype = 'd' AND t.typnotnull)
             FROM pg_attribute a
             JOIN pg_class c ON c.oid = a.attrelid
             JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -61,6 +62,48 @@ public class DatabaseSchema
                 AND n.nspname NOT IN ('pg_catalog', 'information_schema')""";
 
     /**
+     * Catalog query listing the key columns of every unique index of a user relation that makes them unique across all
+     * rows, ordered by the index and the position: the index has to be valid (an index created with {@code ON ONLY} on
+     * a partitioned table, or one whose concurrent build failed, does not guarantee anything), not partial and not over
+     * an expression; the included non-key columns are left out.
+     */
+    private static final String keyQuery = """
+            SELECT i.indexrelid, n.nspname, c.relname, a.attname
+            FROM pg_index i
+            JOIN pg_class c ON c.oid = i.indrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            CROSS JOIN LATERAL unnest(i.indkey::int2[]) WITH ORDINALITY AS k(attnum, position)
+            JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum
+            WHERE i.indisunique AND i.indisvalid AND i.indpred IS NULL AND i.indexprs IS NULL
+                AND k.position <= i.indnkeyatts
+                AND c.relkind IN ('r', 'v', 'm', 'p', 'f')
+                AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+            ORDER BY i.indexrelid, k.position""";
+
+    /**
+     * Catalog query listing the column pairs of every validated foreign key of a user table, ordered by the constraint
+     * and the position, each pair as the referenced (parent) column and the referencing (foreign) column. A constraint
+     * added {@code NOT VALID} is left out, because the rows that existed before it need not satisfy it, and so are the
+     * copies of a constraint that PostgreSQL attaches to the partitions of a referenced partitioned table: they have
+     * the same referencing table as their parent constraint, and its rows reference just one of the partitions.
+     */
+    private static final String foreignKeyQuery = """
+            SELECT k.oid, pn.nspname, pc.relname, pa.attname, fn.nspname, fc.relname, fa.attname
+            FROM pg_constraint k
+            JOIN pg_class pc ON pc.oid = k.confrelid
+            JOIN pg_namespace pn ON pn.oid = pc.relnamespace
+            JOIN pg_class fc ON fc.oid = k.conrelid
+            JOIN pg_namespace fn ON fn.oid = fc.relnamespace
+            CROSS JOIN LATERAL unnest(k.confkey, k.conkey) WITH ORDINALITY AS c(pattnum, fattnum, position)
+            JOIN pg_attribute pa ON pa.attrelid = k.confrelid AND pa.attnum = c.pattnum
+            JOIN pg_attribute fa ON fa.attrelid = k.conrelid AND fa.attnum = c.fattnum
+            WHERE k.contype = 'f' AND k.convalidated
+                AND NOT EXISTS (SELECT 1 FROM pg_constraint p WHERE p.oid = k.conparentid AND p.conrelid = k.conrelid)
+                AND pn.nspname NOT IN ('pg_catalog', 'information_schema')
+                AND fn.nspname NOT IN ('pg_catalog', 'information_schema')
+            ORDER BY k.oid, c.position""";
+
+    /**
      * Query template testing whether a collation orders a sample of strings the same way as the "C" collation.
      */
     private static final String collationProbeQuery = """
@@ -85,6 +128,12 @@ public class DatabaseSchema
     protected final Map<SourceTable, Map<Column, String>> foreignCollations = new HashMap<>();
 
     /**
+     * Per table, the character columns with another collation than the default one of the database, with the collation
+     * name as an SQL identifier.
+     */
+    protected final Map<SourceTable, Map<Column, String>> columnCollations = new HashMap<>();
+
+    /**
      * Unique keys per table, each as its list of columns.
      */
     protected final Map<SourceTable, List<List<Column>>> primaryKeys = new HashMap<>();
@@ -101,8 +150,8 @@ public class DatabaseSchema
 
 
     /**
-     * Reads tables and views, their columns with the types, nullable columns, unique indexes, foreign keys and column
-     * collations from the database.
+     * Reads tables, views, materialized views, partitioned and foreign tables, their columns with the types, nullable
+     * columns, keys, foreign keys and column collations from the catalog of the database.
      *
      * @param connectionPool the connection pool of the database
      * @throws SQLException on database errors
@@ -125,95 +174,71 @@ public class DatabaseSchema
                         if(!typeSchema.equals("pg_catalog") && !typeSchema.equals("public"))
                             typeName = typeSchema + "." + typeName;
 
-                        addColumn(new DatabaseTable(columns.getString(1), columns.getString(2)),
-                                new TableColumn(columns.getString(3), SqlType.of(typeName)));
+                        SourceTable table = new DatabaseTable(columns.getString(1), columns.getString(2));
+                        TableColumn column = new TableColumn(columns.getString(3), SqlType.of(typeName));
+
+                        addColumn(table, column);
+
+                        if(!columns.getBoolean(6))
+                            addNullableColumn(table, column);
                     }
                 }
-            }
 
 
-            DatabaseMetaData metaData = connection.getMetaData();
-
-            try(ResultSet tables = metaData.getTables(null, null, null, new String[] { "TABLE", "VIEW" }))
-            {
-                while(tables.next())
+                try(ResultSet keys = statement.executeQuery(keyQuery))
                 {
-                    String tableSchema = tables.getString("TABLE_SCHEM");
-                    String tableName = tables.getString("TABLE_NAME");
-                    SourceTable table = new DatabaseTable(tableSchema, tableName);
+                    long index = 0;
+                    SourceTable table = null;
+                    List<Column> columns = new ArrayList<>();
 
-
-                    try(ResultSet columns = metaData.getColumns(null, tableSchema, tableName, null))
+                    while(keys.next())
                     {
-                        while(columns.next())
+                        if(keys.getLong(1) != index)
                         {
-                            TableColumn column = requireColumn(table, columns.getString("COLUMN_NAME"));
+                            if(table != null)
+                                addPrimaryKeys(table, columns);
 
-                            if(columns.getInt("NULLABLE") != DatabaseMetaData.columnNoNulls)
-                                addNullableColumn(table, column);
-                        }
-                    }
-
-
-                    try(ResultSet indexes = metaData.getIndexInfo(null, tableSchema, tableName, true, false))
-                    {
-                        List<Column> columns = null;
-
-                        while(indexes.next())
-                        {
-                            short position = indexes.getShort("ORDINAL_POSITION");
-
-                            if(position == 0)
-                                continue;
-
-                            if(position == 1)
-                            {
-                                if(columns != null)
-                                    addPrimaryKeys(table, columns);
-
-                                columns = new ArrayList<>();
-                            }
-
-                            columns.add(requireColumn(table, indexes.getString("COLUMN_NAME")));
+                            index = keys.getLong(1);
+                            table = new DatabaseTable(keys.getString(2), keys.getString(3));
+                            columns = new ArrayList<>();
                         }
 
-                        if(columns != null)
-                            addPrimaryKeys(table, columns);
+                        columns.add(requireColumn(table, keys.getString(4)));
                     }
 
+                    if(table != null)
+                        addPrimaryKeys(table, columns);
+                }
 
-                    try(ResultSet indexes = metaData.getCrossReference(null, tableSchema, tableName, null, null, null))
+
+                try(ResultSet keys = statement.executeQuery(foreignKeyQuery))
+                {
+                    long constraint = 0;
+                    SourceTable parentTable = null;
+                    SourceTable foreignTable = null;
+                    List<Column> parentColumns = new ArrayList<>();
+                    List<Column> foreignColumns = new ArrayList<>();
+
+                    while(keys.next())
                     {
-                        SourceTable foreignTable = null;
-                        List<Column> parentColumns = new ArrayList<>();
-                        List<Column> foreignColumns = new ArrayList<>();
-
-
-                        while(indexes.next())
+                        if(keys.getLong(1) != constraint)
                         {
-                            short seq = indexes.getShort("KEY_SEQ");
+                            if(parentTable != null)
+                                addForeignKeys(parentTable, parentColumns, foreignTable, foreignColumns);
 
-                            if(seq == 1)
-                            {
-                                if(foreignTable != null)
-                                {
-                                    addForeignKeys(table, parentColumns, foreignTable, foreignColumns);
-
-                                    parentColumns = new ArrayList<>();
-                                    foreignColumns = new ArrayList<>();
-                                }
-
-                                foreignTable = new DatabaseTable(indexes.getString("FKTABLE_SCHEM"),
-                                        indexes.getString("FKTABLE_NAME"));
-                            }
-
-                            parentColumns.add(requireColumn(table, indexes.getString("PKCOLUMN_NAME")));
-                            foreignColumns.add(requireColumn(foreignTable, indexes.getString("FKCOLUMN_NAME")));
+                            constraint = keys.getLong(1);
+                            parentTable = new DatabaseTable(keys.getString(2), keys.getString(3));
+                            foreignTable = new DatabaseTable(keys.getString(5), keys.getString(6));
+                            parentColumns = new ArrayList<>();
+                            foreignColumns = new ArrayList<>();
                         }
 
-                        if(foreignTable != null)
-                            addForeignKeys(table, parentColumns, foreignTable, foreignColumns);
+                        parentColumns.add(requireColumn(parentTable, keys.getString(4)));
+                        foreignColumns.add(requireColumn(foreignTable, keys.getString(7)));
                     }
+
+                    if(parentTable != null)
+                        addForeignKeys(parentTable, parentColumns, foreignTable, foreignColumns);
                 }
             }
 
