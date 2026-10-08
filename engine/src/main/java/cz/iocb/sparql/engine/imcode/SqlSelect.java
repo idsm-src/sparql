@@ -367,7 +367,10 @@ public final class SqlSelect extends SqlIntercode
         childRestrictions.add(orderBy.keySet()); //TODO: not all resource classes are sortable
         childRestrictions.add(simpleOrderBy); //TODO: not all resource classes are sortable
 
-        SqlIntercode optChild = child.optimize(request, childRestrictions, false, evalServices);
+        // duplicates do not matter to a DISTINCT that is going to deduplicate the child over the projections below
+        boolean childReduced = distinct && projections.containsAll(orderBy.keySet());
+
+        SqlIntercode optChild = child.optimize(request, childRestrictions, childReduced, evalServices);
 
 
         LinkedHashMap<Variable, Direction> stripedOrderBy = new LinkedHashMap<>();
@@ -424,7 +427,15 @@ public final class SqlSelect extends SqlIntercode
         // a slice picks its rows from the multiset, so the multiplicities of the child rows have to be kept exact
         boolean childReduced = reduced && limit == null && (offset == null || offset.equals(BigInteger.ZERO));
 
-        SqlIntercode optChild = child.optimize(request, childRestrictions, childReduced, evalServices);
+        // the deduplication compares the solutions over all the projected variables, so unless the multiplicities do
+        // not matter, the pattern has to keep them even when the parent needs none of them (COUNT(*) over a DISTINCT
+        // sub-select)
+        Restrictions patternRestrictions = new Restrictions(childRestrictions);
+
+        if(distinct && !childReduced)
+            patternRestrictions.add(bindings.getVariables());
+
+        SqlIntercode optChild = child.optimize(request, patternRestrictions, childReduced, evalServices);
 
         LinkedHashMap<Variable, Direction> stripedOrderBy = new LinkedHashMap<>();
 
@@ -437,7 +448,7 @@ public final class SqlSelect extends SqlIntercode
         if(optDistinct && bindings.getVariables().containsAll(stripedOrderBy.keySet()))
         {
             optChild = SqlDistinct.create(request, optChild, bindings.getVariables()).optimize(request,
-                    childRestrictions, reduced, evalServices);
+                    childRestrictions, childReduced, evalServices);
             optDistinct = false;
         }
 
@@ -458,11 +469,13 @@ public final class SqlSelect extends SqlIntercode
             return optChild;
 
 
-        if(restrictions.isOptimized(relations, bindings) && optChild == child && optDistinct == distinct
-                && stripedOrderBy.equals(orderBy))
+        // a select that still deduplicates by itself keeps all the projected variables, over which it groups
+        if((optDistinct || restrictions.isOptimized(relations, bindings)) && optChild == child
+                && optDistinct == distinct && stripedOrderBy.equals(orderBy))
             return this;
 
-        return create(request, restrictions.getNames(), optChild, optDistinct, stripedOrderBy, offset, limit);
+        return create(request, optDistinct ? bindings.getVariables() : restrictions.getNames(), optChild, optDistinct,
+                stripedOrderBy, offset, limit);
     }
 
 

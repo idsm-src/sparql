@@ -108,8 +108,14 @@ public final class SqlDistinct extends SqlIntercode
         if(optChild.equals(SqlEmptySolution.get()))
             return SqlEmptySolution.get();
 
+        // When the deduplication is left out below, the child's rows are already distinct over the variables, so the
+        // child may treat them as reduced only if the parent needs all the variables in all their classes. If the
+        // parent drops some (COUNT(*) over a DISTINCT sub-select), rows that differ only in them look like duplicates
+        // and must be kept, unless the parent itself does not care about duplicates.
+        boolean childReduced = reduced || !restrictions.canBeOptimized(relations, optChild.getVariableBindings());
+
         if(optChild.isDistinct(request, distinctVariables))
-            return optChild.optimize(request, restrictions, true, evalServices);
+            return optChild.optimize(request, restrictions, childReduced, evalServices);
 
         if(optChild instanceof SqlUnion union)
         {
@@ -128,7 +134,7 @@ public final class SqlDistinct extends SqlIntercode
                 for(SqlIntercode child : segs)
                     childs.add(create(request, child, distinctVariables, restrictions));
 
-                return SqlUnion.union(request, childs).optimize(request, restrictions, true, evalServices);
+                return SqlUnion.union(request, childs).optimize(request, restrictions, childReduced, evalServices);
             }
         }
 
@@ -156,7 +162,7 @@ public final class SqlDistinct extends SqlIntercode
             }
 
             if(canBeEliminated)
-                return join.optimize(request, restrictions, true, evalServices);
+                return join.optimize(request, restrictions, childReduced, evalServices);
         }
 
 

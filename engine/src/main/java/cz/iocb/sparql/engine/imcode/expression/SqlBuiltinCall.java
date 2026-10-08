@@ -219,7 +219,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
 
     /**
-     * Creates the call; {@code RAND} with a materialised result is nondeterministic.
+     * Creates the call; {@code RAND}, {@code UUID}, {@code STRUUID} and {@code BNODE} without an argument are
+     * nondeterministic when their result is materialised.
      *
      * @param function lower-case function name
      * @param distinct whether the mapping declares distinct rows
@@ -230,8 +231,15 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
     protected SqlBuiltinCall(String function, boolean distinct, List<SqlExpressionIntercode> arguments,
             Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
-        boolean isDeterministic = (!function.equals("rand") || mappings.get(xsdDouble) == null)
-                && arguments.stream().allMatch(r -> r.isDeterministic());
+        // these give a new value in every solution, so the solutions they extend never become duplicates
+        boolean isDeterministic = switch(function)
+        {
+            case "rand" -> mappings.get(xsdDouble) == null;
+            case "uuid" -> mappings.get(iri) == null;
+            case "struuid" -> mappings.get(xsdString) == null;
+            case "bnode" -> !arguments.isEmpty() || mappings.get(bnodeIntBlankNode) == null;
+            default -> true;
+        } && arguments.stream().allMatch(r -> r.isDeterministic());
         super(mappings, canBeNull, isDeterministic);
 
         this.function = function;
