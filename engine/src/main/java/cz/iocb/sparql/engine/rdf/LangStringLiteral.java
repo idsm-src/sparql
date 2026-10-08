@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.rdf;
 
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.rdfLangStringIri;
+import static java.util.Locale.ROOT;
 import java.util.Objects;
 
 
@@ -26,7 +27,7 @@ public class LangStringLiteral extends Literal
     {
         super(value);
 
-        this.tag = tag.toLowerCase();
+        this.tag = tag.toLowerCase(ROOT);
     }
 
 

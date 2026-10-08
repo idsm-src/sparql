@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.model.base;
 
+import static java.util.Locale.ROOT;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import cz.iocb.sparql.engine.parser.Position;
@@ -106,7 +107,8 @@ public class Range
             return start.toString();
 
         if(start.getLineNumber() == end.getLineNumber())
-            return String.format("%d:%d-%d", start.getLineNumber(), start.getPositionInLine(), end.getPositionInLine());
+            return String.format(ROOT, "%d:%d-%d", start.getLineNumber(), start.getPositionInLine(),
+                    end.getPositionInLine());
 
         return String.format("%s-%s", start.toString(), end.toString());
     }

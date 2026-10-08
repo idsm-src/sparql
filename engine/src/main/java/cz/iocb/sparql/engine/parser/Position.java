@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.parser;
 
+import static java.util.Locale.ROOT;
+
 
 
 /**
@@ -56,6 +58,6 @@ public class Position
     @Override
     public String toString()
     {
-        return String.format("%d:%d", lineNumber, positionInLine);
+        return String.format(ROOT, "%d:%d", lineNumber, positionInLine);
     }
 }

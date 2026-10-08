@@ -8,6 +8,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfRtlLangStr
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.rdfDirLangStringType;
+import static java.util.Locale.ROOT;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -68,9 +69,9 @@ public final class DirLangStringWithTagClass extends CanonicalLiteralClass
      */
     public static DirLangStringWithTagClass get(Direction direction, String tag)
     {
-        String name = getName(direction, tag.toLowerCase());
+        String name = getName(direction, tag.toLowerCase(ROOT));
 
-        return instances.computeIfAbsent(name, _ -> new DirLangStringWithTagClass(direction, tag.toLowerCase()));
+        return instances.computeIfAbsent(name, _ -> new DirLangStringWithTagClass(direction, tag.toLowerCase(ROOT)));
     }
 
 

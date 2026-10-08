@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
+import static java.util.Locale.ROOT;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
@@ -103,13 +104,14 @@ public class MapUserIriClass extends SimpleUserIriClass
         if(prefix == null && suffix == null)
             code = "?::varchar";
         else if(length > 0)
-            code = String.format("substring(?, %d, %d)::varchar", prefix != null ? prefix.length() + 1 : 1, length);
+            code = String.format(ROOT, "substring(?, %d, %d)::varchar", prefix != null ? prefix.length() + 1 : 1,
+                    length);
         else if(prefix == null)
-            code = String.format("left(?, -%d)::varchar", suffix.length());
+            code = String.format(ROOT, "left(?, -%d)::varchar", suffix.length());
         else if(suffix == null)
-            code = String.format("right(?, -%d)::varchar", prefix.length());
+            code = String.format(ROOT, "right(?, -%d)::varchar", prefix.length());
         else
-            code = String.format("left(right(?, -%d), -%d)::varchar", prefix.length(), suffix.length());
+            code = String.format(ROOT, "left(right(?, -%d), -%d)::varchar", prefix.length(), suffix.length());
 
         this.sqlQuery = String.format("(SELECT %s::varchar FROM %s WHERE %s = %s)", from, table, to, code);
 

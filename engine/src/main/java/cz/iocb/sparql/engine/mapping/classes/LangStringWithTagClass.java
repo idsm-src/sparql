@@ -7,6 +7,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.rdfLangStringType;
+import static java.util.Locale.ROOT;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -55,7 +56,7 @@ public final class LangStringWithTagClass extends CanonicalLiteralClass
      */
     public static LangStringWithTagClass get(String tag)
     {
-        return instances.computeIfAbsent(tag.toLowerCase(), LangStringWithTagClass::new);
+        return instances.computeIfAbsent(tag.toLowerCase(ROOT), LangStringWithTagClass::new);
     }
 
 

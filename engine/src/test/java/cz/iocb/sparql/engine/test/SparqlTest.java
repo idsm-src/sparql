@@ -20,6 +20,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedBy
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedLong;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedShort;
+import static java.util.Locale.ROOT;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -994,7 +995,7 @@ public class SparqlTest
                     lang = attributes.getValue("xml:lang");
 
                     if(lang != null)
-                        lang = lang.toLowerCase();
+                        lang = lang.toLowerCase(ROOT);
 
                     direction = attributes.getValue("its:dir");
                     datatype = attributes.getValue("datatype");

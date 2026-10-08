@@ -8,6 +8,7 @@ import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
 import static java.lang.String.format;
+import static java.util.Locale.ROOT;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Objects;
@@ -79,7 +80,7 @@ public class IntegerUserIriClass extends SimpleUserIriClass
         if(pattern != null)
             builder.append("(" + pattern + ")");
         else if(length > 0)
-            builder.append(format("[0-9]{%d}", length));
+            builder.append(format(ROOT, "[0-9]{%d}", length));
         else if(sqlType.equals(INT2))
             builder.append(generateMaxNumberPattern("32767", -length));
         else if(sqlType.equals(INT4))
@@ -254,22 +255,23 @@ public class IntegerUserIriClass extends SimpleUserIriClass
         StringBuilder builder = new StringBuilder();
 
         if(minLength == 0)
-            builder.append(format("(0|[1-9][0-9]{0,%d}|", max.length() - 2));
+            builder.append(format(ROOT, "(0|[1-9][0-9]{0,%d}|", max.length() - 2));
         else if(max.length() - minLength == 1)
-            builder.append(format("([0-9]{%d}|", minLength));
+            builder.append(format(ROOT, "([0-9]{%d}|", minLength));
         else if(max.length() - minLength == 2)
-            builder.append(format("([1-9]?[0-9]{%d}|", minLength));
+            builder.append(format(ROOT, "([1-9]?[0-9]{%d}|", minLength));
         else
-            builder.append(format("(([1-9][0-9]{0,%d})?[0-9]{%d}|", max.length() - 2 - minLength, minLength));
+            builder.append(format(ROOT, "(([1-9][0-9]{0,%d})?[0-9]{%d}|", max.length() - 2 - minLength, minLength));
 
-        builder.append(format("[1-%d][0-9]{%d}|", max.charAt(0) - '0' - 1, max.length() - 1));
+        builder.append(format(ROOT, "[1-%d][0-9]{%d}|", max.charAt(0) - '0' - 1, max.length() - 1));
 
         for(int i = 1; i < max.length() - 1; i++)
             if(max.charAt(i) > '0')
-                builder.append(format("%s[0-%d][0-9]{%d}|", max.substring(0, i), max.charAt(i) - '0' - 1,
+                builder.append(format(ROOT, "%s[0-%d][0-9]{%d}|", max.substring(0, i), max.charAt(i) - '0' - 1,
                         max.length() - i - 1));
 
-        builder.append(format("%s[0-%d])", max.substring(0, max.length() - 1), max.charAt(max.length() - 1) - '0'));
+        builder.append(
+                format(ROOT, "%s[0-%d])", max.substring(0, max.length() - 1), max.charAt(max.length() - 1) - '0'));
 
         return builder.toString();
     }

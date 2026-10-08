@@ -16,6 +16,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLanguageTag
 import static cz.iocb.sparql.engine.translator.TermGenerator.getIri;
 import static cz.iocb.sparql.engine.translator.TermGenerator.getLiteral;
 import static cz.iocb.sparql.engine.translator.TermGenerator.getVariable;
+import static java.util.Locale.ROOT;
 import java.util.LinkedList;
 import java.util.List;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryArithmetic;
@@ -198,7 +199,8 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         if(function.equalsIgnoreCase("if") && arguments.size() > 0)
             arguments.set(0, SqlEffectiveBooleanValue.create(request.getConfiguration(), arguments.get(0)));
 
-        return SqlBuiltinCall.create(request, function.toLowerCase(), builtInCallExpression.isDistinct(), arguments);
+        return SqlBuiltinCall.create(request, function.toLowerCase(ROOT), builtInCallExpression.isDistinct(),
+                arguments);
     }
 
 

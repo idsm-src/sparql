@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.error;
 
+import static java.util.Locale.ROOT;
 import java.io.Serializable;
 import cz.iocb.sparql.engine.model.base.Range;
 
@@ -43,7 +44,7 @@ public class TranslateMessage implements Serializable
     {
         this.range = range;
         this.category = erType.getCategory();
-        this.message = String.format(erType.getText(), o);
+        this.message = String.format(ROOT, erType.getText(), o);
     }
 
 

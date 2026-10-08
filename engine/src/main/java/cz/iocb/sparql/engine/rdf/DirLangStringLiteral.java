@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.rdf;
 
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.rdfDirLangStringIri;
+import static java.util.Locale.ROOT;
 import java.util.Objects;
 
 
@@ -94,7 +95,7 @@ public class DirLangStringLiteral extends Literal
         if(direction == null)
             throw new IllegalArgumentException();
 
-        this.tag = tag.toLowerCase();
+        this.tag = tag.toLowerCase(ROOT);
         this.direction = direction;
     }
 

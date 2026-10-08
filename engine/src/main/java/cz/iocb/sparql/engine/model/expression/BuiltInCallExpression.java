@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.model.expression;
 
+import static java.util.Locale.ROOT;
 import java.util.Collection;
 import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 
@@ -85,7 +86,7 @@ public class BuiltInCallExpression extends CallExpression
      */
     public boolean isAggregateFunction()
     {
-        switch(functionName.toLowerCase())
+        switch(functionName.toLowerCase(ROOT))
         {
             // aggregate functions according to SPARQL 1.1
             case "count":

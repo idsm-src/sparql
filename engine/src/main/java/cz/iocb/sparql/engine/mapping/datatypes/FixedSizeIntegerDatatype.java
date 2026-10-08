@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.mapping.datatypes;
 
 import static java.lang.String.format;
+import static java.util.Locale.ROOT;
 import java.math.BigInteger;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.rdf.Iri;
@@ -72,16 +73,17 @@ public abstract sealed class FixedSizeIntegerDatatype extends GenericIntegerData
         if(last == 1)
             builder.append("|[1-9]");
         else if(last > 1)
-            builder.append(format("|[1-9][0-9]{0,%d}", last - 1));
+            builder.append(format(ROOT, "|[1-9][0-9]{0,%d}", last - 1));
 
         // numbers having the same number of digits but a smaller leading digit
         if(digits.charAt(0) > '1')
-            builder.append(format("|[1-%c][0-9]{%d}", digits.charAt(0) - 1, last));
+            builder.append(format(ROOT, "|[1-%c][0-9]{%d}", digits.charAt(0) - 1, last));
 
         // numbers sharing a prefix with the limit and having a smaller digit at the first differing position
         for(int i = 1; i < last; i++)
             if(digits.charAt(i) > '0')
-                builder.append(format("|%s[0-%c][0-9]{%d}", digits.substring(0, i), digits.charAt(i) - 1, last - i));
+                builder.append(
+                        format(ROOT, "|%s[0-%c][0-9]{%d}", digits.substring(0, i), digits.charAt(i) - 1, last - i));
 
         // numbers sharing all but the last digit with the limit
         builder.append(format("|%s[0-%c]", digits.substring(0, last), digits.charAt(last)));

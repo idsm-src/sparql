@@ -10,6 +10,7 @@ import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.intersect;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.translator.TermGenerator.getIri;
 import static cz.iocb.sparql.engine.translator.TermGenerator.getTerm;
+import static java.util.Locale.ROOT;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -533,7 +534,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         for(Component component : Component.values())
         {
             SqlExpressionIntercode node = SqlVariable.create(relations, intercode.getVariableBindings().get(variable));
-            SqlExpressionIntercode part = SqlBuiltinCall.create(request, component.name().toLowerCase(), false,
+            SqlExpressionIntercode part = SqlBuiltinCall.create(request, component.name().toLowerCase(ROOT), false,
                     List.of(node));
 
             intercode = matchTerm(terms.get(component.ordinal()), part, intercode);
