@@ -965,8 +965,10 @@ public final class SqlTableAccess extends SqlIntercode
     private static SqlIntercode joinWithValues(ClassRelations relations, SqlTableAccess left, SqlValues right,
             Restrictions restrictions)
     {
+        // the conditions are evaluated inside the access, so they refer to the table's own columns and expressions,
+        // not to the aliases under which the access exposes them
         Conditions conditions = Conditions.and(left.conditions,
-                right.asConditions(left.schema, left.table, left.getVariableBindings()));
+                right.asConditions(left.schema, left.table, left.internal));
 
         return create(left.schema, left.table, conditions, left.internal.restrict(relations, restrictions),
                 left.reduced, left.distinctColumns);

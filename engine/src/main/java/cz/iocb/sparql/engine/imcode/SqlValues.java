@@ -136,7 +136,7 @@ public final class SqlValues extends SqlIntercode
      *
      * @param schema the database schema of the access to merge into
      * @param table the table of the access to merge into
-     * @param outerBindings bindings of the access to merge into
+     * @param outerBindings bindings of the access to merge into, in terms of the columns and expressions of its table
      * @return the rows as a disjunction of equality conditions on the given outer bindings, used to merge the values
      *         into a table access
      */
