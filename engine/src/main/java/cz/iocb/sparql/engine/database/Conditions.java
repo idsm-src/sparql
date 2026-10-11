@@ -159,7 +159,7 @@ public class Conditions
      */
     public static Conditions or(Conditions... conditions)
     {
-        Conditions result = new Conditions(true);
+        Conditions result = new Conditions(false);
 
         for(Conditions condition : conditions)
             result = or(result, condition);
