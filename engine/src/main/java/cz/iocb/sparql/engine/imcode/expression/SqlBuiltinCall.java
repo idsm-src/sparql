@@ -2319,11 +2319,12 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                 if(resultClass.equals(xsdString) || isFixedTagClass(resultClass))
                 {
-                    builder.append("concat(");
+                    // the operator || is strict, whereas concat() takes a NULL argument as an empty string
+                    builder.append("(");
                     builder.append(arguments.get(0).getStringLiteral());
 
                     for(int i = 1; i < arguments.size(); i++)
-                        builder.append(", ").append(arguments.get(i).getStringLiteral());
+                        builder.append(" || ").append(arguments.get(i).getStringLiteral());
 
                     builder.append(")");
                 }
