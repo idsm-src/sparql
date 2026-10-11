@@ -27,9 +27,9 @@ public class SqlType
     public static final SqlType BOOL = builtin("bool", Boolean.class, "boolean");
 
     /**
-     * PostgreSQL {@code character}.
+     * PostgreSQL {@code character}, which the catalog names {@code bpchar}.
      */
-    public static final SqlType CHAR = builtin("char", Character.class, "character");
+    public static final SqlType CHAR = builtin("char", Character.class, "character", "bpchar");
 
     /**
      * PostgreSQL {@code smallint}.

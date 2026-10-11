@@ -400,7 +400,10 @@ public final class SqlRecursive extends SqlIntercode
 
         for(ResourceClass resClass : endVarClasses)
         {
-            List<Column> columns = nextEndBinding != null ? nextEndBinding.deriveMapping(relations, resClass) : null;
+            // the step delivers the node through its alias, and a conversion to the class of the recursion cannot be
+            // qualified afterwards, so it is built over the qualified columns
+            List<Column> columns = nextEndBinding != null ?
+                    nextEndBinding.deriveMapping(relations, resClass, rightTable) : null;
 
             for(int j = 0; j < resClass.getColumnCount(); j++)
             {
@@ -411,7 +414,7 @@ public final class SqlRecursive extends SqlIntercode
                 hasUnionSelect = true;
 
                 if(columns != null)
-                    builder.append(columns.get(j).fromTable(rightTable));
+                    builder.append(columns.get(j));
                 else
                     builder.append("NULL");
             }

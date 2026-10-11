@@ -78,6 +78,18 @@ public class ColumnSpecificationTest
         assertFalse(column.canBeNull());
 
         assertEquals("'1'::int4", getColumn("'1'::integer").toString());
+        assertEquals("'P'::char", getColumn("'P'::bpchar").toString());
+    }
+
+
+    @Test
+    void catalogTypeNames()
+    {
+        assertEquals(SqlType.CHAR, SqlType.of("bpchar"));
+        assertEquals(SqlType.CHAR, SqlType.of("character"));
+        assertEquals(SqlType.VARCHAR, SqlType.of("varchar"));
+        assertEquals(SqlType.INT2, SqlType.of("int2"));
+        assertEquals(SqlType.TIMESTAMPTZ, SqlType.of("timestamptz"));
     }
 
 
