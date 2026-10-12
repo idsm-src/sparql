@@ -661,15 +661,17 @@ public class DatabaseSchema
 
     /**
      * A foreign key from {@code childTable} to {@code parentTable} all of whose pairs are among the given join pairs
-     * and whose child columns cover, through the pairs, all of {@code parentColumns}, or null. The parent side of the
-     * join can then be dropped.
+     * and whose parent columns cover all of {@code parentColumns}, or null. The parent side of the join can then be
+     * dropped, because a child row has the values of exactly those parent columns. A parent column paired with a key
+     * child column through an equality of the parent is not covered: the equality itself has no child column to be
+     * moved onto.
      *
      * @param parentTable the referenced table
      * @param childTable the referencing table
      * @param columns the join column pairs
      * @param parentColumns columns of the referenced table
      * @return A foreign key from {@code childTable} to {@code parentTable} all of whose pairs are among the given join
-     *         pairs and whose child columns cover, through the pairs, all of {@code parentColumns}, or null
+     *         pairs and whose parent columns cover all of {@code parentColumns}, or null
      */
     public Set<ColumnPair> getCompatibleForeignKey(SourceTable parentTable, SourceTable childTable,
             Set<ColumnPair> columns, Set<Column> parentColumns)
@@ -683,9 +685,7 @@ public class DatabaseSchema
                 Set<Column> covered = new HashSet<>();
 
                 for(ColumnPair keyPair : key)
-                    for(ColumnPair pair : columns)
-                        if(keyPair.getRight().equals(pair.getRight()))
-                            covered.add(pair.getLeft());
+                    covered.add(keyPair.getLeft());
 
                 if(parentColumns.stream().allMatch(c -> covered.contains(c)))
                     return key;

@@ -4,13 +4,15 @@ import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 
 
 /**
  * Disjunction and conjunction of {@link Conditions}: false and true are their neutral elements and true and false their
- * absorbing ones, also for any number of operands; and the sufficient test of an implication between disjunctions.
+ * absorbing ones, also for any number of operands; the sufficient test of an implication between disjunctions; and the
+ * columns equal to a column in every disjunct.
  */
 public class ConditionsTest
 {
@@ -25,6 +27,15 @@ public class ConditionsTest
     {
         Condition condition = new Condition();
         condition.addAreNotEqual(l, r);
+
+        return new Conditions(condition);
+    }
+
+
+    private static Conditions equal(Column l, Column r)
+    {
+        Condition condition = new Condition();
+        condition.addAreEqual(l, r);
 
         return new Conditions(condition);
     }
@@ -97,5 +108,23 @@ public class ConditionsTest
         assertTrue(ab.implies(new Conditions(true)));
         assertFalse(new Conditions(true).implies(ab));
         assertFalse(ab.implies(new Conditions(false)));
+    }
+
+
+    @Test
+    void equalColumnsInEveryDisjunct()
+    {
+        Conditions ab = equal(a, b);
+        Conditions ac = equal(a, c);
+        Conditions abAndAc = Conditions.and(ab, ac);
+        Conditions abOrAc = Conditions.or(ab, ac);
+
+        assertEquals(Set.of(a, b), ab.getEqualTableColumns(a));
+        assertEquals(Set.of(a, b, c), abAndAc.getEqualTableColumns(a));
+        assertEquals(Set.of(a), abOrAc.getEqualTableColumns(a));
+        assertEquals(Set.of(a, b), Conditions.or(ab, abAndAc).getEqualTableColumns(a));
+
+        assertEquals(Set.of(a), new Conditions(true).getEqualTableColumns(a));
+        assertEquals(Set.of(), new Conditions(false).getEqualTableColumns(a));
     }
 }

@@ -1144,11 +1144,13 @@ public final class SqlTableAccess extends SqlIntercode
     static SqlIntercode joinByForeignKey(ClassRelations relations, SqlTableAccess parent, SqlTableAccess child,
             Set<ColumnPair> key, Restrictions restrictions)
     {
+        // only the parent columns of the key have their values in the child row; a parent column equated with one of
+        // them by the parent condition must not be moved onto the same child column, which would turn that equality
+        // into a tautology
         Map<Column, Column> map = new HashMap<>();
 
         for(ColumnPair pair : key)
-            for(Column col : parent.conditions.getEqualTableColumns(pair.getLeft()))
-                map.put(col, pair.getRight());
+            map.put(pair.getLeft(), pair.getRight());
 
 
         Condition joinCondition = new Condition();

@@ -4,6 +4,7 @@ import static java.util.stream.Collectors.toSet;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Function;
 import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
 
 
@@ -209,26 +210,50 @@ public class Conditions
 
 
     /**
-     * Table columns equal to {@code col} in some disjunct.
+     * Table columns equal to {@code col} in every disjunct (including {@code col} itself if it is a table column and
+     * there is a disjunct). The result is used to decide which columns share the values of {@code col} in all the
+     * selected rows, so an equality holding in some disjunct only does not count.
      *
      * @param col the column
-     * @return table columns equal to {@code col} in some disjunct
+     * @return table columns equal to {@code col} in every disjunct
      */
     public Set<Column> getEqualTableColumns(Column col)
     {
-        return conditions.stream().flatMap(c -> c.getEqualTableColumns(col).stream()).collect(toSet());
+        return intersect(c -> c.getEqualTableColumns(col));
     }
 
 
     /**
-     * Columns equal to {@code col} in some disjunct.
+     * Columns equal to {@code col} in every disjunct (including {@code col} itself if there is a disjunct).
      *
      * @param col the column
-     * @return columns equal to {@code col} in some disjunct
+     * @return columns equal to {@code col} in every disjunct
      */
     public Set<Column> getEqualColumns(Column col)
     {
-        return conditions.stream().flatMap(c -> c.getEqualColumns(col).stream()).collect(toSet());
+        return intersect(c -> c.getEqualColumns(col));
+    }
+
+
+    /**
+     * Intersection of the sets given by the function for the disjuncts, empty if there is no disjunct.
+     *
+     * @param function the function giving the set of a disjunct
+     * @return the intersection of the sets given by the function for the disjuncts
+     */
+    private Set<Column> intersect(Function<Condition, Set<Column>> function)
+    {
+        Set<Column> result = null;
+
+        for(Condition condition : conditions)
+        {
+            if(result == null)
+                result = new HashSet<>(function.apply(condition));
+            else
+                result.retainAll(function.apply(condition));
+        }
+
+        return result != null ? result : new HashSet<>();
     }
 
 

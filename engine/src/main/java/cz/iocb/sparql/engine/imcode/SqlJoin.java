@@ -795,14 +795,14 @@ public final class SqlJoin extends SqlIntercode
             if(!columns.stream().map(p -> p.getLeft()).collect(toSet()).containsAll(parentColumns))
                 return null;
 
-            // the candidate is dropped, which requires that each of its rows has the referenced row
-            if(!columns.stream().allMatch(p -> candidate.isKnownNotNull(schema, p.getRight())))
-                return null;
-
             List<Set<ColumnPair>> keys = schema.getForeignKeys(distinct.getTable(), candidate.getTable());
 
+            // the distinct part is dropped, which requires that each candidate row references a distinct row; a
+            // foreign key matched simply guarantees that only for the rows with no null in any of its child columns,
+            // also those not joined
             for(Set<ColumnPair> key : keys)
-                if(key.containsAll(columns))
+                if(key.containsAll(columns)
+                        && key.stream().allMatch(p -> candidate.isKnownNotNull(schema, p.getRight())))
                     return SqlTableAccess.joinByForeignKey(relations, distinct, candidate, columns, restrictions);
         }
 
