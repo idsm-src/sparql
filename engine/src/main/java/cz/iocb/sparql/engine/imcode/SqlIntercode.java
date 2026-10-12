@@ -204,14 +204,21 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
         /**
-         * Adds needed classes of the variable.
+         * Adds needed classes of the variable. The stored set is replaced by a new one, because it may be immutable or
+         * shared with other restrictions.
          *
          * @param var the variable
          * @param set the needed classes
          */
         public void add(Variable var, Set<ResourceClass> set)
         {
-            map.computeIfAbsent(var, _ -> new HashSet<>()).addAll(set);
+            Set<ResourceClass> classes = new HashSet<>(set);
+            Set<ResourceClass> current = map.get(var);
+
+            if(current != null)
+                classes.addAll(current);
+
+            map.put(var, classes);
         }
 
 
@@ -223,7 +230,7 @@ public abstract class SqlIntercode extends SqlBaseClass
          */
         public void add(Variable var, ResourceClass resClass)
         {
-            map.computeIfAbsent(var, _ -> new HashSet<>()).add(resClass);
+            add(var, Set.of(resClass));
         }
 
 
