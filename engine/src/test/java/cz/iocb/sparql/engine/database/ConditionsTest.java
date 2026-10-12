@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Disjunction and conjunction of {@link Conditions}: false and true are their neutral elements and true and false their
- * absorbing ones, also for any number of operands.
+ * absorbing ones, also for any number of operands; and the sufficient test of an implication between disjunctions.
  */
 public class ConditionsTest
 {
@@ -75,5 +75,27 @@ public class ConditionsTest
     void conjunctionWithFalseIsFalse()
     {
         assertTrue(Conditions.and(notEqual(a, b), new Conditions(false), notEqual(b, c)).isFalse());
+    }
+
+
+    @Test
+    void implication()
+    {
+        Conditions ab = notEqual(a, b);
+        Conditions ac = notEqual(a, c);
+        Conditions abAndBc = Conditions.and(ab, notEqual(b, c));
+        Conditions abOrAc = Conditions.or(ab, ac);
+
+        assertTrue(ab.implies(ab));
+        assertTrue(abAndBc.implies(ab));
+        assertFalse(ab.implies(abAndBc));
+        assertTrue(ab.implies(abOrAc));
+        assertFalse(abOrAc.implies(ab));
+        assertTrue(abOrAc.implies(abOrAc));
+
+        assertTrue(new Conditions(false).implies(ab));
+        assertTrue(ab.implies(new Conditions(true)));
+        assertFalse(new Conditions(true).implies(ab));
+        assertFalse(ab.implies(new Conditions(false)));
     }
 }

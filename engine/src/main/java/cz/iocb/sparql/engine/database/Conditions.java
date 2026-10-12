@@ -191,6 +191,24 @@ public class Conditions
 
 
     /**
+     * True if the disjunction is shown to imply the other one: each of its disjuncts contains, after the normalization,
+     * all the predicates of some disjunct of the other one. The test is sufficient, not necessary: false means that the
+     * implication has not been shown.
+     *
+     * @param other the implied disjunction
+     * @return true if the disjunction is shown to imply the other one, false otherwise
+     */
+    public boolean implies(Conditions other)
+    {
+        for(Condition condition : conditions)
+            if(other.conditions.stream().noneMatch(c -> Condition.and(condition, c).equals(condition)))
+                return false;
+
+        return true;
+    }
+
+
+    /**
      * Table columns equal to {@code col} in some disjunct.
      *
      * @param col the column

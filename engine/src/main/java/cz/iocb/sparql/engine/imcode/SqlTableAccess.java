@@ -813,34 +813,38 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * Foreign key allowing a distinct union of the parent and child accesses to be merged (each parent row has exactly
-     * one child row), or null.
+     * True if a distinct union of the parent and child accesses can be merged into the parent access along a foreign
+     * key. A child row whose key columns are not null references a parent row and has its values, so the parent access
+     * yields the values of all such child rows when it takes every parent row or when the condition of the child
+     * implies its condition. Otherwise the parent access misses the child rows that reference parent rows failing its
+     * condition, and widening its condition by that of the child is not exact either: a parent row that meets only the
+     * condition of the child need not be referenced by any child row.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param schema the database schema
      * @param parent access to the referenced table
      * @param child access to the referencing table
-     * @return foreign key allowing a distinct union of the parent and child accesses to be merged (each parent row has
-     *         exactly one child row), or null
+     * @return true if a distinct union of the parent and child accesses can be merged into the parent access, false
+     *         otherwise
      */
-    private static Set<ColumnPair> canBeDistinctUnionizedByForeignKey(ClassRelations relations, DatabaseSchema schema,
+    private static boolean canBeDistinctUnionizedByForeignKey(ClassRelations relations, DatabaseSchema schema,
             SqlTableAccess parent, SqlTableAccess child)
     {
         if(parent.table == null || child.table == null || schema.getForeignKeys(parent.table, child.table).isEmpty())
-            return null;
+            return false;
 
         // because we cannot rewrite expressions
         if(child.hasExpression())
-            return null;
+            return false;
 
         // the sets of variables (and their resource classes) have to be the same
 
         if(!parent.internal.getVariables().equals(child.internal.getVariables()))
-            return null;
+            return false;
 
         if(parent.internal.getVariables().stream().anyMatch(n -> !parent.internal.get(n).getMappings().keySet()
                 .equals(child.internal.get(n).getMappings().keySet())))
-            return null;
+            return false;
 
         Set<ColumnPair> columns = new HashSet<>();
 
@@ -859,17 +863,34 @@ public final class SqlTableAccess extends SqlIntercode
             }
         }
 
-        // the child is dropped, which requires that each child row has the referenced parent row
-        if(!columns.stream().allMatch(p -> child.isKnownNotNull(schema, p.getRight())))
-            return null;
-
         Set<Column> childColumns = new HashSet<>();
         childColumns.addAll(child.getVariableBindings().getNonConstantColumns());
 
         if(!child.conditions.isTrue())
             childColumns.addAll(child.conditions.getNonConstantColumns());
 
-        return schema.isPartOfForeignKey(parent.table, child.table, columns, childColumns);
+        Set<ColumnPair> key = schema.isPartOfForeignKey(parent.table, child.table, columns, childColumns);
+
+        // the child is dropped, which requires that each child row references a parent row; a foreign key matched
+        // simply guarantees that only for the rows with no null in the key columns
+        if(key == null || !key.stream().allMatch(p -> child.isKnownNotNull(schema, p.getRight())))
+            return false;
+
+        if(parent.conditions.isTrue())
+            return true;
+
+        // a child condition with a trivially true disjunct cannot imply the condition of the parent
+        if(child.conditions.isTrue())
+            return false;
+
+        // the condition of the child moved from the child columns of the key, the only ones it refers to, onto their
+        // parent columns
+        Map<Column, Column> map = new HashMap<>();
+
+        for(ColumnPair pair : key)
+            map.put(pair.getRight(), pair.getLeft());
+
+        return remap(map, child.conditions).implies(parent.conditions);
     }
 
 
@@ -1230,33 +1251,16 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * Merges a distinct union of a parent and a child access along a foreign key into an access to the parent table
-     * with the disjunction of the conditions.
+     * Merges a distinct union of a parent and a child access along a foreign key into the parent access, which yields
+     * the values of all the child rows (see {@link #canBeDistinctUnionizedByForeignKey}).
      *
      * @param parent access to the referenced table
      * @param child access to the referencing table
-     * @param key the foreign key
      * @return the merged access
      */
-    private static SqlIntercode distinctUnionizeByForeignKey(SqlTableAccess parent, SqlTableAccess child,
-            Set<ColumnPair> key)
+    private static SqlIntercode distinctUnionizeByForeignKey(SqlTableAccess parent, SqlTableAccess child)
     {
-        Conditions conditions = null;
-
-        if(parent.conditions.isTrue())
-        {
-            conditions = new Conditions(parent.conditions);
-        }
-        else
-        {
-            Map<Column, Column> map = new HashMap<>();
-
-            for(ColumnPair pair : key)
-                for(Column col : child.conditions.getEqualTableColumns(pair.getRight()))
-                    map.put(col, pair.getLeft());
-
-            conditions = Conditions.or(parent.conditions, remap(map, child.conditions));
-        }
+        Conditions conditions = new Conditions(parent.conditions);
 
         VariableBindings bindings = new VariableBindings();
 
@@ -1388,15 +1392,11 @@ public final class SqlTableAccess extends SqlIntercode
     public static SqlIntercode tryReduceDistinctUnion(ClassRelations relations, DatabaseSchema schema,
             SqlTableAccess left, SqlTableAccess right)
     {
-        Set<ColumnPair> dropRight = SqlTableAccess.canBeDistinctUnionizedByForeignKey(relations, schema, left, right);
+        if(SqlTableAccess.canBeDistinctUnionizedByForeignKey(relations, schema, left, right))
+            return SqlTableAccess.distinctUnionizeByForeignKey(left, right);
 
-        if(dropRight != null)
-            return SqlTableAccess.distinctUnionizeByForeignKey(left, right, dropRight);
-
-        Set<ColumnPair> dropLeft = SqlTableAccess.canBeDistinctUnionizedByForeignKey(relations, schema, right, left);
-
-        if(dropLeft != null)
-            return SqlTableAccess.distinctUnionizeByForeignKey(right, left, dropLeft);
+        if(SqlTableAccess.canBeDistinctUnionizedByForeignKey(relations, schema, right, left))
+            return SqlTableAccess.distinctUnionizeByForeignKey(right, left);
 
 
         if(SqlTableAccess.canBeDistinctUnionizedByPrimaryKey(schema, left, right))
