@@ -473,6 +473,56 @@ public class Condition
 
 
     /**
+     * Resolution of the two conditions on a null test: when one of them requires a column to be null, the other
+     * requires it to be not null and the conditions agree otherwise, their disjunction is the condition without the
+     * test, which is returned; null when the conditions have no such form. A not-null requirement made redundant by a
+     * comparison is not a stored predicate, so such a condition is not resolved.
+     *
+     * @param other the other condition
+     * @return the disjunction of the conditions without the resolved null test, or null
+     */
+    public Condition resolve(Condition other)
+    {
+        if(!areEqual.equals(other.areEqual) || !areNotDistinct.equals(other.areNotDistinct)
+                || !areNotEqual.equals(other.areNotEqual))
+            return null;
+
+        Condition result = resolve(this, other);
+
+        return result != null ? result : resolve(other, this);
+    }
+
+
+    /**
+     * Resolution of two conditions agreeing in their comparisons, see {@link #resolve(Condition)}: the first one
+     * requires the resolved column to be null, the second one requires it to be not null.
+     *
+     * @param nullSide the condition with the null test
+     * @param notNullSide the condition with the not-null test
+     * @return the disjunction of the conditions without the resolved null test, or null
+     */
+    private static Condition resolve(Condition nullSide, Condition notNullSide)
+    {
+        if(nullSide.isNull.size() != notNullSide.isNull.size() + 1
+                || notNullSide.isNotNull.size() != nullSide.isNotNull.size() + 1)
+            return null;
+
+        if(!nullSide.isNull.containsAll(notNullSide.isNull) || !notNullSide.isNotNull.containsAll(nullSide.isNotNull))
+            return null;
+
+        Column column = nullSide.isNull.stream().filter(c -> !notNullSide.isNull.contains(c)).findAny().get();
+
+        if(!notNullSide.isNotNull.contains(column) || nullSide.isNotNull.contains(column))
+            return null;
+
+        Condition result = new Condition(notNullSide);
+        result.isNotNull.remove(column);
+
+        return result;
+    }
+
+
+    /**
      * True if the condition contains no predicate.
      *
      * @return true if the condition contains no predicate, false otherwise

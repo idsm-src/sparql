@@ -11,8 +11,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Disjunction and conjunction of {@link Conditions}: false and true are their neutral elements and true and false their
- * absorbing ones, also for any number of operands; the sufficient test of an implication between disjunctions; and the
- * columns equal to a column in every disjunct.
+ * absorbing ones, also for any number of operands; the sufficient test of an implication between disjunctions; the
+ * columns equal to a column in every disjunct; and the resolution of disjuncts on complementary null tests.
  */
 public class ConditionsTest
 {
@@ -36,6 +36,24 @@ public class ConditionsTest
     {
         Condition condition = new Condition();
         condition.addAreEqual(l, r);
+
+        return new Conditions(condition);
+    }
+
+
+    private static Conditions isNull(Column c)
+    {
+        Condition condition = new Condition();
+        condition.addIsNull(c);
+
+        return new Conditions(condition);
+    }
+
+
+    private static Conditions isNotNull(Column c)
+    {
+        Condition condition = new Condition();
+        condition.addIsNotNull(c);
 
         return new Conditions(condition);
     }
@@ -126,5 +144,31 @@ public class ConditionsTest
 
         assertEquals(Set.of(a), new Conditions(true).getEqualTableColumns(a));
         assertEquals(Set.of(), new Conditions(false).getEqualTableColumns(a));
+    }
+
+
+    @Test
+    void complementaryNullTests()
+    {
+        Conditions bc = notEqual(b, c);
+
+        assertTrue(Conditions.or(isNull(a), isNotNull(a)).isTrue());
+        assertEquals(bc, Conditions.or(Conditions.and(isNull(a), bc), Conditions.and(isNotNull(a), bc)));
+        assertEquals(bc, Conditions.or(Conditions.and(isNotNull(a), bc), Conditions.and(isNull(a), bc)));
+
+        assertEquals(2, Conditions.or(isNull(a), isNotNull(b)).getConditions().size());
+        assertEquals(2, Conditions.or(Conditions.and(isNull(a), bc), isNotNull(a)).getConditions().size());
+        assertEquals(2, Conditions.or(Conditions.and(isNull(a), isNull(b)), isNotNull(a)).getConditions().size());
+
+        Conditions nested = Conditions.or(Conditions.and(isNull(a), isNull(b)), Conditions.and(isNull(a), isNotNull(b)),
+                isNotNull(a));
+
+        assertTrue(nested.isTrue());
+        assertEquals(1, nested.getConditions().size());
+
+        Conditions copy = new Conditions(Conditions.and(isNull(a), bc));
+        copy.add(Conditions.and(isNotNull(a), bc));
+
+        assertEquals(bc, copy);
     }
 }

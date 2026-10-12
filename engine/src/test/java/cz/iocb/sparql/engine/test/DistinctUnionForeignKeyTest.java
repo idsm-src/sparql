@@ -43,11 +43,11 @@ import cz.iocb.sparql.testing.Database;
  * condition. Otherwise the merged access would miss the child rows that reference parent rows failing its condition,
  * or, widened by the condition of the child, take parent rows that no child row references.
  *
- * The table {@code parent} holds the items 1 to 4 of the kinds 1, 2, 2 and 3, the table {@code child} references the
- * items 3 (flag 0) and 4 (flag 1), so no child row references the items 1 and 2. The table {@code pair} with the
- * composite key (a, b) holds the pairs (1, 7) and (2, 2); the table {@code pair_child} references the pair (1, 7), and
- * the table {@code pair_child_null}, whose column b is nullable, references the pair (1, 7) and holds the row (9,
- * NULL), which references no pair.
+ * The table {@code parent} holds the items 1 to 4 of the kinds 1, 2, 2 and 3, the items 2 and 4 having a note, the
+ * table {@code child} references the items 3 (flag 0) and 4 (flag 1), so no child row references the items 1 and 2. The
+ * table {@code pair} with the composite key (a, b) holds the pairs (1, 7) and (2, 2); the table {@code pair_child}
+ * references the pair (1, 7), and the table {@code pair_child_null}, whose column b is nullable, references the pair
+ * (1, 7) and holds the row (9, NULL), which references no pair.
  */
 public class DistinctUnionForeignKeyTest
 {
@@ -69,12 +69,13 @@ public class DistinctUnionForeignKeyTest
 
     /**
      * Creates the {@code fkunion_test} schema with its tables and maps them. The items of {@code parent} are typed
-     * ex:Item (every item), ex:KindOne (the items of the kind 1) and ex:NotSecond (the items other than 2), and the
-     * rows of {@code child} refer to their items by ex:refers (every row), ex:refersNotSecond (the rows not referencing
-     * the item 2), ex:refersNotThird (the rows not referencing the item 3) and ex:refersFlagged (the rows with the flag
-     * 1). The pairs are typed ex:Pair (every pair) and ex:PairNotSeven (the pairs whose b is not 7), the rows of
-     * {@code pair_child} refer to the a of their pairs by ex:equalNotSeven (a = b and a is not 7) and ex:notSeven (a is
-     * not 7), and the rows of {@code pair_child_null} by ex:refersPair (every row).
+     * ex:Item (every item), ex:KindOne (the items of the kind 1), ex:NotSecond (the items other than 2), ex:Noted (the
+     * items with a note) and ex:Unnoted (the items without a note), and the rows of {@code child} refer to their items
+     * by ex:refers (every row), ex:refersNotSecond (the rows not referencing the item 2), ex:refersNotThird (the rows
+     * not referencing the item 3) and ex:refersFlagged (the rows with the flag 1). The pairs are typed ex:Pair (every
+     * pair) and ex:PairNotSeven (the pairs whose b is not 7), the rows of {@code pair_child} refer to the a of their
+     * pairs by ex:equalNotSeven (a = b and a is not 7) and ex:notSeven (a is not 7), and the rows of
+     * {@code pair_child_null} by ex:refersPair (every row).
      *
      * @throws SQLException on database errors
      */
@@ -87,8 +88,9 @@ public class DistinctUnionForeignKeyTest
         {
             statement.execute("create schema fkunion_test");
 
-            statement.execute("create table fkunion_test.parent (id int primary key, kind int not null)");
-            statement.execute("insert into fkunion_test.parent values (1, 1), (2, 2), (3, 2), (4, 3)");
+            statement.execute("create table fkunion_test.parent (id int primary key, kind int not null, note int)");
+            statement.execute(
+                    "insert into fkunion_test.parent values (1, 1, null), (2, 2, 7), (3, 2, null), " + "(4, 3, 9)");
 
             statement.execute("create table fkunion_test.child (id int primary key, "
                     + "parent int not null references fkunion_test.parent(id), flag int not null)");
@@ -129,6 +131,12 @@ public class DistinctUnionForeignKeyTest
 
         config.addQuadMapping(parent, graph, config.createIriMapping("item", "id"), config.createIriMapping("rdf:type"),
                 config.createIriMapping("ex:NotSecond"), config.createAreNotEqualCondition("id", "'2'::int4"));
+
+        config.addQuadMapping(parent, graph, config.createIriMapping("item", "id"), config.createIriMapping("rdf:type"),
+                config.createIriMapping("ex:Noted"), config.createIsNotNullCondition(parent, "note"));
+
+        config.addQuadMapping(parent, graph, config.createIriMapping("item", "id"), config.createIriMapping("rdf:type"),
+                config.createIriMapping("ex:Unnoted"), config.createIsNullCondition(parent, "note"));
 
         config.addQuadMapping(child, graph, config.createIriMapping("child", "id"),
                 config.createIriMapping("ex:refers"), config.createIriMapping("item", "parent"));
@@ -273,6 +281,18 @@ public class DistinctUnionForeignKeyTest
     void unconditionedParent() throws Exception
     {
         String query = "SELECT DISTINCT ?y WHERE { { ?y a ex:Item } UNION { ?c ex:refers ?y } }";
+
+        assertThat(execute(query), containsInAnyOrder(item(1), item(2), item(3), item(4)));
+        assertThat(translate(query), not(containsString("\"child\"")));
+    }
+
+
+    @Test
+    @DisplayName("parent conditions complementary in a null test take every parent row and absorb the child")
+    void complementaryParentConditions() throws Exception
+    {
+        String query = "SELECT DISTINCT ?y WHERE { { ?y a ex:Noted } UNION { ?y a ex:Unnoted } "
+                + "UNION { ?c ex:refers ?y } }";
 
         assertThat(execute(query), containsInAnyOrder(item(1), item(2), item(3), item(4)));
         assertThat(translate(query), not(containsString("\"child\"")));

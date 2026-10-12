@@ -11,7 +11,9 @@ import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
 
 /**
  * Disjunction of {@link Condition}s, i.e. a condition in disjunctive normal form. No disjunct means false, a disjunct
- * without predicates means true.
+ * without predicates means true. Two disjuncts differing only in a null test of a column, one requiring the column to
+ * be null and the other to be not null, are replaced by their resolvent, the disjunct without the test (see
+ * {@link Condition#resolve}), so a disjunction of complementary null tests is true also syntactically.
  */
 public class Conditions
 {
@@ -56,13 +58,25 @@ public class Conditions
 
 
     /**
-     * Adds a disjunct.
+     * Adds a disjunct, resolved on null tests with the present disjuncts as long as possible.
      *
      * @param condition the disjunct
      */
     public void add(Condition condition)
     {
-        conditions.add(condition);
+        Condition resolvent = null;
+
+        for(Condition other : conditions)
+            if((resolvent = condition.resolve(other)) != null)
+            {
+                conditions.remove(other);
+                break;
+            }
+
+        if(resolvent != null)
+            add(resolvent);
+        else
+            conditions.add(condition);
     }
 
 
@@ -73,7 +87,8 @@ public class Conditions
      */
     public void add(Conditions other)
     {
-        conditions.addAll(other.conditions);
+        for(Condition condition : other.conditions)
+            add(condition);
     }
 
 
