@@ -478,28 +478,96 @@ public final class DerivedClass extends ResourceClass
     private static boolean isSubclassOf(ClassRelations relations, Set<Map<PrimitiveResourceClass, Boolean>> left,
             Set<Map<PrimitiveResourceClass, Boolean>> right)
     {
+        Set<PrimitiveResourceClass> classes = getPositiveClasses(right);
+
+        if(classes != null)
+            return left.stream().allMatch(term -> isCoveredByClasses(relations, term, classes));
+
         ArrayList<Map<PrimitiveResourceClass, Boolean>> rightTerms = new ArrayList<>(right);
 
         rightTerms.sort(Comparator.comparingInt(term -> term.size()));
 
         for(Map<PrimitiveResourceClass, Boolean> leftTerm : left)
-        {
-            assert !isEmpty(relations, leftTerm);
-
-            if(existsOutsideRight(relations, leftTerm, rightTerms, 0))
+            if(!isEmpty(relations, leftTerm) && existsOutsideRight(relations, leftTerm, rightTerms, 0))
                 return false;
-        }
 
         return true;
     }
 
 
     /**
-     * True if some value of {@code left} lies outside all terms of {@code right} from {@code index} on; recursion
-     * splits {@code left} by the literals of the current right term.
+     * The classes of a normal form whose terms are all single positive literals, or null when some term is not.
+     *
+     * @param terms the normal form
+     * @return the classes of the terms, or null when some term is not a single positive literal
+     */
+    private static Set<PrimitiveResourceClass> getPositiveClasses(
+            Collection<Map<PrimitiveResourceClass, Boolean>> terms)
+    {
+        Set<PrimitiveResourceClass> classes = new HashSet<>();
+
+        for(Map<PrimitiveResourceClass, Boolean> term : terms)
+        {
+            if(term.size() != 1)
+                return null;
+
+            Entry<PrimitiveResourceClass, Boolean> literal = term.entrySet().iterator().next();
+
+            if(!literal.getValue())
+                return null;
+
+            classes.add(literal.getKey());
+        }
+
+        return classes;
+    }
+
+
+    /**
+     * True if the term lies within the union of the classes, which is what {@link #existsOutsideRight} decides for
+     * terms of single positive literals, found without the search: a non-empty term lies within the union exactly when
+     * one of its positive classes is one of the classes or a subclass of one of them that the term overlaps. The
+     * negated classes of the term are not split by positive classes, and the union of several classes covers no term
+     * that none of them covers, because the normal forms do not know that a class lies within a union of unrelated
+     * classes.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
-     * @param left the term to test
+     * @param term the term to test
+     * @param classes the classes
+     * @return true if the term lies within the union of the classes, false otherwise
+     */
+    private static boolean isCoveredByClasses(ClassRelations relations, Map<PrimitiveResourceClass, Boolean> term,
+            Set<PrimitiveResourceClass> classes)
+    {
+        if(isEmpty(relations, term))
+            return true;
+
+        for(Entry<PrimitiveResourceClass, Boolean> literal : term.entrySet())
+        {
+            if(!literal.getValue())
+                continue;
+
+            if(classes.contains(literal.getKey()))
+                return true;
+
+            // the subclass test of the primitive classes, not their listed superclasses: a triple term class is a
+            // subclass of the classes with wider components
+            for(PrimitiveResourceClass resClass : classes)
+                if(literal.getKey().isSubclassOf(resClass) && !isEmpty(relations, term, Map.of(resClass, true)))
+                    return true;
+        }
+
+        return false;
+    }
+
+
+    /**
+     * True if some value of {@code left}, which is not empty, lies outside all terms of {@code right} from
+     * {@code index} on; recursion splits {@code left} by the literals of the current right term, adding only literals
+     * compatible with it, so that it stays non-empty.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param left the non-empty term to test
      * @param right the covering terms
      * @param index index of the right term to start at
      * @return true if some value of {@code left} lies outside all terms of {@code right} from {@code index} on, false
@@ -508,9 +576,6 @@ public final class DerivedClass extends ResourceClass
     private static boolean existsOutsideRight(ClassRelations relations, Map<PrimitiveResourceClass, Boolean> left,
             List<Map<PrimitiveResourceClass, Boolean>> right, int index)
     {
-        if(isEmpty(relations, left))
-            return false;
-
         if(index == right.size())
             return true;
 
@@ -521,10 +586,14 @@ public final class DerivedClass extends ResourceClass
 
         for(Entry<PrimitiveResourceClass, Boolean> literal : rightTerm.entrySet())
         {
-            Map<PrimitiveResourceClass, Boolean> newCurrent = new HashMap<>(left);
+            Entry<PrimitiveResourceClass, Boolean> negated = Map.entry(literal.getKey(), !literal.getValue());
 
-            if(literal.getValue().equals(newCurrent.put(literal.getKey(), !literal.getValue())))
+            // the part of the term outside the literal is empty when the negated literal excludes some of its literals
+            if(left.entrySet().stream().anyMatch(l -> isEmpty(relations, l, negated)))
                 continue;
+
+            Map<PrimitiveResourceClass, Boolean> newCurrent = new HashMap<>(left);
+            newCurrent.put(negated.getKey(), negated.getValue());
 
             if(existsOutsideRight(relations, newCurrent, right, index + 1))
                 return true;
@@ -647,6 +716,27 @@ public final class DerivedClass extends ResourceClass
             Set<Map<PrimitiveResourceClass, Boolean>> input)
     {
         Set<Map<PrimitiveResourceClass, Boolean>> terms = prepareTerms(relations, input);
+
+        Set<PrimitiveResourceClass> classes = getPositiveClasses(terms);
+
+        if(classes != null)
+        {
+            // a union of classes: a class is covered only by a superclass among the other members (see
+            // isCoveredByClasses) and the only literal of a term is never redundant, so the terms are reduced in one
+            // pass, in place to keep the order of the set as the general reduction would
+            for(Map<PrimitiveResourceClass, Boolean> term : new ArrayList<>(terms))
+            {
+                PrimitiveResourceClass resClass = term.keySet().iterator().next();
+
+                if(classes.stream().anyMatch(s -> s != resClass && resClass.isSubclassOf(s)))
+                {
+                    terms.remove(term);
+                    classes.remove(resClass);
+                }
+            }
+
+            return terms;
+        }
 
         while(true)
         {
