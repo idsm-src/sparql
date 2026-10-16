@@ -204,6 +204,12 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             Set.of(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString), box);
 
     /**
+     * Number of triple term classes above which the function TRIPLE takes the components of the most classes in their
+     * general classes instead of building a class for every combination of the component classes.
+     */
+    private static final int tripleTermClassLimit = 256;
+
+    /**
      * Lower-case function name.
      */
     private final String function;
@@ -1552,6 +1558,31 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                 if(subjectClasses.isEmpty() || predicateClasses.isEmpty() || objectClasses.isEmpty())
                     return SqlNull.get();
+
+                // too many combinations (arguments bound in most classes of the configuration, such as the variables
+                // of an unevaluated SERVICE call): the components of the most classes are taken in their general
+                // classes, the columns of which the arguments derive from all of their classes
+                long combinations = (long) subjectClasses.size() * predicateClasses.size() * objectClasses.size();
+
+                while(combinations > tripleTermClassLimit)
+                {
+                    if(subjectClasses.size() >= predicateClasses.size()
+                            && subjectClasses.size() >= objectClasses.size())
+                    {
+                        combinations /= subjectClasses.size();
+                        subjectClasses = Set.of(reference);
+                    }
+                    else if(predicateClasses.size() >= objectClasses.size())
+                    {
+                        combinations /= predicateClasses.size();
+                        predicateClasses = Set.of(iri);
+                    }
+                    else
+                    {
+                        combinations /= objectClasses.size();
+                        objectClasses = Set.of(box);
+                    }
+                }
 
                 boolean canBeNull = subject.canBeNull() || predicate.canBeNull() || object.canBeNull()
                         || subject.getResourceClasses().stream().anyMatch(r -> !isReference(r))
