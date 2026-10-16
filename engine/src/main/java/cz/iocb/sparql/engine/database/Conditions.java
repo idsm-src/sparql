@@ -58,12 +58,20 @@ public class Conditions
 
 
     /**
-     * Adds a disjunct, resolved on null tests with the present disjuncts as long as possible.
+     * Adds a disjunct: nothing when it implies a present disjunct (contains all its predicates), since it is absorbed
+     * by it; otherwise the present disjuncts implying the new one are absorbed and removed, and the disjunct is
+     * resolved on null tests with the present disjuncts as long as possible.
      *
      * @param condition the disjunct
      */
     public void add(Condition condition)
     {
+        for(Condition other : conditions)
+            if(Condition.and(condition, other).equals(condition))
+                return;
+
+        conditions.removeIf(other -> Condition.and(other, condition).equals(other));
+
         Condition resolvent = null;
 
         for(Condition other : conditions)

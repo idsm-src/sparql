@@ -171,4 +171,29 @@ public class ConditionsTest
 
         assertEquals(bc, copy);
     }
+
+
+    @Test
+    void absorption()
+    {
+        Conditions ab = Conditions.and(isNotNull(a), isNotNull(b));
+        Conditions ac = Conditions.and(isNotNull(a), isNotNull(c));
+        Conditions aNotB = Conditions.and(isNotNull(a), isNull(b));
+
+        assertEquals(isNotNull(a), Conditions.or(isNotNull(a), ab));
+        assertEquals(isNotNull(a), Conditions.or(ab, isNotNull(a)));
+        assertEquals(isNotNull(a), Conditions.or(ab, ac, isNotNull(a), Conditions.and(ab, isNull(c))));
+        assertEquals(2, Conditions.or(ab, isNotNull(c)).getConditions().size());
+        assertEquals(2, Conditions.or(aNotB, ac).getConditions().size());
+
+        // the resolvent of two disjuncts absorbs the others in both orders
+        assertEquals(isNotNull(a), Conditions.or(aNotB, ab, ac));
+        assertEquals(isNotNull(a), Conditions.or(ac, aNotB, ab));
+
+        Conditions copy = new Conditions(ab);
+        copy.add(new Condition());
+
+        assertTrue(copy.isTrue());
+        assertEquals(1, copy.getConditions().size());
+    }
 }
