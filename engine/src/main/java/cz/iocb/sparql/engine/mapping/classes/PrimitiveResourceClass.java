@@ -159,7 +159,7 @@ public sealed abstract class PrimitiveResourceClass extends ResourceClass
         if(object == this)
             return true;
 
-        if(object == null || getClass() != object.getClass())
+        if(!super.equals(object))
             return false;
 
         PrimitiveResourceClass other = (PrimitiveResourceClass) object;
