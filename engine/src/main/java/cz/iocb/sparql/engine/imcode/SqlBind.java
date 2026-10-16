@@ -4,12 +4,14 @@ import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
@@ -207,6 +209,10 @@ public final class SqlBind extends SqlIntercode
         VariableBinding binding = getVariableBindings().get(variable);
         boolean hasSelect = false;
 
+        // child columns the binding passes through under their own names (such as the tag of a language string),
+        // which the child may no longer deliver for the variables of the expression, so they are selected here
+        Set<Column> passed = new HashSet<>();
+
         for(Entry<ResourceClass, List<Column>> e : expression.getBinding().getMappings().entrySet())
         {
             List<Column> cols = e.getValue();
@@ -224,13 +230,18 @@ public final class SqlBind extends SqlIntercode
                     builder.append(" AS ");
                     builder.append(names.get(i));
                 }
+                else if(!(cols.get(i) instanceof ConstantColumn))
+                {
+                    passed.add(cols.get(i));
+                }
             }
         }
 
 
         VariableBindings tmp = new VariableBindings(getVariableBindings());
         tmp.remove(variable);
-        Set<Column> columns = tmp.getNonConstantColumns();
+        Set<Column> columns = new HashSet<>(tmp.getNonConstantColumns());
+        columns.addAll(passed);
 
         if(!columns.isEmpty())
         {

@@ -28,9 +28,10 @@ import cz.iocb.sparql.testing.Database;
 
 
 /**
- * Optimisation of a join whose child is a remote SERVICE call, which is not evaluated in the first pass: the join adds
- * the variables of the call to the restrictions it has got, also when those already require a variable in any class, as
- * the restrictions of a filter do. The service is never called, because only the first pass is run.
+ * The first optimisation pass over a remote SERVICE call, which is not evaluated in it: the join adds the variables of
+ * the call to the restrictions it has got, also when those already require a variable in any class, as the restrictions
+ * of a filter do, and the expressions over the variables of the call, bound in every class of the configuration, are
+ * translated for all of them. The service is never called, because only the first pass is run.
  */
 public class ServiceJoinRestrictionsTest
 {
@@ -108,6 +109,18 @@ public class ServiceJoinRestrictionsTest
                 SELECT ?x ?o WHERE { ?x ex:label ?l . \
                 SERVICE <http://example.org/remote/sparql> { ?x ex:remote ?o } ?o ex:label ?m \
                 FILTER(?o != ex:none) }""");
+
+        assertNotNull(imcode);
+    }
+
+
+    @Test
+    @DisplayName("STR of a SERVICE variable, bound also in the generic date and dateTime classes")
+    void stringOfServiceVariable() throws Exception
+    {
+        SqlIntercode imcode = optimize("""
+                SELECT ?x ?s WHERE { SERVICE <http://example.org/remote/sparql> { ?x ex:remote ?o } \
+                BIND(STR(?o) AS ?s) FILTER(STRSTARTS(STR(?x), "http://example.org/")) }""");
 
         assertNotNull(imcode);
     }

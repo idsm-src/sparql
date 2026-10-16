@@ -72,6 +72,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isReference;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isRtlLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isStringLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isTripleTerm;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexByte;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexDate;
@@ -814,7 +815,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     return argument;
 
                 boolean canBeNull = argument.canBeNull()
-                        || argument.getResourceClasses().stream().anyMatch(r -> hasBlankNode(r));
+                        || argument.getResourceClasses().stream().anyMatch(r -> hasBlankNode(r) || hasTripleTerm(r));
 
 
                 if(!restriction.contains(relations, xsdString))
@@ -979,7 +980,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                         builder.append(columns.get(0));
                     }
-                    else if(!isBlankNode(argumentClass))
+                    else if(!isBlankNode(argumentClass) && !isTripleTerm(argumentClass))
                     {
                         LiteralClass canonicalClass = Stream
                                 .of(xsdBoolean, xsdByte, xsdUnsignedByte, xsdShort, xsdUnsignedShort, xsdInt,
@@ -2581,7 +2582,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                             builder.append(")");
 
-                            result = List.of(new ExpressionColumn(builder.toString(), VARCHAR));
+                            result = List.of(new ExpressionColumn(builder.toString(), VARCHAR), cols.get(1));
                         }
                         else if(e.getKey() != null)
                         {
