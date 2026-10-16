@@ -605,10 +605,7 @@ public final class SqlServiceStub extends SqlIntercode
             return eval(request, context, restrictions);
 
 
-        Restrictions contextRestrictions = new Restrictions(restrictions);
-
-        for(Variable var : serviceVariables.values())
-            contextRestrictions.add(var);
+        Restrictions contextRestrictions = getContextRestrictions(restrictions);
 
         SqlIntercode optContext = context.optimize(request, contextRestrictions, reduced, evalServices);
 
@@ -652,11 +649,29 @@ public final class SqlServiceStub extends SqlIntercode
 
 
     /**
+     * Restrictions for the context of the call: what the parent needs of the variables, extended by the variables of
+     * the call, which the context may bind as well.
+     *
+     * @param restrictions what the parent needs of the variables
+     * @return restrictions for the context of the call
+     */
+    private Restrictions getContextRestrictions(Restrictions restrictions)
+    {
+        Restrictions contextRestrictions = new Restrictions(restrictions);
+
+        for(Variable var : serviceVariables.values())
+            contextRestrictions.add(var);
+
+        return contextRestrictions;
+    }
+
+
+    /**
      * Evaluates the call for the solutions of {@code context}: the SPARQL text extended by VALUES of the shared
      * variables is sent over the SPARQL protocol (in chunks when the context is large), the XML results are collected
      * by a {@link StoredResultHandler}, and the result joined with the context is returned. Results are cached per
      * context in the state shared by the stubs of one call; a failing endpoint is an error unless the service is
-     * SILENT.
+     * SILENT, when the call yields the solutions of the context with the variables of the call unbound.
      *
      * @param request the current request
      * @param context solutions the call is evaluated for
@@ -829,7 +844,8 @@ public final class SqlServiceStub extends SqlIntercode
                     if(!silent)
                         throw new ServiceException(String.format(MessageType.badServiceEndpoint.getText(), endpoint));
 
-                    return context;
+                    // the context may hold earlier calls, which the result must not keep unevaluated
+                    return context.optimize(request, getContextRestrictions(restrictions), false, true);
                 }
 
 
