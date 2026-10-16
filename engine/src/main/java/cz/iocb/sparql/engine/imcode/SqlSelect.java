@@ -1,31 +1,47 @@
 package cz.iocb.sparql.engine.imcode;
 
+import static cz.iocb.sparql.engine.database.SqlType.CHAR;
+import static cz.iocb.sparql.engine.database.SqlType.TEXT;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.determineResultClass;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDayTimeDuration;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUserType;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intScalarBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDayTimeDuration;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloatPoint;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLtrLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isRtlLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isTripleTerm;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isUnsupportedLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isUserLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.numeric;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLtrLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfRtlLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.scalarBlankNode;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.strScalarBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.tripleTerm;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.userType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
@@ -41,6 +57,9 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.database.VirtualTableDefinition;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
@@ -84,6 +103,13 @@ public final class SqlSelect extends SqlIntercode
      * Variables ordered by raw columns after the ORDER BY conditions.
      */
     private final List<Variable> simpleOrderBy;
+
+    /**
+     * Kinds of language-tagged strings in the order the box sorts them: with a base direction (right-to-left, then
+     * left-to-right) before those without.
+     */
+    private static final List<ResourceClass> languageTaggedStringKinds = List.of(rdfRtlLangString, rdfLtrLangString,
+            rdfLangString);
 
     /**
      * OFFSET, or null.
@@ -554,7 +580,7 @@ public final class SqlSelect extends SqlIntercode
                 builder.append(" FROM (SELECT ");
                 builder.append(translateInnerSelectVariables(bindings));
                 builder.append(", row_number() OVER (");
-                builder.append(translateOrderBy(relations, false));
+                builder.append(translateOrderBy(request, false));
                 builder.append(") AS \"#rn\"");
             }
 
@@ -591,7 +617,7 @@ public final class SqlSelect extends SqlIntercode
                 builder.append(" FROM (SELECT ");
                 builder.append(translateInnerSelectVariables(bindings));
                 builder.append(", row_number() OVER (");
-                builder.append(translateOrderBy(relations, false));
+                builder.append(translateOrderBy(request, false));
                 builder.append(") AS \"#rn\"");
             }
 
@@ -609,7 +635,7 @@ public final class SqlSelect extends SqlIntercode
         }
         else if(!orderBy.isEmpty() || !simpleOrderBy.isEmpty())
         {
-            builder.append(translateOrderBy(relations, true));
+            builder.append(translateOrderBy(request, true));
         }
 
         if(limit != null)
@@ -707,15 +733,48 @@ public final class SqlSelect extends SqlIntercode
 
 
     /**
-     * ORDER BY clause over the sortable representation of the variables, optionally followed by the simple ordering.
+     * Adds the column as a key of the ordering unless it is a constant, which orders nothing (and is not allowed in
+     * ORDER BY). A character key is compared by code points like in the box: unless the default collation of the
+     * database orders by code points already (the mapped character columns do in any case), it gets the collation
+     * {@code "C"}.
      *
-     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param keys the keys of the ordering
+     * @param column the column
+     * @param codepoints whether the default collation of the database orders by code points
+     */
+    private static void addOrderKey(List<String> keys, Column column, boolean codepoints)
+    {
+        if(column instanceof ConstantColumn)
+            return;
+
+        SqlType type = column.getType();
+        boolean character = type.equals(VARCHAR) || type.equals(TEXT) || type.equals(CHAR);
+
+        keys.add(character && !codepoints ? column + " COLLATE \"C\"" : column.toString());
+    }
+
+
+    /**
+     * ORDER BY clause over the sortable representation of the variables, optionally followed by the simple ordering.
+     * The kinds of terms follow the total order of the box (the operator class of {@code sparql.rdfbox}): the unbound
+     * value, blank nodes (the string ones first), IRIs, literals of unknown datatypes, user literals, language-tagged
+     * strings (right-to-left, left-to-right, without a base direction), strings, durations, dates, date-times,
+     * numerics, booleans and triple terms, so that a variable ordered by the box as a whole (one holding boxes or a
+     * class of several kinds) keeps the order of the others. The character keys are compared by code points like in the
+     * box: an IRI class supplies keys of that order through its {@code toOrderColumns}, and unless the default
+     * collation of the database orders by code points, the keys get the collation {@code "C"}.
+     *
+     * @param request the current request
      * @param withSimple whether to append the simple ordering
      * @return ORDER BY clause over the sortable representation of the variables, optionally followed by the simple
      *         ordering
      */
-    private String translateOrderBy(ClassRelations relations, boolean withSimple)
+    private String translateOrderBy(Request request, boolean withSimple)
     {
+        ClassRelations relations = request.getConfiguration();
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+        boolean codepoints = schema != null && schema.hasCodepointDefaultCollation();
+
         StringBuilder builder = new StringBuilder();
 
         builder.append(" ORDER BY ");
@@ -738,56 +797,61 @@ public final class SqlSelect extends SqlIntercode
                     sortSet.computeIfAbsent(scalarBlankNode, _ -> new HashSet<>()).add(r);
                 else if(isIri(r))
                     sortSet.computeIfAbsent(iri, _ -> new HashSet<>()).add(r);
-                else if(isNumeric(r))
-                    sortSet.computeIfAbsent(numeric, _ -> new HashSet<>()).add(r);
-                else if(isBoolean(r))
-                    sortSet.computeIfAbsent(genBoolean, _ -> new HashSet<>()).add(r);
+                else if(isUnsupportedLiteral(r))
+                    sortSet.computeIfAbsent(unsupportedType, _ -> new HashSet<>()).add(r);
+                else if(isUserLiteral(r))
+                    sortSet.computeIfAbsent(genUserType, _ -> new HashSet<>()).add(r);
+                else if(isRtlLangString(r))
+                    sortSet.computeIfAbsent(rdfRtlLangString, _ -> new HashSet<>()).add(r);
+                else if(isLtrLangString(r))
+                    sortSet.computeIfAbsent(rdfLtrLangString, _ -> new HashSet<>()).add(r);
+                else if(isLangString(r))
+                    sortSet.computeIfAbsent(rdfLangString, _ -> new HashSet<>()).add(r);
                 else if(isString(r))
                     sortSet.computeIfAbsent(xsdString, _ -> new HashSet<>()).add(r);
+                else if(isDayTimeDuration(r))
+                    sortSet.computeIfAbsent(genDayTimeDuration, _ -> new HashSet<>()).add(r);
                 else if(isDate(r))
                     sortSet.computeIfAbsent(genScalarDate, _ -> new HashSet<>()).add(r);
                 else if(isDateTime(r))
                     sortSet.computeIfAbsent(genScalarDateTime, _ -> new HashSet<>()).add(r);
+                else if(isNumeric(r))
+                    sortSet.computeIfAbsent(numeric, _ -> new HashSet<>()).add(r);
+                else if(isBoolean(r))
+                    sortSet.computeIfAbsent(genBoolean, _ -> new HashSet<>()).add(r);
                 else if(isTripleTerm(r))
                     sortSet.computeIfAbsent(tripleTerm, _ -> new HashSet<>()).add(r);
-                else if(isUserLiteral(r))
-                    sortSet.computeIfAbsent(genUserType, _ -> new HashSet<>()).add(r);
                 else
                     sortSet.computeIfAbsent(box, _ -> new HashSet<>()).add(r);
             }
 
-            // the other classes (mixed kinds of terms, literals of unknown datatypes, durations, ...) have no sortable
-            // representation but the box, whose total order is the only order defined for them and does not depend on
-            // how they are stored; the whole variable is then ordered by the box, so that the kinds of its terms keep
-            // their relative order, which also goes for user literals among terms of other kinds, as the order of the
-            // kinds in the box differs from the order of the buckets here
-            if(sortSet.get(box) != null || sortSet.get(genUserType) != null && sortSet.size() > 1)
+            // a class of terms of several kinds (the box, a mixed derived class) has no sortable representation but
+            // the box, whose total order is the only order defined for it and does not depend on how the terms are
+            // stored; the whole variable is then ordered by the box, which agrees with the keys below
+            if(sortSet.get(box) != null)
                 sortSet = Map.of(box, sortSet.values().stream().flatMap(r -> r.stream()).collect(toSet()));
 
 
+            List<String> keys = new ArrayList<>();
+
             // order unbounded (a constant condition does not order anything and is not allowed in ORDER BY)
             if(binding.canBeNull() && !isConstantCondition(binding.getIsNotNull()))
+                keys.add(binding.getIsNotNull());
+
+            // order blank nodes: the string ones before the integer ones, each kind by the values
+            if(sortSet.get(scalarBlankNode) != null)
             {
-                appendComma(builder, hasOrderCondition);
-                hasOrderCondition = true;
+                Set<ResourceClass> blankNodes = sortSet.get(scalarBlankNode);
+                String isNull = binding.getIsNull(relations, unionize(blankNodes));
 
-                builder.append(binding.getIsNotNull());
+                if(!isConstantCondition(isNull))
+                    keys.add(isNull);
 
-                if(order.getValue() == Direction.Descending)
-                    builder.append(" DESC");
-            }
+                if(blankNodes.stream().anyMatch(r -> !areDisjunct(relations, r, strScalarBlankNode)))
+                    addOrderKey(keys, binding.deriveMapping(relations, strScalarBlankNode).get(0), codepoints);
 
-            // order blank nodes
-            if(sortSet.get(scalarBlankNode) != null
-                    && !isConstantCondition(binding.getIsNull(relations, unionize(sortSet.get(scalarBlankNode)))))
-            {
-                appendComma(builder, hasOrderCondition);
-                hasOrderCondition = true;
-
-                builder.append(binding.getIsNull(relations, unionize(sortSet.get(scalarBlankNode))));
-
-                if(order.getValue() == Direction.Descending)
-                    builder.append(" DESC");
+                if(blankNodes.stream().anyMatch(r -> !areDisjunct(relations, r, intScalarBlankNode)))
+                    addOrderKey(keys, binding.deriveMapping(relations, intScalarBlankNode).get(0), codepoints);
             }
 
             // order IRIs
@@ -796,87 +860,75 @@ public final class SqlSelect extends SqlIntercode
                 Set<ResourceClass> iris = sortSet.get(iri);
 
                 if(iris.size() > 1 || !(iris.iterator().next() instanceof IriClass iriClass))
-                {
-                    appendComma(builder, hasOrderCondition);
-                    hasOrderCondition = true;
-
-                    builder.append(binding.deriveMapping(relations, iri).get(0));
-
-                    if(order.getValue() == Direction.Descending)
-                        builder.append(" DESC");
-                }
+                    addOrderKey(keys, binding.deriveMapping(relations, iri).get(0), codepoints);
                 else
-                {
                     for(Column col : iriClass.toOrderColumns(binding.getMapping(iriClass)))
-                    {
-                        appendComma(builder, hasOrderCondition);
-                        hasOrderCondition = true;
+                        addOrderKey(keys, col, codepoints);
+            }
 
-                        builder.append(col);
+            // order literals of unknown datatypes: by the lexical form, then by the datatype IRI
+            if(sortSet.get(unsupportedType) != null)
+            {
+                List<Column> columns = binding.deriveMapping(relations, unsupportedType);
 
-                        if(order.getValue() == Direction.Descending)
-                            builder.append(" DESC");
-                    }
+                addOrderKey(keys, columns.get(0), codepoints);
+                addOrderKey(keys, columns.get(1), codepoints);
+            }
+
+            // order user literals as the box orders them (without building it): by the ubox of the value, which the
+            // user type of every storage gives alike, by the datatype IRI when the classes are of several datatypes,
+            // and by the lexical form when some class keeps it, the canonical forms first
+            if(sortSet.get(genUserType) != null)
+            {
+                Set<ResourceClass> userLiterals = sortSet.get(genUserType);
+                List<Column> columns = binding.deriveMapping(relations, unionize(userLiterals, genUserType));
+
+                Set<Datatype> datatypes = userLiterals.stream()
+                        .map(r -> r.getEffectiveClass() instanceof LiteralClass l ? l.getDatatype() : null)
+                        .collect(toSet());
+
+                addOrderKey(keys, columns.get(0), codepoints);
+
+                if(datatypes.size() > 1 || datatypes.contains(null))
+                    addOrderKey(keys, columns.get(1), codepoints);
+
+                if(!userLiterals.stream().allMatch(r -> r.isSubclassOf(userType)))
+                {
+                    keys.add("(" + columns.get(2) + " <> ''::varchar)");
+                    addOrderKey(keys, columns.get(2), codepoints);
                 }
             }
 
-            // order numerics
-            if(sortSet.get(numeric) != null)
+            // order language-tagged strings: those with a base direction first (right-to-left, then left-to-right),
+            // each kind by the value, then by the language tag
+            for(ResourceClass langString : languageTaggedStringKinds)
             {
-                appendComma(builder, hasOrderCondition);
-                hasOrderCondition = true;
-
-                Set<ResourceClass> numerics = sortSet.get(numeric);
-
-                if(numerics.stream().allMatch(r -> isFloatPoint(r)))
+                if(sortSet.get(langString) != null)
                 {
-                    ResourceClass sortClass = xsdFloat;
+                    List<Column> columns = binding.deriveMapping(relations, langString);
 
-                    for(ResourceClass r : numerics)
-                        sortClass = determineResultClass(sortClass, r);
-
-                    builder.append(binding.promoteNumericAs(numerics, sortClass));
+                    addOrderKey(keys, columns.get(0), codepoints);
+                    addOrderKey(keys, columns.get(1), codepoints);
                 }
-                else if(numerics.stream().allMatch(r -> !isFloatPoint(r)))
-                {
-                    ResourceClass sortClass = xsdShort;
-
-                    for(ResourceClass r : numerics)
-                        sortClass = determineResultClass(sortClass, r);
-
-                    builder.append(binding.promoteNumericAs(numerics, sortClass));
-                }
-                else
-                {
-                    builder.append(binding.deriveMapping(relations, unionize(numerics, box)));
-                }
-
-                if(order.getValue() == Direction.Descending)
-                    builder.append(" DESC");
-            }
-
-            // order xsd:booleans
-            if(sortSet.get(genBoolean) != null)
-            {
-                appendComma(builder, hasOrderCondition);
-                hasOrderCondition = true;
-
-                builder.append(binding.deriveMapping(relations, genBoolean).get(0));
-
-                if(order.getValue() == Direction.Descending)
-                    builder.append(" DESC");
             }
 
             // order xsd:strings
             if(sortSet.get(xsdString) != null)
+                addOrderKey(keys, binding.deriveMapping(relations, xsdString).get(0), codepoints);
+
+            // order xsd:dayTimeDurations
+            if(sortSet.get(genDayTimeDuration) != null)
+                addOrderKey(keys, binding.deriveMapping(relations, genDayTimeDuration).get(0), codepoints);
+
+            // order xsd:dates
+            if(sortSet.get(genScalarDate) != null)
             {
-                appendComma(builder, hasOrderCondition);
-                hasOrderCondition = true;
+                Set<ResourceClass> dates = sortSet.get(genScalarDate);
 
-                builder.append(binding.deriveMapping(relations, xsdString).get(0));
-
-                if(order.getValue() == Direction.Descending)
-                    builder.append(" DESC");
+                if(dates.size() == 1 && dates.iterator().next().getEffectiveClass() instanceof DateInZone)
+                    addOrderKey(keys, binding.deriveMapping(relations, dates.iterator().next()).get(0), codepoints);
+                else
+                    addOrderKey(keys, binding.deriveMapping(relations, genScalarDate).get(0), codepoints);
             }
 
             // order xsd:dateTimes
@@ -888,93 +940,62 @@ public final class SqlSelect extends SqlIntercode
                 ResourceClass sortClass = dateTimes.stream().allMatch(r -> r.isSubclassOf(xsdDateTime)) ? xsdDateTime :
                         genScalarDateTime;
 
-                appendComma(builder, hasOrderCondition);
-                hasOrderCondition = true;
-
-                builder.append(binding.deriveMapping(relations, sortClass).get(0));
-
-                if(order.getValue() == Direction.Descending)
-                    builder.append(" DESC");
+                addOrderKey(keys, binding.deriveMapping(relations, sortClass).get(0), codepoints);
             }
 
-            // order xsd:dates
-            if(sortSet.get(genScalarDate) != null)
+            // order numerics
+            if(sortSet.get(numeric) != null)
             {
-                Set<ResourceClass> dates = sortSet.get(genScalarDate);
+                Set<ResourceClass> numerics = sortSet.get(numeric);
 
-                appendComma(builder, hasOrderCondition);
-                hasOrderCondition = true;
+                if(numerics.stream().allMatch(r -> isFloatPoint(r)))
+                {
+                    ResourceClass sortClass = xsdFloat;
 
-                if(dates.size() == 1 && dates.iterator().next().getEffectiveClass() instanceof DateInZone)
-                    builder.append(binding.deriveMapping(relations, dates.iterator().next()).get(0));
+                    for(ResourceClass r : numerics)
+                        sortClass = determineResultClass(sortClass, r);
+
+                    addOrderKey(keys, binding.promoteNumericAs(numerics, sortClass), codepoints);
+                }
+                else if(numerics.stream().allMatch(r -> !isFloatPoint(r)))
+                {
+                    ResourceClass sortClass = xsdShort;
+
+                    for(ResourceClass r : numerics)
+                        sortClass = determineResultClass(sortClass, r);
+
+                    addOrderKey(keys, binding.promoteNumericAs(numerics, sortClass), codepoints);
+                }
                 else
-                    builder.append(binding.deriveMapping(relations, genScalarDate).get(0));
-
-                if(order.getValue() == Direction.Descending)
-                    builder.append(" DESC");
-            }
-
-            // order user literals as the box orders them (without building it): by the ubox of the value, which the
-            // user type of every storage gives alike, by the datatype IRI when the classes are of several datatypes,
-            // and by the lexical form when some class keeps it, the canonical forms first; the strings are compared by
-            // bytes like in the box
-            if(sortSet.get(genUserType) != null)
-            {
-                Set<ResourceClass> userLiterals = sortSet.get(genUserType);
-                List<Column> columns = binding.deriveMapping(relations, unionize(userLiterals, genUserType));
-
-                Set<Datatype> datatypes = userLiterals.stream()
-                        .map(r -> r.getEffectiveClass() instanceof LiteralClass l ? l.getDatatype() : null)
-                        .collect(toSet());
-
-                List<String> keys = new ArrayList<>();
-                keys.add(columns.get(0).toString());
-
-                if(datatypes.size() > 1 || datatypes.contains(null))
-                    keys.add(columns.get(1) + " COLLATE \"C\"");
-
-                if(!userLiterals.stream().allMatch(r -> r.isSubclassOf(userType)))
                 {
-                    keys.add("(" + columns.get(2) + " <> ''::varchar)");
-                    keys.add(columns.get(2) + " COLLATE \"C\"");
-                }
-
-                for(String key : keys)
-                {
-                    appendComma(builder, hasOrderCondition);
-                    hasOrderCondition = true;
-
-                    builder.append(key);
-
-                    if(order.getValue() == Direction.Descending)
-                        builder.append(" DESC");
+                    addOrderKey(keys, binding.deriveMapping(relations, unionize(numerics, box)).get(0), codepoints);
                 }
             }
 
-            // order triple terms (after the other terms, by their components through the box)
+            // order xsd:booleans
+            if(sortSet.get(genBoolean) != null)
+                addOrderKey(keys, binding.deriveMapping(relations, genBoolean).get(0), codepoints);
+
+            // order triple terms (by their components through the box)
             if(sortSet.get(tripleTerm) != null)
-            {
-                appendComma(builder, hasOrderCondition);
-                hasOrderCondition = true;
-
-                builder.append(binding.deriveMapping(relations, unionize(sortSet.get(tripleTerm), box)).get(0));
-
-                if(order.getValue() == Direction.Descending)
-                    builder.append(" DESC");
-            }
+                addOrderKey(keys, binding.deriveMapping(relations, unionize(sortSet.get(tripleTerm), box)).get(0),
+                        codepoints);
 
             // order boxed values
             if(sortSet.get(box) != null)
+                addOrderKey(keys, binding.deriveMapping(relations, unionize(sortSet.get(box), box)).get(0), codepoints);
+
+
+            for(String key : keys)
             {
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                builder.append(binding.deriveMapping(relations, unionize(sortSet.get(box), box)).get(0));
+                builder.append(key);
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");
             }
-
         }
 
 

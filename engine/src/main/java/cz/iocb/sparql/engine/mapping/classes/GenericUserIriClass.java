@@ -7,6 +7,8 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.subtract;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static java.util.stream.Collectors.joining;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -16,7 +18,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.IntStream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
@@ -30,7 +31,9 @@ import cz.iocb.sparql.engine.request.Request;
  * IRIs recognised by a regular expression and converted by SQL functions supplied by the deployment: {@code function}
  * builds the IRI from the columns, {@code function_inverse} (or {@code function_inv1} .. {@code function_invN} for
  * several columns) extract them. {@link SqlCheck} says when a term must additionally be verified through the inverse
- * functions in the database.
+ * functions in the database. The inverse functions may assume an IRI the regular expression recognises: when a general
+ * IRI is converted to the class with the representability check, an IRI the expression does not recognise yields NULL
+ * without reaching them (unless the IRIs the expression does not recognise are to be verified by them).
  */
 public class GenericUserIriClass extends UserIriClass
 {
@@ -78,6 +81,11 @@ public class GenericUserIriClass extends UserIriClass
     protected final String regexp;
 
     /**
+     * The regular expression anchored to the whole IRI for the search of the extension.
+     */
+    protected final String anchoredRegexp;
+
+    /**
      * SQL function building the IRI from the columns.
      */
     protected final Function function;
@@ -123,6 +131,7 @@ public class GenericUserIriClass extends UserIriClass
 
         //FIXME: check whether the pattern is valid also in pcre2
         this.regexp = regexp;
+        this.anchoredRegexp = "^(?:" + regexp + ")$";
         this.pattern = Pattern.compile(regexp);
     }
 
@@ -221,16 +230,45 @@ public class GenericUserIriClass extends UserIriClass
 
         assert isSubclassOf(sourceClass);
 
+        // the check is needless when every IRI of the superclass belongs to this class
+        boolean check = !checkOptional && !superClass.isSubclassOf(unionize(this, subtract(box, iri)));
+
         if(sourceClass.equals(box))
-            return IntStream.range(0, inverseFunction.size()).mapToObj(i -> expression(sqlTypes.get(i),
-                    "%s(sparql.rdfbox_get_iri(%s))", inverseFunction.get(i), columns.get(0))).toList();
+            return generateInverseFunctions(expression(VARCHAR, "sparql.rdfbox_get_iri(%s)", columns.get(0)), check);
 
         if(sourceClass.equals(iri))
-            return IntStream.range(0, inverseFunction.size())
-                    .mapToObj(i -> expression(sqlTypes.get(i), "%s(%s)", inverseFunction.get(i), columns.get(0)))
-                    .toList();
+            return generateInverseFunctions(columns.get(0), check);
 
         throw new IllegalArgumentException();
+    }
+
+
+    /**
+     * SQL expressions applying the inverse functions to the IRI. With {@code check}, an IRI the regular expression does
+     * not recognise yields NULL instead of being given to the functions, which may assume a recognised IRI; an IRI
+     * recognised wrongly is for the functions to refuse by NULL, as {@link SqlCheck#IF_MATCH} says. The IRIs that
+     * {@link SqlCheck#IF_NOT_MATCH} leaves to the functions reach them in any case.
+     *
+     * @param iri SQL expression of the IRI
+     * @param check whether IRIs outside the class must yield NULL
+     * @return SQL expressions applying the inverse functions to the IRI
+     */
+    private List<Column> generateInverseFunctions(Column iri, boolean check)
+    {
+        List<Column> result = new ArrayList<>(inverseFunction.size());
+
+        for(int i = 0; i < inverseFunction.size(); i++)
+        {
+            Column value = expression(sqlTypes.get(i), "%s(%s)", inverseFunction.get(i), iri);
+
+            if(check && sqlCheck != SqlCheck.IF_NOT_MATCH)
+                value = expression(sqlTypes.get(i), "CASE WHEN sparql.regex_string(%s, %s) THEN %s END", iri,
+                        string(anchoredRegexp), value);
+
+            result.add(value);
+        }
+
+        return result;
     }
 
 

@@ -149,6 +149,12 @@ public class DatabaseSchema
      */
     protected final Map<TablePair, List<List<ColumnPair>>> unjoinableColumns = new HashMap<>();
 
+    /**
+     * Whether the default collation of the database orders by code points, which the character expressions without an
+     * explicit collation (constants, results of functions, columns of VALUES) then do as well.
+     */
+    protected boolean codepointDefaultCollation = false;
+
 
     /**
      * Reads tables, views, materialized views, partitioned and foreign tables, their columns with the types, nullable
@@ -258,6 +264,9 @@ public class DatabaseSchema
 
             Map<String, Boolean> checkedCollations = new HashMap<>();
 
+            codepointDefaultCollation = checkedCollations.computeIfAbsent("\"default\"",
+                    c -> isCodepointCollation(connection, c));
+
             for(String[] collatedColumn : collatedColumns)
             {
                 String collation = collatedColumn[3];
@@ -346,6 +355,20 @@ public class DatabaseSchema
 
         for(Entry<TablePair, List<List<ColumnPair>>> e : other.unjoinableColumns.entrySet())
             unjoinableColumns.put(e.getKey(), new ArrayList<>(e.getValue()));
+
+        codepointDefaultCollation = other.codepointDefaultCollation;
+    }
+
+
+    /**
+     * True if the default collation of the database orders by code points, so that a character expression without an
+     * explicit collation (a constant, a result of a function, a column of VALUES) orders by code points too.
+     *
+     * @return true if the default collation of the database orders by code points, false otherwise
+     */
+    public boolean hasCodepointDefaultCollation()
+    {
+        return codepointDefaultCollation;
     }
 
 

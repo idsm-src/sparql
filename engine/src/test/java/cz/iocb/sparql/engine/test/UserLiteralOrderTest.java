@@ -40,9 +40,9 @@ import cz.iocb.sparql.testing.Database;
  * ORDER BY over literals of a user datatype: the terms are ordered by the total order of the box (the value by the
  * comparison of its PostgreSQL type, then the datatype, the canonical forms before the lexical ones), whether they are
  * stored in a column of the type, in a column of the type with their lexical form, or in a box, so that the order does
- * not depend on the storage; a variable holding such literals among terms of other kinds is ordered by the box as a
- * whole. The datatype is backed by an enum type, whose order is the order of its labels, not the order of their text; a
- * second datatype over the same type tells the literals of several datatypes apart by the datatype IRI.
+ * not depend on the storage; among terms of other kinds they take the place the box gives them. The datatype is backed
+ * by an enum type, whose order is the order of its labels, not the order of their text; a second datatype over the same
+ * type tells the literals of several datatypes apart by the datatype IRI.
  */
 public class UserLiteralOrderTest
 {
@@ -251,7 +251,7 @@ public class UserLiteralOrderTest
 
 
     @Test
-    @DisplayName("terms of other kinds next to a user literal are ordered by the box as a whole")
+    @DisplayName("terms of other kinds next to a user literal are ordered like in the box")
     void mixed() throws Exception
     {
         assertThat(
