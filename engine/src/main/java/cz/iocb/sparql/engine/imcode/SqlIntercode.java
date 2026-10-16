@@ -704,6 +704,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             for(ResourceClass resClass : resClasses)
             {
                 List<List<Column>> variants = new ArrayList<>();
+                boolean materialised = true;
 
                 for(int i = 0; i < vars.size(); i++)
                 {
@@ -716,8 +717,20 @@ public abstract class SqlIntercode extends SqlBaseClass
                     for(ResourceClass specClass : binding.getCompatibleClasses(relations, resClass))
                     {
                         List<Column> columns = toTableColumns(table, binding.getMapping(specClass));
-                        variants.add(specClass.toGeneralClass(resClass, columns, true));
+
+                        // a class the parent does not need has no columns in the children (nor in the join)
+                        if(columns == null)
+                            materialised = false;
+                        else
+                            variants.add(specClass.toGeneralClass(resClass, columns, true));
                     }
+                }
+
+                if(!materialised)
+                {
+                    assert variants.isEmpty();
+                    variableBinding.addMapping(resClass, null);
+                    continue;
                 }
 
                 List<Column> columns = coalesceVariants(resClass.getColumnCount(), variants);

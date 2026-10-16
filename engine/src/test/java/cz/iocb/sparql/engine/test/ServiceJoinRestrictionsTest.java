@@ -124,4 +124,22 @@ public class ServiceJoinRestrictionsTest
 
         assertNotNull(imcode);
     }
+
+
+    @Test
+    @DisplayName("a restricted SERVICE variable joined with a later pattern that does not bind it")
+    void restrictedServiceVariableInJoin() throws Exception
+    {
+        SqlIntercode imcode = optimize("""
+                SELECT ?x ?l WHERE { SERVICE <http://example.org/remote/sparql> { ?x ex:remote ?o } \
+                ?x ex:label ?l FILTER(STRLEN(?o) > 1) }""");
+
+        assertNotNull(imcode);
+
+        imcode = optimize("""
+                SELECT ?x ?l ?s WHERE { SERVICE <http://example.org/remote/sparql> { ?x ex:remote ?o } \
+                ?x ex:label ?l BIND(LANG(?o) AS ?s) }""");
+
+        assertNotNull(imcode);
+    }
 }
