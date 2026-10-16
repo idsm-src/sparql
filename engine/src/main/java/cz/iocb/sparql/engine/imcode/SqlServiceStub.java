@@ -681,10 +681,7 @@ public final class SqlServiceStub extends SqlIntercode
     public SqlIntercode eval(Request request, SqlIntercode context, Restrictions restrictions)
     {
         if(state.results.containsKey(context))
-        {
-            System.err.println("use result from state");
             return state.results.get(context);
-        }
 
 
         /* create variable lists */
