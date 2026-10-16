@@ -405,7 +405,8 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
     /**
-     * True if the subtree contains a SERVICE stub that has not been evaluated yet.
+     * True if the subtree contains a SERVICE stub that has not been evaluated yet, the patterns of the EXISTS
+     * expressions of its nodes included; the second optimisation pass has to reach every such stub.
      *
      * @return true if the subtree contains a SERVICE stub that has not been evaluated yet, false otherwise
      */

@@ -259,6 +259,19 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
 
     /**
+     * True if the expression contains a SERVICE call that has not been evaluated yet: the pattern of an EXISTS may hold
+     * one, and the second optimisation pass has to evaluate it before the expression gets its SQL (see
+     * {@link SqlExists}). An expression without operands contains none.
+     *
+     * @return true if the expression contains a SERVICE call that has not been evaluated yet, false otherwise
+     */
+    public boolean hasServiceSubpattern()
+    {
+        return false;
+    }
+
+
+    /**
      * Rebuilds the expression over the given (optimised) variable bindings, materialising only the classes in
      * {@code restriction}; with {@code evalServices}, patterns nested in EXISTS evaluate their SERVICE stubs.
      *

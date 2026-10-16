@@ -32,7 +32,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * EXISTS and NOT EXISTS: true if the pattern, evaluated for the current solution of the surrounding bindings, has a
  * solution. The pattern refers to the current solution through its context solution (see {@link SqlContextSolution}):
  * the expression supplies the exposed columns of the current solution under an alias, and the pattern is evaluated
- * laterally for them. Without a context solution, the pattern is independent of the current solution.
+ * laterally for them. Without a context solution, the pattern is independent of the current solution. A pattern holding
+ * a SERVICE call not evaluated yet has no SQL; the expression then carries a placeholder column until the second
+ * optimisation pass evaluates the call and rebuilds the expression.
  */
 public final class SqlExists extends SqlExpressionIntercode
 {
@@ -40,6 +42,13 @@ public final class SqlExists extends SqlExpressionIntercode
      * Alias of the pattern.
      */
     private static final AliasTable patternTable = new AliasTable("tab");
+
+    /**
+     * Column standing for the test while its pattern holds a SERVICE call not evaluated yet. It never reaches the
+     * database, as the second optimisation pass rebuilds the expression once the call is evaluated, and would fail
+     * there otherwise.
+     */
+    private static final Column unevaluated = new ExpressionColumn("sparql.unevaluated_service()", BOOL, false);
 
     /**
      * True for NOT EXISTS.
@@ -155,6 +164,11 @@ public final class SqlExists extends SqlExpressionIntercode
 
         if(!restriction.contains(relations, xsdBoolean))
             return new SqlExists(negated, pattern, singletonMap(xsdBoolean, null), bindings, context);
+
+        // the call is evaluated by the second optimisation pass, which rebuilds the expression and everything built
+        // on it; until then a placeholder stands for the test
+        if(pattern.hasServiceSubpattern())
+            return new SqlExists(negated, pattern, singletonMap(xsdBoolean, List.of(unevaluated)), bindings, context);
 
 
         List<Column> result = translate(request, negated, pattern, bindings, context);
@@ -293,6 +307,13 @@ public final class SqlExists extends SqlExpressionIntercode
     public Set<VirtualTable> getVirtualTables()
     {
         return pattern.getVirtualTables();
+    }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return pattern.hasServiceSubpattern();
     }
 
 

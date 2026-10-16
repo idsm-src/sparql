@@ -240,7 +240,7 @@ public final class SqlFilter extends SqlIntercode
     @Override
     public boolean hasServiceSubpattern()
     {
-        return child.hasServiceSubpattern();
+        return child.hasServiceSubpattern() || conditions.stream().anyMatch(c -> c.hasServiceSubpattern());
     }
 
 

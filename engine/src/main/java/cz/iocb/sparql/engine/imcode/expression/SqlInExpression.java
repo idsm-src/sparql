@@ -380,6 +380,13 @@ public final class SqlInExpression extends SqlExpressionIntercode
 
 
     @Override
+    public boolean hasServiceSubpattern()
+    {
+        return left.hasServiceSubpattern() || rights.stream().anyMatch(r -> r.hasServiceSubpattern());
+    }
+
+
+    @Override
     protected int getHashCode()
     {
         return Objects.hash(negated, left, new Multiset<>(rights));

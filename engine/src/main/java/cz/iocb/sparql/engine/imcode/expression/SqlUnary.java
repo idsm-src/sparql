@@ -64,6 +64,13 @@ public abstract class SqlUnary extends SqlExpressionIntercode
 
 
     @Override
+    public boolean hasServiceSubpattern()
+    {
+        return operand.hasServiceSubpattern();
+    }
+
+
+    @Override
     public boolean equals(Object object)
     {
         if(this == object)

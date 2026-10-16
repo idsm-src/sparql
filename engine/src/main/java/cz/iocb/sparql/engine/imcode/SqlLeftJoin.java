@@ -447,7 +447,8 @@ public final class SqlLeftJoin extends SqlIntercode
     @Override
     public boolean hasServiceSubpattern()
     {
-        return left.hasServiceSubpattern() || right.hasServiceSubpattern();
+        return left.hasServiceSubpattern() || right.hasServiceSubpattern()
+                || conditions.stream().anyMatch(c -> c.hasServiceSubpattern());
     }
 
 

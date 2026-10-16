@@ -225,6 +225,13 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
 
 
     @Override
+    public boolean hasServiceSubpattern()
+    {
+        return arguments.stream().anyMatch(a -> a.hasServiceSubpattern());
+    }
+
+
+    @Override
     protected int getHashCode()
     {
         return Objects.hash(definition, arguments);

@@ -272,7 +272,7 @@ public final class SqlBind extends SqlIntercode
     @Override
     public boolean hasServiceSubpattern()
     {
-        return child.hasServiceSubpattern();
+        return child.hasServiceSubpattern() || expression.hasServiceSubpattern();
     }
 
 

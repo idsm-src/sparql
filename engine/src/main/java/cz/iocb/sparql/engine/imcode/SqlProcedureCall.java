@@ -450,7 +450,7 @@ public final class SqlProcedureCall extends SqlIntercode
     @Override
     public boolean hasServiceSubpattern()
     {
-        return child.hasServiceSubpattern();
+        return child.hasServiceSubpattern() || parameters.values().stream().anyMatch(p -> p.hasServiceSubpattern());
     }
 
 

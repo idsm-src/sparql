@@ -429,7 +429,7 @@ public final class SqlAggregation extends SqlIntercode
     @Override
     public boolean hasServiceSubpattern()
     {
-        return child.hasServiceSubpattern();
+        return child.hasServiceSubpattern() || aggregations.values().stream().anyMatch(a -> a.hasServiceSubpattern());
     }
 
 

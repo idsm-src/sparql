@@ -90,6 +90,13 @@ public abstract class SqlBinary extends SqlExpressionIntercode
 
 
     @Override
+    public boolean hasServiceSubpattern()
+    {
+        return left.hasServiceSubpattern() || right.hasServiceSubpattern();
+    }
+
+
+    @Override
     public boolean equals(Object object)
     {
         if(this == object)
