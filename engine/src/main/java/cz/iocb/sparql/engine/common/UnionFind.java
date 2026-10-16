@@ -35,39 +35,43 @@ public class UnionFind
      */
     public static <T> Collection<Set<T>> getDisjunctEntries(Set<T> classes, BiPredicate<T, T> relation)
     {
-        Map<T, T> parent = new HashMap<>();
-
-        for(T c : classes)
-            parent.put(c, c);
-
+        // the elements are handled by their indexes, since hashing them (sets of classes) is costly
         List<T> list = new ArrayList<>(classes);
+        int[] parent = new int[list.size()];
 
+        for(int i = 0; i < parent.length; i++)
+            parent[i] = i;
+
+        // a pair already connected is not tested, the relation being used only to connect
         for(int i = 0; i < list.size(); i++)
             for(int j = i + 1; j < list.size(); j++)
-                if(relation.test(list.get(i), list.get(j)))
-                    parent.put(findRootOfComponent(parent, list.get(i)), findRootOfComponent(parent, list.get(j)));
+                if(findRootOfComponent(parent, i) != findRootOfComponent(parent, j)
+                        && relation.test(list.get(i), list.get(j)))
+                    parent[findRootOfComponent(parent, i)] = findRootOfComponent(parent, j);
 
-        Map<T, Set<T>> groups = new HashMap<>();
+        Map<Integer, Set<T>> groups = new HashMap<>();
 
-        for(T c : classes)
-            groups.computeIfAbsent(findRootOfComponent(parent, c), _ -> new HashSet<>()).add(c);
+        for(int i = 0; i < list.size(); i++)
+            groups.computeIfAbsent(findRootOfComponent(parent, i), _ -> new HashSet<>()).add(list.get(i));
 
         return groups.values();
     }
 
 
     /**
-     * Follows the parent links from {@code root} to the representative of its component.
+     * Follows the parent links from {@code root} to the representative of its component, compressing the path.
      *
-     * @param <T> the element type
      * @param parent parent links of the union-find structure
-     * @param root the element to start from
-     * @return the representative of the component
+     * @param root the index of the element to start from
+     * @return the index of the representative of the component
      */
-    private static <T> T findRootOfComponent(Map<T, T> parent, T root)
+    private static int findRootOfComponent(int[] parent, int root)
     {
-        while(!root.equals(parent.get(root)))
-            root = parent.get(root);
+        while(parent[root] != root)
+        {
+            parent[root] = parent[parent[root]];
+            root = parent[root];
+        }
 
         return root;
     }
