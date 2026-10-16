@@ -48,7 +48,7 @@ import cz.iocb.sparql.testing.Database;
  * once the second optimisation pass has evaluated the call, wherever the test stands (a filter, a BIND, an OPTIONAL, an
  * aggregate, a HAVING, a joined group or another EXISTS). The endpoint is a server on the loopback interface answering
  * the pattern {@code ?s
- * 
+ *
 <p>
  *  ?o} from a few fixed remote triples.
  */

@@ -574,6 +574,18 @@ public class BuiltinClasses
 
 
     /**
+     * True if every value of the class is a literal of a user datatype.
+     *
+     * @param resClass the resource class
+     * @return true if every value of the class is a literal of a user datatype, false otherwise
+     */
+    public static boolean isUserLiteral(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(genUserType);
+    }
+
+
+    /**
      * True if every value of the class is a triple term.
      *
      * @param resClass the resource class

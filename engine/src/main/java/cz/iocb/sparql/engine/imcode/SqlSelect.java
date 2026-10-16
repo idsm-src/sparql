@@ -5,14 +5,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDateTime;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasBlankNode;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasBoolean;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDate;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDateTime;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasIri;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasNumeric;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasString;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasTripleTerm;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUserType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBoolean;
@@ -23,9 +16,11 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isTripleTerm;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isUserLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.numeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.scalarBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.tripleTerm;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.userType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
@@ -51,7 +46,9 @@ import cz.iocb.sparql.engine.database.VirtualTableDefinition;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
+import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.model.OrderCondition.Direction;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.ColumnMap;
@@ -364,8 +361,8 @@ public final class SqlSelect extends SqlIntercode
 
 
         Restrictions childRestrictions = new Restrictions(projections);
-        childRestrictions.add(orderBy.keySet()); //TODO: not all resource classes are sortable
-        childRestrictions.add(simpleOrderBy); //TODO: not all resource classes are sortable
+        childRestrictions.add(orderBy.keySet());
+        childRestrictions.add(simpleOrderBy);
 
         // duplicates do not matter to a DISTINCT that is going to deduplicate the child over the projections below
         boolean childReduced = distinct && projections.containsAll(orderBy.keySet());
@@ -421,8 +418,8 @@ public final class SqlSelect extends SqlIntercode
 
 
         Restrictions childRestrictions = new Restrictions(restrictions);
-        childRestrictions.add(orderBy.keySet()); // FIXME: not all resource classes are sortable
-        childRestrictions.add(simpleOrderBy); // FIXME: not all resource classes are sortable
+        childRestrictions.add(orderBy.keySet());
+        childRestrictions.add(simpleOrderBy);
 
         // a slice picks its rows from the multiset, so the multiplicities of the child rows have to be kept exact
         boolean childReduced = reduced && limit == null && (offset == null || offset.equals(BigInteger.ZERO));
@@ -753,12 +750,18 @@ public final class SqlSelect extends SqlIntercode
                     sortSet.computeIfAbsent(genScalarDateTime, _ -> new HashSet<>()).add(r);
                 else if(isTripleTerm(r))
                     sortSet.computeIfAbsent(tripleTerm, _ -> new HashSet<>()).add(r);
-                else if(hasBlankNode(r) || hasIri(r) || hasNumeric(r) || hasBoolean(r) || hasString(r) || hasDate(r)
-                        || hasDateTime(r) || hasTripleTerm(r))
+                else if(isUserLiteral(r))
+                    sortSet.computeIfAbsent(genUserType, _ -> new HashSet<>()).add(r);
+                else
                     sortSet.computeIfAbsent(box, _ -> new HashSet<>()).add(r);
             }
 
-            if(sortSet.get(box) != null)
+            // the other classes (mixed kinds of terms, literals of unknown datatypes, durations, ...) have no sortable
+            // representation but the box, whose total order is the only order defined for them and does not depend on
+            // how they are stored; the whole variable is then ordered by the box, so that the kinds of its terms keep
+            // their relative order, which also goes for user literals among terms of other kinds, as the order of the
+            // kinds in the box differs from the order of the buckets here
+            if(sortSet.get(box) != null || sortSet.get(genUserType) != null && sortSet.size() > 1)
                 sortSet = Map.of(box, sortSet.values().stream().flatMap(r -> r.stream()).collect(toSet()));
 
 
@@ -911,6 +914,43 @@ public final class SqlSelect extends SqlIntercode
                     builder.append(" DESC");
             }
 
+            // order user literals as the box orders them (without building it): by the ubox of the value, which the
+            // user type of every storage gives alike, by the datatype IRI when the classes are of several datatypes,
+            // and by the lexical form when some class keeps it, the canonical forms first; the strings are compared by
+            // bytes like in the box
+            if(sortSet.get(genUserType) != null)
+            {
+                Set<ResourceClass> userLiterals = sortSet.get(genUserType);
+                List<Column> columns = binding.deriveMapping(relations, unionize(userLiterals, genUserType));
+
+                Set<Datatype> datatypes = userLiterals.stream()
+                        .map(r -> r.getEffectiveClass() instanceof LiteralClass l ? l.getDatatype() : null)
+                        .collect(toSet());
+
+                List<String> keys = new ArrayList<>();
+                keys.add(columns.get(0).toString());
+
+                if(datatypes.size() > 1 || datatypes.contains(null))
+                    keys.add(columns.get(1) + " COLLATE \"C\"");
+
+                if(!userLiterals.stream().allMatch(r -> r.isSubclassOf(userType)))
+                {
+                    keys.add("(" + columns.get(2) + " <> ''::varchar)");
+                    keys.add(columns.get(2) + " COLLATE \"C\"");
+                }
+
+                for(String key : keys)
+                {
+                    appendComma(builder, hasOrderCondition);
+                    hasOrderCondition = true;
+
+                    builder.append(key);
+
+                    if(order.getValue() == Direction.Descending)
+                        builder.append(" DESC");
+                }
+            }
+
             // order triple terms (after the other terms, by their components through the box)
             if(sortSet.get(tripleTerm) != null)
             {
@@ -935,7 +975,6 @@ public final class SqlSelect extends SqlIntercode
                     builder.append(" DESC");
             }
 
-            //TODO: sort other types of literals as well
         }
 
 
