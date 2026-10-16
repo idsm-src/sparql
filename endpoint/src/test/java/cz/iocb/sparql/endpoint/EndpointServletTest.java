@@ -462,4 +462,21 @@ public class EndpointServletTest
         assertEquals(ntriples, response.contentType);
         assertTrue(response.getBody().startsWith("<http://example.org/s> <http://example.org/p> "));
     }
+
+
+    @Test
+    @DisplayName("a failing federated call is a bad request with the message of the service error")
+    void failingService() throws Exception
+    {
+        String pattern = "<http://127.0.0.1:1/sparql> { ?x <http://example.org/p> ?o } }";
+        Response response = get(parameters("query", "SELECT ?x WHERE { SERVICE " + pattern), sparqlJson);
+
+        assertEquals(HttpServletResponse.SC_BAD_REQUEST, response.status);
+        assertEquals("text/plain", response.contentType);
+        assertTrue(response.getBody().contains("cannot be evaluated by endpoint 'http://127.0.0.1:1/sparql'"));
+
+        JsonNode results = json(get(parameters("query", "SELECT ?x WHERE { SERVICE SILENT " + pattern), sparqlJson));
+
+        assertEquals(1, results.get("results").get("bindings").size());
+    }
 }

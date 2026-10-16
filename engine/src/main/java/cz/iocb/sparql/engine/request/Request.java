@@ -53,6 +53,7 @@ import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Result.ResultType;
 import cz.iocb.sparql.engine.translator.ServiceException;
+import cz.iocb.sparql.engine.translator.ServiceRuntimeException;
 import cz.iocb.sparql.engine.translator.TranslateVisitor;
 
 
@@ -470,14 +471,27 @@ public class Request implements AutoCloseable
 
             TranslateVisitor translateVisitor = new TranslateVisitor(this);
             SqlSelect imcode = translateVisitor.translate(syntaxTree, newOffset, newLimit, order);
+            String code;
 
-            // optimize
-            imcode = imcode.optimize(this, false);
+            try
+            {
+                // optimize
+                imcode = imcode.optimize(this, false);
 
-            // evaluate service calls
-            imcode = imcode.optimize(this, true);
+                // evaluate service calls
+                imcode = imcode.optimize(this, true);
 
-            String code = imcode.translate(this);
+                code = imcode.translate(this);
+            }
+            catch(ServiceRuntimeException e)
+            {
+                // the unchecked wrappers of the intermediate code are unwrapped at the border of the request
+                throw(ServiceException) e.getCause();
+            }
+            catch(SQLRuntimeException e)
+            {
+                throw(SQLException) e.getCause();
+            }
 
             /*
             System.err.println();

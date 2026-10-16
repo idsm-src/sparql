@@ -29,7 +29,6 @@ import cz.iocb.sparql.engine.request.LimitExceedException;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.request.Result;
 import cz.iocb.sparql.engine.translator.ServiceException;
-import cz.iocb.sparql.engine.translator.ServiceRuntimeException;
 import cz.iocb.sparql.testing.Database;
 
 
@@ -37,8 +36,8 @@ import cz.iocb.sparql.testing.Database;
 /**
  * Failing calls of SERVICE SILENT: a call to an unreachable endpoint yields the solutions of its context with the
  * variables of the call unbound, also when the context holds an earlier call, which must not stay in the evaluated
- * query unevaluated; the same call without SILENT is an error. The endpoints are ports of the loopback address nothing
- * listens on, so no network is needed.
+ * query unevaluated; the same call without SILENT is an error reported by the checked exception of the request. The
+ * endpoints are ports of the loopback address nothing listens on, so no network is needed.
  */
 public class SilentServiceTest
 {
@@ -172,7 +171,7 @@ public class SilentServiceTest
     @DisplayName("a failing call without SILENT is an error")
     void callWithoutSilentIsAnError()
     {
-        assertThrows(ServiceRuntimeException.class,
+        assertThrows(ServiceException.class,
                 () -> execute("SELECT ?x ?y ?z WHERE { " + first + second.replace("SERVICE SILENT", "SERVICE") + "}"));
     }
 }

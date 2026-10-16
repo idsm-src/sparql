@@ -50,6 +50,7 @@ import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.request.Request.PreparedQuery;
 import cz.iocb.sparql.engine.request.Result;
 import cz.iocb.sparql.engine.request.Result.ResultType;
+import cz.iocb.sparql.engine.translator.ServiceException;
 
 
 
@@ -777,6 +778,20 @@ public class EndpointServlet extends HttpServlet
             PrintWriter out = res.getWriter();
 
             out.println(e.getMessage());
+        }
+        catch(ServiceException e)
+        {
+            try
+            {
+                res.resetBuffer();
+            }
+            catch(Throwable x)
+            {
+            }
+
+            res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            res.setContentType("text/plain");
+            res.getWriter().println("error: " + e.getMessage());
         }
         catch(SQLException e)
         {
