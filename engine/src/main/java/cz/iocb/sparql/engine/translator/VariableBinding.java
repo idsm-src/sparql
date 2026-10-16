@@ -763,6 +763,7 @@ public class VariableBinding
      */
     public boolean hasExpressionColumn()
     {
-        return mappings.values().stream().flatMap(c -> c.stream()).anyMatch(c -> c instanceof ExpressionColumn);
+        return mappings.values().stream().filter(c -> c != null).flatMap(c -> c.stream())
+                .anyMatch(c -> c instanceof ExpressionColumn);
     }
 }

@@ -290,13 +290,15 @@ public final class SqlInExpression extends SqlExpressionIntercode
         Restriction leftSet = new Restriction();
         List<SqlExpressionIntercode> optRights = new ArrayList<>(rights.size());
 
-        for(ResourceClass leftClass : left.getMappings().keySet())
+        // each operand on the right is restricted to its classes comparable with some class of the left operand, and
+        // kept once (an operand comparable with nothing is dropped)
+        for(SqlExpressionIntercode right : rights)
         {
-            for(SqlExpressionIntercode right : rights)
-            {
-                Restriction rightSet = new Restriction();
-                boolean isComparable = false;
+            Restriction rightSet = new Restriction();
+            boolean isComparable = false;
 
+            for(ResourceClass leftClass : left.getMappings().keySet())
+            {
                 for(ResourceClass rightClass : right.getMappings().keySet())
                 {
                     if(areComparable(relations, operator, leftClass, rightClass) != ComparisonType.NULL)
@@ -306,10 +308,10 @@ public final class SqlInExpression extends SqlExpressionIntercode
                         isComparable = true;
                     }
                 }
-
-                if(isComparable)
-                    optRights.add(right.optimize(request, bindings, rightSet, evalServices));
             }
+
+            if(isComparable)
+                optRights.add(right.optimize(request, bindings, rightSet, evalServices));
         }
 
         SqlExpressionIntercode optLeft = left.optimize(request, bindings, leftSet, evalServices);

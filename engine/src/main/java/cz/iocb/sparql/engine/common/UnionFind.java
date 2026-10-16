@@ -42,12 +42,22 @@ public class UnionFind
         for(int i = 0; i < parent.length; i++)
             parent[i] = i;
 
-        // a pair already connected is not tested, the relation being used only to connect
-        for(int i = 0; i < list.size(); i++)
-            for(int j = i + 1; j < list.size(); j++)
+        // a pair already connected is not tested, the relation being used only to connect, and nothing is tested once
+        // all the elements are connected
+        int components = list.size();
+
+        for(int i = 0; i < list.size() && components > 1; i++)
+        {
+            for(int j = i + 1; j < list.size() && components > 1; j++)
+            {
                 if(findRootOfComponent(parent, i) != findRootOfComponent(parent, j)
                         && relation.test(list.get(i), list.get(j)))
+                {
                     parent[findRootOfComponent(parent, i)] = findRootOfComponent(parent, j);
+                    components--;
+                }
+            }
+        }
 
         Map<Integer, Set<T>> groups = new HashMap<>();
 

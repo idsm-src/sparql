@@ -69,6 +69,7 @@ import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
 import cz.iocb.sparql.engine.mapping.classes.DateInZoneClass;
+import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.TripleTermClass;
 import cz.iocb.sparql.engine.mapping.classes.TripleTermClass.Component;
@@ -279,6 +280,12 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     private static final int SECS_PER_DAY = 24 * 60 * 60;
 
     /**
+     * Number of argument class combinations above which the operands are compared as boxes by a single expression
+     * instead of combination by combination.
+     */
+    private static final int boxComparisonLimit = 256;
+
+    /**
      * The operator.
      */
     private final ComparisonOperator operator;
@@ -398,16 +405,6 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             return trueValue;
 
 
-        List<SqlExpressionIntercode> operands = List.of(left, right);
-        Map<ResourceClass, Set<List<Set<ResourceClass>>>> resMap = processResultMap(relations, operands, map,
-                restriction);
-
-        Map<ResourceClass, List<Column>> mappings = new HashMap<>();
-
-        for(Entry<ResourceClass, Set<List<Set<ResourceClass>>>> e : resMap.entrySet())
-            mappings.put(e.getKey(),
-                    e.getValue() == null ? null : translate(relations, operator, e.getValue(), left, right));
-
         NonConstantBooleanValue value = switch(operator)
         {
             case EQUAL -> isAlwaysDifferentIfNotNull ? FALSE_OR_ERROR : ANY;
@@ -415,7 +412,49 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             default -> ANY;
         };
 
+        Map<ResourceClass, List<Column>> mappings = new HashMap<>();
+
+        if(set.size() > boxComparisonLimit)
+        {
+            // too many combinations to compare them one by one (operands bound in most classes of the configuration,
+            // such as the variables of an unevaluated SERVICE call): the operands are compared as boxes, whose
+            // operators implement the operator mapping of SPARQL for terms of every kind
+            Set<ResourceClass> lset = set.stream().map(c -> c.get(0)).collect(toSet());
+            Set<ResourceClass> rset = set.stream().map(c -> c.get(1)).collect(toSet());
+
+            String code = "(" + getBox(left, lset) + " operator(sparql." + operator.getText() + ") "
+                    + getBox(right, rset) + ")";
+
+            mappings.put(xsdBoolean,
+                    restriction.contains(relations, xsdBoolean) ? List.of(new ExpressionColumn(code, BOOL)) : null);
+        }
+        else
+        {
+            List<SqlExpressionIntercode> operands = List.of(left, right);
+            Map<ResourceClass, Set<List<Set<ResourceClass>>>> resMap = processResultMap(relations, operands, map,
+                    restriction);
+
+            for(Entry<ResourceClass, Set<List<Set<ResourceClass>>>> e : resMap.entrySet())
+                mappings.put(e.getKey(),
+                        e.getValue() == null ? null : translate(relations, operator, e.getValue(), left, right));
+        }
+
         return new SqlBinaryComparison(operator, left, right, mappings, canBeNull, value);
+    }
+
+
+    /**
+     * Box holding the value of the operand taken in the given classes: the COALESCE of their conversions to the box.
+     * Only the given classes are converted, the other classes of the operand being possibly not materialised.
+     *
+     * @param operand the operand
+     * @param classes the classes of the operand to take
+     * @return box holding the value of the operand taken in the given classes
+     */
+    private static Column getBox(SqlExpressionIntercode operand, Set<ResourceClass> classes)
+    {
+        return Column.coalesce(
+                classes.stream().map(c -> c.toGeneralClass(box, operand.getMapping(c), true).get(0)).collect(toSet()));
     }
 
 
@@ -547,10 +586,17 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             Set<ResourceClass> left, Set<ResourceClass> right)
     {
         ComparisonMode result = null;
+        Set<PrimitiveResourceClass> rights = estimateAsUnion(right);
 
         for(ResourceClass l : estimateAsUnion(left))
-            for(ResourceClass r : estimateAsUnion(right))
+        {
+            for(ResourceClass r : rights)
                 result = mergeComparisonTypes(result, determineComparisonMode(relations, operator, l, r));
+
+            // the box absorbs every other mode
+            if(result == ComparisonMode.BOX)
+                return result;
+        }
 
         return result;
     }

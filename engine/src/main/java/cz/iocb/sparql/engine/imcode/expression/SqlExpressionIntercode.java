@@ -505,8 +505,13 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
             for(List<ResourceClass> c : e.getValue())
                 inputs.add(new Input(e.getKey(), c));
 
-        Collection<Set<Input>> groupParameters = UnionFind.getDisjunctEntries(inputs,
-                (l, r) -> Input.areInConflict(relations, arguments, restriction, l, r));
+        // only an argument computed by an SQL expression can make two combinations conflict
+        boolean expressions = arguments.stream().anyMatch(a -> a.getBinding().hasExpressionColumn());
+
+        Collection<Set<Input>> groupParameters = expressions ?
+                UnionFind.getDisjunctEntries(inputs,
+                        (l, r) -> Input.areInConflict(relations, arguments, restriction, l, r)) :
+                inputs.stream().map(i -> Set.of(i)).toList();
 
 
         record Midle(Set<ResourceClass> result, List<Set<ResourceClass>> params)
