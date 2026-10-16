@@ -33,9 +33,10 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 /**
- * Effective boolean value of an operand (SPARQL 1.2, section 17.2.2): booleans as they are, numerics true when non-zero
- * and not NaN, strings true when non-empty, anything else (a literal with an invalid lexical form or of another
- * datatype, a non-literal) an error.
+ * Effective boolean value of an operand (SPARQL 1.2, section 17.2.3): booleans as they are, numerics true when non-zero
+ * and not NaN, strings of the datatype xsd:string true when non-empty, anything else (a literal with an invalid lexical
+ * form or of another datatype, a language-tagged string included, as the W3C test {@code expression/not-not} confirms,
+ * a non-literal) an error.
  */
 public final class SqlEffectiveBooleanValue extends SqlUnary
 {
@@ -137,12 +138,14 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
 
     /**
      * SQL computing the effective boolean value: booleans as is, numerics compared to zero, strings tested for
-     * emptiness, boxed values through the extension; a class with no effective boolean value yields NULL.
+     * emptiness, the values of the other classes overlapping the classes with an effective boolean value (boxes, mixed
+     * string literals) through the extension; a class with no effective boolean value yields NULL.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param operand the operand
      * @return SQL computing the effective boolean value: booleans as is, numerics compared to zero, strings tested for
-     *         emptiness, boxed values through the extension; a class with no effective boolean value yields NULL
+     *         emptiness, the values of the other classes overlapping the classes with an effective boolean value
+     *         through the extension; a class with no effective boolean value yields NULL
      */
     private static List<Column> translate(ClassRelations relations, SqlExpressionIntercode operand)
     {
@@ -177,7 +180,8 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
             }
             else if(!areDisjunct(relations, e.getKey(), operandClass))
             {
-                Column col = operand.get(relations, unionize(operandClasses, box)).get(0);
+                // the extension yields NULL for the boxed terms without an effective boolean value
+                Column col = e.getKey().toGeneralClass(box, e.getValue(), true).get(0);
                 cols.add(new ExpressionColumn("sparql.ebv_rdfbox(" + col + ")", BOOL));
             }
         }
