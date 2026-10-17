@@ -2711,8 +2711,11 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                             Column op = argument.get(relations, e.getKey()).get(0);
                             String code = function + "(" + op + ")";
 
-                            // ceil, floor and round of real return double precision
-                            if(op.getType().equals(FLOAT4) && !function.equals("abs"))
+                            // round() of PostgreSQL rounds a half away from zero or to even instead of up, and ceil()
+                            // and floor() of real return double precision
+                            if(function.equals("round"))
+                                code = "sparql.round_" + getLiteralClassName(e.getKey()) + "(" + op + ")";
+                            else if(op.getType().equals(FLOAT4) && !function.equals("abs"))
                                 code = "(" + code + ")::" + FLOAT4;
 
                             cols.add(new ExpressionColumn(code, op.getType()));
