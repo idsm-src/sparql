@@ -27,8 +27,7 @@ import cz.iocb.sparql.testing.Database;
 /**
  * ROUND of values kept in columns of their own numeric type, run against an empty configuration: a half is rounded
  * towards positive infinity, as fn:round does, also where round() of PostgreSQL rounds it away from zero (xsd:decimal)
- * or to even (xsd:double, xsd:float), and a negative double or float that rounds to zero keeps its sign. The values are
- * written in their canonical lexical forms, which keeps them in the columns of the canonical classes.
+ * or to even (xsd:double, xsd:float), and a negative double or float that rounds to zero keeps its sign.
  */
 public class RoundFunctionTest
 {

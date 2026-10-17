@@ -62,7 +62,6 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDateOrDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDerivatedFromInteger;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLanguageTaggedString;
@@ -2667,7 +2666,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 if(argument.getResourceClasses().stream().noneMatch(r -> hasNumeric(r)))
                     return SqlNull.get();
 
-                if(!function.equals("abs") && argument.getResourceClasses().stream().allMatch(r -> isInteger(r)))
+                // a canonical integer is its own result, the others yield the canonical xsd:integer of their value
+                if(!function.equals("abs")
+                        && argument.getResourceClasses().stream().allMatch(r -> r.isSubclassOf(xsdInteger)))
                     return argument;
 
 
@@ -2707,18 +2708,20 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         }
                         else if(Stream.of(xsdDouble, xsdFloat, xsdDecimal).anyMatch(r -> r.equals(e.getKey())))
                         {
-                            //NOTE: ignoring variants should be safe here
-                            Column op = argument.get(relations, e.getKey()).get(0);
-                            String code = function + "(" + op + ")";
+                            for(List<Set<ResourceClass>> variant : e.getValue())
+                            {
+                                Column op = argument.promoteNumericAs(variant.get(0), e.getKey());
+                                String code = function + "(" + op + ")";
 
-                            // round() of PostgreSQL rounds a half away from zero or to even instead of up, and ceil()
-                            // and floor() of real return double precision
-                            if(function.equals("round"))
-                                code = "sparql.round_" + getLiteralClassName(e.getKey()) + "(" + op + ")";
-                            else if(op.getType().equals(FLOAT4) && !function.equals("abs"))
-                                code = "(" + code + ")::" + FLOAT4;
+                                // round() of PostgreSQL rounds a half away from zero or to even instead of up, and
+                                // ceil() and floor() of real return double precision
+                                if(function.equals("round"))
+                                    code = "sparql.round_" + getLiteralClassName(e.getKey()) + "(" + op + ")";
+                                else if(op.getType().equals(FLOAT4) && !function.equals("abs"))
+                                    code = "(" + code + ")::" + FLOAT4;
 
-                            cols.add(new ExpressionColumn(code, op.getType()));
+                                cols.add(new ExpressionColumn(code, op.getType()));
+                            }
                         }
                         else
                         {
