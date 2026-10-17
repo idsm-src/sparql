@@ -402,6 +402,43 @@ public final class TripleTermClass extends PrimitiveResourceClass
     }
 
 
+    /**
+     * True if the representability can be checked in every component that is converted from a superclass of it: from
+     * the corresponding component of a triple term superclass, or from the boxed subject, the predicate IRI and the
+     * boxed object of a box.
+     */
+    @Override
+    public boolean canCheckRepresentability(ResourceClass superClass)
+    {
+        if(superClass.equals(this))
+            return true;
+
+        if(superClass.getEffectiveClass() instanceof TripleTermClass other)
+            return canCheckComponent(subject, other.subject) && canCheckComponent(predicate, other.predicate)
+                    && canCheckComponent(object, other.object);
+
+        return canCheckComponent(subject, box) && canCheckComponent(predicate, iri) && canCheckComponent(object, box);
+    }
+
+
+    /**
+     * True if {@link #fromComponentClass} can check the representability of a value of the source class in the
+     * component class; only a conversion from a superclass of the component needs the check.
+     *
+     * @param component the component class
+     * @param sourceClass class of the given columns
+     * @return true if the representability of a value of the source class in the component class can be checked, false
+     *         otherwise
+     */
+    private static boolean canCheckComponent(ResourceClass component, ResourceClass sourceClass)
+    {
+        if(component.equals(sourceClass) || !component.isSubclassOf(sourceClass))
+            return true;
+
+        return component.canCheckRepresentability(sourceClass);
+    }
+
+
     @Override
     public boolean isOptionalColumn(int index)
     {

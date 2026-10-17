@@ -13,6 +13,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.reference;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.stringLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.tripleTerm;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -51,6 +52,9 @@ public class TripleTermClassTest
     private static final TripleTermClass referenceSubject = new TripleTermClass(reference, iri, stringLiteral);
     private static final TripleTermClass blankSubject = new TripleTermClass(intBlankNode, iri, rdfLangString);
     private static final TripleTermClass nested = new TripleTermClass(iri, iri, stringObject);
+    private static final TripleTermClass unsupportedSubject = new TripleTermClass(unsupportedIri, iri, xsdString);
+    private static final TripleTermClass unsupportedPredicate = new TripleTermClass(iri, unsupportedIri, xsdString);
+    private static final TripleTermClass unsupportedNested = new TripleTermClass(iri, iri, unsupportedSubject);
 
     private static final Iri s = new Iri("http://example.org/s");
     private static final Iri p = new Iri("http://example.org/p");
@@ -267,5 +271,60 @@ public class TripleTermClassTest
                                 "sparql.rdfbox_get_string(sparql.rdfbox_get_tripleterm_object("
                                         + "sparql.rdfbox_get_tripleterm_object(x)))")),
                 nested.fromGeneralClass(box, List.of(x), false));
+    }
+
+
+    /**
+     * True if {@link ResourceClass#fromGeneralClass} converts the columns of the superclass with the representability
+     * check, false if it refuses to.
+     *
+     * @param resClass the class to convert to
+     * @param superClass the class to convert from
+     * @return true if the conversion with the check succeeds, false if it is not supported
+     */
+    private static boolean checks(ResourceClass resClass, ResourceClass superClass)
+    {
+        List<Column> columns = superClass.getSqlTypes().stream().map(t -> expression(t, "c")).toList();
+
+        try
+        {
+            resClass.fromGeneralClass(superClass, columns, false);
+            return true;
+        }
+        catch(UnsupportedOperationException e)
+        {
+            return false;
+        }
+    }
+
+
+    @Test
+    void canCheckRepresentabilityTest()
+    {
+        assertTrue(stringObject.canCheckRepresentability(box));
+        assertTrue(stringObject.canCheckRepresentability(tripleTerm));
+        assertTrue(stringObject.canCheckRepresentability(generalObject));
+        assertTrue(nested.canCheckRepresentability(box));
+
+        assertTrue(unsupportedSubject.canCheckRepresentability(unsupportedSubject));
+        assertTrue(unsupportedSubject.canCheckRepresentability(new TripleTermClass(unsupportedIri, iri, box)));
+        assertFalse(unsupportedSubject.canCheckRepresentability(box));
+        assertFalse(unsupportedSubject.canCheckRepresentability(tripleTerm));
+        assertFalse(unsupportedSubject.canCheckRepresentability(stringObject));
+        assertFalse(unsupportedPredicate.canCheckRepresentability(box));
+        assertFalse(unsupportedPredicate.canCheckRepresentability(stringObject));
+        assertFalse(unsupportedNested.canCheckRepresentability(box));
+        assertFalse(unsupportedNested.canCheckRepresentability(new TripleTermClass(iri, iri, tripleTerm)));
+
+        assertTrue(unsupportedSubject.canConvertTo(box));
+        assertFalse(box.canConvertTo(unsupportedSubject));
+        assertFalse(tripleTerm.canConvertTo(unsupportedNested));
+
+        for(TripleTermClass resClass : List.of(stringObject, nested, unsupportedSubject, unsupportedPredicate,
+                unsupportedNested))
+            for(ResourceClass superClass : List.of(box, tripleTerm, generalObject, stringObject, resClass))
+                if(resClass.isSubclassOf(superClass))
+                    assertEquals(checks(resClass, superClass), resClass.canCheckRepresentability(superClass),
+                            resClass + " from " + superClass);
     }
 }

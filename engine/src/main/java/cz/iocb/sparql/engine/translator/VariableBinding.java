@@ -299,6 +299,34 @@ public class VariableBinding
 
 
     /**
+     * True if {@link #deriveMapping(ClassRelations, ResourceClass, Table)} can convert every class of the variable
+     * overlapping the target class to the target class, checking the representability where the conversion narrows the
+     * class (see {@link ResourceClass#canCheckRepresentability}).
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param targetClass the class to convert to
+     * @return true if the columns of the target class can be derived, false otherwise
+     */
+    public boolean canDeriveMapping(ClassRelations relations, ResourceClass targetClass)
+    {
+        if(mappings.containsKey(targetClass))
+            return true;
+
+        for(ResourceClass sourceClass : mappings.keySet())
+        {
+            if(ResourceClass.areDisjunct(relations, targetClass, sourceClass) || sourceClass.isSubclassOf(targetClass))
+                continue;
+
+            if(targetClass.isSubclassOf(sourceClass.getEffectiveClass()) ?
+                    !targetClass.canCheckRepresentability(sourceClass) : !sourceClass.canConvertTo(targetClass))
+                return false;
+        }
+
+        return true;
+    }
+
+
+    /**
      * Column whose nullness decides whether a value of the class is present in the given columns: the first
      * non-constant column at a determining position (see {@link ResourceClass#isOptionalColumn}). Null when there is no
      * such column, i.e. when the presence is decided by the constants alone.

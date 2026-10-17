@@ -105,4 +105,15 @@ public final class UnsupportedIriClass extends IriClass
 
         throw new IllegalArgumentException();
     }
+
+
+    /**
+     * True only for the class itself: an IRI of a superclass cannot be told to belong to no user IRI class without the
+     * IRI classes of the configuration.
+     */
+    @Override
+    public boolean canCheckRepresentability(ResourceClass superClass)
+    {
+        return superClass.equals(this);
+    }
 }

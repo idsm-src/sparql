@@ -1,9 +1,12 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.subtract;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
@@ -93,5 +96,62 @@ public class UnsupportedIriClassTest
         assertEquals(expected, unsupportedIri.toColumns(request, unknown));
         assertEquals(expected, request.getColumns(unsupportedIri, unknown));
         assertEquals(expected, request.getColumns(request.getIriClass(unknown), unknown));
+    }
+
+
+    /**
+     * True if {@link ResourceClass#fromGeneralClass} converts the columns of the superclass with the representability
+     * check, false if it refuses to.
+     *
+     * @param resClass the class to convert to
+     * @param superClass the class to convert from
+     * @return true if the conversion with the check succeeds, false if it is not supported
+     */
+    private static boolean checks(ResourceClass resClass, ResourceClass superClass)
+    {
+        List<Column> columns = superClass.getSqlTypes().stream().map(t -> expression(t, "c")).toList();
+
+        try
+        {
+            resClass.fromGeneralClass(superClass, columns, false);
+            return true;
+        }
+        catch(UnsupportedOperationException e)
+        {
+            return false;
+        }
+    }
+
+
+    @Test
+    void canCheckRepresentabilityTest()
+    {
+        ResourceClass other = subtract(request.getConfiguration(), iri, TestRequest.iriClass);
+        ResourceClass any = unionize(unsupportedIri, TestRequest.iriClass);
+        ResourceClass mixed = unionize(unsupportedIri, xsdString);
+
+        assertTrue(unsupportedIri.canCheckRepresentability(unsupportedIri));
+        assertFalse(unsupportedIri.canCheckRepresentability(iri));
+        assertFalse(unsupportedIri.canCheckRepresentability(box));
+
+        assertTrue(TestRequest.iriClass.canCheckRepresentability(iri));
+        assertTrue(TestRequest.iriClass.canCheckRepresentability(box));
+        assertTrue(other.canCheckRepresentability(iri));
+        assertTrue(other.canCheckRepresentability(box));
+
+        assertFalse(any.canCheckRepresentability(iri));
+        assertFalse(any.canCheckRepresentability(box));
+        assertFalse(mixed.canCheckRepresentability(box));
+
+        assertTrue(unsupportedIri.canConvertTo(box));
+        assertFalse(box.canConvertTo(unsupportedIri));
+        assertFalse(iri.canConvertTo(any));
+        assertTrue(iri.canConvertTo(other));
+
+        for(ResourceClass resClass : List.of(unsupportedIri, TestRequest.iriClass, other, any, mixed))
+            for(ResourceClass superClass : List.of(box, iri, any, resClass))
+                if(resClass.isSubclassOf(superClass))
+                    assertEquals(checks(resClass, superClass), resClass.canCheckRepresentability(superClass),
+                            resClass + " from " + superClass);
     }
 }

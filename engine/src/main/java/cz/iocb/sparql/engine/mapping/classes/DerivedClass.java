@@ -1121,6 +1121,32 @@ public final class DerivedClass extends ResourceClass
 
 
     /**
+     * True if the conversion to the effective class and the membership test of every literal of the normal form that
+     * the superclass or the effective class does not imply can check the representability, see
+     * {@link #getMembershipCondition(ResourceClass, List, PrimitiveResourceClass, boolean)}.
+     */
+    @Override
+    public boolean canCheckRepresentability(ResourceClass superClass)
+    {
+        if(superClass.equals(this))
+            return true;
+
+        PrimitiveResourceClass sourceClass = superClass.getEffectiveClass();
+
+        if(!canConvert(sourceClass, effectiveClass))
+            return false;
+
+        for(Map<PrimitiveResourceClass, Boolean> term : terms)
+            for(PrimitiveResourceClass resClass : term.keySet())
+                if(!superClass.isSubclassOf(resClass) && !effectiveClass.isSubclassOf(resClass)
+                        && !canConvert(sourceClass, resClass))
+                    return false;
+
+        return true;
+    }
+
+
+    /**
      * SQL condition that a value of the superclass, given in the columns of its effective class, belongs to this class:
      * a disjunction over the terms of the conjunctions of the tests of their literals; {@code true} when the membership
      * is implied by the superclass and the effective class, {@code false} when the conversions exclude it.

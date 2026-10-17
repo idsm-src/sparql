@@ -105,6 +105,22 @@ public sealed abstract class ResourceClass permits PrimitiveResourceClass, Deriv
 
 
     /**
+     * True if {@link #fromGeneralClass} can check the representability of a value of the selected superclass in this
+     * class, so that a value outside this class yields NULL columns. Every class can, unless telling its values from
+     * the other values of the superclass needs knowledge the class does not have: an IRI that belongs to no user IRI
+     * class ({@link UnsupportedIriClass}) cannot be told from the other IRIs without the IRI classes of the
+     * configuration, and a triple term or derived class built from such a class cannot check where that class cannot.
+     *
+     * @param superClass the resource class from which is converted
+     * @return true if the representability of a value of the superclass in this class can be checked, false otherwise
+     */
+    public boolean canCheckRepresentability(ResourceClass superClass)
+    {
+        return true;
+    }
+
+
+    /**
      * Returns a base class, i.e. one that is not a composite class, that effectively represents this resource class.
      *
      * @return the base class that effectively represents this resource class
@@ -172,6 +188,29 @@ public sealed abstract class ResourceClass permits PrimitiveResourceClass, Deriv
 
 
     /**
+     * True if {@link #toClass} can convert the columns of this resource class into the columns of the target resource
+     * class, which it cannot when the representability in the target class cannot be checked (see
+     * {@link #canCheckRepresentability}).
+     *
+     * @param targetClass the resource class to which is converted
+     * @return true if the columns of this resource class can be converted into the columns of the target resource
+     *         class, false otherwise
+     */
+    public boolean canConvertTo(ResourceClass targetClass)
+    {
+        if(this.equals(targetClass) || this.isSubclassOf(targetClass))
+            return true;
+        else if(targetClass.isSubclassOf(this))
+            return targetClass.canCheckRepresentability(this);
+
+        PrimitiveResourceClass common = PrimitiveResourceClass.getCommonSuperclass(getEffectiveClass(),
+                targetClass.getEffectiveClass());
+
+        return targetClass.canCheckRepresentability(common);
+    }
+
+
+    /**
      * Columns of the target primitive class representing the value given in the columns of the source primitive class:
      * converted directly when one class is a subclass of the other, and through a common superclass otherwise. Unless
      * {@code checkOptional}, a value outside the target class yields NULL columns.
@@ -198,6 +237,27 @@ public sealed abstract class ResourceClass permits PrimitiveResourceClass, Deriv
         PrimitiveResourceClass common = PrimitiveResourceClass.getCommonSuperclass(source, target);
 
         return target.fromGeneralClass(common, source.toGeneralClass(common, columns, canBeNull), checkOptional);
+    }
+
+
+    /**
+     * True if {@link #convert} can convert the columns of the source primitive class into the columns of the target
+     * primitive class with the representability check, see {@link #canCheckRepresentability}.
+     *
+     * @param source class of the given columns
+     * @param target the class to convert to
+     * @return true if the columns of the source class can be converted into the columns of the target class with the
+     *         representability check, false otherwise
+     */
+    static boolean canConvert(PrimitiveResourceClass source, PrimitiveResourceClass target)
+    {
+        if(source.equals(target) || source.isSubclassOf(target))
+            return true;
+
+        if(target.isSubclassOf(source))
+            return target.canCheckRepresentability(source);
+
+        return target.canCheckRepresentability(PrimitiveResourceClass.getCommonSuperclass(source, target));
     }
 
 

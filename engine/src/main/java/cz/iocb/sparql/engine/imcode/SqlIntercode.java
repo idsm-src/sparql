@@ -647,7 +647,10 @@ public abstract class SqlIntercode extends SqlBaseClass
 
     /**
      * Binding of one join variable: for an always-bound variable the columns of each class are taken from the children
-     * binding it (null when constants conflict), otherwise the variants of all children are coalesced.
+     * binding it (null when constants conflict), otherwise the variants of all children are coalesced. A child that
+     * cannot derive the columns of a class with the representability check (see
+     * {@link VariableBinding#canDeriveMapping}) is left out when another child holds the class itself, whose columns
+     * then tell whether the value belongs to the class.
      *
      * @param request the current request
      * @param variable the variable
@@ -672,11 +675,17 @@ public abstract class SqlIntercode extends SqlBaseClass
             {
                 List<List<Column>> mappings = new ArrayList<>();
 
+                boolean held = vars.stream().anyMatch(v -> v != null && !v.canBeNull() && v.containsClass(resClass));
+
                 for(int i = 0; i < vars.size(); i++)
                 {
                     VariableBinding binding = vars.get(i);
 
                     if(binding == null || binding.canBeNull() || !binding.contains(relations, resClass))
+                        continue;
+
+                    // the holding child decides the class instead, the join condition makes their values equal
+                    if(held && !binding.canDeriveMapping(relations, resClass))
                         continue;
 
                     mappings.add(binding.deriveMapping(relations, resClass, tables.get(i)));
