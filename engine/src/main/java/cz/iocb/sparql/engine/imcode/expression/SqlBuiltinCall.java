@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.imcode.expression;
 
 import static cz.iocb.sparql.engine.database.Column.coalesce;
 import static cz.iocb.sparql.engine.database.SqlType.BOOL;
+import static cz.iocb.sparql.engine.database.SqlType.FLOAT4;
 import static cz.iocb.sparql.engine.database.SqlType.FLOAT8;
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.database.SqlType.INT8;
@@ -2708,7 +2709,13 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         {
                             //NOTE: ignoring variants should be safe here
                             Column op = argument.get(relations, e.getKey()).get(0);
-                            cols.add(new ExpressionColumn(function + "(" + op + ")", op.getType()));
+                            String code = function + "(" + op + ")";
+
+                            // ceil, floor and round of real return double precision
+                            if(op.getType().equals(FLOAT4) && !function.equals("abs"))
+                                code = "(" + code + ")::" + FLOAT4;
+
+                            cols.add(new ExpressionColumn(code, op.getType()));
                         }
                         else
                         {
