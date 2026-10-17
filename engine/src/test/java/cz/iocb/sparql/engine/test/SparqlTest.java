@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.test;
 
 import static cz.iocb.sparql.engine.error.MessageCategory.ERROR;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdByte;
@@ -34,7 +35,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -82,6 +85,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.mapping.ConstantBlankNodeMapping;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
@@ -123,9 +127,10 @@ import cz.iocb.sparql.testing.Database;
 /**
  * Conformance tests driven by the W3C-style manifests under {@code src/test/resources/sparql11} and
  * {@code src/test/resources/sparql12}: syntax tests check that a query is or is not accepted, evaluation tests load the
- * test data as constant quad mappings of a fresh configuration and compare the results with the expected {@code .srx}
- * or {@code .ttl} file. The NeXtProt families only translate and run the queries of {@code nextprot/queryset.sparql}
- * against the three NeXtProt configurations. Requires the {@link Database} container.
+ * test data as constant quad mappings of a fresh configuration (or store them in a table of boxes mapped by column) and
+ * compare the results with the expected {@code .srx} or {@code .ttl} file. The NeXtProt families only translate and run
+ * the queries of {@code nextprot/queryset.sparql} against the three NeXtProt configurations. Requires the
+ * {@link Database} container.
  */
 @DisplayName("SPARQL Tests")
 public class SparqlTest
@@ -168,6 +173,12 @@ public class SparqlTest
     }
 
     /**
+     * Table of the quad table family: graph (NULL for the default graph), subject, predicate and object of each quad of
+     * the current test, all of type {@code sparql.rdfbox}.
+     */
+    static final DatabaseTable quadTable = new DatabaseTable("sparql_test", "quads");
+
+    /**
      * Pool of the test database.
      */
     static DataSource connectionPool = null;
@@ -199,13 +210,21 @@ public class SparqlTest
 
 
     /**
-     * Creates the NeXtProt engines, reads every {@code manifest.ttl} into the model and prepares the subset literal
-     * classes.
+     * Creates the quad table and the NeXtProt engines, reads every {@code manifest.ttl} into the model and prepares the
+     * subset literal classes.
      */
     @BeforeAll
     static void init() throws FileNotFoundException, IOException, SQLException
     {
         connectionPool = Database.getPool();
+
+        try(Connection connection = connectionPool.getConnection(); Statement statement = connection.createStatement())
+        {
+            statement.execute("create schema if not exists sparql_test");
+            statement.execute("create table if not exists " + quadTable + " (g sparql.rdfbox, "
+                    + "s sparql.rdfbox not null, p sparql.rdfbox not null, o sparql.rdfbox not null)");
+        }
+
         schema = new DatabaseSchema(connectionPool);
 
         SparqlDatabaseConfiguration stringConfig = new NeXtProtStringConfiguration(null, connectionPool, schema);
@@ -380,6 +399,41 @@ public class SparqlTest
 
         try(Request request = engine.getRequest())
         {
+            List<List<RdfTerm>> result = getResult(request.execute(query), expected.variables());
+
+            MatcherAssert.assertThat(result, Matchers.containsInAnyOrder(expected.rows().toArray()));
+        }
+    }
+
+
+    /**
+     * Evaluation tests with the test data stored in {@link #quadTable} and mapped as boxes: the quads of the default
+     * graph (those with a NULL graph) by one mapping, the quads of the named graphs by another, so that a triple
+     * pattern reads the table once in either graph.
+     */
+    @DisplayName("Query Evaluation Tests (with a quad table)")
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("getQueryEvaluationTests")
+    void doQueryEvaluationTestsWithQuadTable(String name, String query, List<Quad> quads, ExpectedResult expected)
+            throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
+    {
+        SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool, schema, false);
+
+        TermMapping graph = config.createTermMapping(box, "g");
+        TermMapping subject = config.createTermMapping(box, "s");
+        TermMapping predicate = config.createTermMapping(box, "p");
+        TermMapping object = config.createTermMapping(box, "o");
+
+        config.addQuadMapping(quadTable, null, subject, predicate, object,
+                config.createIsNullCondition(quadTable, "g"));
+        config.addQuadMapping(quadTable, graph, subject, predicate, object);
+
+        Engine engine = new Engine(config);
+
+        try(Request request = engine.getRequest())
+        {
+            storeQuads(request, quads);
+
             List<List<RdfTerm>> result = getResult(request.execute(query), expected.variables());
 
             MatcherAssert.assertThat(result, Matchers.containsInAnyOrder(expected.rows().toArray()));
@@ -760,6 +814,42 @@ public class SparqlTest
         }
 
         return null;
+    }
+
+
+    /**
+     * Replaces the content of {@link #quadTable} by the quads, a null graph standing for the default graph.
+     */
+    static void storeQuads(Request request, List<Quad> quads) throws SQLException
+    {
+        try(Connection connection = connectionPool.getConnection(); Statement statement = connection.createStatement())
+        {
+            statement.execute("truncate " + quadTable);
+
+            if(quads.isEmpty())
+                return;
+
+            List<String> rows = new ArrayList<>(quads.size());
+
+            for(Quad quad : quads)
+                rows.add("(" + getBoxedTerm(request, quad.graph) + ", " + getBoxedTerm(request, quad.subject) + ", "
+                        + getBoxedTerm(request, quad.predicate) + ", " + getBoxedTerm(request, quad.object) + ")");
+
+            statement.execute("insert into " + quadTable + " (g, s, p, o) values " + String.join(", ", rows));
+        }
+    }
+
+
+    /**
+     * SQL expression of a Jena node (see {@link #getTerm}) boxed as the engine boxes a constant of its class; NULL for
+     * a null node.
+     */
+    static String getBoxedTerm(Request request, Node node)
+    {
+        if(node == null)
+            return "NULL";
+
+        return box.toColumns(request, getTerm(node, true)).get(0).toString();
     }
 
 

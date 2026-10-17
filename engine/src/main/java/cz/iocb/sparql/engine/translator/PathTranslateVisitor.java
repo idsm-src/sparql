@@ -48,7 +48,6 @@ import cz.iocb.sparql.engine.mapping.ConstantMapping;
 import cz.iocb.sparql.engine.mapping.InternalNodeMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping.JoinColumns;
-import cz.iocb.sparql.engine.mapping.ParametrisedIriMapping;
 import cz.iocb.sparql.engine.mapping.QuadMapping;
 import cz.iocb.sparql.engine.mapping.SingleTableQuadMapping;
 import cz.iocb.sparql.engine.mapping.TermMapping;
@@ -425,7 +424,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                     {
                         if(mapping.getPredicate().match(request, iri))
                         {
-                            ParametrisedIriMapping pm = (ParametrisedIriMapping) mapping.getPredicate();
+                            TermMapping pm = mapping.getPredicate();
                             List<Column> columns = pm.getColumns(request);
                             List<Column> values = request.getColumns(pm.getResourceClass(request), iri);
                             Conditions conditions = new Conditions(false);

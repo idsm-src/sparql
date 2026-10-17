@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.config;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
@@ -63,6 +64,7 @@ import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.database.VirtualTableDefinition;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.ConstantLiteralMapping;
+import cz.iocb.sparql.engine.mapping.ConstantMapping;
 import cz.iocb.sparql.engine.mapping.ConstantTripleTermMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping.JoinColumns;
@@ -801,7 +803,8 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
     /**
      * Registers a single-table quad mapping of this service (see {@link SingleTableQuadMapping}). With
-     * {@code autoAddToDefaultGraph}, a named-graph mapping is also added to the default graph. The columns of the table
+     * {@code autoAddToDefaultGraph}, a named-graph mapping is also added to the default graph. The graph and the
+     * predicate are constant IRIs or columns of a class that can hold IRIs, such as the box. The columns of the table
      * referenced by the mappings and the conditions are checked against the database schema: they have to exist with
      * the types they are declared with. Mapped character columns must use a code-point collation.
      *
@@ -812,17 +815,21 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * @param object the object mapping
      * @param conditions the conditions
      * @param distinct distinct flag of each table
-     * @throws IllegalArgumentException if a referenced column of the table is unknown to the schema or declared with
-     *             another type
+     * @throws IllegalArgumentException if the graph or the predicate mapping cannot hold an IRI, or if a referenced
+     *             column of the table is unknown to the schema or declared with another type
      */
-    public void addQuadMapping(SourceTable table, ConstantIriMapping graph, TermMapping subject,
-            ConstantIriMapping predicate, TermMapping object, Conditions conditions, boolean distinct)
+    public void addQuadMapping(SourceTable table, TermMapping graph, TermMapping subject, TermMapping predicate,
+            TermMapping object, Conditions conditions, boolean distinct)
     {
         checkVirtualTables(table == null ? List.of() : List.of(table));
+        checkIriMapping(graph);
+        checkIriMapping(predicate);
+        checkMapping(table, graph);
         checkMapping(table, subject);
+        checkMapping(table, predicate);
         checkMapping(table, object);
         checkConditions(table, conditions);
-        checkColumnCollations(table == null ? List.of() : List.of(table), subject, predicate, object);
+        checkColumnCollations(table == null ? List.of() : List.of(table), graph, subject, predicate, object);
 
         mappings.get(serviceIri)
                 .add(new SingleTableQuadMapping(table, graph, subject, predicate, object, conditions, distinct));
@@ -843,8 +850,8 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * @param object the object mapping
      * @param conditions the conditions
      */
-    public void addQuadMapping(SourceTable table, ConstantIriMapping graph, TermMapping subject,
-            ConstantIriMapping predicate, TermMapping object, Conditions conditions)
+    public void addQuadMapping(SourceTable table, TermMapping graph, TermMapping subject, TermMapping predicate,
+            TermMapping object, Conditions conditions)
     {
         addQuadMapping(table, graph, subject, predicate, object, conditions, false);
     }
@@ -859,8 +866,8 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * @param predicate the predicate mapping
      * @param object the object mapping
      */
-    public void addQuadMapping(SourceTable table, ConstantIriMapping graph, TermMapping subject,
-            ConstantIriMapping predicate, TermMapping object)
+    public void addQuadMapping(SourceTable table, TermMapping graph, TermMapping subject, TermMapping predicate,
+            TermMapping object)
     {
         addQuadMapping(table, graph, subject, predicate, object, new Conditions(true));
     }
@@ -1329,6 +1336,21 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
         for(Column column : mapping.getColumns(null))
             checkColumn(table, column);
+    }
+
+
+    /**
+     * Checks that a graph or predicate mapping can hold an IRI: a constant has to be an IRI, a column mapping has to be
+     * of a class that is not disjoint with the IRIs; a null graph mapping (the default graph) passes.
+     *
+     * @param mapping the graph or predicate mapping, or null
+     * @throws IllegalArgumentException if the mapping cannot hold an IRI
+     */
+    private void checkIriMapping(TermMapping mapping)
+    {
+        if(mapping instanceof ConstantMapping constant ? !(constant.getValue() instanceof Iri) :
+                mapping != null && ResourceClass.areDisjunct(this, mapping.getResourceClass(null), iri))
+            throw new IllegalArgumentException("the mapping of a graph or a predicate cannot hold an IRI");
     }
 
 
