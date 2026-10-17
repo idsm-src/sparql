@@ -3585,7 +3585,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     case "timezone" ->
                     {
                         Set<ResourceClass> set = arguments.get(0).getResourceClasses().stream()
-                                .filter(r -> isDateOrDateTime(r)
+                                .filter(r -> (hasDate(r) || hasDateTime(r))
                                         && (!(r instanceof DateTimeInZoneClass z) || z.getZone() != Integer.MIN_VALUE)
                                         && (!(r instanceof DateInZoneClass z) || z.getZone() != Integer.MIN_VALUE))
                                 .collect(toSet());
