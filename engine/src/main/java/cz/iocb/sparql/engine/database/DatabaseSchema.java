@@ -264,8 +264,8 @@ public class DatabaseSchema
 
             Map<String, Boolean> checkedCollations = new HashMap<>();
 
-            codepointDefaultCollation = checkedCollations.computeIfAbsent("\"default\"",
-                    c -> isCodepointCollation(connection, c));
+            codepointDefaultCollation = isCodepointCollation(connection, "\"default\"");
+            checkedCollations.put("\"default\"", codepointDefaultCollation);
 
             for(String[] collatedColumn : collatedColumns)
             {
@@ -276,7 +276,15 @@ public class DatabaseSchema
                 if(!collation.equals("\"default\""))
                     addCollation(table, column, collation);
 
-                if(!checkedCollations.computeIfAbsent(collation, c -> isCodepointCollation(connection, c)))
+                Boolean codepoint = checkedCollations.get(collation);
+
+                if(codepoint == null)
+                {
+                    codepoint = isCodepointCollation(connection, collation);
+                    checkedCollations.put(collation, codepoint);
+                }
+
+                if(!codepoint)
                     addForeignCollation(table, column, collation);
             }
         }
@@ -311,8 +319,9 @@ public class DatabaseSchema
      * @param connection the database connection
      * @param collation name of the collation
      * @return true if the collation orders by code points, false otherwise
+     * @throws SQLException on database errors
      */
-    protected boolean isCodepointCollation(Connection connection, String collation)
+    protected boolean isCodepointCollation(Connection connection, String collation) throws SQLException
     {
         try(Statement statement = connection.createStatement())
         {
@@ -320,10 +329,6 @@ public class DatabaseSchema
             {
                 return result.next() && result.getBoolean(1);
             }
-        }
-        catch(SQLException e)
-        {
-            throw new SQLRuntimeException(e);
         }
     }
 

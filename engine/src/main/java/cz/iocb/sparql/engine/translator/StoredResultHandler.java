@@ -19,7 +19,6 @@ import java.util.stream.IntStream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.NullColumn;
-import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.imcode.SqlIntercode;
@@ -264,7 +263,7 @@ public class StoredResultHandler extends ResultHandler
             e.fillInStackTrace();
 
             if(e.getCause() instanceof SQLException ex)
-                throw new SQLRuntimeException(ex);
+                throw ex;
 
             throw new RuntimeException(e);
         }
