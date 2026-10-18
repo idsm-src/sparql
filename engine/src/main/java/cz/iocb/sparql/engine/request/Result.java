@@ -525,15 +525,13 @@ public class Result implements AutoCloseable
 
             case DecimalClass _ ->
             {
-                BigDecimal bn = ((BigDecimal) value).stripTrailingZeros();
-                yield new TypedLiteral((bn.scale() < 1 ? bn.setScale(1) : bn).toPlainString(), xsdDecimalIri);
+                yield new TypedLiteral(decimalToString((BigDecimal) value), xsdDecimalIri);
             }
 
             case DecimalBaseClass _ ->
             {
                 String lexical = rs.getString(column++);
-                BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
-                String str = lexical.isEmpty() ? num.toPlainString() : lexical;
+                String str = lexical.isEmpty() ? decimalToString((BigDecimal) value) : lexical;
                 yield new TypedLiteral(str, xsdDecimalIri);
             }
 
@@ -761,6 +759,20 @@ public class Result implements AutoCloseable
     public void close() throws SQLException
     {
         rs.close();
+    }
+
+
+    /**
+     * Canonical xsd:decimal lexical form of the value: without trailing zeros, but with at least one fractional digit.
+     *
+     * @param value the value
+     * @return canonical xsd:decimal lexical form of the value
+     */
+    private static String decimalToString(BigDecimal value)
+    {
+        BigDecimal number = value.stripTrailingZeros();
+
+        return (number.scale() < 1 ? number.setScale(1) : number).toPlainString();
     }
 
 
