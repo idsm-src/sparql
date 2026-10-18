@@ -127,10 +127,10 @@ import cz.iocb.sparql.testing.Database;
 /**
  * Conformance tests driven by the W3C-style manifests under {@code src/test/resources/sparql11} and
  * {@code src/test/resources/sparql12}: syntax tests check that a query is or is not accepted, evaluation tests load the
- * test data as constant quad mappings of a fresh configuration (or store them in a table of boxes mapped by column) and
- * compare the results with the expected {@code .srx} or {@code .ttl} file. The NeXtProt families only translate and run
- * the queries of {@code nextprot/queryset.sparql} against the three NeXtProt configurations. Requires the
- * {@link Database} container.
+ * test data as constant quad mappings of a fresh configuration (or store them in one table, as boxes or in typed
+ * columns, mapped by column) and compare the results with the expected {@code .srx} or {@code .ttl} file. The NeXtProt
+ * families only translate and run the queries of {@code nextprot/queryset.sparql} against the three NeXtProt
+ * configurations. Requires the {@link Database} container.
  */
 @DisplayName("SPARQL Tests")
 public class SparqlTest
@@ -442,6 +442,31 @@ public class SparqlTest
 
 
     /**
+     * Evaluation tests with the test data stored in {@link TypedQuadTable} in the unboxed built-in classes of the
+     * variant, mapped by one quad mapping per combination of classes occurring in the data.
+     */
+    @DisplayName("Query Evaluation Tests (with a typed table)")
+    @ParameterizedTest(name = "{0}: {1}")
+    @MethodSource("getTypedTableTests")
+    void doQueryEvaluationTestsWithTypedTable(TypedQuadTable.Variant variant, String name, String query,
+            List<Quad> quads, ExpectedResult expected)
+            throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
+    {
+        SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool, schema, false);
+        Engine engine = new Engine(config);
+
+        try(Request request = engine.getRequest())
+        {
+            TypedQuadTable.store(config, request, variant, quads);
+
+            List<List<RdfTerm>> result = getResult(request.execute(query), expected.variables());
+
+            MatcherAssert.assertThat(result, Matchers.containsInAnyOrder(expected.rows().toArray()));
+        }
+    }
+
+
+    /**
      * NeXtProt queries must translate and run against the string configuration.
      */
     @DisplayName("NeXtProt String Tests")
@@ -676,6 +701,28 @@ public class SparqlTest
         }
 
         return queries;
+    }
+
+
+    /**
+     * The evaluation tests (see {@link #getQueryEvaluationTests}) in every variant of {@link TypedQuadTable}.
+     */
+    static List<Arguments> getTypedTableTests()
+            throws URISyntaxException, IOException, ParserConfigurationException, SAXException
+    {
+        List<Arguments> tests = getQueryEvaluationTests();
+        List<Arguments> result = new ArrayList<>();
+
+        for(TypedQuadTable.Variant variant : TypedQuadTable.getVariants())
+        {
+            for(Arguments test : tests)
+            {
+                Object[] args = test.get();
+                result.add(Arguments.of(variant, args[0], args[1], args[2], args[3]));
+            }
+        }
+
+        return result;
     }
 
 
