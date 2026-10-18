@@ -851,9 +851,17 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         builder.append(constantZoneClass.getZone());
                         builder.append("'::int4)");
                     }
-                    else if(argumentClass instanceof DateTimeInZoneBaseClass)
+                    else if(argumentClass instanceof DateTimeInZoneBaseClass constantZoneClass)
                     {
-                        builder.append(argument.getMapping(argumentClass).get(1));
+                        List<Column> columns = argument.getMapping(argumentClass);
+
+                        builder.append("COALESCE(NULLIF(");
+                        builder.append(columns.get(1));
+                        builder.append(", ''::varchar), sparql.str_datetime(");
+                        builder.append(columns.get(0));
+                        builder.append(", '");
+                        builder.append(constantZoneClass.getZone());
+                        builder.append("'::int4))");
                     }
                     else if(argumentClass instanceof DateInZoneClass constantZoneClass)
                     {
@@ -863,9 +871,17 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         builder.append(constantZoneClass.getZone());
                         builder.append("'::int4)");
                     }
-                    else if(argumentClass instanceof DateInZoneBaseClass)
+                    else if(argumentClass instanceof DateInZoneBaseClass constantZoneClass)
                     {
-                        builder.append(argument.getMapping(argumentClass).get(1));
+                        List<Column> columns = argument.getMapping(argumentClass);
+
+                        builder.append("COALESCE(NULLIF(");
+                        builder.append(columns.get(1));
+                        builder.append(", ''::varchar), sparql.str_date(");
+                        builder.append(columns.get(0));
+                        builder.append(", '");
+                        builder.append(constantZoneClass.getZone());
+                        builder.append("'::int4))");
                     }
                     else if(argumentClass instanceof LangStringWithTagClass)
                     {
@@ -888,7 +904,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     }
                     else if(argument.canSafelyGeneralize(relations, argumentClass, genDateTime))
                     {
-                        List<Column> columns = argumentClass.toGeneralClass(xsdDateTime,
+                        List<Column> columns = argumentClass.toGeneralClass(genDateTime,
                                 argument.get(relations, argumentClass), true);
 
                         builder.append("COALESCE(NULLIF(");
@@ -913,7 +929,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     }
                     else if(argument.canSafelyGeneralize(relations, argumentClass, genDate))
                     {
-                        List<Column> columns = argumentClass.toGeneralClass(xsdDate,
+                        List<Column> columns = argumentClass.toGeneralClass(genDate,
                                 argument.get(relations, argumentClass), true);
 
                         builder.append("COALESCE(NULLIF(");

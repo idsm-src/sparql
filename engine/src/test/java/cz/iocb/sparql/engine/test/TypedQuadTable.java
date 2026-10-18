@@ -502,8 +502,8 @@ public final class TypedQuadTable
 
 
     /**
-     * Creates the table anew and inserts the rows; the character columns use the code-point collation, as SPARQL orders
-     * strings by code points.
+     * Creates the table anew (and its schema when missing) and inserts the rows; the character columns use the
+     * code-point collation, as SPARQL orders strings by code points.
      *
      * @param rows the rows
      * @throws SQLException on database errors
@@ -520,6 +520,7 @@ public final class TypedQuadTable
         try(Connection connection = config.getConnectionPool().getConnection();
                 Statement statement = connection.createStatement())
         {
+            statement.execute("create schema if not exists " + table.getSchema());
             statement.execute("drop table if exists " + table);
             statement.execute("create table " + table + " (" + definition + ")");
 
