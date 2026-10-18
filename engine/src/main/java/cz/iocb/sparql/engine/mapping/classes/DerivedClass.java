@@ -22,6 +22,8 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.TripleTerm;
+import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 
 
@@ -1037,13 +1039,36 @@ public final class DerivedClass extends ResourceClass
 
     /**
      * True if the term satisfies some term of the normal form; the primitive classes are matched through the request
-     * when there is one, so that the detected class of an IRI is reused instead of matching each class anew.
+     * when there is one, so that the detected class of an IRI is reused instead of matching each class anew. A term
+     * with variables (a variable, or a triple term with one) satisfies every negated literal, as some of its values may
+     * lie outside the class.
      */
     @Override
     public boolean match(Request request, RdfTerm term)
     {
-        return terms.stream()
-                .anyMatch(t -> t.entrySet().stream().allMatch(e -> match(request, e.getKey(), term) == e.getValue()));
+        boolean ground = !(term instanceof Variable) && !(term instanceof TripleTerm triple && triple.hasVariable());
+
+        return terms.stream().anyMatch(t -> t.entrySet().stream().allMatch(e -> match(request, e, term, ground)));
+    }
+
+
+    /**
+     * True if the term satisfies the literal of a term of the normal form: belongs to the class of a positive literal,
+     * or does not belong to the class of a negated one, which a term with variables always satisfies.
+     *
+     * @param request the current request, or null
+     * @param literal the primitive class and whether it is positive
+     * @param term the RDF term
+     * @param ground false if the term has variables
+     * @return true if the term satisfies the literal, false otherwise
+     */
+    private static boolean match(Request request, Entry<PrimitiveResourceClass, Boolean> literal, RdfTerm term,
+            boolean ground)
+    {
+        if(literal.getValue())
+            return match(request, literal.getKey(), term);
+
+        return !ground || !match(request, literal.getKey(), term);
     }
 
 
