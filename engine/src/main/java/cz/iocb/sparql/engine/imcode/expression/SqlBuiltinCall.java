@@ -2799,14 +2799,18 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 if(!timeFunc && argument.getResourceClasses().stream().noneMatch(r -> hasDate(r) || hasDateTime(r)))
                     return SqlNull.get();
 
-                if(function.equals("timezone") && argument.getResourceClasses().stream().noneMatch(r -> hasDate(r)
-                        && !(r instanceof DateInZoneClass d && d.getZone() == Integer.MIN_VALUE)
-                        || hasDateTime(r) && !(r instanceof DateTimeInZoneClass t && t.getZone() == Integer.MIN_VALUE)))
+                if(function.equals("timezone") && argument.getResourceClasses().stream()
+                        .noneMatch(r -> hasDate(r) && !(r instanceof DateInZone d && d.getZone() == Integer.MIN_VALUE)
+                                || hasDateTime(r)
+                                        && !(r instanceof DateTimeInZone t && t.getZone() == Integer.MIN_VALUE)))
                     return SqlNull.get();
 
+                // the timezone of a value without a zone is an error
                 boolean canBeNull = argument.canBeNull()
                         || timeFunc && argument.getResourceClasses().stream().anyMatch(r -> !isDateTime(r))
-                        || !timeFunc && argument.getResourceClasses().stream().anyMatch(r -> !isDateOrDateTime(r));
+                        || !timeFunc && argument.getResourceClasses().stream().anyMatch(r -> !isDateOrDateTime(r))
+                        || function.equals("timezone")
+                                && argument.getResourceClasses().stream().anyMatch(r -> !hasZone(r));
 
                 ResourceClass resultClass = switch(function)
                 {
@@ -3617,8 +3621,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         Set<ResourceClass> set = arguments.get(0).getResourceClasses().stream()
                                 .filter(r -> (hasDate(r) || hasDateTime(r))
-                                        && (!(r instanceof DateTimeInZoneClass z) || z.getZone() != Integer.MIN_VALUE)
-                                        && (!(r instanceof DateInZoneClass z) || z.getZone() != Integer.MIN_VALUE))
+                                        && (!(r instanceof DateTimeInZone z) || z.getZone() != Integer.MIN_VALUE)
+                                        && (!(r instanceof DateInZone z) || z.getZone() != Integer.MIN_VALUE))
                                 .collect(toSet());
 
                         yield List.of(arguments.get(0).optimize(request, bindings, new Restriction(set), evalServices));
@@ -3651,6 +3655,20 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             return this;
 
         return create(request, function, distinct, optimized, restriction);
+    }
+
+
+    /**
+     * True if every value of the class has a timezone: the class is the class of one zone, other than the absence of a
+     * zone.
+     *
+     * @param resClass the resource class
+     * @return true if every value of the class has a timezone, false otherwise
+     */
+    private static boolean hasZone(ResourceClass resClass)
+    {
+        return resClass instanceof DateTimeInZone dateTime && dateTime.getZone() != Integer.MIN_VALUE
+                || resClass instanceof DateInZone date && date.getZone() != Integer.MIN_VALUE;
     }
 
 
