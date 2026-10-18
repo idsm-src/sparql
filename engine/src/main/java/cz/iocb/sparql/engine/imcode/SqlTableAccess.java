@@ -1648,6 +1648,11 @@ public final class SqlTableAccess extends SqlIntercode
         }
 
 
+        // a reduced access binding constants only just tests whether the table has a matching row; the test is an
+        // EXISTS subquery and not a LIMIT 1, because a subquery with LIMIT is never parallel-safe for the planner and
+        // one such member makes the whole UNION ALL or join around it sequential
+        boolean existence = canBeLimited && table != null;
+
         StringBuilder builder = new StringBuilder();
 
         builder.append("SELECT ");
@@ -1660,6 +1665,9 @@ public final class SqlTableAccess extends SqlIntercode
                     .collect(joining(", ")));
         else
             builder.append("1");
+
+        if(existence)
+            builder.append(" WHERE EXISTS (SELECT 1");
 
         if(table != null)
         {
@@ -1737,8 +1745,8 @@ public final class SqlTableAccess extends SqlIntercode
             builder.append(groupColumns.stream().sorted().map(Object::toString).collect(joining(", ")));
         }
 
-        if(canBeLimited && table != null)
-            builder.append(" LIMIT 1");
+        if(existence)
+            builder.append(")");
 
         return builder.toString();
     }
