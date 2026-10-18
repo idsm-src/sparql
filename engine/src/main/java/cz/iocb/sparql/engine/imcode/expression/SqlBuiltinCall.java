@@ -661,8 +661,17 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     return realArguments.get(0);
 
 
+                // a value of a class the parent does not need stops the search for a bound argument too, so the classes
+                // are split only when no argument but the last one can take such a class, and nothing is computed when
+                // no class is needed
+                boolean needed = resourceClasses.stream().anyMatch(c -> restriction.contains(relations, c));
+                boolean unneeded = realArguments.subList(0, realArguments.size() - 1).stream()
+                        .flatMap(a -> a.getResourceClasses().stream())
+                        .anyMatch(c -> !restriction.contains(relations, c));
+                Restriction split = needed && unneeded ? ALL : restriction;
+
                 Map<Boolean, Set<ResourceClass>> classes = resourceClasses.stream()
-                        .collect(partitioningBy(c -> restriction.contains(relations, c), toSet()));
+                        .collect(partitioningBy(c -> split.contains(relations, c), toSet()));
 
                 Map<ResourceClass, List<Column>> mappings = new HashMap<>();
 
@@ -3387,8 +3396,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     case "coalesce" ->
                     {
-                        yield arguments.stream().map(a -> a.optimize(request, bindings, restriction, evalServices))
-                                .toList();
+                        // a value of a class the parent does not need still stops the search for a bound argument
+                        yield arguments.stream().map(a -> a.optimize(request, bindings, ALL, evalServices)).toList();
                     }
 
                     case "sameterm" ->
@@ -3625,7 +3634,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
         if(optimized.equals(arguments))
             return this;
 
-        return create(request, function, distinct, optimized);
+        return create(request, function, distinct, optimized, restriction);
     }
 
 
