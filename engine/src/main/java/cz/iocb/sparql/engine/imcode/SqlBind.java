@@ -103,6 +103,13 @@ public final class SqlBind extends SqlIntercode
 
         for(Entry<ResourceClass, List<Column>> e : expression.getMappings().entrySet())
         {
+            // a class the parent does not need is not materialised by the expression, nor by the variable
+            if(e.getValue() == null)
+            {
+                columns.put(e.getKey(), null);
+                continue;
+            }
+
             List<Column> names = e.getKey().createColumns(request.getColumnMap(), variable);
 
             List<Column> list = new ArrayList<>(e.getKey().getColumnCount());
@@ -218,6 +225,9 @@ public final class SqlBind extends SqlIntercode
             List<Column> cols = e.getValue();
             ResourceClass resClass = e.getKey();
             List<Column> names = binding.getMapping(resClass);
+
+            if(cols == null)
+                continue;
 
             for(int i = 0; i < resClass.getColumnCount(); i++)
             {
