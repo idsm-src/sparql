@@ -114,7 +114,8 @@ public final class SqlUnaryArithmetic extends SqlUnary
 
 
     /**
-     * SQL computing the result in the class from the operand promoted to it.
+     * SQL computing the result in the class from the operand promoted to it: for plus the promoted operand itself, or
+     * the unary plus of a boxed operand, for minus its negation.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param isMinus true for minus, false for plus
@@ -133,7 +134,8 @@ public final class SqlUnaryArithmetic extends SqlUnary
             for(List<Set<ResourceClass>> variant : variants)
             {
                 Column op = operand.promoteNumericAs(variant.get(0), resultClass);
-                cols.add(new ExpressionColumn("(operator(sparql.-) " + op + ")", resultClass.getSqlTypes().get(0)));
+                cols.add(isMinus ?
+                        new ExpressionColumn("(operator(sparql.-) " + op + ")", resultClass.getSqlTypes().get(0)) : op);
             }
         }
         else
@@ -141,7 +143,8 @@ public final class SqlUnaryArithmetic extends SqlUnary
             for(List<Set<ResourceClass>> variant : variants)
             {
                 Column op = operand.get(relations, unionize(variant.get(0), box)).get(0);
-                cols.add(new ExpressionColumn("(operator(sparql.-) " + op + ")", resultClass.getSqlTypes().get(0)));
+                cols.add(new ExpressionColumn("(operator(sparql." + (isMinus ? "-" : "+") + ") " + op + ")",
+                        resultClass.getSqlTypes().get(0)));
             }
         }
 
