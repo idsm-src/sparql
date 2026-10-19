@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.IntStream;
@@ -46,7 +47,10 @@ public abstract class SqlIntercode extends SqlBaseClass
 {
     /**
      * What a parent requires of a child's variables: for each needed variable, the resource classes whose values must
-     * be materialised (the box stands for any class). Variables absent from the restrictions are not needed at all.
+     * be materialised (the box stands for any class). Variables absent from the restrictions are not needed at all. For
+     * a variable a join compares with the same variable of another child, the restrictions also carry the classes of
+     * that other side (the join classes, see {@link #getJoinClasses}): a union presents its classes overlapping one of
+     * them as a single class, so that the join compares a single pair of classes instead of a disjunction of pairs.
      */
     public static class Restrictions
     {
@@ -54,6 +58,11 @@ public abstract class SqlIntercode extends SqlBaseClass
          * Needed classes per variable.
          */
         private final Map<Variable, Set<ResourceClass>> map = new HashMap<>();
+
+        /**
+         * Join classes per variable: the classes the variable is compared with on the other sides of the joins above.
+         */
+        private final Map<Variable, Set<ResourceClass>> joinClasses = new HashMap<>();
 
         /**
          * Creates empty restrictions (nothing is needed).
@@ -71,6 +80,7 @@ public abstract class SqlIntercode extends SqlBaseClass
         public Restrictions(Restrictions restrictions)
         {
             map.putAll(restrictions.map);
+            addJoinClasses(restrictions.joinClasses);
         }
 
 
@@ -119,6 +129,9 @@ public abstract class SqlIntercode extends SqlBaseClass
                     map.put(v, sc);
                 }
             }
+
+            addJoinClasses(a.joinClasses);
+            addJoinClasses(b.joinClasses);
         }
 
 
@@ -288,6 +301,46 @@ public abstract class SqlIntercode extends SqlBaseClass
                     map.put(v, sc);
                 }
             }
+
+            addJoinClasses(restrictions.joinClasses);
+        }
+
+
+        /**
+         * Adds join classes of the variable, see {@link #getJoinClasses(Variable)}.
+         *
+         * @param var the variable
+         * @param classes classes of the other side of a join
+         */
+        public void addJoinClasses(Variable var, Set<ResourceClass> classes)
+        {
+            joinClasses.computeIfAbsent(var, _ -> new HashSet<>()).addAll(classes);
+        }
+
+
+        /**
+         * Adds join classes of several variables, see {@link #getJoinClasses(Variable)}.
+         *
+         * @param classes join classes per variable
+         */
+        private void addJoinClasses(Map<Variable, Set<ResourceClass>> classes)
+        {
+            for(Entry<Variable, Set<ResourceClass>> entry : classes.entrySet())
+                addJoinClasses(entry.getKey(), entry.getValue());
+        }
+
+
+        /**
+         * Join classes of the variable: the classes the variable is compared with on the other sides of the joins above
+         * the child, or an empty set when no join compares it. A union presents its classes overlapping one of them as
+         * a single class (see {@link SqlIntercode#unionResourceClasses(ClassRelations, List, Set)}).
+         *
+         * @param var the variable
+         * @return join classes of the variable, or an empty set when no join compares it
+         */
+        public Set<ResourceClass> getJoinClasses(Variable var)
+        {
+            return joinClasses.getOrDefault(var, Set.of());
         }
 
 
@@ -311,7 +364,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             if(other.getClass() != getClass())
                 return false;
 
-            return map.equals(((Restrictions) other).map);
+            return map.equals(((Restrictions) other).map) && joinClasses.equals(((Restrictions) other).joinClasses);
         }
 
 
@@ -587,6 +640,41 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
     /**
+     * Classes a variable can take in a union of the given children that is compared with the given join classes (see
+     * {@link Restrictions#getJoinClasses}): the classes of {@link #unionResourceClasses(ClassRelations, List)}, where
+     * the classes overlapping a join class are merged into their union, so that the join compares the class with a
+     * single class of the union, in the columns of their common superclass, instead of a disjunction of pairs of
+     * classes, which a database can neither hash nor merge. The classes overlapping a join class are counted before any
+     * merge, as a merge keeps the overlaps of its members, so one pass over the join classes finds every group.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param defs bindings of the variable in the children where it is bound
+     * @param joinClasses classes the variable is compared with by the joins above the union
+     * @return classes a variable can take in a union of the given children, where the classes overlapping a join class
+     *         are merged into their union
+     */
+    protected static Set<ResourceClass> unionResourceClasses(ClassRelations relations, List<VariableBinding> defs,
+            Set<ResourceClass> joinClasses)
+    {
+        Set<ResourceClass> result = unionResourceClasses(relations, defs);
+
+        for(ResourceClass joinClass : joinClasses)
+        {
+            Set<ResourceClass> group = result.stream().filter(c -> !ResourceClass.areDisjunct(relations, c, joinClass))
+                    .collect(toSet());
+
+            if(group.size() > 1)
+            {
+                result.removeAll(group);
+                result.add(unionize(group));
+            }
+        }
+
+        return result;
+    }
+
+
+    /**
      * Bindings of the join of the given children (aliased by {@code tables}). A variable bound non-null in some child
      * keeps only the classes compatible across those children (empty bindings are returned if there is none, or if
      * constants differ), otherwise all its classes are unioned and coalesced. Fresh output columns are allocated;
@@ -631,7 +719,8 @@ public abstract class SqlIntercode extends SqlBaseClass
             }
             else
             {
-                Set<ResourceClass> resClasses = unionResourceClasses(relations, defs);
+                Set<ResourceClass> resClasses = unionResourceClasses(relations, defs,
+                        restrictions == null ? Set.of() : restrictions.getJoinClasses(variable));
                 VariableBinding binding = createVariableBinding(request, variable, resClasses, vars, tables, columnMap,
                         true);
 
@@ -1189,7 +1278,9 @@ public abstract class SqlIntercode extends SqlBaseClass
      * @param others bindings of the other children
      * @param restrictions what the parent needs of the variables
      * @return restrictions for a join child against several other children, see
-     *         {@link #getJoinRestrictions(ClassRelations, VariableBindings, VariableBindings, Restrictions)}
+     *         {@link #getJoinRestrictions(ClassRelations, VariableBindings, VariableBindings, Restrictions)}; the
+     *         classes of the other children are the join classes of the shared variables (see
+     *         {@link Restrictions#getJoinClasses})
      */
     protected static Restrictions getJoinRestrictions(ClassRelations relations, VariableBindings bindings,
             Collection<VariableBindings> others, Restrictions restrictions)
@@ -1205,6 +1296,9 @@ public abstract class SqlIntercode extends SqlBaseClass
 
             if(!vars.isEmpty())
             {
+                for(VariableBinding v : vars)
+                    joinRestrictions.addJoinClasses(variable, v.getClasses());
+
                 if(binding.canBeNull())
                 {
                     joinRestrictions.set(variable, binding.getMappings().keySet());

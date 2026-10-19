@@ -68,6 +68,22 @@ public final class SqlUnion extends SqlIntercode
      */
     public static SqlIntercode union(Request request, List<SqlIntercode> branches)
     {
+        return union(request, branches, null);
+    }
+
+
+    /**
+     * Union of the branches (see {@link #union(Request, List)}) presenting the classes of a variable that a join above
+     * the union compares with one of its join classes as a single class, so that the join compares a single pair of
+     * classes (see {@link Restrictions#getJoinClasses}).
+     *
+     * @param request the current request
+     * @param branches the branches
+     * @param restrictions what the parent needs of the variables, or null
+     * @return union of the branches presenting the classes a join above compares as a single class
+     */
+    protected static SqlIntercode union(Request request, List<SqlIntercode> branches, Restrictions restrictions)
+    {
         ClassRelations relations = request.getConfiguration();
 
         /* special cases */
@@ -83,16 +99,7 @@ public final class SqlUnion extends SqlIntercode
 
         /* standard union */
 
-        Set<Variable> varNames = branches.stream().flatMap(i -> i.bindings.getVariables().stream()).collect(toSet());
-        Map<Variable, Set<ResourceClass>> classes = new HashMap<>();
-
-        for(Variable var : varNames)
-        {
-            List<VariableBinding> defs = branches.stream().map(b -> b.getVariableBindings().get(var))
-                    .filter(Objects::nonNull).toList();
-
-            classes.put(var, unionResourceClasses(relations, defs));
-        }
+        Map<Variable, Set<ResourceClass>> classes = getUnionClasses(relations, branches, restrictions);
 
 
         List<SqlIntercode> childs = new ArrayList<>();
@@ -195,6 +202,35 @@ public final class SqlUnion extends SqlIntercode
 
 
     /**
+     * Classes per variable of a union of the branches: the classes of the branches merged by
+     * {@link #unionResourceClasses(ClassRelations, List)}, and further by the join classes of the restrictions when
+     * given (see {@link #unionResourceClasses(ClassRelations, List, Set)}).
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param branches the branches
+     * @param restrictions what the parent needs of the variables, or null
+     * @return classes per variable of a union of the branches
+     */
+    private static Map<Variable, Set<ResourceClass>> getUnionClasses(ClassRelations relations,
+            List<SqlIntercode> branches, Restrictions restrictions)
+    {
+        Set<Variable> varNames = branches.stream().flatMap(i -> i.bindings.getVariables().stream()).collect(toSet());
+        Map<Variable, Set<ResourceClass>> classes = new HashMap<>();
+
+        for(Variable var : varNames)
+        {
+            List<VariableBinding> defs = branches.stream().map(b -> b.getVariableBindings().get(var))
+                    .filter(Objects::nonNull).toList();
+
+            classes.put(var, restrictions == null ? unionResourceClasses(relations, defs) :
+                    unionResourceClasses(relations, defs, restrictions.getJoinClasses(var)));
+        }
+
+        return classes;
+    }
+
+
+    /**
      * The branches.
      *
      * @return the branches
@@ -208,6 +244,8 @@ public final class SqlUnion extends SqlIntercode
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
         List<SqlIntercode> optChilds = childs.stream()
                 .map(c -> c.optimize(request, restrictions, reduced, evalServices))
                 .filter(i -> !i.equals(SqlNoSolution.get())).toList();
@@ -220,10 +258,22 @@ public final class SqlUnion extends SqlIntercode
             return optChilds.get(0);
 
 
-        if(optChilds.equals(childs))
+        if(optChilds.equals(childs) && hasClasses(getUnionClasses(relations, childs, restrictions)))
             return this;
 
-        return union(request, optChilds);
+        return union(request, optChilds, restrictions);
+    }
+
+
+    /**
+     * True if the variables take exactly the given classes.
+     *
+     * @param classes classes per variable
+     * @return true if the variables take exactly the given classes, false otherwise
+     */
+    private boolean hasClasses(Map<Variable, Set<ResourceClass>> classes)
+    {
+        return bindings.getValues().stream().allMatch(b -> b.getClasses().equals(classes.get(b.getVariable())));
     }
 
 
