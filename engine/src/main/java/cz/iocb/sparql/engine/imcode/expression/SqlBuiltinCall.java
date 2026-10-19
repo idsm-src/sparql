@@ -5,7 +5,6 @@ import static cz.iocb.sparql.engine.database.SqlType.BOOL;
 import static cz.iocb.sparql.engine.database.SqlType.FLOAT4;
 import static cz.iocb.sparql.engine.database.SqlType.FLOAT8;
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
-import static cz.iocb.sparql.engine.database.SqlType.INT8;
 import static cz.iocb.sparql.engine.database.SqlType.NUMERIC;
 import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
@@ -2979,82 +2978,6 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 return new SqlBuiltinCall(function, distinct, arguments, singletonMap(xsdString, result), canBeNull);
             }
 
-            case "_strhash":
-            {
-                SqlExpressionIntercode argument = arguments.get(0);
-
-                if(argument.getResourceClasses().stream().noneMatch(r -> hasStringLiteral(r)))
-                    return SqlNull.get();
-
-                boolean canBeNull = argument.canBeNull()
-                        || argument.getResourceClasses().stream().anyMatch(r -> !isStringLiteral(r));
-
-
-                if(!restriction.contains(relations, xsdLong))
-                    return new SqlBuiltinCall(function, distinct, arguments, singletonMap(xsdLong, null), canBeNull);
-
-                boolean partCanBeBull = argument.canBeNull() || argument.getResourceClasses().size() > 1;
-
-                Set<Column> variants = new HashSet<>();
-
-                for(ResourceClass argumentClass : argument.getResourceClasses())
-                {
-                    StringBuilder builder = new StringBuilder();
-
-                    if(isFixedTagClass(argumentClass))
-                    {
-                        builder.append("hashtextextended(");
-                        builder.append(argument.getMapping(argumentClass).get(0));
-                        builder.append(",0)::int8");
-                    }
-                    else if(isString(argumentClass))
-                    {
-                        builder.append("hashtextextended(");
-                        builder.append(argumentClass
-                                .toGeneralClass(xsdString, argument.get(relations, argumentClass), partCanBeBull)
-                                .get(0));
-                        builder.append(",0)::int8");
-                    }
-                    else if(argument.canSafelyGeneralize(relations, argumentClass, rdfLangString))
-                    {
-                        builder.append("hashtextextended(");
-                        builder.append(argumentClass
-                                .toGeneralClass(rdfLangString, argument.get(relations, argumentClass), partCanBeBull)
-                                .get(0));
-                        builder.append(",0)::int8");
-                    }
-                    else if(argument.canSafelyGeneralize(relations, argumentClass, rdfLtrLangString))
-                    {
-                        builder.append("hashtextextended(");
-                        builder.append(argumentClass
-                                .toGeneralClass(rdfLtrLangString, argument.get(relations, argumentClass), partCanBeBull)
-                                .get(0));
-                        builder.append(",0)::int8");
-                    }
-                    else if(argument.canSafelyGeneralize(relations, argumentClass, rdfRtlLangString))
-                    {
-                        builder.append("hashtextextended(");
-                        builder.append(argumentClass
-                                .toGeneralClass(rdfRtlLangString, argument.get(relations, argumentClass), partCanBeBull)
-                                .get(0));
-                        builder.append(",0)::int8");
-                    }
-                    else if(hasStringLiteral(argumentClass))
-                    {
-                        builder.append("hashtextextended(sparql.rdfbox_get_string_literal(");
-                        builder.append(argument.get(relations, unionize(Set.of(argumentClass), box)).get(0));
-                        builder.append("), 0)::int8");
-                    }
-
-                    if(!builder.isEmpty())
-                        variants.add(new ExpressionColumn(builder.toString(), INT8));
-                }
-
-                List<Column> result = List.of(coalesce(variants));
-
-                return new SqlBuiltinCall(function, distinct, arguments, singletonMap(xsdLong, result), canBeNull);
-            }
-
             default:
                 //TODO: SPARQL 1.2
                 throw new IllegalArgumentException("unsupported function: " + function); // unexpected
@@ -3638,13 +3561,6 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         yield List.of(
                                 arguments.get(0).optimize(request, bindings, new Restriction(xsdString), evalServices));
-                    }
-
-                    case "_strhash" ->
-                    {
-                        yield List.of(arguments.get(0).optimize(request, bindings,
-                                new Restriction(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString),
-                                evalServices));
                     }
 
                     default -> throw new IllegalArgumentException(); // unexpected

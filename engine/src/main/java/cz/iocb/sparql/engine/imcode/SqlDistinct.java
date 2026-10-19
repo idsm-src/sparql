@@ -1,6 +1,5 @@
 package cz.iocb.sparql.engine.imcode;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isStringLiteral;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -15,8 +14,6 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.VirtualTable;
-import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
-import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -178,21 +175,7 @@ public final class SqlDistinct extends SqlIntercode
     {
         ClassRelations relations = request.getConfiguration();
 
-        SqlIntercode child = this.child;
         Restrictions restrictions = new Restrictions(distinctVariables);
-        VariableBindings bindings = child.getVariableBindings().restrict(relations, restrictions);
-
-        Set<Variable> stringLiterals = new HashSet<>();
-
-        for(VariableBinding v : bindings.getValues())
-            for(ResourceClass c : v.getClasses())
-                if(isStringLiteral(c))
-                    stringLiterals.add(v.getVariable());
-
-        for(Variable var : stringLiterals)
-            child = SqlBind.bind(request, new Variable("#hash_" + var), SqlBuiltinCall.create(request, "_strhash",
-                    false, List.of(SqlVariable.create(relations, child.getVariable(var)))), child);
-
 
         StringBuilder builder = new StringBuilder();
 
@@ -214,19 +197,9 @@ public final class SqlDistinct extends SqlIntercode
         Set<Column> groupColumns = child.getVariableBindings().restrict(relations, restrictions)
                 .getNonConstantColumns();
 
-        Set<Column> hashColumns = new HashSet<>();
-
-        for(Variable var : stringLiterals)
-            hashColumns.addAll(child.getVariableBindings().get(new Variable("#hash_" + var)).getNonConstantColumns());
-
-        builder.append(hashColumns.stream().map(Object::toString).collect(joining(", ")));
-
-        if(!hashColumns.isEmpty() && !groupColumns.isEmpty())
-            builder.append(", ");
-
         if(!groupColumns.isEmpty())
             builder.append(groupColumns.stream().map(Object::toString).collect(joining(", ")));
-        else if(hashColumns.isEmpty())
+        else
             builder.append("1");
 
         return builder.toString();
