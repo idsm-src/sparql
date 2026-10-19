@@ -27,7 +27,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 /**
  * Union (keeping duplicates) of children over the union of their variables; a variable missing in a branch is unbound
- * there, and the columns of the branches are aligned by resource class.
+ * there, and the columns of the branches are aligned by resource class. Two branches accessing the same table whose
+ * conditions differ only in the null test of a column are written as a single scan of the table (see
+ * {@link SqlTableAccess#translateUnion}).
  */
 public final class SqlUnion extends SqlIntercode
 {
@@ -284,14 +286,35 @@ public final class SqlUnion extends SqlIntercode
 
         Set<Column> columns = bindings.getNonConstantColumns();
 
+        // the branches already written together with an earlier branch as a single scan of their table
+        boolean[] merged = new boolean[childs.size()];
+        boolean hasBranch = false;
 
         for(int i = 0; i < childs.size(); i++)
         {
-            if(i > 0)
+            if(merged[i])
+                continue;
+
+            if(hasBranch)
                 builder.append(" UNION ALL ");
+
+            hasBranch = true;
 
             SqlIntercode child = childs.get(i);
             Map<Column, Column> columnMapping = columnMappings.get(i);
+
+            if(child instanceof SqlTableAccess access)
+            {
+                int partner = findUnionPartner(access, i, merged);
+
+                if(partner >= 0)
+                {
+                    merged[partner] = true;
+                    builder.append(SqlTableAccess.translateUnion(access, (SqlTableAccess) childs.get(partner),
+                            columnMapping, columnMappings.get(partner), columns));
+                    continue;
+                }
+            }
 
             builder.append("SELECT ");
             boolean hasSelect = false;
@@ -321,6 +344,26 @@ public final class SqlUnion extends SqlIntercode
         }
 
         return builder.toString();
+    }
+
+
+    /**
+     * Index of the first later branch that can be written together with the given branch as a single scan of their
+     * table (see {@link SqlTableAccess#canBeUnionized}), or -1 when there is none.
+     *
+     * @param access the branch
+     * @param index the index of the branch
+     * @param merged the branches already written together with an earlier branch
+     * @return index of the first later branch that can be written together with the branch, or -1
+     */
+    private int findUnionPartner(SqlTableAccess access, int index, boolean[] merged)
+    {
+        for(int j = index + 1; j < childs.size(); j++)
+            if(!merged[j] && childs.get(j) instanceof SqlTableAccess other
+                    && SqlTableAccess.canBeUnionized(access, other))
+                return j;
+
+        return -1;
     }
 
 

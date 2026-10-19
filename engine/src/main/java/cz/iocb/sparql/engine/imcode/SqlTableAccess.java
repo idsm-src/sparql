@@ -21,6 +21,7 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
@@ -38,8 +39,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 /**
  * Access to one table, or to constants only when the table is null: the mapped columns are exposed as variables and the
  * rows are restricted by conditions. Joins, left joins and distinct unions of accesses to the same table or along keys
- * are merged into a single access ({@link #tryReduceJoin} and friends). {@code reduced} means the parent does not care
- * about duplicates; {@code distinctColumns} asks for deduplication over those columns (see
+ * are merged into a single access ({@link #tryReduceJoin} and friends), and a union of two accesses telling their rows
+ * apart by the null test of a column is written as a single scan ({@link #translateUnion}). {@code reduced} means the
+ * parent does not care about duplicates; {@code distinctColumns} asks for deduplication over those columns (see
  * {@link cz.iocb.sparql.engine.mapping.SingleTableQuadMapping}).
  */
 public final class SqlTableAccess extends SqlIntercode
@@ -1598,26 +1600,7 @@ public final class SqlTableAccess extends SqlIntercode
     @Override
     public String translate(Request request)
     {
-        Map<Column, Column> rev = new HashMap<>();
-
-        for(VariableBinding binding : bindings.getValues())
-        {
-            VariableBinding inner = internal.get(binding.getVariable());
-
-            for(ResourceClass resClass : binding.getClasses())
-            {
-                List<Column> vCols = binding.getMapping(resClass);
-                List<Column> iCols = inner.getMapping(resClass);
-
-                if(iCols != null)
-                {
-                    for(int i = 0; i < iCols.size(); i++)
-                        if(iCols.get(i) instanceof ExpressionColumn)
-                            rev.put(vCols.get(i), iCols.get(i));
-                }
-            }
-        }
-
+        Map<Column, Column> rev = getExpressions();
 
         boolean canBeLimited = reduced;
 
@@ -1675,69 +1658,7 @@ public final class SqlTableAccess extends SqlIntercode
             builder.append(table);
         }
 
-        if(!conditions.isTrue())
-        {
-            builder.append(" WHERE ");
-
-            boolean hasWhere = false;
-
-            for(Condition condition : conditions.getConditions())
-            {
-                appendOr(builder, hasWhere);
-                hasWhere = true;
-
-                builder.append("(");
-                boolean hasCondition = false;
-
-                // TODO: do not use derivable conditions
-
-                for(ColumnComparison pair : condition.getAreEqual())
-                {
-                    appendAnd(builder, hasCondition);
-                    hasCondition = true;
-
-                    builder.append(pair.getType().equal(pair.getLeft(), pair.getRight()));
-                }
-
-                for(ColumnComparison pair : condition.getAreNotDistinct())
-                {
-                    appendAnd(builder, hasCondition);
-                    hasCondition = true;
-
-                    builder.append(pair.getType().notDistinct(pair.getLeft(), pair.getRight()));
-                }
-
-                for(ColumnComparison pair : condition.getAreNotEqual())
-                {
-                    appendAnd(builder, hasCondition);
-                    hasCondition = true;
-
-                    builder.append(pair.getType().notEqual(pair.getLeft(), pair.getRight()));
-                }
-
-                // TODO: do not use derivable conditions
-
-                for(Column column : condition.getIsNotNull())
-                {
-                    appendAnd(builder, hasCondition);
-                    hasCondition = true;
-
-                    builder.append(column);
-                    builder.append(" IS NOT NULL");
-                }
-
-                for(Column column : condition.getIsNull())
-                {
-                    appendAnd(builder, hasCondition);
-                    hasCondition = true;
-
-                    builder.append(column);
-                    builder.append(" IS NULL");
-                }
-
-                builder.append(")");
-            }
-        }
+        appendConditions(builder, conditions);
 
         if(groupColumns != null)
         {
@@ -1749,6 +1670,263 @@ public final class SqlTableAccess extends SqlIntercode
             builder.append(")");
 
         return builder.toString();
+    }
+
+
+    /**
+     * The expressions behind the exposed columns: an exposed binding stands for an SQL expression of the table by a
+     * placeholder column, which the generated code replaces by the expression itself.
+     *
+     * @return the expression behind each exposed placeholder column
+     */
+    private Map<Column, Column> getExpressions()
+    {
+        Map<Column, Column> rev = new HashMap<>();
+
+        for(VariableBinding binding : bindings.getValues())
+        {
+            VariableBinding inner = internal.get(binding.getVariable());
+
+            for(ResourceClass resClass : binding.getClasses())
+            {
+                List<Column> vCols = binding.getMapping(resClass);
+                List<Column> iCols = inner.getMapping(resClass);
+
+                if(iCols != null)
+                {
+                    for(int i = 0; i < iCols.size(); i++)
+                        if(iCols.get(i) instanceof ExpressionColumn)
+                            rev.put(vCols.get(i), iCols.get(i));
+                }
+            }
+        }
+
+        return rev;
+    }
+
+
+    /**
+     * Appends the WHERE clause of the conditions, nothing when they always hold.
+     *
+     * @param builder the SQL code being built
+     * @param conditions the conditions
+     */
+    private static void appendConditions(StringBuilder builder, Conditions conditions)
+    {
+        if(conditions.isTrue())
+            return;
+
+        builder.append(" WHERE ");
+
+        boolean hasWhere = false;
+
+        for(Condition condition : conditions.getConditions())
+        {
+            appendOr(builder, hasWhere);
+            hasWhere = true;
+
+            builder.append("(");
+            boolean hasCondition = false;
+
+            // TODO: do not use derivable conditions
+
+            for(ColumnComparison pair : condition.getAreEqual())
+            {
+                appendAnd(builder, hasCondition);
+                hasCondition = true;
+
+                builder.append(pair.getType().equal(pair.getLeft(), pair.getRight()));
+            }
+
+            for(ColumnComparison pair : condition.getAreNotDistinct())
+            {
+                appendAnd(builder, hasCondition);
+                hasCondition = true;
+
+                builder.append(pair.getType().notDistinct(pair.getLeft(), pair.getRight()));
+            }
+
+            for(ColumnComparison pair : condition.getAreNotEqual())
+            {
+                appendAnd(builder, hasCondition);
+                hasCondition = true;
+
+                builder.append(pair.getType().notEqual(pair.getLeft(), pair.getRight()));
+            }
+
+            // TODO: do not use derivable conditions
+
+            for(Column column : condition.getIsNotNull())
+            {
+                appendAnd(builder, hasCondition);
+                hasCondition = true;
+
+                builder.append(column);
+                builder.append(" IS NOT NULL");
+            }
+
+            for(Column column : condition.getIsNull())
+            {
+                appendAnd(builder, hasCondition);
+                hasCondition = true;
+
+                builder.append(column);
+                builder.append(" IS NULL");
+            }
+
+            builder.append(")");
+        }
+    }
+
+
+    /**
+     * True if the union of the two accesses can be translated as a single scan of their table (see
+     * {@link #translateUnion}): both read the same table without deduplication and project some column, and their
+     * conditions differ only in the null test of one column, which one access requires to be null and the other to be
+     * non-null, so that every row satisfying the common part of the conditions belongs to exactly one of them.
+     *
+     * @param left the left access
+     * @param right the right access
+     * @return true if the union of the accesses can be translated as a single scan of their table, false otherwise
+     */
+    static boolean canBeUnionized(SqlTableAccess left, SqlTableAccess right)
+    {
+        if(left.table == null || !left.table.equals(right.table))
+            return false;
+
+        if(!left.distinctColumns.isEmpty() || !right.distinctColumns.isEmpty())
+            return false;
+
+        if(left.bindings.getNonConstantColumns().isEmpty() || right.bindings.getNonConstantColumns().isEmpty())
+            return false;
+
+        return getDiscriminator(left, right) != null;
+    }
+
+
+    /**
+     * The column whose null test tells the rows of the left access from the rows of the right one: the conditions of
+     * the accesses are single conjunctions differing only in the null test of the column, which one of them requires to
+     * be null and the other to be non-null (see {@link Condition#resolve}); null when there is no such column.
+     *
+     * @param left the left access
+     * @param right the right access
+     * @return the column telling the rows of the accesses apart, or null
+     */
+    private static Column getDiscriminator(SqlTableAccess left, SqlTableAccess right)
+    {
+        if(left.conditions.getConditions().size() != 1 || right.conditions.getConditions().size() != 1)
+            return null;
+
+        Condition l = left.conditions.getConditions().iterator().next();
+        Condition r = right.conditions.getConditions().iterator().next();
+
+        if(l.resolve(r) == null)
+            return null;
+
+        Set<Column> columns = new HashSet<>(l.getIsNull());
+        columns.addAll(r.getIsNull());
+        columns.removeIf(c -> l.getIsNull().contains(c) && r.getIsNull().contains(c));
+
+        assert columns.size() == 1;
+
+        return columns.iterator().next();
+    }
+
+
+    /**
+     * Translates the union of two accesses satisfying {@link #canBeUnionized} as a single scan of their table: the rows
+     * are restricted by the common part of the conditions, and a column the accesses expose differently is computed by
+     * a CASE over the null test telling their rows apart, so that each row yields the columns of the access it belongs
+     * to and nulls for the other one. Unlike a UNION ALL of two filtered scans, the single scan can be pulled up by the
+     * database into the surrounding query, looked up by an index when it is joined, and its join selectivity is
+     * estimated from the statistics of the columns.
+     *
+     * @param left the left access
+     * @param right the right access
+     * @param leftColumns the exposed column of the left access behind each column of the union (missing or a null
+     *            constant when the left access does not provide the column)
+     * @param rightColumns the exposed column of the right access behind each column of the union
+     * @param columns the columns of the union in the order of the projection
+     * @return SQL code of the union of the two accesses as a single scan of their table
+     */
+    static String translateUnion(SqlTableAccess left, SqlTableAccess right, Map<Column, Column> leftColumns,
+            Map<Column, Column> rightColumns, Collection<Column> columns)
+    {
+        Condition l = left.conditions.getConditions().iterator().next();
+        Condition r = right.conditions.getConditions().iterator().next();
+        Column discriminator = getDiscriminator(left, right);
+
+        String leftTest = discriminator + (l.getIsNull().contains(discriminator) ? " IS NULL" : " IS NOT NULL");
+        String rightTest = discriminator + (r.getIsNull().contains(discriminator) ? " IS NULL" : " IS NOT NULL");
+
+        Map<Column, Column> leftExpressions = left.getExpressions();
+        Map<Column, Column> rightExpressions = right.getExpressions();
+
+        StringBuilder builder = new StringBuilder();
+
+        builder.append("SELECT ");
+        boolean hasSelect = false;
+
+        for(Column column : columns)
+        {
+            appendComma(builder, hasSelect);
+            hasSelect = true;
+
+            Column lc = getSource(leftExpressions, leftColumns.get(column));
+            Column rc = getSource(rightExpressions, rightColumns.get(column));
+
+            if(lc == null && rc == null)
+            {
+                builder.append(new NullColumn(column.getType()));
+            }
+            else if(lc != null && lc.equals(rc))
+            {
+                builder.append(lc);
+            }
+            else
+            {
+                builder.append("CASE");
+
+                if(lc != null)
+                    builder.append(" WHEN ").append(leftTest).append(" THEN ").append(lc);
+
+                if(rc != null)
+                    builder.append(" WHEN ").append(rightTest).append(" THEN ").append(rc);
+
+                builder.append(" END");
+            }
+
+            builder.append(" AS ");
+            builder.append(column);
+        }
+
+        if(!hasSelect)
+            builder.append("1");
+
+        builder.append(" FROM ");
+        builder.append(left.table);
+
+        appendConditions(builder, new Conditions(l.resolve(r)));
+
+        return builder.toString();
+    }
+
+
+    /**
+     * The expression of the table behind a column exposed by an access, or null when there is no column or it is a null
+     * constant.
+     *
+     * @param expressions the expressions behind the exposed placeholder columns of the access
+     * @param column the exposed column, or null
+     * @return the expression of the table behind the column, or null
+     */
+    private static Column getSource(Map<Column, Column> expressions, Column column)
+    {
+        if(column == null || column instanceof NullColumn)
+            return null;
+
+        return expressions.getOrDefault(column, column);
     }
 
 
