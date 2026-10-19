@@ -39,7 +39,7 @@ public class TypedLiteral extends Literal
     @Override
     public String toString()
     {
-        return super.toString() + "@" + "^^" + type;
+        return super.toString() + "^^" + type;
     }
 
 
