@@ -119,13 +119,13 @@ public class LiteralVisitor extends BaseVisitor<LiteralNode>
             IriNode type = new IriVisitor(prologue, messages).visit(ctx.iri());
 
             if(type == null)
-                return new LiteralNode(value, new IriNode(xsdStringIri.getValue()));
+                return new LiteralNode(value, new IriNode(xsdStringIri.getValue()), true);
 
             return new LiteralNode(value, type);
         }
         else
         {
-            return new LiteralNode(value, new IriNode(xsdStringIri.getValue()));
+            return new LiteralNode(value, new IriNode(xsdStringIri.getValue()), true);
         }
     }
 

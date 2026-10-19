@@ -485,7 +485,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<Void>
                 builder.append(literal.getDirection());
             }
         }
-        else if(literal.getType() != null)
+        else if(literal.getType() != null && !literal.isSimple())
         {
             builder.append("^^<");
             builder.append(literal.getType().getValue());

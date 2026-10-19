@@ -792,7 +792,7 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
                 separator = "";
             }
 
-            result.add(withRange(new LiteralNode(separator, new IriNode(xsdStringIri.getValue())), ctx.string()));
+            result.add(withRange(new LiteralNode(separator, new IriNode(xsdStringIri.getValue()), true), ctx.string()));
         }
 
         return result;

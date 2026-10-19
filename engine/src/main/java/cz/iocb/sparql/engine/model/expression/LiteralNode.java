@@ -43,6 +43,11 @@ public class LiteralNode extends BaseComplexNode implements Expression, Node
      */
     private final String direction;
 
+    /**
+     * True if the literal was written as a plain string, its xsd:string datatype being implied.
+     */
+    private final boolean simple;
+
 
     /**
      * Creates a language-tagged literal.
@@ -69,6 +74,19 @@ public class LiteralNode extends BaseComplexNode implements Expression, Node
         this.type = null;
         this.tag = tag;
         this.direction = direction;
+        this.simple = false;
+    }
+
+
+    /**
+     * Creates a typed literal with an explicit datatype.
+     *
+     * @param value the lexical form
+     * @param type the datatype IRI
+     */
+    public LiteralNode(String value, IriNode type)
+    {
+        this(value, type, false);
     }
 
 
@@ -77,13 +95,15 @@ public class LiteralNode extends BaseComplexNode implements Expression, Node
      *
      * @param value the lexical form
      * @param type the datatype IRI
+     * @param simple true if the literal was written as a plain string, the datatype (xsd:string) being implied
      */
-    public LiteralNode(String value, IriNode type)
+    public LiteralNode(String value, IriNode type, boolean simple)
     {
         this.value = value;
         this.type = type;
         this.tag = null;
         this.direction = null;
+        this.simple = simple;
     }
 
 
@@ -130,6 +150,18 @@ public class LiteralNode extends BaseComplexNode implements Expression, Node
     public String getDirection()
     {
         return direction;
+    }
+
+
+    /**
+     * True if the literal was written as a plain string, its xsd:string datatype being implied; a literal written with
+     * the explicit datatype {@code xsd:string} denotes the same term but is not simple.
+     *
+     * @return true if the literal was written as a plain string, false otherwise
+     */
+    public boolean isSimple()
+    {
+        return simple;
     }
 
 
