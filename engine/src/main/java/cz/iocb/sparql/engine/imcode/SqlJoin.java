@@ -6,6 +6,7 @@ import java.sql.SQLException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
@@ -39,7 +40,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 /**
  * Natural join of several children on their shared variables. Optimisation flattens nested joins, merges accesses to
- * the same table or along keys ({@link SqlTableAccess}), distributes the join over unions, evaluates nondeterministic
+ * the same table or along keys ({@link SqlTableAccess}), distributes the join over unions (a leading OPTIONAL sharing a
+ * variable with another child being turned into one first, see {@link SqlLeftJoin#toUnion}), evaluates nondeterministic
  * children last, and decides the evaluation of SERVICE stubs by row estimates when service reordering is enabled.
  */
 public final class SqlJoin extends SqlIntercode
@@ -182,6 +184,8 @@ public final class SqlJoin extends SqlIntercode
             List<SqlIntercode> newChilds = reduceDistinctUnion(relations, reduceJoin(relations,
                     optimize(request, optChilds, newRestrictions, reduced, evalServices), newRestrictions, schema),
                     newRestrictions, schema);
+
+            newChilds = expandLeadingOptionals(request, newChilds, evalServices);
 
             if(!Objects.equals(new Multiset<>(newChilds), new Multiset<>(optChilds)))
                 optChilds = newChilds;
@@ -869,6 +873,54 @@ public final class SqlJoin extends SqlIntercode
                 .toList();
 
         return getJoinRestrictions(relations, child.getVariableBindings(), others, restrictions);
+    }
+
+
+    /**
+     * Replaces each leading OPTIONAL sharing a variable with another child by the union it stands for (see
+     * {@link SqlLeftJoin#toUnion}), so that the join is expanded over the branches and compares the shared variables by
+     * plain equality.
+     *
+     * @param request the current request
+     * @param childs the child nodes
+     * @param evalServices whether SERVICE stubs are evaluated
+     * @return the children, the leading OPTIONALs sharing a variable with another child replaced by unions
+     */
+    private static List<SqlIntercode> expandLeadingOptionals(Request request, List<SqlIntercode> childs,
+            boolean evalServices)
+    {
+        List<SqlIntercode> result = new ArrayList<>(childs.size());
+
+        for(int i = 0; i < childs.size(); i++)
+        {
+            SqlIntercode child = childs.get(i);
+
+            if(child instanceof SqlLeftJoin join && join.isLeadingOptional() && sharesVariable(childs, i))
+                result.add(join.toUnion(request, evalServices));
+            else
+                result.add(child);
+        }
+
+        return result;
+    }
+
+
+    /**
+     * Whether the child at the index shares a variable with another child.
+     *
+     * @param childs the child nodes
+     * @param index index of the child
+     * @return whether the child at the index shares a variable with another child
+     */
+    private static boolean sharesVariable(List<SqlIntercode> childs, int index)
+    {
+        Set<Variable> variables = childs.get(index).getVariableBindings().getVariables();
+
+        for(int i = 0; i < childs.size(); i++)
+            if(i != index && !Collections.disjoint(variables, childs.get(i).getVariableBindings().getVariables()))
+                return true;
+
+        return false;
     }
 
 

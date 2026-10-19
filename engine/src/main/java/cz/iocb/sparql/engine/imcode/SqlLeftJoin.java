@@ -5,6 +5,7 @@ import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,7 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression;
+import cz.iocb.sparql.engine.imcode.expression.SqlExists;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
@@ -31,7 +33,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 /**
  * Left outer join implementing OPTIONAL: every solution of the left side is kept, extended by the compatible solutions
- * of the right side that satisfy the conditions, or by unbound variables when there is none.
+ * of the right side that satisfy the conditions, or by unbound variables when there is none. A leading OPTIONAL (the
+ * left side being the single empty solution) whose variables are joined later stands for a union instead (see
+ * {@link #toUnion}).
  */
 public final class SqlLeftJoin extends SqlIntercode
 {
@@ -305,6 +309,10 @@ public final class SqlLeftJoin extends SqlIntercode
         //if(isJoinConditionAlwaysTrue(optLeft.variables, optRight.getVariables()) && optConditions.isEmpty())
         //    return SqlJoin.join(request, optLeft, optRight).optimize(request, restrictions, optReduced, evalServices);
 
+        if(optLeft instanceof SqlLeftJoin join && join.isLeadingOptional() && !Collections
+                .disjoint(optLeft.getVariableBindings().getVariables(), optRight.getVariableBindings().getVariables()))
+            optLeft = join.toUnion(request, evalServices);
+
         if(optLeft instanceof SqlUnion union)
         {
             List<SqlIntercode> unionList = new ArrayList<>();
@@ -360,6 +368,47 @@ public final class SqlLeftJoin extends SqlIntercode
                 .filter(f -> !f.equals(trueValue)).forEach(f -> result.add(f));
 
         return result;
+    }
+
+
+    /**
+     * Whether this is a leading OPTIONAL: the left join of the single empty solution with the optional pattern, as a
+     * group graph pattern starting with OPTIONAL gives.
+     *
+     * @return whether this is a leading OPTIONAL
+     */
+    public boolean isLeadingOptional()
+    {
+        return left.equals(SqlEmptySolution.get());
+    }
+
+
+    /**
+     * Union a leading OPTIONAL stands for: the solutions of the optional pattern satisfying the conditions, and the
+     * empty solution when there is none. The left join keeps the variables of the pattern possibly unbound, so a join
+     * on them admits their unbound values by a disjunction the database can neither hash nor serve by an index; a join
+     * with the union is expanded over its branches instead, the first compared by plain equality and the second guarded
+     * by an existence test of the pattern evaluated once.
+     *
+     * @param request the current request
+     * @param evalServices whether SERVICE stubs are evaluated
+     * @return union a leading OPTIONAL stands for
+     */
+    protected SqlIntercode toUnion(Request request, boolean evalServices)
+    {
+        SqlIntercode pattern = right instanceof SqlStripConstantColumns strip ? strip.getChild() : right;
+        VariableBindings patternBindings = pattern.getVariableBindings();
+
+        List<SqlExpressionIntercode> cnds = conditions.stream()
+                .map(c -> c.optimize(request, patternBindings, new Restriction(xsdBoolean), evalServices)).toList();
+
+        if(!cnds.isEmpty())
+            pattern = SqlFilter.filter(request, cnds, pattern);
+
+        SqlExpressionIntercode missing = SqlExists.create(request, true, pattern, new VariableBindings());
+        SqlIntercode none = SqlFilter.filter(request, List.of(missing), SqlEmptySolution.get());
+
+        return SqlUnion.union(request, List.of(pattern, none));
     }
 
 
