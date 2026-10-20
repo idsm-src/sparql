@@ -1401,7 +1401,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
     /**
      * Translates a procedure call evaluated laterally for every solution of {@code context}, filling in the default
-     * values of omitted parameters.
+     * values of omitted parameters; a call that takes no parameter value from {@code context} is evaluated once and
+     * joined with it, because the database would otherwise run the function again for every solution.
      *
      * @param procedureCallBase the procedure call
      * @param context solutions the call is evaluated for
@@ -1409,6 +1410,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      */
     private SqlIntercode translateProcedureCall(ProcedureCallBase procedureCallBase, SqlIntercode context)
     {
+        if(!(context instanceof SqlEmptySolution) && !usesContext(procedureCallBase, context))
+            return SqlJoin.join(request, context, translateProcedureCall(procedureCallBase, SqlEmptySolution.get()));
+
         IriNode procedureName = procedureCallBase.getProcedure();
         ProcedureDefinition procedureDefinition = configuration.getProcedures(getService())
                 .get(procedureName.getValue());
@@ -1523,6 +1527,22 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
         return intercode;
+    }
+
+
+    /**
+     * Tells whether a parameter of the procedure call takes its value from a variable of the context.
+     *
+     * @param procedureCall the procedure call
+     * @param context solutions the call would be evaluated for
+     * @return whether the value of a parameter is a variable that the context binds
+     */
+    private static boolean usesContext(ProcedureCallBase procedureCall, SqlIntercode context)
+    {
+        Set<Variable> variables = context.getVariableBindings().getVariables();
+
+        return procedureCall.getParameters().stream()
+                .anyMatch(p -> p.getValue() instanceof VariableOrBlankNode v && variables.contains(getVariable(v)));
     }
 
 
