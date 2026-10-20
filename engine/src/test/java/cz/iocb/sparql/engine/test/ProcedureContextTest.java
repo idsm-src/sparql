@@ -41,7 +41,8 @@ import cz.iocb.sparql.testing.Database;
 /**
  * A procedure call is evaluated for the solutions of the patterns preceding it in its group, so that its parameters can
  * take their values from them. A call whose parameters take no value from those solutions is evaluated once and joined
- * with them instead; otherwise the database runs the function again for every solution.
+ * with them instead; otherwise the database runs the function again for every solution. Such a call is evaluated once
+ * even when the statement contains it several times, e.g. in every branch of a union the join was distributed over.
  */
 public class ProcedureContextTest
 {
@@ -224,6 +225,44 @@ public class ProcedureContextTest
 
         assertThat(execute(query), containsInAnyOrder(row(thing("a"), string("red")), row(thing("b"), string("red"))));
         assertThat(calls(query), is(1L));
+    }
+
+
+    @Test
+    @DisplayName("a call with a constant parameter joined with a union is evaluated once")
+    void independentCallWithUnion() throws Exception
+    {
+        String query = "SELECT ?x ?y WHERE { { ?x ex:tag 'red' } UNION { ?x ex:tag 'blue' } "
+                + "?y ex:search [ ex:query 'red' ] }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(thing("a"), thing("a")), row(thing("a"), thing("b")),
+                        row(thing("b"), thing("a")), row(thing("b"), thing("b")), row(thing("c"), thing("a")),
+                        row(thing("c"), thing("b"))));
+        assertThat(calls(query), is(1L));
+    }
+
+
+    @Test
+    @DisplayName("two calls with the same constant parameter are evaluated once")
+    void sameIndependentCalls() throws Exception
+    {
+        String query = "SELECT ?y ?z WHERE { ?y ex:search [ ex:query 'red' ] . ?z ex:search [ ex:query 'red' ] }";
+
+        assertThat(execute(query), containsInAnyOrder(row(thing("a"), thing("a")), row(thing("a"), thing("b")),
+                row(thing("b"), thing("a")), row(thing("b"), thing("b"))));
+        assertThat(calls(query), is(1L));
+    }
+
+
+    @Test
+    @DisplayName("two calls with different constant parameters are evaluated separately")
+    void differentIndependentCalls() throws Exception
+    {
+        String query = "SELECT ?y ?z WHERE { ?y ex:search [ ex:query 'red' ] . ?z ex:search [ ex:query 'blue' ] }";
+
+        assertThat(execute(query), containsInAnyOrder(row(thing("a"), thing("c")), row(thing("b"), thing("c"))));
+        assertThat(calls(query), is(2L));
     }
 
 

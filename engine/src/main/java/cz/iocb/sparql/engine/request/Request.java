@@ -7,6 +7,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -241,6 +242,12 @@ public class Request implements AutoCloseable
      * Counter of LATERAL aliases.
      */
     private int lateralId = 0;
+
+    /**
+     * Common table expressions of the statement being translated, by their queries; null outside the translation of a
+     * statement.
+     */
+    private LinkedHashMap<String, AliasTable> commonTableExpressions = null;
 
     /**
      * Start of the execution in {@link System#nanoTime} units.
@@ -852,6 +859,55 @@ public class Request implements AutoCloseable
     public AliasTable createLateralTable()
     {
         return new AliasTable("lateral" + lateralId++);
+    }
+
+
+    /**
+     * Begins the translation of a statement: the common table expressions asked for until {@link #endStatement()} are
+     * collected for the {@code WITH} clause of the statement.
+     */
+    public void beginStatement()
+    {
+        commonTableExpressions = new LinkedHashMap<>();
+    }
+
+
+    /**
+     * Ends the translation of a statement.
+     *
+     * @return the common table expressions of the statement by their queries, in the order they were asked for; null
+     *         when no statement was being translated
+     */
+    public LinkedHashMap<String, AliasTable> endStatement()
+    {
+        LinkedHashMap<String, AliasTable> result = commonTableExpressions;
+        commonTableExpressions = null;
+        return result;
+    }
+
+
+    /**
+     * Alias of the common table expression of the statement being translated that evaluates the query, declared when
+     * first asked for, so that a query asked for several times is evaluated once by the statement; null outside the
+     * translation of a statement, when the query has to be written in place.
+     *
+     * @param query the query
+     * @return alias of the common table expression evaluating the query, or null outside the translation of a statement
+     */
+    public AliasTable getCommonTableExpression(String query)
+    {
+        if(commonTableExpressions == null)
+            return null;
+
+        AliasTable table = commonTableExpressions.get(query);
+
+        if(table == null)
+        {
+            table = new AliasTable("cte" + commonTableExpressions.size());
+            commonTableExpressions.put(query, table);
+        }
+
+        return table;
     }
 
 

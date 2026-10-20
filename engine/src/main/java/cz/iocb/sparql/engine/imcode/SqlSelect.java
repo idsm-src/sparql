@@ -55,7 +55,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
+import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
@@ -504,18 +506,20 @@ public final class SqlSelect extends SqlIntercode
 
     /**
      * {@code WITH} clause declaring the virtual tables the query reads and, transitively, the virtual tables their
-     * definitions read, each one after the tables it depends on; empty when the query reads no virtual table.
+     * definitions read, each one after the tables it depends on, followed by the common table expressions of the
+     * statement; empty when there is nothing to declare.
      *
      * @param request the current request
+     * @param expressions the common table expressions of the statement by their queries
      * @return the {@code WITH} clause followed by a space, or the empty string
      * @throws IllegalStateException if a virtual table has no definition in the configuration or the dependencies of
      *             the virtual tables are cyclic
      */
-    private String translateWithClause(Request request)
+    private String translateWithClause(Request request, LinkedHashMap<String, AliasTable> expressions)
     {
         Set<VirtualTable> tables = getVirtualTables();
 
-        if(tables.isEmpty())
+        if(tables.isEmpty() && expressions.isEmpty())
             return "";
 
         LinkedHashMap<VirtualTable, VirtualTableDefinition> ordered = new LinkedHashMap<>();
@@ -523,8 +527,11 @@ public final class SqlSelect extends SqlIntercode
         for(VirtualTable table : tables.stream().sorted(comparing(VirtualTable::getName)).toList())
             orderVirtualTable(request.getConfiguration(), table, ordered, new HashSet<>());
 
-        return ordered.entrySet().stream().map(e -> e.getKey() + " AS (" + e.getValue().getQuery() + ")")
-                .collect(joining(", ", "WITH ", " "));
+        Stream<String> definitions = ordered.entrySet().stream()
+                .map(e -> e.getKey() + " AS (" + e.getValue().getQuery() + ")");
+        Stream<String> queries = expressions.entrySet().stream().map(e -> e.getValue() + " AS (" + e.getKey() + ")");
+
+        return Stream.concat(definitions, queries).collect(joining(", ", "WITH ", " "));
     }
 
 
@@ -563,12 +570,37 @@ public final class SqlSelect extends SqlIntercode
     @Override
     public String translate(Request request)
     {
+        if(!isTopLevel())
+            return translateSelect(request);
+
+        request.beginStatement();
+        LinkedHashMap<String, AliasTable> expressions;
+        String select;
+
+        try
+        {
+            select = translateSelect(request);
+        }
+        finally
+        {
+            expressions = request.endStatement();
+        }
+
+        return translateWithClause(request, expressions) + select;
+    }
+
+
+    /**
+     * The select without the {@code WITH} clause of the statement.
+     *
+     * @param request the current request
+     * @return the select without the {@code WITH} clause of the statement
+     */
+    private String translateSelect(Request request)
+    {
         ClassRelations relations = request.getConfiguration();
 
         StringBuilder builder = new StringBuilder();
-
-        if(isTopLevel())
-            builder.append(translateWithClause(request));
 
         if(!isTopLevel())
         {

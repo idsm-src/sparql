@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
@@ -40,7 +41,10 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 /**
  * Call of a procedure (a set-returning SQL function) for every solution of the child: the parameters are expressions
  * over the child's variables, the results are bound to variables (joined with the child when a result variable is
- * already bound).
+ * already bound). A call over the empty solution, which takes nothing from any context, is evaluated by a common table
+ * expression of the statement (see {@link Request#getCommonTableExpression}), so that the statement evaluates it once
+ * even when it occurs several times, e.g. in every branch of a union a join above it was distributed over; PostgreSQL
+ * folds a common table expression referenced once into the query.
  */
 public final class SqlProcedureCall extends SqlIntercode
 {
@@ -330,23 +334,38 @@ public final class SqlProcedureCall extends SqlIntercode
         else
             builder.append("1");
 
-        builder.append(" FROM (");
-        generateInnerSelect(request, builder);
-        builder.append(" ) AS tab ");
+        builder.append(" FROM ");
+
+        String call = translateCall(request);
+        AliasTable table = child.equals(SqlEmptySolution.get()) ? request.getCommonTableExpression(call) : null;
+
+        if(table != null)
+        {
+            builder.append(table);
+        }
+        else
+        {
+            builder.append("(");
+            builder.append(call);
+            builder.append(" ) AS tab ");
+        }
 
         return builder.toString();
     }
 
 
     /**
-     * Appends the SQL calling the function with the parameters converted to their declared classes.
+     * SQL calling the function with the parameters converted to their declared classes for every solution of the child.
      *
      * @param request the current request
-     * @param builder the builder to append to
+     * @return SQL calling the function with the parameters converted to their declared classes for every solution of
+     *         the child
      */
-    private void generateInnerSelect(Request request, StringBuilder builder)
+    private String translateCall(Request request)
     {
         ClassRelations relations = request.getConfiguration();
+
+        StringBuilder builder = new StringBuilder();
 
         builder.append("SELECT ");
 
@@ -391,6 +410,8 @@ public final class SqlProcedureCall extends SqlIntercode
             builder.append(child.translate(request));
             builder.append(" ) AS tab");
         }
+
+        return builder.toString();
     }
 
 

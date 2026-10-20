@@ -7,7 +7,7 @@ package cz.iocb.sparql.engine.database;
  * is registered in the {@code SparqlDatabaseConfiguration}, and every generated statement that reads the table declares
  * it in a {@code WITH} clause (common table expression) under this name. The name therefore has to be unique among the
  * virtual tables of a configuration and must not collide with the aliases the engine generates ({@code tab0},
- * {@code lateral0}, {@code recursion} and the like).
+ * {@code lateral0}, {@code cte0}, {@code recursion} and the like).
  */
 public final class VirtualTable extends SourceTable
 {
