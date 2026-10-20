@@ -246,7 +246,7 @@ public enum MessageType
     /**
      * A SERVICE call would be issued for more context solutions than allowed.
      */
-    serviceContextLimitExceeded(ERROR, "The limit of service calls has been exceeded."),
+    serviceContextLimitExceeded(ERROR, "The limit of context solutions of a service call has been exceeded."),
 
     /**
      * A SERVICE call returned more solutions than allowed.

@@ -47,8 +47,10 @@ import cz.iocb.sparql.testing.Database;
  * without the datatype and {@code "str"^^xsd:string} with it, so that an endpoint distinguishing the two forms (RDF 1.0
  * semantics) receives the same term; literals of other datatypes keep their datatype and language-tagged strings their
  * tag, and the separator of GROUP_CONCAT stays a plain string. A value bound to a shared variable by the local pattern
- * has no written form and is sent in the VALUES clause with its datatype, an xsd:string value too. The endpoint is a
- * server on the loopback interface that records the queries it receives and answers each with no solutions.
+ * has no written form: by default a literal value is not sent at all (and the VALUES clause of nothing but
+ * {@code undef} is left out), and when the settings of the endpoint ask for literals to be sent, it is sent in the
+ * VALUES clause with its datatype, an xsd:string value too. The endpoint is a server on the loopback interface that
+ * records the queries it receives and answers each with no solutions.
  */
 public class ServiceStringLiteralTest
 {
@@ -89,9 +91,14 @@ public class ServiceStringLiteralTest
     private static String endpoint = null;
 
     /**
-     * Engine over the local configuration.
+     * Engine over the local configuration with the default settings of remote endpoints.
      */
     private static Engine engine = null;
+
+    /**
+     * Engine over the local configuration sending the literal values of the shared variables.
+     */
+    private static Engine literalEngine = null;
 
 
     /**
@@ -121,6 +128,13 @@ public class ServiceStringLiteralTest
                 config.createLiteralMapping(xsdInteger, new TypedLiteral("1", xsdIntegerIri)));
 
         engine = new Engine(config);
+
+        SparqlDatabaseConfiguration literalConfig = new SparqlDatabaseConfiguration(null, connectionPool, schema,
+                false);
+        literalConfig.addService(config, true);
+        literalConfig.setServiceSettings(literalConfig.getServiceSettings().withSendLiterals(true));
+
+        literalEngine = new Engine(literalConfig);
     }
 
 
@@ -186,8 +200,9 @@ public class ServiceStringLiteralTest
 
 
     /**
-     * Runs the query and returns the queries the endpoint received for it.
+     * Runs the query by the engine and returns the queries the endpoint received for it.
      *
+     * @param engine the engine
      * @param query the query, without the prefix declarations
      * @return the queries the endpoint received
      * @throws SQLException on database errors
@@ -195,7 +210,7 @@ public class ServiceStringLiteralTest
      * @throws LimitExceedException if the generated SQL is too long
      * @throws ServiceException if a federated SERVICE call fails
      */
-    private static List<String> sent(String query)
+    private static List<String> sent(Engine engine, String query)
             throws SQLException, TranslateExceptions, LimitExceedException, ServiceException
     {
         try(Request request = engine.getRequest(); Result result = request.execute(prefix + query))
@@ -232,7 +247,7 @@ public class ServiceStringLiteralTest
 
 
     /**
-     * The sole query the endpoint received for the query.
+     * The sole query the endpoint received for the query run by the engine with the default settings.
      *
      * @param query the query, without the prefix declarations
      * @return the query the endpoint received
@@ -240,7 +255,21 @@ public class ServiceStringLiteralTest
      */
     private static String sole(String query) throws Exception
     {
-        List<String> received = sent(query);
+        return sole(engine, query);
+    }
+
+
+    /**
+     * The sole query the endpoint received for the query run by the engine.
+     *
+     * @param engine the engine
+     * @param query the query, without the prefix declarations
+     * @return the query the endpoint received
+     * @throws Exception on errors
+     */
+    private static String sole(Engine engine, String query) throws Exception
+    {
+        List<String> received = sent(engine, query);
         assertThat(received.size(), is(1));
         return received.get(0);
     }
@@ -297,20 +326,31 @@ public class ServiceStringLiteralTest
 
 
     @Test
-    @DisplayName("an xsd:string value of a shared variable is sent with the datatype")
+    @DisplayName("a literal value of a shared variable is not sent by default")
+    void sharedLiteralNotSent() throws Exception
+    {
+        assertThat(sole("SELECT ?s WHERE { :a :p ?v " + service("?s :r ?v") + "}"), not(containsString("values")));
+
+        reset();
+        assertThat(sole("SELECT ?s WHERE { :a :q ?v " + service("?s :r ?v") + "}"), not(containsString("values")));
+    }
+
+
+    @Test
+    @DisplayName("an xsd:string value of a shared variable is sent with the datatype when literals are sent")
     void sharedString() throws Exception
     {
-        String query = sole("SELECT ?s WHERE { :a :p ?v " + service("?s :r ?v") + "}");
+        String query = sole(literalEngine, "SELECT ?s WHERE { :a :p ?v " + service("?s :r ?v") + "}");
 
         assertThat(query, containsString("values ( ?v) {('str'" + stringType + " )}"));
     }
 
 
     @Test
-    @DisplayName("an xsd:integer value of a shared variable is sent with the datatype")
+    @DisplayName("an xsd:integer value of a shared variable is sent with the datatype when literals are sent")
     void sharedInteger() throws Exception
     {
-        String query = sole("SELECT ?s WHERE { :a :q ?v " + service("?s :r ?v") + "}");
+        String query = sole(literalEngine, "SELECT ?s WHERE { :a :q ?v " + service("?s :r ?v") + "}");
 
         assertThat(query, containsString("values ( ?v) {('1'" + integerType + " )}"));
     }

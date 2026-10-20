@@ -48,6 +48,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import javax.sql.DataSource;
 import cz.iocb.sparql.engine.database.Column;
@@ -185,6 +186,16 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * Cache of IRI class detections shared by all requests.
      */
     protected final IriCache iriCache = new IriCache(10000);
+
+    /**
+     * Settings of the calls of the remote SERVICE endpoints that have no settings of their own.
+     */
+    protected ServiceSettings serviceSettings = ServiceSettings.DEFAULT;
+
+    /**
+     * Settings of the calls of particular remote SERVICE endpoints, by endpoint IRI.
+     */
+    protected Map<Iri, ServiceSettings> endpointSettings = new HashMap<>();
 
 
     /**
@@ -1040,9 +1051,10 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
-     * Imports another configuration: its datatypes and IRI classes are added, and its mappings, procedures and
-     * functions become available under its service IRIs (for SERVICE patterns) or, with {@code merge}, its own service
-     * is merged into this one together with its prefixes.
+     * Imports another configuration: its datatypes and IRI classes are added, its mappings, procedures and functions
+     * become available under its service IRIs (for SERVICE patterns) or, with {@code merge}, its own service is merged
+     * into this one together with its prefixes, and the settings of the remote endpoints it knows are adopted for the
+     * endpoints this configuration has no settings of its own for (its defaults are not imported).
      *
      * @param other the configuration to import
      * @param merge whether to merge the other service into this one
@@ -1065,6 +1077,9 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
         for(Entry<VirtualTable, VirtualTableDefinition> entry : other.getVirtualTables().entrySet())
             addVirtualTable(entry.getKey(), entry.getValue());
+
+        for(Entry<Iri, ServiceSettings> entry : other.endpointSettings.entrySet())
+            endpointSettings.putIfAbsent(entry.getKey(), entry.getValue());
 
         for(Iri service : other.getServices())
         {
@@ -1418,6 +1433,59 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     public List<Iri> getServices()
     {
         return services;
+    }
+
+
+    /**
+     * Sets the settings of the calls of the remote SERVICE endpoints that have no settings of their own; initially
+     * {@link ServiceSettings#DEFAULT}. An endpoint given settings of its own keeps them, so they have to be derived
+     * from the new defaults again if they should follow them.
+     *
+     * @param settings the settings
+     */
+    public void setServiceSettings(ServiceSettings settings)
+    {
+        this.serviceSettings = Objects.requireNonNull(settings);
+    }
+
+
+    /**
+     * Sets the settings of the calls of a remote SERVICE endpoint, replacing the defaults of the configuration for the
+     * calls naming the endpoint by the IRI (in the SERVICE clause or by the value of its variable). Null removes the
+     * settings of the endpoint.
+     *
+     * @param endpoint IRI of the endpoint
+     * @param settings the settings, or null
+     */
+    public void setServiceSettings(Iri endpoint, ServiceSettings settings)
+    {
+        if(settings == null)
+            endpointSettings.remove(endpoint);
+        else
+            endpointSettings.put(endpoint, settings);
+    }
+
+
+    /**
+     * Settings of the calls of the remote SERVICE endpoints that have no settings of their own.
+     *
+     * @return settings of the calls of the remote SERVICE endpoints that have no settings of their own
+     */
+    public ServiceSettings getServiceSettings()
+    {
+        return serviceSettings;
+    }
+
+
+    /**
+     * Settings of the calls of the remote SERVICE endpoint: its own settings, or the defaults of the configuration.
+     *
+     * @param endpoint IRI of the endpoint
+     * @return settings of the calls of the remote SERVICE endpoint
+     */
+    public ServiceSettings getServiceSettings(Iri endpoint)
+    {
+        return endpointSettings.getOrDefault(endpoint, serviceSettings);
     }
 
 

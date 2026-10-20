@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -34,12 +35,15 @@ import javax.xml.parsers.SAXParserFactory;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
+import cz.iocb.sparql.engine.config.ServiceSettings;
+import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeInSegmentClass;
+import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.rdf.BlankNode;
 import cz.iocb.sparql.engine.rdf.DirLangStringLiteral;
 import cz.iocb.sparql.engine.rdf.DirLangStringLiteral.Direction;
@@ -92,9 +96,21 @@ public final class SqlServiceStub extends SqlIntercode
 
 
     /**
-     * SAX handler of a SPARQL 1.2 XML results document. It collects the received solutions (merged with the context
-     * solution they were asked for) into a {@link ResultHandler}, reading IRIs, blank nodes, literals (with a language
-     * tag, a base direction or a datatype) and triple terms, the latter nested to any depth.
+     * One request to an endpoint; the context solutions asking the same query of the same endpoint share it.
+     *
+     * @param endpoint URL of the endpoint
+     * @param query the SPARQL query sent
+     */
+    private static record Call(String endpoint, String query)
+    {
+    }
+
+
+    /**
+     * SAX handler of a SPARQL 1.2 XML results document. It collects the received solutions, each merged with every
+     * context solution of the request consistent with it, into a {@link ResultHandler}, reading IRIs, blank nodes,
+     * literals (with a language tag, a base direction or a datatype) and triple terms, the latter nested to any depth.
+     * The received typed literals are brought to their canonical forms when asked for.
      */
     private static final class ResultsHandler extends DefaultHandler
     {
@@ -134,14 +150,19 @@ public final class SqlServiceStub extends SqlIntercode
         private static final String itsNamespace = "http://www.w3.org/2005/11/its";
 
         /**
+         * Current request, whose configuration knows the datatypes of the received literals.
+         */
+        private final Request request;
+
+        /**
          * Variables of the pattern by their name in the sent query.
          */
         private final Map<String, Variable> serviceVariables;
 
         /**
-         * Context solution the received solutions are merged with.
+         * Context solutions that asked the query of the request, which the received solutions are merged with.
          */
-        private final Map<Variable, RdfTerm> defaultResult;
+        private final List<Map<Variable, RdfTerm>> contexts;
 
         /**
          * Collector of the solutions.
@@ -149,7 +170,7 @@ public final class SqlServiceStub extends SqlIntercode
         private final ResultHandler results;
 
         /**
-         * Prefix of the received blank node labels, unique per call.
+         * Prefix of the received blank node labels, unique per request.
          */
         private final String blankNodePrefix;
 
@@ -159,12 +180,22 @@ public final class SqlServiceStub extends SqlIntercode
         private final int segment;
 
         /**
-         * Variables bound in the current solution.
+         * Whether the received typed literals are brought to their canonical forms.
+         */
+        private final boolean canonicalize;
+
+        /**
+         * Maximum number of solutions the collector may hold.
+         */
+        private final int limit;
+
+        /**
+         * Variables bound in the received solution being read.
          */
         private final Set<Variable> used = new HashSet<>();
 
         /**
-         * The current solution.
+         * The received solution being read.
          */
         private final Map<Variable, RdfTerm> result = new HashMap<>();
 
@@ -172,11 +203,6 @@ public final class SqlServiceStub extends SqlIntercode
          * Triple terms being read, innermost last.
          */
         private final Deque<Triple> triples = new ArrayDeque<>();
-
-        /**
-         * Whether the current solution is inconsistent with the context and is to be dropped.
-         */
-        private boolean skip;
 
         /**
          * Variable of the binding being read, null outside a binding.
@@ -207,20 +233,26 @@ public final class SqlServiceStub extends SqlIntercode
         /**
          * Creates the handler.
          *
+         * @param request the current request
          * @param serviceVariables variables of the pattern by their name in the sent query
-         * @param defaultResult context solution the received solutions are merged with
+         * @param contexts context solutions that asked the query of the request
          * @param results collector of the solutions
          * @param blankNodePrefix prefix of the received blank node labels
          * @param segment segment of the received blank nodes
+         * @param canonicalize whether the received typed literals are brought to their canonical forms
+         * @param limit maximum number of solutions the collector may hold
          */
-        ResultsHandler(Map<String, Variable> serviceVariables, Map<Variable, RdfTerm> defaultResult,
-                ResultHandler results, String blankNodePrefix, int segment)
+        ResultsHandler(Request request, Map<String, Variable> serviceVariables, List<Map<Variable, RdfTerm>> contexts,
+                ResultHandler results, String blankNodePrefix, int segment, boolean canonicalize, int limit)
         {
+            this.request = request;
             this.serviceVariables = serviceVariables;
-            this.defaultResult = defaultResult;
+            this.contexts = contexts;
             this.results = results;
             this.blankNodePrefix = blankNodePrefix;
             this.segment = segment;
+            this.canonicalize = canonicalize;
+            this.limit = limit;
         }
 
 
@@ -229,14 +261,9 @@ public final class SqlServiceStub extends SqlIntercode
         {
             if(localName.equalsIgnoreCase("result"))
             {
-                skip = false;
                 used.clear();
                 result.clear();
-                result.putAll(defaultResult);
                 triples.clear();
-
-                if(results.size() >= serviceResultLimit)
-                    throw new SAXException();
             }
             else if(localName.equalsIgnoreCase("binding"))
             {
@@ -280,16 +307,25 @@ public final class SqlServiceStub extends SqlIntercode
         {
             if(localName.equalsIgnoreCase("result"))
             {
-                if(skip)
-                    return;
+                for(Map<Variable, RdfTerm> context : contexts)
+                {
+                    if(!isConsistent(context))
+                        continue;
 
-                try
-                {
-                    results.add(result);
-                }
-                catch(SQLException e)
-                {
-                    throw new SQLRuntimeException(e);
+                    if(results.size() >= limit)
+                        throw new SAXException();
+
+                    Map<Variable, RdfTerm> solution = new HashMap<>(context);
+                    solution.putAll(result);
+
+                    try
+                    {
+                        results.add(solution);
+                    }
+                    catch(SQLException e)
+                    {
+                        throw new SQLRuntimeException(e);
+                    }
                 }
             }
             else if(localName.equalsIgnoreCase("binding"))
@@ -312,10 +348,8 @@ public final class SqlServiceStub extends SqlIntercode
                     addTerm(new DirLangStringLiteral(value, lang, parseDirection()));
                 else if(lang != null)
                     addTerm(new LangStringLiteral(value, lang));
-                else if(datatype != null)
-                    addTerm(new TypedLiteral(value, new Iri(datatype)));
                 else
-                    addTerm(new TypedLiteral(value, xsdStringIri));
+                    addTerm(typedLiteral(value, datatype != null ? new Iri(datatype) : xsdStringIri));
             }
             else if(localName.equalsIgnoreCase("triple") && !triples.isEmpty())
             {
@@ -373,9 +407,52 @@ public final class SqlServiceStub extends SqlIntercode
 
 
         /**
+         * Typed literal of the lexical form, brought to the canonical form of its datatype when canonical literals are
+         * asked for, the datatype is known to the configuration and the form is valid.
+         *
+         * @param value the lexical form
+         * @param type the datatype IRI
+         * @return typed literal of the lexical form
+         */
+        private TypedLiteral typedLiteral(String value, Iri type)
+        {
+            if(canonicalize)
+            {
+                Datatype datatype = request.getConfiguration().getDatatype(type);
+
+                if(datatype != null && datatype.isValidForm(value) && !datatype.isCanonicalForm(value))
+                    return new TypedLiteral(datatype.getCanonicalLexicalForm(value), type);
+            }
+
+            return new TypedLiteral(value, type);
+        }
+
+
+        /**
+         * True if the received solution is consistent with the context solution: a variable bound by both has the same
+         * term in both, and a variable the context binds to a blank node is not bound by the received solution, as a
+         * blank node of this endpoint never equals a term of a remote one.
+         *
+         * @param context the context solution
+         * @return true if the received solution is consistent with the context solution, false otherwise
+         */
+        private boolean isConsistent(Map<Variable, RdfTerm> context)
+        {
+            for(Entry<Variable, RdfTerm> binding : result.entrySet())
+            {
+                RdfTerm bound = context.get(binding.getKey());
+
+                if(bound instanceof BlankNode || bound != null && !bound.equals(binding.getValue()))
+                    return false;
+            }
+
+            return true;
+        }
+
+
+        /**
          * Places the term just read: as a component of the innermost triple term being read, or as the value of the
-         * current binding. A binding of a variable that the context binds to a blank node or to a different term makes
-         * the solution inconsistent, and it is dropped.
+         * current binding (a repeated binding of a variable is ignored).
          *
          * @param term the term
          */
@@ -394,19 +471,6 @@ public final class SqlServiceStub extends SqlIntercode
             if(!used.add(variable))
                 return; // should not happen if the response is valid
 
-            if(defaultResult.get(variable) instanceof BlankNode)
-            {
-                skip = true;
-                return;
-            }
-
-            if(defaultResult.containsKey(variable) && !defaultResult.get(variable).equals(term))
-            {
-                // should not happen if the response is correct
-                skip = true;
-                return;
-            }
-
             result.put(variable, term);
         }
     }
@@ -416,21 +480,6 @@ public final class SqlServiceStub extends SqlIntercode
      * User-Agent header sent to remote endpoints.
      */
     private static final String userAgent;
-
-    /**
-     * Maximum number of HTTP redirects followed.
-     */
-    private static final int serviceRedirectLimit = 3;
-
-    /**
-     * Maximum number of context solutions sent in one call.
-     */
-    private static final int serviceContextLimit = 1000;
-
-    /**
-     * Maximum number of solutions accepted from the endpoint.
-     */
-    private static final int serviceResultLimit = 10000000;
 
     /**
      * Solutions the call is evaluated for.
@@ -650,7 +699,8 @@ public final class SqlServiceStub extends SqlIntercode
 
     /**
      * Restrictions for the context of the call: what the parent needs of the variables, extended by the variables of
-     * the call, which the context may bind as well.
+     * the call, which the context may bind as well, and by the variable naming the endpoint, whose value each context
+     * solution has to supply.
      *
      * @param restrictions what the parent needs of the variables
      * @return restrictions for the context of the call
@@ -662,16 +712,23 @@ public final class SqlServiceStub extends SqlIntercode
         for(Variable var : serviceVariables.values())
             contextRestrictions.add(var);
 
+        if(name instanceof Variable variable)
+            contextRestrictions.add(variable);
+
         return contextRestrictions;
     }
 
 
     /**
-     * Evaluates the call for the solutions of {@code context}: the SPARQL text extended by VALUES of the shared
-     * variables is sent over the SPARQL protocol (in chunks when the context is large), the XML results are collected
-     * by a {@link StoredResultHandler}, and the result joined with the context is returned. Results are cached per
-     * context in the state shared by the stubs of one call; a failing endpoint is an error unless the service is
-     * SILENT, when the call yields the solutions of the context with the variables of the call unbound.
+     * Evaluates the call for the solutions of {@code context}: the SPARQL text, extended by a VALUES clause with the
+     * values of the shared variables that the settings of the endpoint allow to send, is sent over the SPARQL protocol
+     * for each context solution, the context solutions asking the same query of the same endpoint sharing one request
+     * (within this evaluation; the members of a union context are evaluated by stubs of their own), the XML results are
+     * collected by a {@link StoredResultHandler}, and the result joined with the context is returned. Results are
+     * cached per context in the state shared by the stubs of one call; a failing endpoint is an error unless the
+     * service is SILENT, when the call yields the solutions of the context with the variables of the call unbound. The
+     * context and result limits are those of the endpoint when the call names it, and the defaults of the configuration
+     * when the endpoint is a variable; the other settings are those of the endpoint of each request.
      *
      * @param request the current request
      * @param context solutions the call is evaluated for
@@ -684,19 +741,19 @@ public final class SqlServiceStub extends SqlIntercode
             return state.results.get(context);
 
 
+        SparqlDatabaseConfiguration config = request.getConfiguration();
+        ServiceSettings settings = name instanceof Iri iri ? config.getServiceSettings(iri) :
+                config.getServiceSettings();
+
+
         /* create variable lists */
 
         Set<Variable> contextVariables = context.getVariableBindings().getVariables();
-        Set<Variable> mergedVariables = new HashSet<>(contextVariables);
-        Set<String> sharedVariables = new HashSet<>();
+        List<String> sharedVariables = new ArrayList<>();
 
         for(Entry<String, Variable> e : serviceVariables.entrySet())
-        {
-            mergedVariables.add(e.getValue());
-
             if(contextVariables.contains(e.getValue()))
                 sharedVariables.add(e.getKey());
-        }
 
 
         List<RdfTerm[]> rows = new ArrayList<>();
@@ -711,7 +768,7 @@ public final class SqlServiceStub extends SqlIntercode
         {
             /* evaluate context pattern */
 
-            BigInteger limit = BigInteger.valueOf(serviceContextLimit + 1);
+            BigInteger limit = BigInteger.valueOf(settings.contextLimit() + 1);
             List<Variable> vars = new ArrayList<>(contextVariables);
             SqlSelect query = SqlSelect.createTopLevel(request, vars, context, null, limit).optimize(request, true);
 
@@ -726,7 +783,7 @@ public final class SqlServiceStub extends SqlIntercode
                 {
                     rows.add(result.getRow());
 
-                    if(rows.size() > serviceContextLimit)
+                    if(rows.size() > settings.contextLimit())
                     {
                         //TODO: use failback variant
                         throw new ServiceException(MessageType.serviceContextLimitExceeded.getText());
@@ -744,64 +801,51 @@ public final class SqlServiceStub extends SqlIntercode
         }
 
 
+        /* group the context solutions by the request they need */
+
+        LinkedHashMap<Call, List<Map<Variable, RdfTerm>>> calls = new LinkedHashMap<>();
+
+        for(RdfTerm[] row : rows)
+        {
+            String endpoint = null;
+
+            if(name instanceof Iri iri)
+                endpoint = iri.getValue();
+            else if(row[varIndexes.get(name)] instanceof Iri iri)
+                endpoint = iri.getValue();
+            else
+                continue;
+
+
+            Map<Variable, RdfTerm> solution = new HashMap<>();
+
+            for(Variable variable : contextVariables)
+            {
+                Integer idx = varIndexes.get(variable);
+
+                if(idx != null)
+                    solution.put(variable, row[idx]);
+            }
+
+
+            boolean literals = config.getServiceSettings(new Iri(endpoint)).sendLiterals();
+            String query = buildQuery(sharedVariables, row, varIndexes, literals);
+
+            calls.computeIfAbsent(new Call(endpoint, query), _ -> new ArrayList<>()).add(solution);
+        }
+
+
         /* create result */
 
         try(ResultHandler results = new StoredResultHandler(request, restrictions))
         {
             int call = 0;
 
-            for(RdfTerm[] row : rows)
+            for(Entry<Call, List<Map<Variable, RdfTerm>>> entry : calls.entrySet())
             {
-                String endpoint = null;
-
-                if(name instanceof Iri iri)
-                    endpoint = iri.getValue();
-                else if(row[varIndexes.get(name)] instanceof Iri iri)
-                    endpoint = iri.getValue();
-                else
-                    continue;
-
-
-                /* build default result */
-
-                Map<Variable, RdfTerm> defaultResult = new HashMap<>();
-
-                for(Variable variable : contextVariables)
-                {
-                    Integer idx = varIndexes.get(variable);
-
-                    if(idx != null)
-                        defaultResult.put(variable, row[idx]);
-                }
-
-
-                /* build service query */
-
-                StringBuilder sparqlQueryBuilder = new StringBuilder();
-                sparqlQueryBuilder.append("select * where ");
-                sparqlQueryBuilder.append(serviceCode);
-
-                if(!sharedVariables.isEmpty())
-                {
-                    sparqlQueryBuilder.append("values (");
-
-                    for(String var : sharedVariables)
-                        sparqlQueryBuilder.append(" ?").append(var);
-
-                    sparqlQueryBuilder.append(") {(");
-
-                    for(String variable : sharedVariables)
-                    {
-                        RdfTerm term = row[varIndexes.get(serviceVariables.get(variable))];
-
-                        if(term != null && isDataTerm(term))
-                            sparqlQueryBuilder.append(term).append(" ");
-                        else
-                            sparqlQueryBuilder.append("undef ");
-                    }
-
-                    sparqlQueryBuilder.append(")}");
-                }
+                String endpoint = entry.getKey().endpoint();
+                String query = entry.getKey().query();
+                ServiceSettings endpointSettings = config.getServiceSettings(new Iri(endpoint));
 
 
                 /* open connection */
@@ -812,7 +856,7 @@ public final class SqlServiceStub extends SqlIntercode
                 {
                     String url = endpoint;
 
-                    for(int i = 0; i <= serviceRedirectLimit && url != null; i++)
+                    for(int i = 0; i <= endpointSettings.redirectLimit() && url != null; i++)
                     {
                         connection = (HttpURLConnection) (new URI(url)).toURL().openConnection();
                         connection.setRequestMethod("POST");
@@ -824,8 +868,7 @@ public final class SqlServiceStub extends SqlIntercode
 
                         try(OutputStream out = connection.getOutputStream())
                         {
-                            out.write(
-                                    ("query=" + URLEncoder.encode(sparqlQueryBuilder.toString(), "UTF-8")).getBytes());
+                            out.write(("query=" + URLEncoder.encode(query, "UTF-8")).getBytes());
                         }
 
                         url = connection.getHeaderField("Location");
@@ -850,8 +893,9 @@ public final class SqlServiceStub extends SqlIntercode
 
                 try
                 {
-                    ResultsHandler handler = new ResultsHandler(serviceVariables, defaultResult, results, call++ + "r",
-                            blankNodeClass.getSegment());
+                    ResultsHandler handler = new ResultsHandler(request, serviceVariables, entry.getValue(), results,
+                            call++ + "r", blankNodeClass.getSegment(), endpointSettings.canonicalizeLiterals(),
+                            settings.resultLimit());
 
                     try(InputStream input = connection.getInputStream())
                     {
@@ -863,7 +907,7 @@ public final class SqlServiceStub extends SqlIntercode
                 }
                 catch(ParserConfigurationException | SAXException | IOException e)
                 {
-                    if(e instanceof SAXException && results.size() >= serviceResultLimit)
+                    if(e instanceof SAXException && results.size() >= settings.resultLimit())
                     {
                         throw new ServiceException(
                                 String.format(MessageType.serviceResultLimitExceeded.getText(), endpoint));
@@ -895,19 +939,80 @@ public final class SqlServiceStub extends SqlIntercode
 
 
     /**
-     * True if the term can be written as a constant of a VALUES clause: an IRI, a literal, or a triple term whose
-     * subject and predicate are IRIs and whose object is such a term again (blank nodes and variables cannot be sent).
+     * Query sent to the endpoint for a context solution: the SPARQL text of the pattern, followed by a VALUES clause
+     * binding the shared variables to the values of the solution when some of them can be sent; the others are
+     * {@code undef}, and a VALUES clause of nothing but {@code undef} is left out. A blank node or a variable cannot be
+     * sent, a literal (and a triple term containing one) only when the endpoint asks for it ({@code literals}).
+     *
+     * @param sharedVariables names of the variables of the pattern that the context binds
+     * @param row the context solution
+     * @param varIndexes positions of the variables in the solution
+     * @param literals whether literal values are sent
+     * @return query sent to the endpoint for the context solution
+     */
+    private String buildQuery(List<String> sharedVariables, RdfTerm[] row, Map<Variable, Integer> varIndexes,
+            boolean literals)
+    {
+        StringBuilder builder = new StringBuilder();
+        builder.append("select * where ");
+        builder.append(serviceCode);
+
+        List<String> values = new ArrayList<>();
+        boolean bound = false;
+
+        for(String variable : sharedVariables)
+        {
+            RdfTerm term = row[varIndexes.get(serviceVariables.get(variable))];
+
+            if(term != null && isSendable(term, literals))
+            {
+                values.add(term.toString());
+                bound = true;
+            }
+            else
+            {
+                values.add("undef");
+            }
+        }
+
+        if(bound)
+        {
+            builder.append("values (");
+
+            for(String variable : sharedVariables)
+                builder.append(" ?").append(variable);
+
+            builder.append(") {(");
+
+            for(String value : values)
+                builder.append(value).append(" ");
+
+            builder.append(")}");
+        }
+
+        return builder.toString();
+    }
+
+
+    /**
+     * True if the term can be sent as a constant of a VALUES clause: an IRI, a literal when literals are sent, or a
+     * triple term whose subject and predicate are IRIs and whose object is such a term again (blank nodes and variables
+     * cannot be sent).
      *
      * @param term the RDF term
-     * @return true if the term can be written as a constant of a VALUES clause, false otherwise
+     * @param literals whether literals are sent
+     * @return true if the term can be sent as a constant of a VALUES clause, false otherwise
      */
-    private static boolean isDataTerm(RdfTerm term)
+    private static boolean isSendable(RdfTerm term, boolean literals)
     {
-        if(term instanceof Iri || term instanceof Literal)
+        if(term instanceof Iri)
             return true;
 
+        if(term instanceof Literal)
+            return literals;
+
         return term instanceof TripleTerm triple && triple.getSubject() instanceof Iri
-                && triple.getPredicate() instanceof Iri && isDataTerm(triple.getObject());
+                && triple.getPredicate() instanceof Iri && isSendable(triple.getObject(), literals);
     }
 
 
