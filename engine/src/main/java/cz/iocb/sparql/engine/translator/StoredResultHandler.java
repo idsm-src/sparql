@@ -26,6 +26,7 @@ import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.imcode.SqlNoSolution;
 import cz.iocb.sparql.engine.imcode.SqlTableAccess;
 import cz.iocb.sparql.engine.imcode.SqlValues;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -80,6 +81,11 @@ public class StoredResultHandler extends ResultHandler
     private final Map<Variable, Integer> counts = new HashMap<>();
 
     /**
+     * Number of rows in which each variable is stored in each class.
+     */
+    private final Map<Variable, Map<ResourceClass, Integer>> classCounts = new HashMap<>();
+
+    /**
      * Columns constant over all rows so far, with their value.
      */
     private final Map<Column, Column> constants = new HashMap<>();
@@ -122,6 +128,25 @@ public class StoredResultHandler extends ResultHandler
     @Override
     public void add(Map<Variable, RdfTerm> row) throws SQLException
     {
+        ClassRelations relations = request.getConfiguration();
+        Map<Variable, ResourceClass> classes = new HashMap<>();
+
+        // a solution binding a variable to a value of a class the parent does not accept never reaches the result, so
+        // it is neither stored nor counted
+        for(Entry<Variable, RdfTerm> entry : row.entrySet())
+        {
+            if(!restrictions.containsVar(entry.getKey()))
+                continue;
+
+            ResourceClass resClass = getResourceClass(request, entry.getValue(), entry.getKey());
+            Set<ResourceClass> accepted = restrictions.getAcceptedClasses(entry.getKey());
+
+            if(resClass != null && accepted != null && ResourceClass.areDisjunct(relations, resClass, accepted))
+                return;
+
+            classes.put(entry.getKey(), resClass);
+        }
+
         for(Entry<Variable, RdfTerm> entry : row.entrySet())
         {
             if(!restrictions.containsVar(entry.getKey()))
@@ -137,10 +162,12 @@ public class StoredResultHandler extends ResultHandler
                 bindings.add(binding);
             }
 
-            ResourceClass resClass = getResourceClass(request, entry.getValue(), entry.getKey());
+            ResourceClass resClass = classes.get(entry.getKey());
 
-            if(!restrictions.contains(request.getConfiguration(), entry.getKey(), resClass))
+            if(!restrictions.contains(relations, entry.getKey(), resClass))
                 continue;
+
+            classCounts.computeIfAbsent(entry.getKey(), _ -> new HashMap<>()).merge(resClass, 1, Integer::sum);
 
             resourceClasses.computeIfAbsent(entry.getKey(), _ -> new ArrayList<>(nCopies(batchSize, null)))
                     .set(batchCount, resClass);
@@ -206,7 +233,15 @@ public class StoredResultHandler extends ResultHandler
                     counts.getOrDefault(binding.getVariable(), 0) < rowCount);
 
             for(Entry<ResourceClass, List<Column>> e : binding.getMappings().entrySet())
-                v.addMapping(e.getKey(), e.getValue().stream().map(c -> constants.getOrDefault(c, c)).toList());
+            {
+                // a column is constant only when the class is stored in every row: a value shared by the rows of the
+                // class alone would hide in which rows the variable takes the class
+                boolean complete = classCounts.getOrDefault(binding.getVariable(), Map.of()).getOrDefault(e.getKey(),
+                        0) == rowCount;
+
+                v.addMapping(e.getKey(),
+                        e.getValue().stream().map(c -> complete ? constants.getOrDefault(c, c) : c).toList());
+            }
 
             varBindings.add(v);
         }
