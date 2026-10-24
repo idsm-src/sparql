@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.test;
 
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -44,8 +45,9 @@ import cz.iocb.sparql.testing.Database;
  * {@code ex:sub*} has three branches: the parents of the nodes, the parents of the others, and the node a parentless
  * other is a subclass of. From a node, the walk thus reaches the others, but it never comes back, so when the parent
  * joins the end variable with the labels, which only the nodes have, the branches over the others contribute nothing
- * and the recursion runs over the nodes alone. Where the parent keeps the solutions it cannot join (the left side of an
- * OPTIONAL, a nullable sibling) or picks them by a slice, the branches have to stay.
+ * and the recursion runs over the nodes alone. The same holds for the right side of a MINUS and for the keys of a GROUP
+ * BY. Where the parent keeps the solutions it cannot join (the left side of an OPTIONAL, a nullable sibling or left
+ * side), computes an aggregate from them or picks them by a slice, the branches have to stay.
  */
 public class RecursivePruningTest
 {
@@ -183,6 +185,15 @@ public class RecursivePruningTest
     }
 
 
+    /**
+     * Integer literal.
+     */
+    private static TypedLiteral integer(int value)
+    {
+        return new TypedLiteral(Integer.toString(value), xsdIntegerIri);
+    }
+
+
     @Test
     @DisplayName("a join over the end variable prunes the branches that cannot lead to its classes")
     void joinPrunesBranches() throws Exception
@@ -273,5 +284,55 @@ public class RecursivePruningTest
 
         assertThat(execute(query), empty());
         assertThat(translate(query), not(containsString("others")));
+    }
+
+
+    @Test
+    @DisplayName("the right side of a MINUS is pruned by the variables the left side always binds")
+    void minusRightSidePruned() throws Exception
+    {
+        String query = "SELECT ?x ?l WHERE { ?x ex:label ?l MINUS { ?x ex:sub* <http://example.org/n/1> } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(0), string("zero")), row(node(3), string("three"))));
+        assertThat(translate(query), not(containsString("others")));
+    }
+
+
+    @Test
+    @DisplayName("a left side of a MINUS that may leave the variable unbound keeps every branch")
+    void minusNullableLeftKept() throws Exception
+    {
+        String query = "SELECT ?l ?x WHERE { { ?z ex:label ?l OPTIONAL { ?z ex:sub ?x } } "
+                + "MINUS { ?x ex:sub* <http://example.org/n/1> } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(string("zero"), null), row(string("one"), node(0)),
+                row(string("three"), node(0))));
+        assertThat(translate(query), containsString("others"));
+    }
+
+
+    @Test
+    @DisplayName("a grouping variable is pruned by the classes the parent accepts")
+    void groupKeyPruned() throws Exception
+    {
+        String query = "SELECT ?x ?l ?n WHERE { { SELECT ?x (COUNT(*) AS ?n) WHERE { "
+                + "?x ex:sub* <http://example.org/n/0> } GROUP BY ?x } ?x ex:label ?l }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(0), string("zero"), integer(1)), row(node(1), string("one"), integer(1)),
+                        row(node(2), string("two"), integer(1)), row(node(3), string("three"), integer(1))));
+        assertThat(translate(query), not(containsString("others")));
+    }
+
+
+    @Test
+    @DisplayName("the solutions behind an aggregate keep every branch")
+    void aggregateKeepsBranches() throws Exception
+    {
+        String query = "SELECT ?m ?l WHERE { { SELECT (MIN(?x) AS ?m) WHERE { ?x ex:sub* <http://example.org/n/0> } } "
+                + "?m ex:label ?l }";
+
+        assertThat(execute(query), empty());
+        assertThat(translate(query), containsString("others"));
     }
 }

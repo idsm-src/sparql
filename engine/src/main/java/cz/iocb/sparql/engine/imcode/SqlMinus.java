@@ -128,10 +128,13 @@ public final class SqlMinus extends SqlIntercode
         SqlIntercode optRight = right;
 
         boolean leftReduced = reduced & optRight.isDeterministic;
+        // a right solution binding a shared variable to a value of a class the left side cannot bind is compatible
+        // with no left solution and removes nothing, so the right side may leave such solutions out (the left side
+        // keeps every solution, matched or not)
         Restrictions leftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
                 optRight.getVariableBindings(), restrictions, false);
         Restrictions rightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
-                optLeft.getVariableBindings(), new Restrictions(), false);
+                optLeft.getVariableBindings(), new Restrictions(), true);
 
         while(true)
         {
@@ -154,7 +157,7 @@ public final class SqlMinus extends SqlIntercode
             Restrictions newLeftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
                     optRight.getVariableBindings(), restrictions, false);
             Restrictions newRightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
-                    optLeft.getVariableBindings(), new Restrictions(), false);
+                    optLeft.getVariableBindings(), new Restrictions(), true);
 
 
 
