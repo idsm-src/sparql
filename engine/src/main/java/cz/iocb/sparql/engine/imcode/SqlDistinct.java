@@ -96,7 +96,15 @@ public final class SqlDistinct extends SqlIntercode
     {
         ClassRelations relations = request.getConfiguration();
 
-        SqlIntercode optChild = child.optimize(request, new Restrictions(distinctVariables), true, evalServices);
+        // the deduplication needs every variable in every class, but a solution of a class the parent does not accept
+        // is dropped above whether deduplicated or not, so the child may leave such solutions out
+        Restrictions childRestrictions = new Restrictions(distinctVariables);
+
+        for(Variable variable : distinctVariables)
+            if(restrictions.getAcceptedClasses(variable) != null)
+                childRestrictions.addAcceptedClasses(variable, restrictions.getAcceptedClasses(variable));
+
+        SqlIntercode optChild = child.optimize(request, childRestrictions, true, evalServices);
 
 
         if(optChild.equals(SqlNoSolution.get()))

@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.test;
 
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
@@ -46,8 +47,9 @@ import cz.iocb.sparql.testing.Database;
  * other is a subclass of. From a node, the walk thus reaches the others, but it never comes back, so when the parent
  * joins the end variable with the labels, which only the nodes have, the branches over the others contribute nothing
  * and the recursion runs over the nodes alone. The same holds for the right side of a MINUS, for the keys of a GROUP BY
- * and for a union branch bound only in such classes. Where the parent keeps the solutions it cannot join (the left side
- * of an OPTIONAL, a nullable sibling or left side), computes an aggregate from them or picks them by a slice, the
+ * and for a union branch bound only in such classes, also inside the deduplicated zero-length paths of a walk between
+ * variables, which enumerate every node of the graph. Where the parent keeps the solutions it cannot join (the left
+ * side of an OPTIONAL, a nullable sibling or left side), computes an aggregate from them or picks them by a slice, the
  * branches have to stay.
  */
 public class RecursivePruningTest
@@ -58,6 +60,11 @@ public class RecursivePruningTest
     private static final String prefix = "PREFIX ex: <http://example.org/> ";
 
     /**
+     * The node outside the classes of the nodes and the others, held as a whole IRI.
+     */
+    private static final Iri thing = new Iri("http://other.org/thing");
+
+    /**
      * Configuration mapping the test tables.
      */
     private static SparqlDatabaseConfiguration config = null;
@@ -65,8 +72,10 @@ public class RecursivePruningTest
 
     /**
      * Creates the {@code recursive_pruning_test} schema: the nodes (0 is the root, 1 and 3 its children, 2 the child of
-     * 1) with their labels, and the others (10 and 20 are subclasses of the node 1, 11 of 10 and 12 of 11), and the
-     * configuration mapping them.
+     * 1) with their labels, the others (10 and 20 are subclasses of the node 1, 11 of 10 and 12 of 11), the links from
+     * the nodes to whole IRIs (whose general class overlaps every other, so that the zero-length paths are not split by
+     * class), and the configuration mapping them: {@code ex:sub} over the nodes and the others, {@code ex:next} over
+     * the nodes alone.
      */
     @BeforeAll
     static void init() throws SQLException
@@ -85,6 +94,9 @@ public class RecursivePruningTest
             statement.execute("create table recursive_pruning_test.others (id integer not null, parent integer)");
             statement.execute(
                     "insert into recursive_pruning_test.others values (10, null), (11, 10), (12, 11), " + "(20, null)");
+            statement.execute("create table recursive_pruning_test.links (subject integer not null, "
+                    + "object varchar not null)");
+            statement.execute("insert into recursive_pruning_test.links values (3, 'http://other.org/thing')");
         }
 
         DatabaseSchema schema = new DatabaseSchema(connectionPool);
@@ -97,10 +109,17 @@ public class RecursivePruningTest
         DatabaseTable nodes = new DatabaseTable("recursive_pruning_test", "nodes");
         DatabaseTable labels = new DatabaseTable("recursive_pruning_test", "labels");
         DatabaseTable others = new DatabaseTable("recursive_pruning_test", "others");
+        DatabaseTable links = new DatabaseTable("recursive_pruning_test", "links");
         ConstantIriMapping graph = config.createIriMapping("<http://example.org/graph>");
 
         config.addQuadMapping(nodes, graph, config.createIriMapping("node", "id"), config.createIriMapping("ex:sub"),
                 config.createIriMapping("node", "parent"));
+
+        config.addQuadMapping(nodes, graph, config.createIriMapping("node", "id"), config.createIriMapping("ex:next"),
+                config.createIriMapping("node", "parent"));
+
+        config.addQuadMapping(links, graph, config.createIriMapping("node", "subject"),
+                config.createIriMapping("ex:link"), config.createIriMapping(iri, "object"));
 
         config.addQuadMapping(labels, graph, config.createIriMapping("node", "id"), config.createIriMapping("ex:label"),
                 config.createLiteralMapping(xsdString, "label"));
@@ -359,6 +378,50 @@ public class RecursivePruningTest
 
         assertThat(execute(query),
                 containsInAnyOrder(row(node(1), string("one")), row(node(3), string("three")), row(other(11), null)));
+        assertThat(translate(query), containsString("others"));
+    }
+
+
+    @Test
+    @DisplayName("the zero-length paths of a walk whose start the parent restricts enumerate only the accepted classes")
+    void zeroPathPruned() throws Exception
+    {
+        String query = "SELECT ?x ?y WHERE { ?x ex:next* ?y . ?x ex:sub <http://example.org/a/10> }";
+
+        assertThat(execute(query), containsInAnyOrder(row(other(11), other(11))));
+        assertThat(translate(query), not(containsString("labels")));
+    }
+
+
+    @Test
+    @DisplayName("the zero-length paths keep the nodes of the general class overlapping the accepted ones")
+    void zeroPathGeneralKept() throws Exception
+    {
+        String query = "SELECT ?x ?y ?l WHERE { ?x ex:next* ?y . ?x ex:label ?l }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(0), node(0), string("zero")), row(node(1), node(1), string("one")),
+                        row(node(1), node(0), string("one")), row(node(2), node(2), string("two")),
+                        row(node(2), node(1), string("two")), row(node(2), node(0), string("two")),
+                        row(node(3), node(3), string("three")), row(node(3), node(0), string("three"))));
+        assertThat(translate(query), containsString("links"));
+    }
+
+
+    @Test
+    @DisplayName("without a restricting parent the zero-length paths enumerate every node")
+    void zeroPathUnrestricted() throws Exception
+    {
+        String query = "SELECT ?x ?y WHERE { ?x ex:next* ?y }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(0), node(0)), row(node(1), node(1)), row(node(2), node(2)),
+                        row(node(3), node(3)), row(other(10), other(10)), row(other(11), other(11)),
+                        row(other(12), other(12)), row(other(20), other(20)), row(string("zero"), string("zero")),
+                        row(string("one"), string("one")), row(string("two"), string("two")),
+                        row(string("three"), string("three")), row(thing, thing), row(node(1), node(0)),
+                        row(node(2), node(1)), row(node(2), node(0)), row(node(3), node(0))));
+        assertThat(translate(query), containsString("labels"));
         assertThat(translate(query), containsString("others"));
     }
 }
