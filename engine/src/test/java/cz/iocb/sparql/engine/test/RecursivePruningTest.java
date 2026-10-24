@@ -48,9 +48,9 @@ import cz.iocb.sparql.testing.Database;
  * joins the end variable with the labels, which only the nodes have, the branches over the others contribute nothing
  * and the recursion runs over the nodes alone. The same holds for the right side of a MINUS, for the keys of a GROUP BY
  * and for a union branch bound only in such classes, also inside the deduplicated zero-length paths of a walk between
- * variables, which enumerate every node of the graph. Where the parent keeps the solutions it cannot join (the left
- * side of an OPTIONAL, a nullable sibling or left side), computes an aggregate from them or picks them by a slice, the
- * branches have to stay.
+ * variables, which enumerate every node of the graph. A FILTER accepts the classes in which its conditions can hold.
+ * Where the parent keeps the solutions it cannot join (the left side of an OPTIONAL, a nullable sibling or left side),
+ * computes an aggregate from them or picks them by a slice, the branches have to stay.
  */
 public class RecursivePruningTest
 {
@@ -423,5 +423,54 @@ public class RecursivePruningTest
                         row(node(2), node(1)), row(node(2), node(0)), row(node(3), node(0))));
         assertThat(translate(query), containsString("labels"));
         assertThat(translate(query), containsString("others"));
+    }
+
+
+    @Test
+    @DisplayName("a filter comparing the end variable with a constant prunes the branches of other classes")
+    void filterEqualityPrunesBranches() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:sub* <http://example.org/n/0> FILTER(?x = <http://example.org/n/2>) }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(2))));
+        assertThat(translate(query), not(containsString("others")));
+    }
+
+
+    @Test
+    @DisplayName("a filter testing the end variable for membership prunes the branches of other classes")
+    void filterMembershipPrunesBranches() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:sub* <http://example.org/n/0> "
+                + "FILTER(?x IN (<http://example.org/n/1>, <http://example.org/n/2>)) }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(1)), row(node(2))));
+        assertThat(translate(query), not(containsString("others")));
+    }
+
+
+    @Test
+    @DisplayName("a filter that can hold in every class keeps every branch")
+    void inequalityFilterKeepsBranches() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:sub* <http://example.org/n/0> "
+                + "FILTER(?x != <http://example.org/a/20>) }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(0)), row(node(1)), row(node(2)), row(node(3)),
+                row(other(10)), row(other(11)), row(other(12))));
+        assertThat(translate(query), containsString("others"));
+    }
+
+
+    @Test
+    @DisplayName("a filter of an OPTIONAL prunes the branches of the walk on its right side")
+    void optionalFilterPrunesBranches() throws Exception
+    {
+        String query = "SELECT ?l ?x WHERE { ?z ex:label ?l "
+                + "OPTIONAL { ?x ex:sub* <http://example.org/n/0> FILTER(?x = <http://example.org/n/2>) } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(string("zero"), node(2)), row(string("one"), node(2)),
+                row(string("two"), node(2)), row(string("three"), node(2))));
+        assertThat(translate(query), not(containsString("others")));
     }
 }

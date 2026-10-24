@@ -1,7 +1,9 @@
 package cz.iocb.sparql.engine.imcode;
 
 import static cz.iocb.sparql.engine.database.Table.toTableColumns;
+import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.intersect;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static java.util.stream.Collectors.joining;
@@ -25,7 +27,10 @@ import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
+import cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression;
+import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
+import cz.iocb.sparql.engine.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -1408,6 +1413,61 @@ public abstract class SqlIntercode extends SqlBaseClass
         }
 
         return new Restrictions(joinRestrictions, restrictions);
+    }
+
+
+    /**
+     * Adds the classes in which the conditions can hold as the accepted classes of their variables (see
+     * {@link Restrictions#getAcceptedClasses}): a solution binding a variable to a value of a class under which some
+     * condition folds to false or to an error never satisfies the conditions, so the node holding the solutions may
+     * leave it out. Every class of the binding of a variable is tried alone; a class without columns cannot be tried
+     * and counts as accepted, and a variable accepted in all its classes gets no entry. Remote SERVICE calls inside the
+     * conditions are not evaluated by the trial.
+     *
+     * @param request the current request
+     * @param restrictions the restrictions to extend
+     * @param conditions the conditions, all of which have to hold
+     * @param bindings the variable bindings the conditions are evaluated under
+     */
+    protected static void addAcceptedClasses(Request request, Restrictions restrictions,
+            Collection<SqlExpressionIntercode> conditions, VariableBindings bindings)
+    {
+        for(SqlExpressionIntercode condition : conditions)
+        {
+            for(Variable variable : condition.getReferencedVariables())
+            {
+                VariableBinding binding = bindings.get(variable);
+
+                if(binding == null || binding.getClasses().size() < 2)
+                    continue;
+
+                Set<ResourceClass> accepted = new HashSet<>();
+
+                for(ResourceClass resClass : binding.getClasses())
+                {
+                    List<Column> columns = binding.getMapping(resClass);
+
+                    if(columns == null)
+                    {
+                        accepted.add(resClass);
+                        continue;
+                    }
+
+                    VariableBindings trial = new VariableBindings(bindings);
+                    trial.add(new VariableBinding(variable, resClass, columns, binding.canBeNull()));
+
+                    SqlExpressionIntercode expression = condition.optimize(request, trial, new Restriction(xsdBoolean),
+                            false);
+
+                    if(!expression.equals(SqlNull.get()) && !expression.equals(falseValue)
+                            && !(expression instanceof SqlBooleanExpression e && e.isFalseOrError()))
+                        accepted.add(resClass);
+                }
+
+                if(accepted.size() < binding.getClasses().size())
+                    restrictions.addAcceptedClasses(variable, accepted);
+            }
+        }
     }
 
 

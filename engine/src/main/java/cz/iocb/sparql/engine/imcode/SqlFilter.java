@@ -104,6 +104,12 @@ public final class SqlFilter extends SqlIntercode
         for(SqlExpressionIntercode cnd : optCnds)
             childRestrictions.add(cnd.getRequirements(relations));
 
+        // the classes of a variable in which no condition can hold never pass the filter, so the child may leave their
+        // solutions out; they are read once from the child as built, whose bindings still carry every class
+        Restrictions accepted = new Restrictions();
+        addAcceptedClasses(request, accepted, conditions, child.getVariableBindings());
+        childRestrictions.add(accepted);
+
         while(true)
         {
             SqlIntercode newOptChild = optChild.optimize(request, childRestrictions, childReduced, evalServices);
@@ -129,6 +135,7 @@ public final class SqlFilter extends SqlIntercode
             boolean newChildReduced = reduced && optCnds.stream().allMatch(r -> r.isDeterministic());
             Restrictions newChildRestrictions = new Restrictions(restrictions);
             newOptCnds.forEach(c -> newChildRestrictions.add(c.getRequirements(relations)));
+            newChildRestrictions.add(accepted);
 
             if(newChildReduced == childReduced && newChildRestrictions.equals(childRestrictions))
                 break;
