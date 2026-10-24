@@ -473,4 +473,16 @@ public class RecursivePruningTest
                 row(string("two"), node(2)), row(string("three"), node(2))));
         assertThat(translate(query), not(containsString("others")));
     }
+
+
+    @Test
+    @DisplayName("a VALUES row of a class the parent does not accept is left out")
+    void valuesRowPruned() throws Exception
+    {
+        String query = "SELECT ?x ?l WHERE { VALUES ?x { <http://example.org/n/1> <http://example.org/a/10> } "
+                + "?x ex:label ?l }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(1), string("one"))));
+        assertThat(translate(query), not(containsString("'10'")));
+    }
 }

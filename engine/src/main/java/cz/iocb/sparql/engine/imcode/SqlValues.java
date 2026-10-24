@@ -87,6 +87,18 @@ public final class SqlValues extends SqlIntercode
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
+        // a row binding a variable to a value of a class the parent does not accept never reaches the result
+        boolean[] mask = new boolean[size];
+        int kept = 0;
+
+        for(int i = 0; i < size; i++)
+            if(mask[i] = isAccepted(request, restrictions, i))
+                kept++;
+
+        if(kept < size)
+            return strip(mask).optimize(request, restrictions, reduced, evalServices);
+
+
         VariableBindings optimizedBindings = bindings.restrict(request.getConfiguration(), restrictions);
 
         if(optimizedBindings.equals(bindings))
@@ -98,6 +110,31 @@ public final class SqlValues extends SqlIntercode
             optimizedData.put(column, data.get(column));
 
         return create(optimizedBindings, resourceClasses, optimizedData, size);
+    }
+
+
+    /**
+     * False if the row binds a variable to a value of a class disjoint with every class the parent accepts (see
+     * {@link Restrictions#getAcceptedClasses}), true otherwise.
+     *
+     * @param request the current request
+     * @param restrictions what the parent needs of the variables
+     * @param row the row index
+     * @return false if the row binds a variable to a value of a class the parent does not accept, true otherwise
+     */
+    private boolean isAccepted(Request request, Restrictions restrictions, int row)
+    {
+        for(Entry<Variable, List<ResourceClass>> entry : resourceClasses.entrySet())
+        {
+            ResourceClass resClass = entry.getValue().get(row);
+            Set<ResourceClass> accepted = restrictions.getAcceptedClasses(entry.getKey());
+
+            if(resClass != null && accepted != null
+                    && ResourceClass.areDisjunct(request.getConfiguration(), resClass, accepted))
+                return false;
+        }
+
+        return true;
     }
 
 

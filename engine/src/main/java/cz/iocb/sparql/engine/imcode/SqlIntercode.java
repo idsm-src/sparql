@@ -1420,8 +1420,9 @@ public abstract class SqlIntercode extends SqlBaseClass
      * Adds the classes in which the conditions can hold as the accepted classes of their variables (see
      * {@link Restrictions#getAcceptedClasses}): a solution binding a variable to a value of a class under which some
      * condition folds to false or to an error never satisfies the conditions, so the node holding the solutions may
-     * leave it out. Every class of the binding of a variable is tried alone; a class without columns cannot be tried
-     * and counts as accepted, and a variable accepted in all its classes gets no entry. Remote SERVICE calls inside the
+     * leave it out. Every class of the binding of a variable is tried alone, with the variable bound (a class without
+     * columns, because it is not materialised or the binding belongs to a call not evaluated yet, over columns created
+     * for the trial), and a variable accepted in all its classes gets no entry. Remote SERVICE calls inside the
      * conditions are not evaluated by the trial.
      *
      * @param request the current request
@@ -1448,13 +1449,11 @@ public abstract class SqlIntercode extends SqlBaseClass
                     List<Column> columns = binding.getMapping(resClass);
 
                     if(columns == null)
-                    {
-                        accepted.add(resClass);
-                        continue;
-                    }
+                        columns = resClass.createColumns(request.getColumnMap(), variable);
 
+                    // the trial asks about the solutions binding the variable, so the variable is bound in it
                     VariableBindings trial = new VariableBindings(bindings);
-                    trial.add(new VariableBinding(variable, resClass, columns, binding.canBeNull()));
+                    trial.add(new VariableBinding(variable, resClass, columns, false));
 
                     SqlExpressionIntercode expression = condition.optimize(request, trial, new Restriction(xsdBoolean),
                             false);
