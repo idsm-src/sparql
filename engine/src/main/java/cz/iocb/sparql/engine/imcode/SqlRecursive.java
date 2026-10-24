@@ -46,6 +46,17 @@ public final class SqlRecursive extends SqlIntercode
     private static final AliasTable rightTable = new AliasTable("tab1");
 
     /**
+     * Alias of the recursion in the recursive term when the step is joined laterally; the branches of the step then
+     * carry their own aliases {@code tab0}, {@code tab1}, ... inside the lateral subquery, which would shadow it.
+     */
+    private static final AliasTable walkTable = new AliasTable("walk");
+
+    /**
+     * Alias of the step in the recursive term when it is joined laterally.
+     */
+    private static final AliasTable stepTable = new AliasTable("step");
+
+    /**
      * Solutions starting the recursion.
      */
     public final SqlIntercode init;
@@ -396,7 +407,16 @@ public final class SqlRecursive extends SqlIntercode
 
         builder.append(" UNION SELECT ");
 
-        builder.append(ev.stream().map(c -> c.fromTable(leftTable).toString()).collect(joining(", ")));
+        // a step that is a union whose branches deliver the node in several disjoint classes is joined laterally,
+        // branch by branch with a condition of its own: the condition of the union as a whole is a disjunction over the
+        // class pairs, which the database can neither hash nor look up by an index, whereas it joins a single pair
+        // through the index of the branch (the step of a single class stays a plain join, so that the database may
+        // still choose a hash join when the recursion grows large)
+        boolean lateral = next instanceof SqlUnion && endBinding.getClasses().size() > 1;
+        AliasTable left = lateral ? walkTable : leftTable;
+        AliasTable right = lateral ? stepTable : rightTable;
+
+        builder.append(ev.stream().map(c -> c.fromTable(left).toString()).collect(joining(", ")));
 
         boolean hasUnionSelect = !ev.isEmpty();
 
@@ -406,8 +426,8 @@ public final class SqlRecursive extends SqlIntercode
         {
             // the step delivers the node through its alias, and a conversion to the class of the recursion cannot be
             // qualified afterwards, so it is built over the qualified columns
-            List<Column> columns = nextEndBinding != null ?
-                    nextEndBinding.deriveMapping(relations, resClass, rightTable) : null;
+            List<Column> columns = nextEndBinding != null ? nextEndBinding.deriveMapping(relations, resClass, right) :
+                    null;
 
             for(int j = 0; j < resClass.getColumnCount(); j++)
             {
@@ -428,23 +448,34 @@ public final class SqlRecursive extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM recursion AS ");
-        builder.append(leftTable);
-
-        builder.append(", (");
-        builder.append(next.translate(request));
-        builder.append(") AS ");
-        builder.append(rightTable);
+        builder.append(left);
 
         VariableBindings tmp = new VariableBindings(bindings);
         tmp.remove(endBinding.getVariable());
         tmp.add(new VariableBinding(joinVar, endBinding.getMappings(), endBinding.canBeNull()));
 
-        String condition = generateJoinCondition(relations, tmp, next.getVariableBindings(), leftTable, rightTable);
-
-        if(condition != null)
+        if(lateral)
         {
-            builder.append(" WHERE ");
-            builder.append(condition);
+            builder.append(" CROSS JOIN LATERAL (");
+            builder.append(((SqlUnion) next).translate(request, (branch, alias) -> generateJoinCondition(relations, tmp,
+                    branch.getVariableBindings(), left, alias)));
+            builder.append(") AS ");
+            builder.append(right);
+        }
+        else
+        {
+            builder.append(", (");
+            builder.append(next.translate(request));
+            builder.append(") AS ");
+            builder.append(right);
+
+            String condition = generateJoinCondition(relations, tmp, next.getVariableBindings(), left, right);
+
+            if(condition != null)
+            {
+                builder.append(" WHERE ");
+                builder.append(condition);
+            }
         }
 
         builder.append(") SELECT ");

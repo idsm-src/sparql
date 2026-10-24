@@ -10,9 +10,12 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiFunction;
+import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
+import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
@@ -306,6 +309,23 @@ public final class SqlUnion extends SqlIntercode
     @Override
     public String translate(Request request)
     {
+        return translate(request, null);
+    }
+
+
+    /**
+     * SQL of the union, each branch selecting the columns of the union from its own SQL, with a condition of its own
+     * when the conditions are given. The branches of one table whose conditions are complementary are written together
+     * as a single scan (see {@link SqlTableAccess#translateUnion}) only without the conditions, because a condition
+     * belongs to one branch.
+     *
+     * @param request the current request
+     * @param conditions the condition of a branch given the branch and its alias (null for none), or null when the
+     *            branches get no conditions
+     * @return SQL of the union
+     */
+    public String translate(Request request, BiFunction<SqlIntercode, Table, String> conditions)
+    {
         StringBuilder builder = new StringBuilder();
 
         Set<Column> columns = bindings.getNonConstantColumns();
@@ -327,7 +347,7 @@ public final class SqlUnion extends SqlIntercode
             SqlIntercode child = childs.get(i);
             Map<Column, Column> columnMapping = columnMappings.get(i);
 
-            if(child instanceof SqlTableAccess access)
+            if(conditions == null && child instanceof SqlTableAccess access)
             {
                 int partner = findUnionPartner(access, i, merged);
 
@@ -365,6 +385,17 @@ public final class SqlUnion extends SqlIntercode
             builder.append(child.translate(request));
             builder.append(") AS tab");
             builder.append(i);
+
+            if(conditions != null)
+            {
+                String condition = conditions.apply(child, new AliasTable("tab" + i));
+
+                if(condition != null)
+                {
+                    builder.append(" WHERE ");
+                    builder.append(condition);
+                }
+            }
         }
 
         return builder.toString();

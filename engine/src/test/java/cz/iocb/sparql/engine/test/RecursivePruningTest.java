@@ -50,7 +50,8 @@ import cz.iocb.sparql.testing.Database;
  * and for a union branch bound only in such classes, also inside the deduplicated zero-length paths of a walk between
  * variables, which enumerate every node of the graph. A FILTER accepts the classes in which its conditions can hold.
  * Where the parent keeps the solutions it cannot join (the left side of an OPTIONAL, a nullable sibling or left side),
- * computes an aggregate from them or picks them by a slice, the branches have to stay.
+ * computes an aggregate from them or picks them by a slice, the branches have to stay, and a walk whose end variable
+ * keeps several classes then joins its step laterally, branch by branch, instead of by a disjunction.
  */
 public class RecursivePruningTest
 {
@@ -224,6 +225,7 @@ public class RecursivePruningTest
                 row(node(2), string("two")), row(node(3), string("three"))));
         assertThat(translate(query), not(containsString("others")));
         assertThat(translate(query), not(containsString(" OR ")));
+        assertThat(translate(query), not(containsString("LATERAL")));
     }
 
 
@@ -236,6 +238,9 @@ public class RecursivePruningTest
         assertThat(execute(query), containsInAnyOrder(row(node(0)), row(node(1)), row(node(2)), row(node(3)),
                 row(other(10)), row(other(11)), row(other(12)), row(other(20))));
         assertThat(translate(query), containsString("others"));
+        // the end variable keeps two classes, so the step is joined laterally instead of by a disjunction
+        assertThat(translate(query), containsString("CROSS JOIN LATERAL"));
+        assertThat(translate(query), not(containsString(" OR ")));
     }
 
 
