@@ -45,9 +45,10 @@ import cz.iocb.sparql.testing.Database;
  * {@code ex:sub*} has three branches: the parents of the nodes, the parents of the others, and the node a parentless
  * other is a subclass of. From a node, the walk thus reaches the others, but it never comes back, so when the parent
  * joins the end variable with the labels, which only the nodes have, the branches over the others contribute nothing
- * and the recursion runs over the nodes alone. The same holds for the right side of a MINUS and for the keys of a GROUP
- * BY. Where the parent keeps the solutions it cannot join (the left side of an OPTIONAL, a nullable sibling or left
- * side), computes an aggregate from them or picks them by a slice, the branches have to stay.
+ * and the recursion runs over the nodes alone. The same holds for the right side of a MINUS, for the keys of a GROUP BY
+ * and for a union branch bound only in such classes. Where the parent keeps the solutions it cannot join (the left side
+ * of an OPTIONAL, a nullable sibling or left side), computes an aggregate from them or picks them by a slice, the
+ * branches have to stay.
  */
 public class RecursivePruningTest
 {
@@ -333,6 +334,31 @@ public class RecursivePruningTest
                 + "?m ex:label ?l }";
 
         assertThat(execute(query), empty());
+        assertThat(translate(query), containsString("others"));
+    }
+
+
+    @Test
+    @DisplayName("a union branch binding the variable only in classes the parent does not accept is left out")
+    void unionBranchPruned() throws Exception
+    {
+        String query = "SELECT ?x ?l WHERE { { SELECT ?x WHERE { { ?x ex:sub <http://example.org/n/0> } "
+                + "UNION { ?x ex:sub <http://example.org/a/10> } } ORDER BY ?x } ?x ex:label ?l }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(1), string("one")), row(node(3), string("three"))));
+        assertThat(translate(query), not(containsString("others")));
+    }
+
+
+    @Test
+    @DisplayName("a union on the left side of an OPTIONAL keeps its branches")
+    void unionUnderOptionalLeftKept() throws Exception
+    {
+        String query = "SELECT ?x ?l WHERE { { ?x ex:sub <http://example.org/n/0> } "
+                + "UNION { ?x ex:sub <http://example.org/a/10> } OPTIONAL { ?x ex:label ?l } }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(1), string("one")), row(node(3), string("three")), row(other(11), null)));
         assertThat(translate(query), containsString("others"));
     }
 }

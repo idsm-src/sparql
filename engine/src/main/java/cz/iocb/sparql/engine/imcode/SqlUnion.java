@@ -250,7 +250,7 @@ public final class SqlUnion extends SqlIntercode
 
         List<SqlIntercode> optChilds = childs.stream()
                 .map(c -> c.optimize(request, restrictions, reduced, evalServices))
-                .filter(i -> !i.equals(SqlNoSolution.get())).toList();
+                .filter(i -> !i.equals(SqlNoSolution.get()) && isAccepted(relations, i, restrictions)).toList();
 
 
         if(optChilds.isEmpty())
@@ -264,6 +264,30 @@ public final class SqlUnion extends SqlIntercode
             return this;
 
         return union(request, optChilds, restrictions);
+    }
+
+
+    /**
+     * False if some solution of the branch may reach the result: a branch that always binds a variable, and only in
+     * classes disjoint with those the parent accepts (see {@link Restrictions#getAcceptedClasses}), delivers solutions
+     * the parent drops as a whole, so the union may leave it out.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param branch the branch
+     * @param restrictions what the parent needs of the variables
+     * @return false if the branch always binds a variable in classes the parent does not accept, true otherwise
+     */
+    private static boolean isAccepted(ClassRelations relations, SqlIntercode branch, Restrictions restrictions)
+    {
+        for(VariableBinding binding : branch.getVariableBindings().getValues())
+        {
+            Set<ResourceClass> accepted = restrictions.getAcceptedClasses(binding.getVariable());
+
+            if(accepted != null && !binding.canBeNull() && areDisjunct(relations, accepted, binding.getClasses()))
+                return false;
+        }
+
+        return true;
     }
 
 
