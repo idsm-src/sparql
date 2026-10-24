@@ -209,18 +209,24 @@ public final class SqlRecursive extends SqlIntercode
     {
         ClassRelations relations = request.getConfiguration();
 
+        Variable endVar = endBinding.getVariable();
+
         Restrictions childRestrictions = new Restrictions(restrictions);
 
-        childRestrictions.add(endBinding.getVariable());
+        childRestrictions.add(endVar);
         childRestrictions.add(joinVar); //TODO: set appropriate resource classes
+
+        // the children deliver the nodes of the walk, not only the values the parent sees: a node of a class the
+        // parent does not accept may still lead to one it does, so the children have to keep every node (the step
+        // branches that cannot lead to an accepted class are left out below)
+        childRestrictions.removeAcceptedClasses(endVar);
+        childRestrictions.removeAcceptedClasses(joinVar);
 
         if(graphVar != null)
             childRestrictions.add(graphVar);
 
         if(beginVar != null)
             childRestrictions.add(beginVar);
-
-        Variable endVar = endBinding.getVariable();
 
         SqlIntercode initOpt = init.optimize(request, childRestrictions, reduced, evalServices);
         SqlIntercode nextOpt = next.optimize(request, childRestrictions, reduced, evalServices);
@@ -263,33 +269,31 @@ public final class SqlRecursive extends SqlIntercode
         }
 
 
+        // a branch is left out when the walk cannot take it: its start is disjoint with every class reachable from
+        // the initial nodes, or it delivers only nodes of classes the parent does not accept from which no branch
+        // leads to an accepted class (the parent drops the nodes it delivers, and so everything reached from them)
+        Set<ResourceClass> accepted = restrictions.getAcceptedClasses(endVar);
+
         while(nextOpt instanceof SqlUnion union)
         {
-            Set<ResourceClass> classes = new HashSet<>(initOpt.getVariable(endVar).getClasses());
+            Set<ResourceClass> reachable = expand(relations, union.getChilds(),
+                    initOpt.getVariable(endVar).getClasses(), joinVar, endVar);
+            Set<ResourceClass> useful = accepted == null ? null :
+                    expand(relations, union.getChilds(), accepted, endVar, joinVar);
 
-            while(true)
-            {
-                Set<ResourceClass> additional = new HashSet<>(classes);
-
-                for(SqlIntercode c : union.getChilds())
-                    if(c.getVariable(joinVar) != null
-                            && !areDisjunct(relations, classes, c.getVariable(joinVar).getClasses()))
-                        additional.addAll(c.getVariable(endVar).getClasses());
-
-                if(additional.equals(classes))
-                    break;
-
-                classes.addAll(additional);
-            }
-
-            List<SqlIntercode> childs = union.getChilds().stream().filter(c -> c.getVariable(joinVar) != null
-                    && !areDisjunct(relations, classes, c.getVariable(joinVar).getClasses())).toList();
+            List<SqlIntercode> childs = union.getChilds().stream()
+                    .filter(c -> overlaps(relations, c, joinVar, reachable)
+                            && (useful == null || overlaps(relations, c, endVar, useful)))
+                    .toList();
 
             if(childs.size() == union.getChilds().size())
                 break;
 
             nextOpt = SqlUnion.union(request, childs);
         }
+
+        if(accepted != null && !(nextOpt instanceof SqlUnion) && !overlaps(relations, nextOpt, endVar, accepted))
+            nextOpt = SqlNoSolution.get();
 
 
         if(nextOpt.equals(SqlNoSolution.get()))
@@ -455,6 +459,57 @@ public final class SqlRecursive extends SqlIntercode
         builder.append(" FROM recursion");
 
         return builder.toString();
+    }
+
+
+    /**
+     * Classes of the nodes the step branches connect with nodes of the given classes: the closure of the classes under
+     * the branches, each taken from the variable {@code from} to the variable {@code to} (from the current end to the
+     * new one for the nodes reachable from the initial ones, in the other direction for the nodes from which an
+     * accepted class is reachable).
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param branches the branches of the step
+     * @param classes the classes to start from
+     * @param from variable of the branches that has to overlap the classes
+     * @param to variable of the branches whose classes are added
+     * @return classes of the nodes the step branches connect with nodes of the given classes
+     */
+    private static Set<ResourceClass> expand(ClassRelations relations, List<SqlIntercode> branches,
+            Set<ResourceClass> classes, Variable from, Variable to)
+    {
+        Set<ResourceClass> result = new HashSet<>(classes);
+
+        while(true)
+        {
+            Set<ResourceClass> additional = new HashSet<>(result);
+
+            for(SqlIntercode branch : branches)
+                if(overlaps(relations, branch, from, result) && branch.getVariable(to) != null)
+                    additional.addAll(branch.getVariable(to).getClasses());
+
+            if(additional.equals(result))
+                return result;
+
+            result = additional;
+        }
+    }
+
+
+    /**
+     * True if the branch binds the variable in a class overlapping one of the given classes.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param branch a branch of the step
+     * @param variable the variable
+     * @param classes the classes
+     * @return true if the branch binds the variable in a class overlapping one of the given classes, false otherwise
+     */
+    private static boolean overlaps(ClassRelations relations, SqlIntercode branch, Variable variable,
+            Set<ResourceClass> classes)
+    {
+        return branch.getVariable(variable) != null
+                && !areDisjunct(relations, classes, branch.getVariable(variable).getClasses());
     }
 
 

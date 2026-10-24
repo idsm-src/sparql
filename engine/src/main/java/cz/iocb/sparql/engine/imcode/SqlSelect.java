@@ -449,8 +449,13 @@ public final class SqlSelect extends SqlIntercode
         childRestrictions.add(orderBy.keySet());
         childRestrictions.add(simpleOrderBy);
 
-        // a slice picks its rows from the multiset, so the multiplicities of the child rows have to be kept exact
-        boolean childReduced = reduced && limit == null && (offset == null || offset.equals(BigInteger.ZERO));
+        // a slice picks its rows from the multiset, so the multiplicities of the child rows have to be kept exact, and
+        // the rows the parent drops afterwards have to be there to be picked
+        boolean sliced = limit != null || offset != null && !offset.equals(BigInteger.ZERO);
+        boolean childReduced = reduced && !sliced;
+
+        if(sliced)
+            childRestrictions.retainAcceptedClasses(Set.of());
 
         // the deduplication compares the solutions over all the projected variables, so unless the multiplicities do
         // not matter, the pattern has to keep them even when the parent needs none of them (COUNT(*) over a DISTINCT

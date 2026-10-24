@@ -303,9 +303,9 @@ public final class SqlLateralJoin extends SqlIntercode
 
         boolean leftReduced = reduced && optRight.isDeterministic();
         Restrictions leftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
-                optRight.getVariableBindings(), leftBaseRestrictions);
+                optRight.getVariableBindings(), leftBaseRestrictions, true);
         Restrictions rightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
-                optLeft.getVariableBindings(), restrictions);
+                optLeft.getVariableBindings(), restrictions, true);
 
 
         while(true)
@@ -329,9 +329,9 @@ public final class SqlLateralJoin extends SqlIntercode
 
             boolean newLeftReduced = reduced && optRight.isDeterministic();
             Restrictions newLeftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
-                    optRight.getVariableBindings(), leftBaseRestrictions);
+                    optRight.getVariableBindings(), leftBaseRestrictions, true);
             Restrictions newRightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
-                    optLeft.getVariableBindings(), restrictions);
+                    optLeft.getVariableBindings(), restrictions, true);
 
 
             if(newLeftReduced == leftReduced && newLeftRestrictions.equals(leftRestrictions)

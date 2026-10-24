@@ -129,9 +129,9 @@ public final class SqlMinus extends SqlIntercode
 
         boolean leftReduced = reduced & optRight.isDeterministic;
         Restrictions leftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
-                optRight.getVariableBindings(), restrictions);
+                optRight.getVariableBindings(), restrictions, false);
         Restrictions rightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
-                optLeft.getVariableBindings(), new Restrictions());
+                optLeft.getVariableBindings(), new Restrictions(), false);
 
         while(true)
         {
@@ -152,9 +152,9 @@ public final class SqlMinus extends SqlIntercode
 
             boolean newLeftReduced = reduced & optRight.isDeterministic;
             Restrictions newLeftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
-                    optRight.getVariableBindings(), restrictions);
+                    optRight.getVariableBindings(), restrictions, false);
             Restrictions newRightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
-                    optLeft.getVariableBindings(), new Restrictions());
+                    optLeft.getVariableBindings(), new Restrictions(), false);
 
 
 

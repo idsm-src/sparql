@@ -1,0 +1,277 @@
+package cz.iocb.sparql.engine.test;
+
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.not;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import javax.sql.DataSource;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
+import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.DatabaseTable;
+import cz.iocb.sparql.engine.error.TranslateExceptions;
+import cz.iocb.sparql.engine.imcode.SqlSelect;
+import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
+import cz.iocb.sparql.engine.mapping.classes.IntegerUserIriClass;
+import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.TypedLiteral;
+import cz.iocb.sparql.engine.request.Engine;
+import cz.iocb.sparql.engine.request.LimitExceedException;
+import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.request.Request.PreparedQuery;
+import cz.iocb.sparql.engine.request.Result;
+import cz.iocb.sparql.engine.translator.ServiceException;
+import cz.iocb.sparql.engine.translator.TranslateVisitor;
+import cz.iocb.sparql.testing.Database;
+
+
+
+/**
+ * Pruning of the branches of a recursive step that cannot lead to a class the parent accepts. The step of
+ * {@code ex:sub*} has three branches: the parents of the nodes, the parents of the others, and the node a parentless
+ * other is a subclass of. From a node, the walk thus reaches the others, but it never comes back, so when the parent
+ * joins the end variable with the labels, which only the nodes have, the branches over the others contribute nothing
+ * and the recursion runs over the nodes alone. Where the parent keeps the solutions it cannot join (the left side of an
+ * OPTIONAL, a nullable sibling) or picks them by a slice, the branches have to stay.
+ */
+public class RecursivePruningTest
+{
+    /**
+     * Prefix declarations prepended to every query.
+     */
+    private static final String prefix = "PREFIX ex: <http://example.org/> ";
+
+    /**
+     * Configuration mapping the test tables.
+     */
+    private static SparqlDatabaseConfiguration config = null;
+
+
+    /**
+     * Creates the {@code recursive_pruning_test} schema: the nodes (0 is the root, 1 and 3 its children, 2 the child of
+     * 1) with their labels, and the others (10 and 20 are subclasses of the node 1, 11 of 10 and 12 of 11), and the
+     * configuration mapping them.
+     */
+    @BeforeAll
+    static void init() throws SQLException
+    {
+        DataSource connectionPool = Database.getPool();
+
+        try(Connection connection = connectionPool.getConnection(); Statement statement = connection.createStatement())
+        {
+            statement.execute("create schema recursive_pruning_test");
+            statement.execute("create table recursive_pruning_test.nodes (id integer not null, parent integer)");
+            statement.execute("insert into recursive_pruning_test.nodes values (0, null), (1, 0), (2, 1), (3, 0)");
+            statement.execute(
+                    "create table recursive_pruning_test.labels (id integer not null, " + "label varchar not null)");
+            statement.execute("insert into recursive_pruning_test.labels values (0, 'zero'), (1, 'one'), (2, 'two'), "
+                    + "(3, 'three')");
+            statement.execute("create table recursive_pruning_test.others (id integer not null, parent integer)");
+            statement.execute(
+                    "insert into recursive_pruning_test.others values (10, null), (11, 10), (12, 11), " + "(20, null)");
+        }
+
+        DatabaseSchema schema = new DatabaseSchema(connectionPool);
+
+        config = new SparqlDatabaseConfiguration(null, connectionPool, schema, true);
+        config.addPrefix("ex", "http://example.org/");
+        config.addIriClass(new IntegerUserIriClass("node", INT4, "http://example.org/n/"));
+        config.addIriClass(new IntegerUserIriClass("other", INT4, "http://example.org/a/"));
+
+        DatabaseTable nodes = new DatabaseTable("recursive_pruning_test", "nodes");
+        DatabaseTable labels = new DatabaseTable("recursive_pruning_test", "labels");
+        DatabaseTable others = new DatabaseTable("recursive_pruning_test", "others");
+        ConstantIriMapping graph = config.createIriMapping("<http://example.org/graph>");
+
+        config.addQuadMapping(nodes, graph, config.createIriMapping("node", "id"), config.createIriMapping("ex:sub"),
+                config.createIriMapping("node", "parent"));
+
+        config.addQuadMapping(labels, graph, config.createIriMapping("node", "id"), config.createIriMapping("ex:label"),
+                config.createLiteralMapping(xsdString, "label"));
+
+        config.addQuadMapping(others, graph, config.createIriMapping("other", "id"), config.createIriMapping("ex:sub"),
+                config.createIriMapping("other", "parent"));
+
+        config.addQuadMapping(others, graph, config.createIriMapping("other", "id"), config.createIriMapping("ex:sub"),
+                config.createIriMapping("<http://example.org/n/1>"), config.createIsNullCondition(others, "parent"));
+    }
+
+
+    /**
+     * Runs the query and returns all rows.
+     */
+    private static List<List<RdfTerm>> execute(String query)
+            throws SQLException, TranslateExceptions, LimitExceedException, ServiceException
+    {
+        Engine engine = new Engine(config);
+
+        try(Request request = engine.getRequest(); Result result = request.execute(prefix + query))
+        {
+            List<List<RdfTerm>> rows = new ArrayList<>();
+
+            while(result.next())
+                rows.add(Arrays.asList(result.getRow()));
+
+            return rows;
+        }
+    }
+
+
+    /**
+     * Returns the SQL code the query is translated to.
+     */
+    private static String translate(String query) throws Exception
+    {
+        Engine engine = new Engine(config);
+
+        try(Request request = engine.getRequest())
+        {
+            PreparedQuery prepared = request.prepareQuery(prefix + query, null);
+            SqlSelect imcode = new TranslateVisitor(request).translate(prepared.getSyntaxTree(), null, null, List.of());
+
+            return imcode.optimize(request, false).optimize(request, true).translate(request);
+        }
+    }
+
+
+    /**
+     * Expected row.
+     */
+    private static List<RdfTerm> row(RdfTerm... terms)
+    {
+        return Arrays.asList(terms);
+    }
+
+
+    /**
+     * IRI of the node with the given number.
+     */
+    private static Iri node(int number)
+    {
+        return new Iri("http://example.org/n/" + number);
+    }
+
+
+    /**
+     * IRI of the other with the given number.
+     */
+    private static Iri other(int number)
+    {
+        return new Iri("http://example.org/a/" + number);
+    }
+
+
+    /**
+     * String literal.
+     */
+    private static TypedLiteral string(String value)
+    {
+        return new TypedLiteral(value, xsdStringIri);
+    }
+
+
+    @Test
+    @DisplayName("a join over the end variable prunes the branches that cannot lead to its classes")
+    void joinPrunesBranches() throws Exception
+    {
+        String query = "SELECT ?x ?l WHERE { ?x ex:sub* <http://example.org/n/0> ; ex:label ?l }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(0), string("zero")), row(node(1), string("one")),
+                row(node(2), string("two")), row(node(3), string("three"))));
+        assertThat(translate(query), not(containsString("others")));
+        assertThat(translate(query), not(containsString(" OR ")));
+    }
+
+
+    @Test
+    @DisplayName("without a restricting parent the walk takes every branch")
+    void unrestrictedWalk() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:sub* <http://example.org/n/0> }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(0)), row(node(1)), row(node(2)), row(node(3)),
+                row(other(10)), row(other(11)), row(other(12)), row(other(20))));
+        assertThat(translate(query), containsString("others"));
+    }
+
+
+    @Test
+    @DisplayName("the right side of an OPTIONAL is pruned by the variables the left side always binds")
+    void optionalRightSidePruned() throws Exception
+    {
+        String query = "SELECT ?x ?l ?d WHERE { ?x ex:label ?l "
+                + "OPTIONAL { ?x ex:sub* <http://example.org/n/0> BIND('yes' AS ?d) } }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(0), string("zero"), string("yes")),
+                        row(node(1), string("one"), string("yes")), row(node(2), string("two"), string("yes")),
+                        row(node(3), string("three"), string("yes"))));
+        assertThat(translate(query), not(containsString("others")));
+    }
+
+
+    @Test
+    @DisplayName("the left side of an OPTIONAL keeps every branch")
+    void optionalLeftSideKept() throws Exception
+    {
+        String query = "SELECT ?x ?l WHERE { ?x ex:sub* <http://example.org/n/0> OPTIONAL { ?x ex:label ?l } }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(0), string("zero")), row(node(1), string("one")),
+                        row(node(2), string("two")), row(node(3), string("three")), row(other(10), null),
+                        row(other(11), null), row(other(12), null), row(other(20), null)));
+        assertThat(translate(query), containsString("others"));
+    }
+
+
+    @Test
+    @DisplayName("a sibling that may leave the variable unbound keeps every branch")
+    void nullableSiblingKept() throws Exception
+    {
+        String query = "SELECT ?x ?l WHERE { ?x ex:sub* <http://example.org/n/0> . "
+                + "{ ?z ex:label ?l OPTIONAL { ?z ex:sub ?x } } }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(0), string("zero")), row(node(1), string("zero")),
+                        row(node(2), string("zero")), row(node(3), string("zero")), row(other(10), string("zero")),
+                        row(other(11), string("zero")), row(other(12), string("zero")), row(other(20), string("zero")),
+                        row(node(0), string("one")), row(node(1), string("two")), row(node(0), string("three"))));
+        assertThat(translate(query), containsString("others"));
+    }
+
+
+    @Test
+    @DisplayName("a slice picks its rows before the join, so the branches stay")
+    void sliceKeepsBranches() throws Exception
+    {
+        String query = "SELECT ?x ?l WHERE { { SELECT ?x WHERE { ?x ex:sub* <http://example.org/n/0> } "
+                + "ORDER BY ?x LIMIT 5 } ?x ex:label ?l }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(0), string("zero"))));
+        assertThat(translate(query), containsString("others"));
+    }
+
+
+    @Test
+    @DisplayName("a single branch that cannot lead to an accepted class is left out")
+    void singleBranchPruned() throws Exception
+    {
+        String query = "SELECT ?x ?l WHERE { ?x ex:sub* <http://example.org/a/10> ; ex:label ?l }";
+
+        assertThat(execute(query), empty());
+        assertThat(translate(query), not(containsString("others")));
+    }
+}

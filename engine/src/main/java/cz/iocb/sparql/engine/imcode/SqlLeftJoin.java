@@ -7,6 +7,7 @@ import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -221,6 +222,27 @@ public final class SqlLeftJoin extends SqlIntercode
     }
 
 
+    /**
+     * Variables the left side always binds. The right side keeps its accepted classes only for them: a solution of the
+     * right side binding one of them to a value of a class the left side cannot join never reaches the result, whereas
+     * for a variable the left side may leave unbound, or does not bind at all, the solution joins (or, left out, leaves
+     * unbound) a value the parent may still accept.
+     *
+     * @param bindings the variable bindings of the left side
+     * @return the variables the left side always binds
+     */
+    private static Set<Variable> getNonNullVariables(VariableBindings bindings)
+    {
+        Set<Variable> variables = new HashSet<>();
+
+        for(VariableBinding binding : bindings.getValues())
+            if(!binding.canBeNull())
+                variables.add(binding.getVariable());
+
+        return variables;
+    }
+
+
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
@@ -243,9 +265,10 @@ public final class SqlLeftJoin extends SqlIntercode
             cndRestrictions.add(condition.getRequirements(relations));
 
         Restrictions leftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
-                optRight.getVariableBindings(), cndRestrictions);
+                optRight.getVariableBindings(), cndRestrictions, false);
         Restrictions rightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
-                optLeft.getVariableBindings(), cndRestrictions);
+                optLeft.getVariableBindings(), cndRestrictions, true);
+        rightRestrictions.retainAcceptedClasses(getNonNullVariables(optLeft.getVariableBindings()));
 
 
         while(true)
@@ -283,9 +306,10 @@ public final class SqlLeftJoin extends SqlIntercode
                 newCndRestrictions.add(condition.getRequirements(relations));
 
             Restrictions newLeftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
-                    optRight.getVariableBindings(), newCndRestrictions);
+                    optRight.getVariableBindings(), newCndRestrictions, false);
             Restrictions newRightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
-                    optLeft.getVariableBindings(), newCndRestrictions);
+                    optLeft.getVariableBindings(), newCndRestrictions, true);
+            newRightRestrictions.retainAcceptedClasses(getNonNullVariables(optLeft.getVariableBindings()));
 
 
             if(newOptReduced == optReduced && newLeftRestrictions.equals(leftRestrictions)

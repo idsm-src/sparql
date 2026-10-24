@@ -51,6 +51,10 @@ public abstract class SqlIntercode extends SqlBaseClass
      * a variable a join compares with the same variable of another child, the restrictions also carry the classes of
      * that other side (the join classes, see {@link #getJoinClasses}): a union presents its classes overlapping one of
      * them as a single class, so that the join compares a single pair of classes instead of a disjunction of pairs.
+     * Where that other side also drops the solutions it cannot join (an inner join, the right side of a left join), the
+     * classes it binds without a null are the accepted classes of the variable (see {@link #getAcceptedClasses}): a
+     * solution binding the variable to a value of a class disjoint with all of them never reaches the result, so a
+     * child may leave such solutions out.
      */
     public static class Restrictions
     {
@@ -63,6 +67,12 @@ public abstract class SqlIntercode extends SqlBaseClass
          * Join classes per variable: the classes the variable is compared with on the other sides of the joins above.
          */
         private final Map<Variable, Set<ResourceClass>> joinClasses = new HashMap<>();
+
+        /**
+         * Accepted classes per variable: the classes a bound value of the variable has to overlap for its solution to
+         * reach the result; a variable without an entry is accepted in any class.
+         */
+        private final Map<Variable, Set<ResourceClass>> acceptedClasses = new HashMap<>();
 
         /**
          * Creates empty restrictions (nothing is needed).
@@ -81,6 +91,7 @@ public abstract class SqlIntercode extends SqlBaseClass
         {
             map.putAll(restrictions.map);
             addJoinClasses(restrictions.joinClasses);
+            addAcceptedClasses(restrictions.acceptedClasses);
         }
 
 
@@ -132,6 +143,8 @@ public abstract class SqlIntercode extends SqlBaseClass
 
             addJoinClasses(a.joinClasses);
             addJoinClasses(b.joinClasses);
+            addAcceptedClasses(a.acceptedClasses);
+            addAcceptedClasses(b.acceptedClasses);
         }
 
 
@@ -303,6 +316,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             }
 
             addJoinClasses(restrictions.joinClasses);
+            addAcceptedClasses(restrictions.acceptedClasses);
         }
 
 
@@ -345,6 +359,70 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
         /**
+         * Adds accepted classes of the variable, see {@link #getAcceptedClasses(Variable)}. The sets of several joins
+         * are united, so that a value is still accepted when it overlaps the classes of any of them, which is weaker
+         * than what the joins require but never leaves out a solution they keep.
+         *
+         * @param var the variable
+         * @param classes classes of a side of a join that drops the solutions it cannot join
+         */
+        public void addAcceptedClasses(Variable var, Set<ResourceClass> classes)
+        {
+            acceptedClasses.computeIfAbsent(var, _ -> new HashSet<>()).addAll(classes);
+        }
+
+
+        /**
+         * Adds accepted classes of several variables, see {@link #getAcceptedClasses(Variable)}.
+         *
+         * @param classes accepted classes per variable
+         */
+        private void addAcceptedClasses(Map<Variable, Set<ResourceClass>> classes)
+        {
+            for(Entry<Variable, Set<ResourceClass>> entry : classes.entrySet())
+                addAcceptedClasses(entry.getKey(), entry.getValue());
+        }
+
+
+        /**
+         * Accepted classes of the variable: the classes a bound value of the variable has to overlap for its solution
+         * to reach the result, because the joins above the child drop the solutions they cannot join with the values of
+         * these classes. Null when the variable is accepted in any class.
+         *
+         * @param var the variable
+         * @return accepted classes of the variable, or null when it is accepted in any class
+         */
+        public Set<ResourceClass> getAcceptedClasses(Variable var)
+        {
+            return acceptedClasses.get(var);
+        }
+
+
+        /**
+         * Accepts the given variables in any class, keeping the accepted classes of the others. A node whose solutions
+         * are not all dropped above (a slice, the left side of a left join) calls it for the variables it passes on
+         * without that guarantee.
+         *
+         * @param vars the variables that keep their accepted classes
+         */
+        public void retainAcceptedClasses(Collection<Variable> vars)
+        {
+            acceptedClasses.keySet().retainAll(vars);
+        }
+
+
+        /**
+         * Accepts the variable in any class.
+         *
+         * @param var the variable
+         */
+        public void removeAcceptedClasses(Variable var)
+        {
+            acceptedClasses.remove(var);
+        }
+
+
+        /**
          * True if the variable is needed at all.
          *
          * @param var the variable
@@ -364,7 +442,8 @@ public abstract class SqlIntercode extends SqlBaseClass
             if(other.getClass() != getClass())
                 return false;
 
-            return map.equals(((Restrictions) other).map) && joinClasses.equals(((Restrictions) other).joinClasses);
+            return map.equals(((Restrictions) other).map) && joinClasses.equals(((Restrictions) other).joinClasses)
+                    && acceptedClasses.equals(((Restrictions) other).acceptedClasses);
         }
 
 
@@ -1259,31 +1338,37 @@ public abstract class SqlIntercode extends SqlBaseClass
      * @param bindings the variable bindings
      * @param other bindings of the other side
      * @param restrictions what the parent needs of the variables
+     * @param filtered true if the join drops the solutions of the child it cannot join with the other side, so that the
+     *            classes the other side binds without a null are the accepted classes of the shared variables (see
+     *            {@link Restrictions#getAcceptedClasses}); false on the side of a left join or a minus whose solutions
+     *            survive without a partner
      * @return restrictions for a join child on top of the parent's: its variables shared with the other side are needed
      *         in the classes compatible with that side (in all classes when the variable may be unbound)
      */
     public static Restrictions getJoinRestrictions(ClassRelations relations, VariableBindings bindings,
-            VariableBindings other, Restrictions restrictions)
+            VariableBindings other, Restrictions restrictions, boolean filtered)
     {
-        return getJoinRestrictions(relations, bindings, Set.of(other), restrictions);
+        return getJoinRestrictions(relations, bindings, Set.of(other), restrictions, filtered);
     }
 
 
     /**
      * Restrictions for a join child against several other children, see
-     * {@link #getJoinRestrictions(ClassRelations, VariableBindings, VariableBindings, Restrictions)}.
+     * {@link #getJoinRestrictions(ClassRelations, VariableBindings, VariableBindings, Restrictions, boolean)}.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param bindings the variable bindings
      * @param others bindings of the other children
      * @param restrictions what the parent needs of the variables
+     * @param filtered true if the join drops the solutions of the child it cannot join with the other children
      * @return restrictions for a join child against several other children, see
-     *         {@link #getJoinRestrictions(ClassRelations, VariableBindings, VariableBindings, Restrictions)}; the
-     *         classes of the other children are the join classes of the shared variables (see
-     *         {@link Restrictions#getJoinClasses})
+     *         {@link #getJoinRestrictions(ClassRelations, VariableBindings, VariableBindings, Restrictions, boolean)};
+     *         the classes of the other children are the join classes of the shared variables (see
+     *         {@link Restrictions#getJoinClasses}) and, when the join is filtered, those bound without a null are their
+     *         accepted classes (see {@link Restrictions#getAcceptedClasses})
      */
     protected static Restrictions getJoinRestrictions(ClassRelations relations, VariableBindings bindings,
-            Collection<VariableBindings> others, Restrictions restrictions)
+            Collection<VariableBindings> others, Restrictions restrictions, boolean filtered)
     {
         Restrictions joinRestrictions = new Restrictions();
 
@@ -1298,6 +1383,12 @@ public abstract class SqlIntercode extends SqlBaseClass
             {
                 for(VariableBinding v : vars)
                     joinRestrictions.addJoinClasses(variable, v.getClasses());
+
+                // a side that may leave the variable unbound joins a value of any class
+                if(filtered)
+                    for(VariableBinding v : vars)
+                        if(!v.canBeNull())
+                            joinRestrictions.addAcceptedClasses(variable, v.getClasses());
 
                 if(binding.canBeNull())
                 {

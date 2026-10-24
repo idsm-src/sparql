@@ -872,7 +872,7 @@ public final class SqlJoin extends SqlIntercode
         List<VariableBindings> others = childs.stream().filter(c -> c != child).map(c -> c.getVariableBindings())
                 .toList();
 
-        return getJoinRestrictions(relations, child.getVariableBindings(), others, restrictions);
+        return getJoinRestrictions(relations, child.getVariableBindings(), others, restrictions, true);
     }
 
 
