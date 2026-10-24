@@ -9,6 +9,8 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.greaterThan;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -52,7 +54,10 @@ import cz.iocb.sparql.testing.Database;
  * Where the parent keeps the solutions it cannot join (the left side of an OPTIONAL, a nullable sibling or left side),
  * computes an aggregate from them or picks them by a slice, the branches have to stay, and a walk whose end variable
  * keeps several classes then joins its step laterally, branch by branch, instead of by a disjunction. A walk between
- * two variables starts from the end the parent restricts more.
+ * two variables starts from the end the parent restricts more, and a sibling in a join that binds an end of the walk
+ * always and distinct solutions over it (the labels, keyed by the node) seeds the walk: its solutions start the
+ * recursion, which carries its variables along, so that it is evaluated once and the join needs it no more; read from a
+ * source of the nodes, it replaces the zero-length paths altogether.
  */
 public class RecursivePruningTest
 {
@@ -74,10 +79,11 @@ public class RecursivePruningTest
 
     /**
      * Creates the {@code recursive_pruning_test} schema: the nodes (0 is the root, 1 and 3 its children, 2 the child of
-     * 1) with their labels, the others (10 and 20 are subclasses of the node 1, 11 of 10 and 12 of 11), the links from
-     * the nodes to whole IRIs (whose general class overlaps every other, so that the zero-length paths are not split by
-     * class), and the configuration mapping them: {@code ex:sub} over the nodes and the others, {@code ex:next} over
-     * the nodes alone.
+     * 1) with their labels (keyed by the node, so that the labels are distinct over it and may seed a walk), the others
+     * (10 and 20 are subclasses of the node 1, 11 of 10 and 12 of 11), the links from the nodes to whole IRIs (whose
+     * general class overlaps every other, so that the zero-length paths are not split by class; the node 3 has two of
+     * them, so the links are not distinct over the node), and the configuration mapping them: {@code ex:sub} over the
+     * nodes and the others, {@code ex:next} over the nodes alone.
      */
     @BeforeAll
     static void init() throws SQLException
@@ -90,7 +96,7 @@ public class RecursivePruningTest
             statement.execute("create table recursive_pruning_test.nodes (id integer not null, parent integer)");
             statement.execute("insert into recursive_pruning_test.nodes values (0, null), (1, 0), (2, 1), (3, 0)");
             statement.execute(
-                    "create table recursive_pruning_test.labels (id integer not null, " + "label varchar not null)");
+                    "create table recursive_pruning_test.labels (id integer primary key, " + "label varchar not null)");
             statement.execute("insert into recursive_pruning_test.labels values (0, 'zero'), (1, 'one'), (2, 'two'), "
                     + "(3, 'three')");
             statement.execute("create table recursive_pruning_test.others (id integer not null, parent integer)");
@@ -152,6 +158,21 @@ public class RecursivePruningTest
 
             return rows;
         }
+    }
+
+
+    /**
+     * Returns the number of times the table is read by the SQL code.
+     */
+    private static int reads(String sql, String table)
+    {
+        String name = "\"recursive_pruning_test\".\"" + table + "\"";
+        int count = 0;
+
+        for(int i = sql.indexOf(name); i >= 0; i = sql.indexOf(name, i + 1))
+            count++;
+
+        return count;
     }
 
 
@@ -404,14 +425,16 @@ public class RecursivePruningTest
     @DisplayName("the zero-length paths keep the nodes of the general class overlapping the accepted ones")
     void zeroPathGeneralKept() throws Exception
     {
-        String query = "SELECT ?x ?y ?l WHERE { ?x ex:next* ?y . ?x ex:label ?l }";
+        // the subclasses are not distinct over the start (the nodes have no key), so the walk is not seeded with them
+        String query = "SELECT ?x ?y ?p WHERE { ?x ex:next* ?y . ?x ex:sub ?p }";
 
         assertThat(execute(query),
-                containsInAnyOrder(row(node(0), node(0), string("zero")), row(node(1), node(1), string("one")),
-                        row(node(1), node(0), string("one")), row(node(2), node(2), string("two")),
-                        row(node(2), node(1), string("two")), row(node(2), node(0), string("two")),
-                        row(node(3), node(3), string("three")), row(node(3), node(0), string("three"))));
-        assertThat(translate(query), containsString("links"));
+                containsInAnyOrder(row(node(1), node(1), node(0)), row(node(1), node(0), node(0)),
+                        row(node(2), node(2), node(1)), row(node(2), node(1), node(1)), row(node(2), node(0), node(1)),
+                        row(node(3), node(3), node(0)), row(node(3), node(0), node(0)),
+                        row(other(10), other(10), node(1)), row(other(11), other(11), other(10)),
+                        row(other(12), other(12), other(11)), row(other(20), other(20), node(1))));
+        assertThat(translate(query), containsString("\"object\""));
     }
 
 
@@ -483,7 +506,7 @@ public class RecursivePruningTest
 
 
     @Test
-    @DisplayName("a walk whose end alone the parent restricts starts from the end")
+    @DisplayName("a walk whose end alone the parent restricts starts from the end, seeded with the sibling")
     void walkTurnedToRestrictedEnd() throws Exception
     {
         String query = "SELECT ?x ?y ?l WHERE { ?x ex:next* ?y . ?y ex:label ?l }";
@@ -493,9 +516,11 @@ public class RecursivePruningTest
                         row(node(1), node(0), string("zero")), row(node(2), node(2), string("two")),
                         row(node(2), node(1), string("one")), row(node(2), node(0), string("zero")),
                         row(node(3), node(3), string("three")), row(node(3), node(0), string("zero"))));
-        // started from the end, the zero-length paths enumerate no node of the others (the node 1 that a parentless
-        // other is a subclass of is still read from their table, so the sources of the class are told by its prefix)
-        assertThat(translate(query), not(containsString("http://example.org/a/")));
+        // started from the end and seeded with the labels, the walk enumerates no other node than the labelled ones
+        String sql = translate(query);
+        assertThat(sql, not(containsString("http://example.org/a/")));
+        assertThat(sql, not(containsString("links")));
+        assertThat(reads(sql, "labels"), is(1));
     }
 
 
@@ -508,6 +533,98 @@ public class RecursivePruningTest
         assertThat(execute(query), containsInAnyOrder(row(node(2), node(2), string("two")),
                 row(node(2), node(1), string("one")), row(node(2), node(0), string("zero"))));
         assertThat(translate(query), not(containsString("http://example.org/a/")));
+    }
+
+
+    @Test
+    @DisplayName("a sibling distinct over the start of a walk seeds it and replaces its zero-length paths")
+    void walkSeededByStart() throws Exception
+    {
+        String query = "SELECT ?x ?y ?l WHERE { ?x ex:next* ?y . ?x ex:label ?l }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(0), node(0), string("zero")), row(node(1), node(1), string("one")),
+                        row(node(1), node(0), string("one")), row(node(2), node(2), string("two")),
+                        row(node(2), node(1), string("two")), row(node(2), node(0), string("two")),
+                        row(node(3), node(3), string("three")), row(node(3), node(0), string("three"))));
+        // the labels are a source of the nodes, so their rows are the zero-length paths, and the recursion carries the
+        // label along instead of joining the labels afterwards
+        String sql = translate(query);
+        assertThat(sql, not(containsString("links")));
+        assertThat(sql, not(containsString("others")));
+        assertThat(reads(sql, "labels"), is(1));
+    }
+
+
+    @Test
+    @DisplayName("a sibling restricted by a constant seeds the walk with the rows it keeps")
+    void walkSeededByRestrictedSibling() throws Exception
+    {
+        String query = "SELECT ?x ?y WHERE { ?x ex:next* ?y . ?x ex:label \"two\" }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(2), node(2)), row(node(2), node(1)), row(node(2), node(0))));
+        String sql = translate(query);
+        assertThat(sql, not(containsString("links")));
+        assertThat(reads(sql, "labels"), is(1));
+    }
+
+
+    @Test
+    @DisplayName("a sibling distinct over the start seeds the first step of a walk of one or more steps")
+    void firstStepSeeded() throws Exception
+    {
+        String query = "SELECT ?x ?y ?l WHERE { ?x ex:next+ ?y . ?x ex:label ?l }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(1), node(0), string("one")), row(node(2), node(1), string("two")),
+                        row(node(2), node(0), string("two")), row(node(3), node(0), string("three"))));
+        // the labels are read once, inside the recursion (joined with the first step) instead of after it
+        String sql = translate(query);
+        assertThat(reads(sql, "labels"), is(1));
+        assertThat(sql.indexOf("\"labels\""), greaterThan(sql.indexOf("WITH RECURSIVE")));
+    }
+
+
+    @Test
+    @DisplayName("a sibling that is not distinct over the start does not seed the walk")
+    void nonDistinctSiblingKeepsWalk() throws Exception
+    {
+        String query = "SELECT ?x ?y ?z WHERE { ?x ex:next* ?y . ?x ex:link ?z }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(3), node(3), thing), row(node(3), node(3), node(2)),
+                row(node(3), node(0), thing), row(node(3), node(0), node(2))));
+        // seeded with the two links of the node 3, the recursion would unite its paths into one; the zero-length
+        // paths still enumerate the nodes (the labels are read as their source)
+        assertThat(translate(query), containsString("labels"));
+    }
+
+
+    @Test
+    @DisplayName("distinct VALUES seed the walk, looked up in the sources of the nodes")
+    void valuesSeedWalk() throws Exception
+    {
+        String query = "SELECT ?x ?y WHERE { VALUES ?x { <http://example.org/n/2> } ?x ex:next* ?y }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(2), node(2)), row(node(2), node(1)), row(node(2), node(0))));
+        assertThat(translate(query), containsString("'2'::int4 = \"id\""));
+    }
+
+
+    @Test
+    @DisplayName("the left side of an OPTIONAL does not seed the walk on its right side")
+    void optionalLeftDoesNotSeed() throws Exception
+    {
+        String query = "SELECT ?x ?l ?y WHERE { ?x ex:label ?l OPTIONAL { ?x ex:next* ?y } }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(0), string("zero"), node(0)), row(node(1), string("one"), node(1)),
+                        row(node(1), string("one"), node(0)), row(node(2), string("two"), node(2)),
+                        row(node(2), string("two"), node(1)), row(node(2), string("two"), node(0)),
+                        row(node(3), string("three"), node(3)), row(node(3), string("three"), node(0))));
+        // the left side would be evaluated twice (as the seed and for the solutions kept without a partner)
+        assertThat(translate(query), containsString("links"));
     }
 
 

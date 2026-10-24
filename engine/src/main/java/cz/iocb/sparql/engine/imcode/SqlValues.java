@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.imcode;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toMap;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -132,6 +133,35 @@ public final class SqlValues extends SqlIntercode
             if(resClass != null && accepted != null
                     && ResourceClass.areDisjunct(request.getConfiguration(), resClass, accepted))
                 return false;
+        }
+
+        return true;
+    }
+
+
+    @Override
+    public boolean isDistinct(Request request, Collection<Variable> selected)
+    {
+        // the rows projected to the columns of the selected variables (a row leaves the columns of the classes it does
+        // not bind the variable in, and of an unbound variable, null)
+        List<List<Column>> columns = new ArrayList<>();
+
+        for(Variable variable : selected)
+            if(bindings.get(variable) != null)
+                for(Column column : bindings.get(variable).getNonConstantColumns())
+                    columns.add(data.get(column));
+
+        for(int i = 0; i < size; i++)
+        {
+            check:
+            for(int j = i + 1; j < size; j++)
+            {
+                for(List<Column> values : columns)
+                    if(!Objects.equals(values.get(i), values.get(j)))
+                        continue check;
+
+                return false;
+            }
         }
 
         return true;

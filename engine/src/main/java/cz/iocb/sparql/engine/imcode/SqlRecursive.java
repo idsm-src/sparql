@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.imcode;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -17,6 +18,7 @@ import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -31,7 +33,10 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * Transitive closure of a path step for the {@code +} and {@code *} property paths, translated to
  * {@code WITH RECURSIVE}: {@code init} yields the end nodes reachable in the first step (or in zero steps) from the
  * begin variable, and {@code next}, whose start node is {@code joinVar}, extends a path from its current end node to a
- * new {@code endVar}. {@code graphVar} carries the graph when the pattern is evaluated in a variable graph.
+ * new {@code endVar}. {@code graphVar} carries the graph when the pattern is evaluated in a variable graph. The
+ * recursion carries the start and graph variables along unchanged, and so every other variable of the initial solutions
+ * the parent needs: a join seeds a walk with its siblings (see {@link #seed}), whose solutions then start the recursion
+ * and whose variables it delivers in place of the join.
  */
 public final class SqlRecursive extends SqlIntercode
 {
@@ -110,6 +115,12 @@ public final class SqlRecursive extends SqlIntercode
      */
     public final Variable reverseJoinVar;
 
+    /**
+     * Variables of the initial solutions carried through the recursion unchanged (the start and graph variables and the
+     * others the parent needs), including those the bindings do not expose.
+     */
+    private final Set<Variable> carried;
+
 
     /**
      * Creates the node.
@@ -125,10 +136,11 @@ public final class SqlRecursive extends SqlIntercode
      * @param graphVar the graph variable, or null
      * @param reverseNext the step of the walk in the other direction, or null
      * @param reverseJoinVar variable of the reverse step bound to the node it reaches, or null
+     * @param carried variables of the initial solutions carried through the recursion
      */
     protected SqlRecursive(VariableBindings bindings, SqlIntercode init, SqlIntercode next, VariableBinding endBinding,
             Variable joinVar, Variable beginVar, List<Column> iv, List<Column> ev, Variable graphVar,
-            SqlIntercode reverseNext, Variable reverseJoinVar)
+            SqlIntercode reverseNext, Variable reverseJoinVar, Set<Variable> carried)
     {
         super(bindings, init.isDeterministic() && next.isDeterministic());
         this.init = init;
@@ -141,6 +153,7 @@ public final class SqlRecursive extends SqlIntercode
         this.graphVar = graphVar;
         this.reverseNext = reverseNext;
         this.reverseJoinVar = reverseJoinVar;
+        this.carried = carried;
     }
 
 
@@ -188,7 +201,10 @@ public final class SqlRecursive extends SqlIntercode
 
 
     /**
-     * Recursion exposing only what the parent needs; the start and graph variables get fresh output columns.
+     * Recursion exposing only what the parent needs; the start and graph variables get fresh output columns, and so
+     * does every other variable of the initial solutions the parent needs, which the recursion carries along unchanged
+     * (the variables of the siblings a walk is seeded with, see {@link #seed}). A variable of the initial solutions
+     * nobody needs is left out, because carrying it would multiply the paths walked by its values.
      *
      * @param request the current request
      * @param init the initial solutions
@@ -197,10 +213,10 @@ public final class SqlRecursive extends SqlIntercode
      * @param joinVar variable of the step bound to the current end node
      * @param endVar the end variable
      * @param graphVar the graph variable, or null
-     * @param restrictions what the parent needs of the variables
+     * @param restrictions what the parent needs of the variables; null to carry the start and graph variables alone
      * @param reverseNext the step of the walk in the other direction, or null
      * @param reverseJoinVar variable of the reverse step bound to the node it reaches, or null
-     * @return recursion exposing only what the parent needs; the start and graph variables get fresh output columns
+     * @return recursion exposing only what the parent needs; the carried variables get fresh output columns
      */
     protected static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, Variable beginVar,
             Variable joinVar, Variable endVar, Variable graphVar, Restrictions restrictions, SqlIntercode reverseNext,
@@ -208,33 +224,46 @@ public final class SqlRecursive extends SqlIntercode
     {
         ClassRelations relations = request.getConfiguration();
 
-        //TODO: accept also variables other than those directly participating in recursion
-
         Map<Column, Column> map = new HashMap<>();
         VariableBindings bindings = new VariableBindings();
+        VariableBindings carried = new VariableBindings();
 
         for(VariableBinding binding : init.getVariableBindings().getValues())
         {
-            if(binding.getVariable().equals(beginVar) || binding.getVariable().equals(graphVar))
+            Variable variable = binding.getVariable();
+
+            if(variable.equals(endVar))
+                continue;
+
+            if(!variable.equals(beginVar) && !variable.equals(graphVar)
+                    && (restrictions == null || !restrictions.containsVar(variable)))
+                continue;
+
+            carried.add(binding);
+
+            VariableBinding v = new VariableBinding(variable, binding.canBeNull());
+
+            for(Entry<ResourceClass, List<Column>> e : binding.getMappings().entrySet())
             {
-                VariableBinding v = new VariableBinding(binding.getVariable(), binding.canBeNull());
-
-                for(Entry<ResourceClass, List<Column>> e : binding.getMappings().entrySet())
+                if(e.getValue() == null)
                 {
-                    List<Column> safeNames = e.getKey().createColumns(request.getColumnMap(), v.getVariable());
-
-                    v.addMapping(e.getKey(), IntStream.range(0, e.getValue().size()).mapToObj(i -> {
-                        Column c = e.getValue().get(i);
-
-                        if(c instanceof ConstantColumn)
-                            return c;
-                        else
-                            return map.computeIfAbsent(c, _ -> safeNames.get(i));
-                    }).toList());
+                    v.addMapping(e.getKey(), null);
+                    continue;
                 }
 
-                bindings.add(v);
+                List<Column> safeNames = e.getKey().createColumns(request.getColumnMap(), variable);
+
+                v.addMapping(e.getKey(), IntStream.range(0, e.getValue().size()).mapToObj(i -> {
+                    Column c = e.getValue().get(i);
+
+                    if(c instanceof ConstantColumn)
+                        return c;
+                    else
+                        return map.computeIfAbsent(c, _ -> safeNames.get(i));
+                }).toList());
             }
+
+            bindings.add(v);
         }
 
         VariableBinding endBinding = createEndVariableBinding(request, endVar, init, next);
@@ -243,19 +272,176 @@ public final class SqlRecursive extends SqlIntercode
             bindings.add(endBinding);
 
 
-        VariableBindings tmp = new VariableBindings();
-
-        if(init.getVariableBindings().get(beginVar) != null)
-            tmp.add(init.getVariableBindings().get(beginVar));
-
-        if(init.getVariableBindings().get(graphVar) != null)
-            tmp.add(init.getVariableBindings().get(graphVar));
-
-        List<Column> innerColumns = new ArrayList<>(tmp.getNonConstantColumns());
+        List<Column> innerColumns = new ArrayList<>(carried.getNonConstantColumns());
         List<Column> outerColumns = innerColumns.stream().map(c -> map.get(c)).toList();
 
         return new SqlRecursive(bindings.restrict(relations, restrictions), init, next, endBinding, joinVar, beginVar,
-                innerColumns, outerColumns, graphVar, reverseNext, reverseJoinVar);
+                innerColumns, outerColumns, graphVar, reverseNext, reverseJoinVar, carried.getVariables());
+    }
+
+
+    /**
+     * The walk seeded with the solutions of its siblings in a join: the initial solutions are joined with the seeds on
+     * the start variable (on the end variable when the walk is turned, the reverse step then walking from it), so that
+     * the recursion enumerates only the paths that start in their values, and the variables of the seeds are carried
+     * through the recursion, so that the join needs the seeds no more and they are evaluated once. A seed has to bind
+     * the start variable without a null and distinct solutions over it: the recursion unites its rows as a set, so
+     * several solutions of a seed for one start would collapse into one, and the paths walked would multiply by their
+     * number. A seed read from a table that is a source of the zero-length paths delivers nodes of the graph, so the
+     * zero-length paths are its own rows; otherwise plain table accesses and values are joined under the deduplication
+     * of the zero-length paths (the join is then distributed over the sources, which the database looks up by their
+     * indexes), and other seeds are joined with the initial solutions as a whole, so that they are not repeated. The
+     * seeded walk is not turned any more, because the carried variables belong to its start.
+     *
+     * @param request the current request
+     * @param seeds the siblings seeding the walk, every one distinct over the start variable and binding it always
+     * @param fromEnd true when the seeds bind the end variable, so that the walk is turned (see {@link #reverseNext})
+     * @param restrictions what the parent needs of the variables
+     * @return the seeded walk
+     */
+    protected SqlIntercode seed(Request request, List<SqlIntercode> seeds, boolean fromEnd, Restrictions restrictions)
+    {
+        Variable startVar = fromEnd ? endBinding.getVariable() : beginVar;
+        Variable stopVar = fromEnd ? beginVar : endBinding.getVariable();
+
+        SqlIntercode seeded = seedInit(request, init, seeds, startVar, stopVar);
+
+        Restrictions seedRestrictions = new Restrictions(restrictions);
+
+        for(SqlIntercode seed : seeds)
+            for(VariableBinding binding : seed.getVariableBindings().getValues())
+                seedRestrictions.add(binding.getVariable(), binding.getClasses());
+
+        if(fromEnd)
+            return create(request, seeded, reverseNext, startVar, reverseJoinVar, stopVar, graphVar, seedRestrictions,
+                    null, null);
+
+        return create(request, seeded, next, startVar, joinVar, stopVar, graphVar, seedRestrictions, null, null);
+    }
+
+
+    /**
+     * Initial solutions of a seeded walk (see {@link #seed}): the seeds alone, with the end variable bound to the
+     * start, when one of them reads a source of the zero-length paths; the seeds joined with the initial solutions
+     * otherwise.
+     *
+     * @param request the current request
+     * @param init the initial solutions
+     * @param seeds the siblings seeding the walk
+     * @param startVar the start variable
+     * @param endVar the end variable
+     * @return initial solutions of the seeded walk
+     */
+    private static SqlIntercode seedInit(Request request, SqlIntercode init, List<SqlIntercode> seeds,
+            Variable startVar, Variable endVar)
+    {
+        for(SqlIntercode seed : seeds)
+        {
+            if(seed instanceof SqlTableAccess access && enumeratesNodesOf(init, access, startVar, endVar))
+            {
+                SqlIntercode joined = seeds.size() == 1 ? seed : SqlJoin.join(request, seeds);
+
+                return SqlBind.bind(request, endVar,
+                        SqlVariable.create(request.getConfiguration(), joined.getVariableBindings().get(startVar)),
+                        joined);
+            }
+        }
+
+        return joinSeeds(request, seeds, init);
+    }
+
+
+    /**
+     * The seeds joined with the initial solutions: branch by branch of a union, under the deduplication of the
+     * zero-length paths when the seeds are plain table accesses or values, and as a whole otherwise.
+     *
+     * @param request the current request
+     * @param seeds the siblings seeding the walk
+     * @param init the initial solutions
+     * @return the seeds joined with the initial solutions
+     */
+    private static SqlIntercode joinSeeds(Request request, List<SqlIntercode> seeds, SqlIntercode init)
+    {
+        if(init instanceof SqlUnion union)
+            return SqlUnion.union(request,
+                    union.getChilds().stream().map(branch -> joinSeeds(request, seeds, branch)).toList());
+
+        if(init instanceof SqlDistinct distinct
+                && seeds.stream().allMatch(s -> s instanceof SqlTableAccess || s instanceof SqlValues))
+        {
+            // the seeds are distinct over the variables they share with the deduplicated solutions, so the join may
+            // be deduplicated as a whole
+            Set<Variable> variables = new HashSet<>(distinct.getDistinctVariables());
+
+            for(SqlIntercode seed : seeds)
+                variables.addAll(seed.getVariableBindings().getVariables());
+
+            return SqlDistinct.create(request, joinSeeds(request, seeds, distinct.getChild()), variables);
+        }
+
+        List<SqlIntercode> childs = new ArrayList<>(seeds);
+        childs.add(init);
+
+        return SqlJoin.join(request, childs);
+    }
+
+
+    /**
+     * True if the initial solutions are the zero-length paths over the nodes of the graph, and one of their sources is
+     * the table the seed reads, under conditions no stronger than those of the seed, with the start variable bound to
+     * the columns the seed binds it to: every value of the seed is then a node of the graph.
+     *
+     * @param init the initial solutions
+     * @param seed a sibling seeding the walk
+     * @param startVar the start variable
+     * @param endVar the end variable
+     * @return true if the initial solutions enumerate the nodes of the graph and a source of them subsumes the seed,
+     *         false otherwise
+     */
+    private static boolean enumeratesNodesOf(SqlIntercode init, SqlTableAccess seed, Variable startVar, Variable endVar)
+    {
+        if(init instanceof SqlDistinct distinct)
+            return enumeratesNodesOf(distinct.getChild(), seed, startVar, endVar);
+
+        if(init instanceof SqlUnion union)
+            return union.getChilds().stream().anyMatch(branch -> enumeratesNodesOf(branch, seed, startVar, endVar));
+
+        if(!(init instanceof SqlTableAccess source) || source.getTable() == null
+                || !source.getTable().equals(seed.getTable()))
+            return false;
+
+        if(!seed.getConditions().implies(source.getConditions()))
+            return false;
+
+        VariableBinding start = source.getInternalVariableBinding(startVar);
+
+        // a zero-length path binds its end to the columns of its start
+        if(start == null || !sameColumns(start, seed.getInternalVariableBinding(startVar))
+                || !sameColumns(start, source.getInternalVariableBinding(endVar)))
+            return false;
+
+        // the other variables of the source (the graph) have to agree with the seed
+        for(Variable variable : source.getInternalVariableBindings().getVariables())
+            if(!variable.equals(startVar) && !variable.equals(endVar)
+                    && !sameColumns(source.getInternalVariableBinding(variable),
+                            seed.getInternalVariableBinding(variable)))
+                return false;
+
+        return true;
+    }
+
+
+    /**
+     * True if both bindings exist, are never null and map the same classes to the same columns.
+     *
+     * @param binding a binding
+     * @param other another binding, or null
+     * @return true if both bindings exist, are never null and map the same classes to the same columns, false otherwise
+     */
+    private static boolean sameColumns(VariableBinding binding, VariableBinding other)
+    {
+        return binding != null && other != null && !binding.canBeNull() && !other.canBeNull()
+                && binding.getMappings().equals(other.getMappings());
     }
 
 
@@ -657,6 +843,18 @@ public final class SqlRecursive extends SqlIntercode
         //TODO: handle constant columns
 
         return endBinding;
+    }
+
+
+    @Override
+    public boolean isDistinct(Request request, Collection<Variable> selected)
+    {
+        // the recursion unites its rows as a set over the carried columns and the end node, so the solutions are
+        // distinct over the variables when they cover every carried variable that has columns, exposed or not
+        if(!selected.contains(endBinding.getVariable()))
+            return false;
+
+        return carried.stream().allMatch(v -> selected.contains(v) || init.getVariableBindings().get(v).isConstant());
     }
 
 

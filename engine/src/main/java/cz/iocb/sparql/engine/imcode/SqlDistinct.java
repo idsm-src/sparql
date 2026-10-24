@@ -413,6 +413,17 @@ public final class SqlDistinct extends SqlIntercode
     }
 
 
+    /**
+     * The variables the deduplication applies to.
+     *
+     * @return the variables the deduplication applies to
+     */
+    public final Set<Variable> getDistinctVariables()
+    {
+        return distinctVariables;
+    }
+
+
     @Override
     public boolean isDistinct(Request request, Collection<Variable> selected)
     {

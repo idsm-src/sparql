@@ -41,7 +41,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 /**
  * Natural join of several children on their shared variables. Optimisation flattens nested joins, merges accesses to
  * the same table or along keys ({@link SqlTableAccess}), distributes the join over unions (a leading OPTIONAL sharing a
- * variable with another child being turned into one first, see {@link SqlLeftJoin#toUnion}), evaluates nondeterministic
+ * variable with another child being turned into one first, see {@link SqlLeftJoin#toUnion}), seeds the walks of
+ * property paths with the siblings that bind their start (see {@link SqlRecursive#seed}), evaluates nondeterministic
  * children last, and decides the evaluation of SERVICE stubs by row estimates when service reordering is enabled.
  */
 public final class SqlJoin extends SqlIntercode
@@ -186,6 +187,7 @@ public final class SqlJoin extends SqlIntercode
                     newRestrictions, schema);
 
             newChilds = expandLeadingOptionals(request, newChilds, evalServices);
+            newChilds = seedWalks(request, newChilds, newRestrictions);
 
             if(!Objects.equals(new Multiset<>(newChilds), new Multiset<>(optChilds)))
                 optChilds = newChilds;
@@ -902,6 +904,85 @@ public final class SqlJoin extends SqlIntercode
         }
 
         return result;
+    }
+
+
+    /**
+     * Seeds a walk between two variables with its siblings (see {@link SqlRecursive#seed}): the siblings that bind the
+     * start variable always and distinct solutions over it, without binding the end variable, or, when no sibling binds
+     * the start that way, those binding the end variable so, the walk being turned then. The seeds leave the join,
+     * carried through the recursion instead. One walk is seeded per call; the optimisation loop comes back for the
+     * others.
+     *
+     * @param request the current request
+     * @param childs the child nodes
+     * @param restrictions what the parent needs of the variables
+     * @return the children, with the first walk that can be seeded replaced by its seeded form and its seeds removed
+     */
+    private static List<SqlIntercode> seedWalks(Request request, List<SqlIntercode> childs, Restrictions restrictions)
+    {
+        for(int i = 0; i < childs.size(); i++)
+        {
+            if(!(childs.get(i) instanceof SqlRecursive walk) || walk.beginVar == null)
+                continue;
+
+            Variable beginVar = walk.beginVar;
+            Variable endVar = walk.endBinding.getVariable();
+
+            boolean fromEnd = false;
+            List<Integer> seeds = selectSeeds(request, childs, i, beginVar, endVar);
+
+            if(seeds.isEmpty() && walk.reverseNext != null)
+            {
+                seeds = selectSeeds(request, childs, i, endVar, beginVar);
+                fromEnd = true;
+            }
+
+            if(seeds.isEmpty())
+                continue;
+
+            List<SqlIntercode> result = new ArrayList<>();
+
+            for(int j = 0; j < childs.size(); j++)
+                if(j != i && !seeds.contains(j))
+                    result.add(childs.get(j));
+
+            result.add(walk.seed(request, seeds.stream().map(j -> childs.get(j)).toList(), fromEnd, restrictions));
+
+            return result;
+        }
+
+        return childs;
+    }
+
+
+    /**
+     * Indexes of the children that can seed the walk at the given index from the start variable: those binding it
+     * always and distinct solutions over it, and not binding the end variable.
+     *
+     * @param request the current request
+     * @param childs the child nodes
+     * @param index index of the walk
+     * @param startVar the variable the walk starts from
+     * @param endVar the variable the walk ends in
+     * @return indexes of the children that can seed the walk from the start variable
+     */
+    private static List<Integer> selectSeeds(Request request, List<SqlIntercode> childs, int index, Variable startVar,
+            Variable endVar)
+    {
+        List<Integer> seeds = new ArrayList<>();
+
+        for(int i = 0; i < childs.size(); i++)
+        {
+            SqlIntercode child = childs.get(i);
+            VariableBinding binding = child.getVariable(startVar);
+
+            if(i != index && binding != null && !binding.canBeNull() && child.getVariable(endVar) == null
+                    && child.isDistinct(request, Set.of(startVar)))
+                seeds.add(i);
+        }
+
+        return seeds;
     }
 
 
