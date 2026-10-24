@@ -96,6 +96,20 @@ public final class SqlRecursive extends SqlIntercode
      */
     public final Variable graphVar;
 
+    /**
+     * The step written for the walk in the other direction, from the start variable to {@link #reverseJoinVar}: a walk
+     * between two variables may start from either of them, and {@link #optimize} starts it from the end variable when
+     * the parent restricts that one more (the step then takes {@code reverseJoinVar} for the current node and the start
+     * variable for the new one). Null when the walk cannot be turned (a constant start, or the same variable at both
+     * ends).
+     */
+    public final SqlIntercode reverseNext;
+
+    /**
+     * Variable of {@link #reverseNext} bound to the node it reaches; null when there is no reverse step.
+     */
+    public final Variable reverseJoinVar;
+
 
     /**
      * Creates the node.
@@ -109,9 +123,12 @@ public final class SqlRecursive extends SqlIntercode
      * @param iv columns of the start and graph variables inside the recursion
      * @param ev columns of the start and graph variables exposed by the recursion
      * @param graphVar the graph variable, or null
+     * @param reverseNext the step of the walk in the other direction, or null
+     * @param reverseJoinVar variable of the reverse step bound to the node it reaches, or null
      */
     protected SqlRecursive(VariableBindings bindings, SqlIntercode init, SqlIntercode next, VariableBinding endBinding,
-            Variable joinVar, Variable beginVar, List<Column> iv, List<Column> ev, Variable graphVar)
+            Variable joinVar, Variable beginVar, List<Column> iv, List<Column> ev, Variable graphVar,
+            SqlIntercode reverseNext, Variable reverseJoinVar)
     {
         super(bindings, init.isDeterministic() && next.isDeterministic());
         this.init = init;
@@ -122,6 +139,8 @@ public final class SqlRecursive extends SqlIntercode
         this.iv = iv;
         this.ev = ev;
         this.graphVar = graphVar;
+        this.reverseNext = reverseNext;
+        this.reverseJoinVar = reverseJoinVar;
     }
 
 
@@ -142,7 +161,29 @@ public final class SqlRecursive extends SqlIntercode
     public static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, Variable beginVar,
             Variable joinVar, Variable endVar, Variable graphVar)
     {
-        return create(request, init, next, beginVar, joinVar, endVar, graphVar, null);
+        return create(request, init, next, beginVar, joinVar, endVar, graphVar, null, null, null);
+    }
+
+
+    /**
+     * Recursive closure of {@code next} started from {@code init} between two variables, which may also be walked the
+     * other way round by {@code reverseNext} (see {@link #reverseNext}).
+     *
+     * @param request the current request
+     * @param init the initial solutions
+     * @param next the recursive step
+     * @param beginVar the start variable
+     * @param joinVar variable of the step bound to the current end node
+     * @param endVar the end variable
+     * @param graphVar the graph variable, or null
+     * @param reverseNext the step of the walk in the other direction
+     * @param reverseJoinVar variable of the reverse step bound to the node it reaches
+     * @return recursive closure of {@code next} started from {@code init}
+     */
+    public static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, Variable beginVar,
+            Variable joinVar, Variable endVar, Variable graphVar, SqlIntercode reverseNext, Variable reverseJoinVar)
+    {
+        return create(request, init, next, beginVar, joinVar, endVar, graphVar, null, reverseNext, reverseJoinVar);
     }
 
 
@@ -157,10 +198,13 @@ public final class SqlRecursive extends SqlIntercode
      * @param endVar the end variable
      * @param graphVar the graph variable, or null
      * @param restrictions what the parent needs of the variables
+     * @param reverseNext the step of the walk in the other direction, or null
+     * @param reverseJoinVar variable of the reverse step bound to the node it reaches, or null
      * @return recursion exposing only what the parent needs; the start and graph variables get fresh output columns
      */
     protected static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, Variable beginVar,
-            Variable joinVar, Variable endVar, Variable graphVar, Restrictions restrictions)
+            Variable joinVar, Variable endVar, Variable graphVar, Restrictions restrictions, SqlIntercode reverseNext,
+            Variable reverseJoinVar)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -211,7 +255,44 @@ public final class SqlRecursive extends SqlIntercode
         List<Column> outerColumns = innerColumns.stream().map(c -> map.get(c)).toList();
 
         return new SqlRecursive(bindings.restrict(relations, restrictions), init, next, endBinding, joinVar, beginVar,
-                innerColumns, outerColumns, graphVar);
+                innerColumns, outerColumns, graphVar, reverseNext, reverseJoinVar);
+    }
+
+
+    /**
+     * True if the walk should start from its end variable: the parent accepts the end in narrower classes than the
+     * start (every accepted class of the end is a subclass of an accepted class of the start, but not the other way
+     * round), or restricts the end alone. Walked from the end, the recursion enumerates only the pairs ending in nodes
+     * the parent accepts, instead of every pair starting anywhere, of which the parent keeps the same ones.
+     *
+     * @param restrictions what the parent needs of the variables
+     * @return true if the walk should start from its end variable, false otherwise
+     */
+    private boolean startsBetterFromEnd(Restrictions restrictions)
+    {
+        Set<ResourceClass> end = restrictions.getAcceptedClasses(endBinding.getVariable());
+        Set<ResourceClass> begin = restrictions.getAcceptedClasses(beginVar);
+
+        if(end == null)
+            return false;
+
+        if(begin == null)
+            return true;
+
+        return isNarrower(end, begin) && !isNarrower(begin, end);
+    }
+
+
+    /**
+     * True if every class of the first set is a subclass of (or equal to) some class of the second set.
+     *
+     * @param classes the classes
+     * @param others the other classes
+     * @return true if every class of the first set is a subclass of some class of the second set, false otherwise
+     */
+    private static boolean isNarrower(Set<ResourceClass> classes, Set<ResourceClass> others)
+    {
+        return classes.stream().allMatch(c -> others.stream().anyMatch(o -> c.equals(o) || c.isSubclassOf(o)));
     }
 
 
@@ -219,6 +300,12 @@ public final class SqlRecursive extends SqlIntercode
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
+
+        // a walk between two variables starts from the end the parent restricts more: the same step walked the other
+        // way round, with the end variable for the start and the start variable for the end
+        if(reverseNext != null && startsBetterFromEnd(restrictions))
+            return create(request, init, reverseNext, endBinding.getVariable(), reverseJoinVar, beginVar, graphVar,
+                    restrictions, next, joinVar).optimize(request, restrictions, reduced, evalServices);
 
         Variable endVar = endBinding.getVariable();
 
@@ -256,7 +343,7 @@ public final class SqlRecursive extends SqlIntercode
 
                 for(SqlIntercode child : segs)
                     childs.add(create(request, child, nextOpt, beginVar, joinVar, endBinding.getVariable(), graphVar,
-                            restrictions));
+                            restrictions, reverseNext, reverseJoinVar));
 
                 return SqlUnion.union(request, childs).optimize(request, restrictions, true, evalServices);
             }
@@ -318,7 +405,8 @@ public final class SqlRecursive extends SqlIntercode
         if(initOpt == init && nextOpt == next && restrictions.isOptimized(relations, bindings))
             return this;
 
-        return create(request, initOpt, nextOpt, beginVar, joinVar, endBinding.getVariable(), graphVar, restrictions);
+        return create(request, initOpt, nextOpt, beginVar, joinVar, endBinding.getVariable(), graphVar, restrictions,
+                reverseNext, reverseJoinVar);
     }
 
 
@@ -645,6 +733,12 @@ public final class SqlRecursive extends SqlIntercode
         if(!Objects.equals(next, imcode.next))
             return false;
 
+        if(!Objects.equals(reverseNext, imcode.reverseNext))
+            return false;
+
+        if(!Objects.equals(reverseJoinVar, imcode.reverseJoinVar))
+            return false;
+
         return true;
     }
 
@@ -652,6 +746,6 @@ public final class SqlRecursive extends SqlIntercode
     @Override
     protected int getHashCode()
     {
-        return Objects.hash(graphVar, beginVar, joinVar, endBinding, init, next);
+        return Objects.hash(graphVar, beginVar, joinVar, endBinding, init, next, reverseNext, reverseJoinVar);
     }
 }

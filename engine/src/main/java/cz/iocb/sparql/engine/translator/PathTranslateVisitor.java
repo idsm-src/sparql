@@ -290,7 +290,22 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
         SqlIntercode next = visitElement(repeatedPath.getChild(), joinVar, endVar);
 
-        SqlIntercode intercode = SqlRecursive.create(request, init, next, beginVar, joinVar, endVar, graphVar);
+        SqlIntercode intercode;
+
+        if(beginVar != null && cndTerm == null)
+        {
+            // a walk between two variables gets the step in both directions, and the recursion starts from the end the
+            // parent restricts more (see SqlRecursive.optimize)
+            Variable reverseJoinVar = parent.createVariable(variablePrefix);
+            SqlIntercode reverseNext = visitElement(repeatedPath.getChild(), beginVar, reverseJoinVar);
+
+            intercode = SqlRecursive.create(request, init, next, beginVar, joinVar, endVar, graphVar, reverseNext,
+                    reverseJoinVar);
+        }
+        else
+        {
+            intercode = SqlRecursive.create(request, init, next, beginVar, joinVar, endVar, graphVar);
+        }
 
         if(cndTerm != null)
         {

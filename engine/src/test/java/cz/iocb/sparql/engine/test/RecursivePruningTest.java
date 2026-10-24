@@ -51,7 +51,8 @@ import cz.iocb.sparql.testing.Database;
  * variables, which enumerate every node of the graph. A FILTER accepts the classes in which its conditions can hold.
  * Where the parent keeps the solutions it cannot join (the left side of an OPTIONAL, a nullable sibling or left side),
  * computes an aggregate from them or picks them by a slice, the branches have to stay, and a walk whose end variable
- * keeps several classes then joins its step laterally, branch by branch, instead of by a disjunction.
+ * keeps several classes then joins its step laterally, branch by branch, instead of by a disjunction. A walk between
+ * two variables starts from the end the parent restricts more.
  */
 public class RecursivePruningTest
 {
@@ -97,7 +98,8 @@ public class RecursivePruningTest
                     "insert into recursive_pruning_test.others values (10, null), (11, 10), (12, 11), " + "(20, null)");
             statement.execute("create table recursive_pruning_test.links (subject integer not null, "
                     + "object varchar not null)");
-            statement.execute("insert into recursive_pruning_test.links values (3, 'http://other.org/thing')");
+            statement.execute("insert into recursive_pruning_test.links values (3, 'http://other.org/thing'), "
+                    + "(3, 'http://example.org/n/2')");
         }
 
         DatabaseSchema schema = new DatabaseSchema(connectionPool);
@@ -477,6 +479,35 @@ public class RecursivePruningTest
         assertThat(execute(query), containsInAnyOrder(row(string("zero"), node(2)), row(string("one"), node(2)),
                 row(string("two"), node(2)), row(string("three"), node(2))));
         assertThat(translate(query), not(containsString("others")));
+    }
+
+
+    @Test
+    @DisplayName("a walk whose end alone the parent restricts starts from the end")
+    void walkTurnedToRestrictedEnd() throws Exception
+    {
+        String query = "SELECT ?x ?y ?l WHERE { ?x ex:next* ?y . ?y ex:label ?l }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(0), node(0), string("zero")), row(node(1), node(1), string("one")),
+                        row(node(1), node(0), string("zero")), row(node(2), node(2), string("two")),
+                        row(node(2), node(1), string("one")), row(node(2), node(0), string("zero")),
+                        row(node(3), node(3), string("three")), row(node(3), node(0), string("zero"))));
+        // started from the end, the zero-length paths enumerate no node of the others (the node 1 that a parentless
+        // other is a subclass of is still read from their table, so the sources of the class are told by its prefix)
+        assertThat(translate(query), not(containsString("http://example.org/a/")));
+    }
+
+
+    @Test
+    @DisplayName("a walk whose end the parent restricts to narrower classes than the start starts from the end")
+    void walkTurnedToNarrowerEnd() throws Exception
+    {
+        String query = "SELECT ?x ?y ?l WHERE { ?x ex:next* ?y . ?z ex:link ?x . ?y ex:label ?l }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(2), node(2), string("two")),
+                row(node(2), node(1), string("one")), row(node(2), node(0), string("zero"))));
+        assertThat(translate(query), not(containsString("http://example.org/a/")));
     }
 
 

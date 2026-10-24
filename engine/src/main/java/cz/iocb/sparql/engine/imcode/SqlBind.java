@@ -152,6 +152,12 @@ public final class SqlBind extends SqlIntercode
             Restrictions expressionRequirements = optExpression.getRequirements(relations);
             Restrictions childRestrictions = new Restrictions(restrictions, expressionRequirements);
 
+            // a copy of a variable takes its value, so the classes the parent accepts for the copy are accepted for the
+            // variable too (the zero-length paths of a walk bind their end this way)
+            if(optExpression instanceof SqlVariable && restrictions.getAcceptedClasses(variable) != null)
+                for(Variable copied : optExpression.getReferencedVariables())
+                    childRestrictions.addAcceptedClasses(copied, restrictions.getAcceptedClasses(variable));
+
             optChild = optChild.optimize(request, childRestrictions, optReduced, evalServices);
             optExpression = optExpression.optimize(request, optChild.getVariableBindings(), varRestriction,
                     evalServices);
