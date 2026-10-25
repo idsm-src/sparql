@@ -10,6 +10,8 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.greaterThan;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import java.sql.Connection;
@@ -59,7 +61,8 @@ import cz.iocb.sparql.testing.Database;
  * recursion, which carries its variables along, so that it is evaluated once and the join needs it no more; read from a
  * source of the nodes, it replaces the zero-length paths altogether. A walk of which the parent needs only one end, and
  * not the multiplicities (a DISTINCT over the end, a MINUS, an EXISTS), reduces to its initial solutions, since a node
- * has a path iff it has a zero-length path or a first step.
+ * has a path iff it has a zero-length path or a first step. An OPTIONAL walk of zero or more steps from nodes the left
+ * side binds always is a join, as the zero-length paths match every node, and the left side then seeds it.
  */
 public class RecursivePruningTest
 {
@@ -638,8 +641,8 @@ public class RecursivePruningTest
 
 
     @Test
-    @DisplayName("the left side of an OPTIONAL does not seed the walk on its right side")
-    void optionalLeftDoesNotSeed() throws Exception
+    @DisplayName("an OPTIONAL walk of zero or more steps from nodes the left side binds is a join seeded with it")
+    void optionalWalkJoined() throws Exception
     {
         String query = "SELECT ?x ?l ?y WHERE { ?x ex:label ?l OPTIONAL { ?x ex:next* ?y } }";
 
@@ -648,8 +651,82 @@ public class RecursivePruningTest
                         row(node(1), string("one"), node(0)), row(node(2), string("two"), node(2)),
                         row(node(2), string("two"), node(1)), row(node(2), string("two"), node(0)),
                         row(node(3), string("three"), node(3)), row(node(3), string("three"), node(0))));
-        // the left side would be evaluated twice (as the seed and for the solutions kept without a partner)
-        assertThat(translate(query), containsString("links"));
+        // every labelled node has at least its zero-length path, so no solution of the left side is kept without a
+        // partner, and the labels seed the walk in place of the zero-length paths
+        String sql = translate(query);
+        assertThat(sql, not(containsString("LEFT JOIN")));
+        assertThat(sql, not(containsString("links")));
+        assertThat(reads(sql, "labels"), is(1));
+    }
+
+
+    @Test
+    @DisplayName("the left side of such an OPTIONAL may bind the start in a join")
+    void optionalWalkJoinedUnderJoin() throws Exception
+    {
+        String query = "SELECT ?x ?z ?y WHERE { ?x ex:label ?l . ?x ex:link ?z OPTIONAL { ?x ex:next* ?y } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(3), thing, node(3)), row(node(3), thing, node(0)),
+                row(node(3), node(2), node(3)), row(node(3), node(2), node(0))));
+        assertThat(translate(query), not(containsString("LEFT JOIN")));
+    }
+
+
+    @Test
+    @DisplayName("the left side of such an OPTIONAL may bind the start under a filter")
+    void optionalWalkJoinedUnderFilter() throws Exception
+    {
+        String query = "SELECT ?x ?y WHERE { { ?x ex:label ?l FILTER(?l != 'zero') } OPTIONAL { ?x ex:next* ?y } }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(1), node(1)), row(node(1), node(0)), row(node(2), node(2)),
+                        row(node(2), node(1)), row(node(2), node(0)), row(node(3), node(3)), row(node(3), node(0))));
+        assertThat(translate(query), not(containsString("LEFT JOIN")));
+    }
+
+
+    @Test
+    @DisplayName("an OPTIONAL walk of one or more steps stays a left join")
+    void optionalFirstStepKept() throws Exception
+    {
+        String query = "SELECT ?x ?l ?y WHERE { ?x ex:label ?l OPTIONAL { ?x ex:next+ ?y } }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(0), string("zero"), null), row(node(1), string("one"), node(0)),
+                        row(node(2), string("two"), node(1)), row(node(2), string("two"), node(0)),
+                        row(node(3), string("three"), node(0))));
+        assertThat(translate(query), containsString("LEFT JOIN"));
+    }
+
+
+    @Test
+    @DisplayName("a condition on the OPTIONAL walk keeps the left join")
+    void optionalConditionKept() throws Exception
+    {
+        String query = "SELECT ?x ?l ?y WHERE { ?x ex:label ?l OPTIONAL { ?x ex:next* ?y FILTER(?y != ?x) } }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(0), string("zero"), null), row(node(1), string("one"), node(0)),
+                        row(node(2), string("two"), node(1)), row(node(2), string("two"), node(0)),
+                        row(node(3), string("three"), node(0))));
+        assertThat(translate(query), containsString("LEFT JOIN"));
+    }
+
+
+    @Test
+    @DisplayName("a start the left side may leave unbound keeps the left join")
+    void optionalNullableStartKept() throws Exception
+    {
+        String query = "SELECT ?l ?x ?y WHERE { { ?z ex:label ?l OPTIONAL { ?z ex:next ?x } } "
+                + "OPTIONAL { ?x ex:next* ?y } }";
+
+        // the solution without the start is compatible with every solution of the walk
+        List<List<RdfTerm>> rows = execute(query);
+        assertThat(rows, hasSize(21));
+        assertThat(rows, hasItem(row(string("zero"), thing, thing)));
+        assertThat(rows, hasItem(row(string("zero"), node(2), node(0))));
+        assertThat(rows, hasItem(row(string("two"), node(1), node(0))));
+        assertThat(translate(query), containsString("LEFT JOIN"));
     }
 
 

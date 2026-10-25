@@ -278,6 +278,28 @@ public final class SqlBind extends SqlIntercode
     }
 
 
+    /**
+     * The solutions being extended.
+     *
+     * @return the solutions being extended
+     */
+    public final SqlIntercode getChild()
+    {
+        return child;
+    }
+
+
+    /**
+     * The bound variable.
+     *
+     * @return the bound variable
+     */
+    public final Variable getVariable()
+    {
+        return variable;
+    }
+
+
     @Override
     public boolean isDistinct(Request request, Collection<Variable> selected)
     {

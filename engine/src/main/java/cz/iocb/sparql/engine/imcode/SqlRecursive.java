@@ -37,7 +37,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * recursion carries the start and graph variables along unchanged, and so every other variable of the initial solutions
  * the parent needs: a join seeds a walk with its siblings (see {@link #seed}), whose solutions then start the recursion
  * and whose variables it delivers in place of the join. When the parent needs neither an end of the walk nor the
- * multiplicities, the walk reduces to its initial solutions, which reach the same nodes (see {@link #optimize}).
+ * multiplicities, the walk reduces to its initial solutions, which reach the same nodes (see {@link #optimize}), and
+ * since the zero-length paths match every node, an OPTIONAL walk of zero or more steps from nodes the left side binds
+ * always is a join (see {@link #matchesEverySolutionOf}).
  */
 public final class SqlRecursive extends SqlIntercode
 {
@@ -443,6 +445,82 @@ public final class SqlRecursive extends SqlIntercode
     {
         return binding != null && other != null && !binding.canBeNull() && !other.canBeNull()
                 && binding.getMappings().equals(other.getMappings());
+    }
+
+
+    /**
+     * True if the walk has a solution for every solution of the node, so that a left join with the walk is a join (see
+     * {@link SqlLeftJoin#optimize}): the walk is one of zero or more steps between two variables, the node binds one of
+     * them always and shares no other variable with the walk but the graph, and every solution of the node takes the
+     * variable (and the graph) from a source of the nodes of the graph, which the zero-length paths enumerate, so that
+     * a zero-length path matches it.
+     *
+     * @param node the node
+     * @return true if the walk has a solution for every solution of the node, false otherwise
+     */
+    protected boolean matchesEverySolutionOf(SqlIntercode node)
+    {
+        if(beginVar == null)
+            return false;
+
+        Variable endVar = endBinding.getVariable();
+        VariableBindings nodeBindings = node.getVariableBindings();
+
+        Variable startVar = nodeBindings.get(beginVar) != null ? beginVar : endVar;
+        VariableBinding binding = nodeBindings.get(startVar);
+
+        if(binding == null || binding.canBeNull())
+            return false;
+
+        for(Variable variable : nodeBindings.getVariables())
+            if(!variable.equals(startVar) && !variable.equals(graphVar) && getVariableBindings().get(variable) != null)
+                return false;
+
+        return bindsNodes(node, startVar, startVar.equals(beginVar) ? endVar : beginVar);
+    }
+
+
+    /**
+     * True if every solution of the node takes the variable (and the graph variable) from a source of the nodes of the
+     * graph enumerated by the zero-length paths of the walk (see {@link #enumeratesNodesOf}): the node is such a table
+     * access, a join with such a child, a union of such nodes, a filter, a deduplication or a bind of another variable
+     * over such a node, or an OPTIONAL or MINUS whose left side is such a node.
+     *
+     * @param node the node
+     * @param startVar the variable, an end of the walk
+     * @param otherVar the other end of the walk
+     * @return true if every solution of the node takes the variable from a source of the nodes, false otherwise
+     */
+    private boolean bindsNodes(SqlIntercode node, Variable startVar, Variable otherVar)
+    {
+        if(node instanceof SqlTableAccess access)
+            return enumeratesNodesOf(init, access, startVar, otherVar);
+
+        if(node instanceof SqlJoin join)
+            return join.getChilds().stream().anyMatch(child -> bindsNodes(child, startVar, otherVar));
+
+        if(node instanceof SqlUnion union)
+            return union.getChilds().stream().allMatch(child -> bindsNodes(child, startVar, otherVar));
+
+        if(node instanceof SqlFilter filter)
+            return bindsNodes(filter.getChild(), startVar, otherVar);
+
+        if(node instanceof SqlDistinct distinct)
+            return bindsNodes(distinct.getChild(), startVar, otherVar);
+
+        if(node instanceof SqlBind bind)
+            return !bind.getVariable().equals(startVar) && bindsNodes(bind.getChild(), startVar, otherVar);
+
+        if(node instanceof SqlLeftJoin join)
+            return bindsNodes(join.getLeft(), startVar, otherVar);
+
+        if(node instanceof SqlMinus minus)
+            return bindsNodes(minus.getLeft(), startVar, otherVar);
+
+        if(node instanceof SqlStripConstantColumns strip)
+            return bindsNodes(strip.getChild(), startVar, otherVar);
+
+        return false;
     }
 
 

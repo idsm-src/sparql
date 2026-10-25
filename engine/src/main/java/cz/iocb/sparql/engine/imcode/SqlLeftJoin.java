@@ -36,7 +36,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * Left outer join implementing OPTIONAL: every solution of the left side is kept, extended by the compatible solutions
  * of the right side that satisfy the conditions, or by unbound variables when there is none. A leading OPTIONAL (the
  * left side being the single empty solution) whose variables are joined later stands for a union instead (see
- * {@link #toUnion}).
+ * {@link #toUnion}), and an OPTIONAL walk of zero or more steps from nodes the left side binds always, which has a
+ * solution for every solution of the left side, is a join (see {@link SqlRecursive#matchesEverySolutionOf}).
  */
 public final class SqlLeftJoin extends SqlIntercode
 {
@@ -338,10 +339,6 @@ public final class SqlLeftJoin extends SqlIntercode
                 || !isJoinable(relations, optLeft, optRight, optConditions))
             return optLeft.optimize(request, restrictions, optReduced, evalServices);
 
-        //FIXME: valid only if it is ensured that optRight has at least one solution
-        //if(isJoinConditionAlwaysTrue(optLeft.variables, optRight.getVariables()) && optConditions.isEmpty())
-        //    return SqlJoin.join(request, optLeft, optRight).optimize(request, restrictions, optReduced, evalServices);
-
         if(optLeft instanceof SqlLeftJoin join && join.isLeadingOptional() && !Collections
                 .disjoint(optLeft.getVariableBindings().getVariables(), optRight.getVariableBindings().getVariables()))
             optLeft = join.toUnion(request, evalServices);
@@ -360,6 +357,12 @@ public final class SqlLeftJoin extends SqlIntercode
 
             return SqlUnion.union(request, unionList).optimize(request, restrictions, optReduced, evalServices);
         }
+
+        // the zero-length paths of a walk match every node of the graph, so a walk of zero or more steps from nodes
+        // the left side always binds has a solution for every solution of the left side: the OPTIONAL is a join (which
+        // may then seed the walk with the left side)
+        if(optConditions.isEmpty() && optRight instanceof SqlRecursive walk && walk.matchesEverySolutionOf(optLeft))
+            return SqlJoin.join(request, optLeft, optRight).optimize(request, restrictions, optReduced, evalServices);
 
         if(optLeft instanceof SqlTableAccess l && optRight instanceof SqlTableAccess r && optConditions.isEmpty())
         {
