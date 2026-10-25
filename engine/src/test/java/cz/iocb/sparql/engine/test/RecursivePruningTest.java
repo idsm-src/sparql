@@ -587,6 +587,29 @@ public class RecursivePruningTest
 
 
     @Test
+    @DisplayName("a seeded walk keeps the end variable a sibling joins")
+    void seededWalkKeepsSiblingEnd() throws Exception
+    {
+        String query = "SELECT ?x ?l ?z WHERE { ?x ex:label ?l . ?x ex:next* ?y . ?y ex:link ?z }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(3), string("three"), thing), row(node(3), string("three"), node(2))));
+        assertThat(reads(translate(query), "labels"), is(1));
+    }
+
+
+    @Test
+    @DisplayName("an EXISTS keeps the walk whose end a sibling joins")
+    void existsKeepsWalkWithJoinedEnd() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { ?x ex:next+ ?o . ?o ex:label 'zero' } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(1)), row(node(2)), row(node(3))));
+        assertThat(translate(query), containsString("WITH RECURSIVE"));
+    }
+
+
+    @Test
     @DisplayName("a sibling that is not distinct over the start does not seed the walk")
     void nonDistinctSiblingKeepsWalk() throws Exception
     {

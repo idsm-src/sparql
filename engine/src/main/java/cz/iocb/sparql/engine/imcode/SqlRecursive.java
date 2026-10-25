@@ -296,7 +296,7 @@ public final class SqlRecursive extends SqlIntercode
      * @param request the current request
      * @param seeds the siblings seeding the walk, every one distinct over the start variable and binding it always
      * @param fromEnd true when the seeds bind the end variable, so that the walk is turned (see {@link #reverseNext})
-     * @param restrictions what the parent needs of the variables
+     * @param restrictions what the parent and the siblings of the walk need of its variables
      * @return the seeded walk
      */
     protected SqlIntercode seed(Request request, List<SqlIntercode> seeds, boolean fromEnd, Restrictions restrictions)

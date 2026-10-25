@@ -947,7 +947,11 @@ public final class SqlJoin extends SqlIntercode
                 if(j != i && !seeds.contains(j))
                     result.add(childs.get(j));
 
-            result.add(walk.seed(request, seeds.stream().map(j -> childs.get(j)).toList(), fromEnd, restrictions));
+            // the seeded walk exposes what the parent and the remaining siblings need of it (the needs of the parent
+            // alone would drop an end variable a sibling joins)
+            Restrictions walkRestrictions = getRestrictions(request.getConfiguration(), walk, childs, restrictions);
+
+            result.add(walk.seed(request, seeds.stream().map(j -> childs.get(j)).toList(), fromEnd, walkRestrictions));
 
             return result;
         }
