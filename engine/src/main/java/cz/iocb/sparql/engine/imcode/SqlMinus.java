@@ -21,7 +21,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 /**
  * Set difference (MINUS): the solutions of the left side for which there is no compatible solution of the right side
- * sharing at least one bound variable.
+ * sharing at least one bound variable. A walk on the right side whose start the left side binds always is seeded with
+ * the distinct values of the start read from the left side, shared so that the statement evaluates it once (see
+ * {@link SqlShared}).
  */
 public final class SqlMinus extends SqlIntercode
 {
@@ -136,9 +138,28 @@ public final class SqlMinus extends SqlIntercode
         Restrictions rightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
                 optLeft.getVariableBindings(), new Restrictions(), true);
 
+        boolean offered = false;
+
         while(true)
         {
             optLeft = optLeft.optimize(request, leftRestrictions, leftReduced, evalServices);
+
+            // a join on the right side holding a walk whose start the left side binds always is offered the distinct
+            // values of the start read from the left side, shared so that the statement evaluates it once, before its
+            // own siblings seed the walk (a walk alone is offered them after the loop)
+            if(!offered && !(optLeft instanceof SqlShared) && !SqlRecursive.isWalkAlone(optRight))
+            {
+                offered = true;
+
+                Variable seedVar = SqlRecursive.seedVariable(optRight, optLeft.getVariableBindings());
+
+                if(seedVar != null && SqlShared.canShare(request, optLeft))
+                {
+                    optLeft = SqlShared.share(optLeft);
+                    optRight = SqlJoin.join(request, SqlShared.seed(request, optLeft, seedVar, evalServices), optRight);
+                }
+            }
+
             optRight = optRight.optimize(request, rightRestrictions, true, evalServices);
 
             if(optRight instanceof SqlUnion union)
@@ -196,6 +217,20 @@ public final class SqlMinus extends SqlIntercode
             return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
         }
 
+
+        // a walk on the right side whose start the left side binds always is seeded with the distinct values of the
+        // start read from the left side, shared so that the statement evaluates it once
+        Variable seedVar = optLeft instanceof SqlShared ? null :
+                SqlRecursive.seedVariable(optRight, optLeft.getVariableBindings());
+
+        if(seedVar != null && SqlShared.canShare(request, optLeft))
+        {
+            SqlIntercode shared = SqlShared.share(optLeft);
+            SqlIntercode seed = SqlShared.seed(request, shared, seedVar, evalServices);
+
+            return minus(request, shared, SqlJoin.join(request, seed, optRight), graph, restrictions).optimize(request,
+                    restrictions, reduced, evalServices);
+        }
 
         if(restrictions.isOptimized(relations, bindings) && optLeft == left && optRight == right)
             return this;

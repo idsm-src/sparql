@@ -124,6 +124,12 @@ public final class SqlRecursive extends SqlIntercode
      */
     private final Set<Variable> carried;
 
+    /**
+     * True when the initial solutions are seeds taken from the siblings (see {@link #seed}); such a walk is seeded no
+     * more.
+     */
+    public final boolean seeded;
+
 
     /**
      * Creates the node.
@@ -140,10 +146,11 @@ public final class SqlRecursive extends SqlIntercode
      * @param reverseNext the step of the walk in the other direction, or null
      * @param reverseJoinVar variable of the reverse step bound to the node it reaches, or null
      * @param carried variables of the initial solutions carried through the recursion
+     * @param seeded whether the initial solutions are seeds taken from the siblings
      */
     protected SqlRecursive(VariableBindings bindings, SqlIntercode init, SqlIntercode next, VariableBinding endBinding,
             Variable joinVar, Variable beginVar, List<Column> iv, List<Column> ev, Variable graphVar,
-            SqlIntercode reverseNext, Variable reverseJoinVar, Set<Variable> carried)
+            SqlIntercode reverseNext, Variable reverseJoinVar, Set<Variable> carried, boolean seeded)
     {
         super(bindings, init.isDeterministic() && next.isDeterministic());
         this.init = init;
@@ -157,6 +164,7 @@ public final class SqlRecursive extends SqlIntercode
         this.reverseNext = reverseNext;
         this.reverseJoinVar = reverseJoinVar;
         this.carried = carried;
+        this.seeded = seeded;
     }
 
 
@@ -177,7 +185,7 @@ public final class SqlRecursive extends SqlIntercode
     public static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, Variable beginVar,
             Variable joinVar, Variable endVar, Variable graphVar)
     {
-        return create(request, init, next, beginVar, joinVar, endVar, graphVar, null, null, null);
+        return create(request, init, next, beginVar, joinVar, endVar, graphVar, null, null, null, false);
     }
 
 
@@ -199,7 +207,8 @@ public final class SqlRecursive extends SqlIntercode
     public static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, Variable beginVar,
             Variable joinVar, Variable endVar, Variable graphVar, SqlIntercode reverseNext, Variable reverseJoinVar)
     {
-        return create(request, init, next, beginVar, joinVar, endVar, graphVar, null, reverseNext, reverseJoinVar);
+        return create(request, init, next, beginVar, joinVar, endVar, graphVar, null, reverseNext, reverseJoinVar,
+                false);
     }
 
 
@@ -219,11 +228,12 @@ public final class SqlRecursive extends SqlIntercode
      * @param restrictions what the parent needs of the variables; null to carry the start and graph variables alone
      * @param reverseNext the step of the walk in the other direction, or null
      * @param reverseJoinVar variable of the reverse step bound to the node it reaches, or null
+     * @param seeded whether the initial solutions are seeds taken from the siblings
      * @return recursion exposing only what the parent needs; the carried variables get fresh output columns
      */
     protected static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, Variable beginVar,
             Variable joinVar, Variable endVar, Variable graphVar, Restrictions restrictions, SqlIntercode reverseNext,
-            Variable reverseJoinVar)
+            Variable reverseJoinVar, boolean seeded)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -279,7 +289,7 @@ public final class SqlRecursive extends SqlIntercode
         List<Column> outerColumns = innerColumns.stream().map(c -> map.get(c)).toList();
 
         return new SqlRecursive(bindings.restrict(relations, restrictions), init, next, endBinding, joinVar, beginVar,
-                innerColumns, outerColumns, graphVar, reverseNext, reverseJoinVar, carried.getVariables());
+                innerColumns, outerColumns, graphVar, reverseNext, reverseJoinVar, carried.getVariables(), seeded);
     }
 
 
@@ -317,9 +327,9 @@ public final class SqlRecursive extends SqlIntercode
 
         if(fromEnd)
             return create(request, seeded, reverseNext, startVar, reverseJoinVar, stopVar, graphVar, seedRestrictions,
-                    null, null);
+                    null, null, true);
 
-        return create(request, seeded, next, startVar, joinVar, stopVar, graphVar, seedRestrictions, null, null);
+        return create(request, seeded, next, startVar, joinVar, stopVar, graphVar, seedRestrictions, null, null, true);
     }
 
 
@@ -356,7 +366,7 @@ public final class SqlRecursive extends SqlIntercode
 
     /**
      * The seeds joined with the initial solutions: branch by branch of a union, under the deduplication of the
-     * zero-length paths when the seeds are plain table accesses or values, and as a whole otherwise.
+     * zero-length paths when the seeds are plain table accesses, values or shared solutions, and as a whole otherwise.
      *
      * @param request the current request
      * @param seeds the siblings seeding the walk
@@ -369,8 +379,8 @@ public final class SqlRecursive extends SqlIntercode
             return SqlUnion.union(request,
                     union.getChilds().stream().map(branch -> joinSeeds(request, seeds, branch)).toList());
 
-        if(init instanceof SqlDistinct distinct
-                && seeds.stream().allMatch(s -> s instanceof SqlTableAccess || s instanceof SqlValues))
+        if(init instanceof SqlDistinct distinct && seeds.stream()
+                .allMatch(s -> s instanceof SqlTableAccess || s instanceof SqlValues || s instanceof SqlShared))
         {
             // the seeds are distinct over the variables they share with the deduplicated solutions, so the join may
             // be deduplicated as a whole
@@ -445,6 +455,70 @@ public final class SqlRecursive extends SqlIntercode
     {
         return binding != null && other != null && !binding.canBeNull() && !other.canBeNull()
                 && binding.getMappings().equals(other.getMappings());
+    }
+
+
+    /**
+     * The variable from which a walk in the node may be seeded with the values the bindings give it: an end of a walk
+     * between two variables, not seeded yet, that the bindings bind always (the begin before the end), the node being
+     * the walk or a join holding it; null when there is none. The seeds have to be distinct over the variable (see
+     * {@link SqlShared#seed}).
+     *
+     * @param node the node
+     * @param bindings the bindings
+     * @return the variable from which a walk in the node may be seeded, or null when there is none
+     */
+    protected static Variable seedVariable(SqlIntercode node, VariableBindings bindings)
+    {
+        if(node instanceof SqlJoin join)
+        {
+            for(SqlIntercode child : join.getChilds())
+            {
+                Variable variable = seedVariable(child, bindings);
+
+                if(variable != null)
+                    return variable;
+            }
+
+            return null;
+        }
+
+        if(!(node instanceof SqlRecursive walk) || walk.beginVar == null || walk.seeded)
+            return null;
+
+        VariableBinding begin = bindings.get(walk.beginVar);
+        VariableBinding end = bindings.get(walk.endBinding.getVariable());
+
+        if(begin != null && !begin.canBeNull())
+            return walk.beginVar;
+
+        if(walk.reverseNext != null && end != null && !end.canBeNull())
+            return walk.endBinding.getVariable();
+
+        return null;
+    }
+
+
+    /**
+     * True if the node is a walk alone: a walk, or a join of a walk with empty solutions only, as a group pattern
+     * holding nothing but a walk is translated. Such a walk is offered the values of the other side of an OPTIONAL or
+     * MINUS once optimised, when it may still turn the OPTIONAL into a join (see {@link #matchesEverySolutionOf}),
+     * whereas a walk with siblings is offered them first, before the siblings seed it.
+     *
+     * @param node the node
+     * @return true if the node is a walk alone, false otherwise
+     */
+    protected static boolean isWalkAlone(SqlIntercode node)
+    {
+        if(node instanceof SqlRecursive)
+            return true;
+
+        if(!(node instanceof SqlJoin join))
+            return false;
+
+        List<SqlIntercode> childs = join.getChilds().stream().filter(c -> !c.equals(SqlEmptySolution.get())).toList();
+
+        return childs.size() == 1 && isWalkAlone(childs.get(0));
     }
 
 
@@ -579,7 +653,7 @@ public final class SqlRecursive extends SqlIntercode
         // way round, with the end variable for the start and the start variable for the end
         if(reverseNext != null && startsBetterFromEnd(restrictions))
             return create(request, init, reverseNext, endBinding.getVariable(), reverseJoinVar, beginVar, graphVar,
-                    restrictions, next, joinVar).optimize(request, restrictions, reduced, evalServices);
+                    restrictions, next, joinVar, seeded).optimize(request, restrictions, reduced, evalServices);
 
         Variable endVar = endBinding.getVariable();
 
@@ -617,7 +691,7 @@ public final class SqlRecursive extends SqlIntercode
 
                 for(SqlIntercode child : segs)
                     childs.add(create(request, child, nextOpt, beginVar, joinVar, endBinding.getVariable(), graphVar,
-                            restrictions, reverseNext, reverseJoinVar));
+                            restrictions, reverseNext, reverseJoinVar, seeded));
 
                 // the segments are walks, which care about the multiplicities as much as their parent does
                 return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
@@ -681,7 +755,7 @@ public final class SqlRecursive extends SqlIntercode
             return this;
 
         return create(request, initOpt, nextOpt, beginVar, joinVar, endBinding.getVariable(), graphVar, restrictions,
-                reverseNext, reverseJoinVar);
+                reverseNext, reverseJoinVar, seeded);
     }
 
 

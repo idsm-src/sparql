@@ -42,8 +42,10 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * Natural join of several children on their shared variables. Optimisation flattens nested joins, merges accesses to
  * the same table or along keys ({@link SqlTableAccess}), distributes the join over unions (a leading OPTIONAL sharing a
  * variable with another child being turned into one first, see {@link SqlLeftJoin#toUnion}), seeds the walks of
- * property paths with the siblings that bind their start (see {@link SqlRecursive#seed}), evaluates nondeterministic
- * children last, and decides the evaluation of SERVICE stubs by row estimates when service reordering is enabled.
+ * property paths with the siblings that bind their start (see {@link SqlRecursive#seed}; a walk binding the start
+ * without being distinct over it is shared, so that its distinct values seed the other walk, see {@link SqlShared}),
+ * evaluates nondeterministic children last, and decides the evaluation of SERVICE stubs by row estimates when service
+ * reordering is enabled.
  */
 public final class SqlJoin extends SqlIntercode
 {
@@ -188,6 +190,7 @@ public final class SqlJoin extends SqlIntercode
 
             newChilds = expandLeadingOptionals(request, newChilds, evalServices);
             newChilds = seedWalks(request, newChilds, newRestrictions);
+            newChilds = shareSeeds(request, newChilds, evalServices);
 
             if(!Objects.equals(new Multiset<>(newChilds), new Multiset<>(optChilds)))
                 optChilds = newChilds;
@@ -923,7 +926,7 @@ public final class SqlJoin extends SqlIntercode
     {
         for(int i = 0; i < childs.size(); i++)
         {
-            if(!(childs.get(i) instanceof SqlRecursive walk) || walk.beginVar == null)
+            if(!(childs.get(i) instanceof SqlRecursive walk) || walk.beginVar == null || walk.seeded)
                 continue;
 
             Variable beginVar = walk.beginVar;
@@ -962,9 +965,63 @@ public final class SqlJoin extends SqlIntercode
 
 
     /**
+     * Shares the first walk that binds an end of another walk, not seeded yet, always, without binding its other end
+     * (the walks of a chain), so that the distinct values of the end read from it seed the other walk (see
+     * {@link SqlShared#seed}) while it keeps its place: the walk is replaced by its shared form and the seeds join the
+     * children, to be taken into the other walk by {@link #seedWalks} in the next round. Nothing is shared when the
+     * other walk has siblings that seed it directly.
+     *
+     * @param request the current request
+     * @param childs the child nodes
+     * @param evalServices whether SERVICE stubs are evaluated
+     * @return the children, with the first such walk shared and the seeds read from it added
+     */
+    private static List<SqlIntercode> shareSeeds(Request request, List<SqlIntercode> childs, boolean evalServices)
+    {
+        for(int i = 0; i < childs.size(); i++)
+        {
+            if(!(childs.get(i) instanceof SqlRecursive walk) || walk.beginVar == null || walk.seeded)
+                continue;
+
+            Variable beginVar = walk.beginVar;
+            Variable endVar = walk.endBinding.getVariable();
+
+            for(Variable variable : walk.reverseNext != null ? List.of(beginVar, endVar) : List.of(beginVar))
+            {
+                Variable other = variable.equals(beginVar) ? endVar : beginVar;
+
+                if(!selectSeeds(request, childs, i, variable, other).isEmpty())
+                    continue;
+
+                for(int j = 0; j < childs.size(); j++)
+                {
+                    SqlIntercode child = childs.get(j);
+                    VariableBinding binding = child.getVariable(variable);
+
+                    if(j == i || !(child instanceof SqlRecursive) || binding == null || binding.canBeNull()
+                            || child.getVariable(other) != null || !SqlShared.canShare(request, child))
+                        continue;
+
+                    SqlIntercode shared = SqlShared.share(child);
+
+                    List<SqlIntercode> result = new ArrayList<>(childs);
+                    result.set(j, shared);
+                    result.add(SqlShared.seed(request, shared, variable, evalServices));
+
+                    return result;
+                }
+            }
+        }
+
+        return childs;
+    }
+
+
+    /**
      * How many rows the seeds are expected to have, roughly, without asking the database: 0 when one of them is inline
      * data, 1 when one of them is a table access restricted by a constant, 2 otherwise (whole tables, or anything
-     * else). Joined together, the seeds have no more rows than the smallest of them.
+     * else); the distinct values read from shared solutions (see {@link SqlShared#seed}) count as the solutions they
+     * are read from. Joined together, the seeds have no more rows than the smallest of them.
      *
      * @param childs the child nodes
      * @param seeds indexes of the seeds
@@ -977,6 +1034,9 @@ public final class SqlJoin extends SqlIntercode
         for(int i : seeds)
         {
             SqlIntercode seed = childs.get(i);
+
+            while(seed instanceof SqlShared || seed instanceof SqlDistinct)
+                seed = seed instanceof SqlShared shared ? shared.getChild() : ((SqlDistinct) seed).getChild();
 
             if(seed instanceof SqlValues)
                 return 0;

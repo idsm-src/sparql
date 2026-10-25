@@ -65,7 +65,9 @@ import cz.iocb.sparql.testing.Database;
  * has a path iff it has a zero-length path or a first step. An OPTIONAL walk of zero or more steps from nodes the left
  * side binds always is a join, as the zero-length paths match every node, and the left side then seeds it. An EXISTS
  * whose pattern joins the current solution plainly compares the pattern with the solution instead of evaluating it for
- * every solution, so that the database may turn the test into a semi-join.
+ * every solution, so that the database may turn the test into a semi-join. A node that binds the start of a walk
+ * without being distinct over it, or the left side of an OPTIONAL or MINUS, is shared as a common table expression, so
+ * that its distinct starts seed the walk while it is evaluated once.
  */
 public class RecursivePruningTest
 {
@@ -807,8 +809,8 @@ public class RecursivePruningTest
 
 
     @Test
-    @DisplayName("an OPTIONAL walk of one or more steps stays a left join")
-    void optionalFirstStepKept() throws Exception
+    @DisplayName("an OPTIONAL walk of one or more steps stays a left join, seeded with the shared left side")
+    void optionalFirstStepSeededByLeft() throws Exception
     {
         String query = "SELECT ?x ?l ?y WHERE { ?x ex:label ?l OPTIONAL { ?x ex:next+ ?y } }";
 
@@ -816,7 +818,81 @@ public class RecursivePruningTest
                 containsInAnyOrder(row(node(0), string("zero"), null), row(node(1), string("one"), node(0)),
                         row(node(2), string("two"), node(1)), row(node(2), string("two"), node(0)),
                         row(node(3), string("three"), node(0))));
-        assertThat(translate(query), containsString("LEFT JOIN"));
+        // the labels are evaluated once, as a common table expression, whose nodes (distinct by the key) start the
+        // recursion, carrying nothing but the node
+        String sql = translate(query);
+        assertThat(sql, containsString("LEFT JOIN"));
+        assertThat(reads(sql, "labels"), is(1));
+        assertThat(sql.indexOf("\"cte0\"", sql.indexOf("WITH RECURSIVE")), greaterThan(0));
+        assertThat(sql.substring(sql.indexOf("WITH RECURSIVE")), not(containsString("\"l#string_par0\"")));
+    }
+
+
+    @Test
+    @DisplayName("the other walk of a chain, shared, seeds the walk with its distinct ends")
+    void chainSeededBySharedWalk() throws Exception
+    {
+        String query = "SELECT ?a ?b ?c WHERE { ?a ex:next* ?b . ?b ex:next+ ?c }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(1), node(1), node(0)), row(node(2), node(1), node(0)),
+                row(node(2), node(2), node(1)), row(node(2), node(2), node(0)), row(node(3), node(3), node(0))));
+        // the first walk is a common table expression, its distinct ends another one, read by the second walk
+        String sql = translate(query);
+        assertThat(sql.split("WITH RECURSIVE").length - 1, is(2));
+        assertThat(sql, containsString("\"cte1\" AS (SELECT"));
+        assertThat(sql.indexOf("\"cte1\"", sql.lastIndexOf("WITH RECURSIVE")), greaterThan(0));
+    }
+
+
+    @Test
+    @DisplayName("a MINUS seeds the walk on its right side with the shared left side")
+    void minusSeededBySharedLeft() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:label ?l MINUS { ?x ex:next+ ?y . ?y ex:sub ?p } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(0)), row(node(1)), row(node(3))));
+        String sql = translate(query);
+        assertThat(sql, containsString("NOT EXISTS"));
+        assertThat(reads(sql, "labels"), is(1));
+        assertThat(sql.indexOf("\"cte0\"", sql.indexOf("WITH RECURSIVE")), greaterThan(0));
+    }
+
+
+    @Test
+    @DisplayName("the shared left side of an OPTIONAL is offered to the walk before its siblings seed it")
+    void optionalLeftOfferedBeforeSiblings() throws Exception
+    {
+        String query = "SELECT ?x ?y ?l WHERE { ?x ex:label 'zero' OPTIONAL { ?y ex:next+ ?x . ?y ex:label ?l } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(0), node(1), string("one")),
+                row(node(0), node(2), string("two")), row(node(0), node(3), string("three"))));
+        // the single node of the left side starts the recursion, turned, rather than all the labelled nodes
+        String sql = translate(query);
+        assertThat(sql.indexOf("\"cte0\"", sql.indexOf("WITH RECURSIVE")), greaterThan(0));
+    }
+
+
+    @Test
+    @DisplayName("the shared left side of a MINUS is offered to the walk before its siblings seed it")
+    void minusLeftOfferedBeforeSiblings() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:label 'three' MINUS { ?y ex:next+ ?x . ?y ex:label ?l } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(3))));
+        String sql = translate(query);
+        assertThat(sql.indexOf("\"cte0\"", sql.indexOf("WITH RECURSIVE")), greaterThan(0));
+    }
+
+
+    @Test
+    @DisplayName("nothing inside an EXISTS pattern is shared, as its SQL stands outside the statement")
+    void existsPatternNotShared() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:label ?l "
+                + "FILTER EXISTS { ?x ex:next ?y OPTIONAL { ?y ex:next+ ?w . ?w ex:label ?q } } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(1)), row(node(2)), row(node(3))));
+        assertThat(translate(query), not(containsString("\"cte")));
     }
 
 

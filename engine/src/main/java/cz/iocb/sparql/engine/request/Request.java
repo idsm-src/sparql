@@ -250,6 +250,11 @@ public class Request implements AutoCloseable
     private LinkedHashMap<String, AliasTable> commonTableExpressions = null;
 
     /**
+     * Depth of the patterns of expressions being optimised (see {@link #isWithinExpression}).
+     */
+    private int expressionDepth = 0;
+
+    /**
      * Start of the execution in {@link System#nanoTime} units.
      */
     private long begin;
@@ -883,6 +888,37 @@ public class Request implements AutoCloseable
         LinkedHashMap<String, AliasTable> result = commonTableExpressions;
         commonTableExpressions = null;
         return result;
+    }
+
+
+    /**
+     * Begins the optimisation of a pattern of an expression (see {@link #isWithinExpression}).
+     */
+    public void beginExpression()
+    {
+        expressionDepth++;
+    }
+
+
+    /**
+     * Ends the optimisation of a pattern of an expression (see {@link #beginExpression}).
+     */
+    public void endExpression()
+    {
+        expressionDepth--;
+    }
+
+
+    /**
+     * True while a pattern of an expression is being optimised: its SQL is rendered into the expression at once,
+     * outside the translation of a statement, so nothing in it can be declared as a common table expression of the
+     * statement.
+     *
+     * @return true while a pattern of an expression is being optimised, false otherwise
+     */
+    public boolean isWithinExpression()
+    {
+        return expressionDepth > 0;
     }
 
 

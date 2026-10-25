@@ -361,13 +361,23 @@ public final class SqlExists extends SqlExpressionIntercode
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
-        //NOTE: only the existence of a solution matters, no column of the pattern is needed
-        SqlIntercode optPattern = pattern.optimize(request, new Restrictions(), true, evalServices);
+        // the SQL of the pattern is rendered into the expression at once, outside a statement
+        request.beginExpression();
 
-        if(optPattern == pattern && bindings.equals(this.bindings) && optimized)
-            return this;
+        try
+        {
+            //NOTE: only the existence of a solution matters, no column of the pattern is needed
+            SqlIntercode optPattern = pattern.optimize(request, new Restrictions(), true, evalServices);
 
-        return create(request, negated, optPattern, bindings, context, restriction, true, evalServices);
+            if(optPattern == pattern && bindings.equals(this.bindings) && optimized)
+                return this;
+
+            return create(request, negated, optPattern, bindings, context, restriction, true, evalServices);
+        }
+        finally
+        {
+            request.endExpression();
+        }
     }
 
 

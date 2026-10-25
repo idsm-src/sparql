@@ -37,7 +37,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * of the right side that satisfy the conditions, or by unbound variables when there is none. A leading OPTIONAL (the
  * left side being the single empty solution) whose variables are joined later stands for a union instead (see
  * {@link #toUnion}), and an OPTIONAL walk of zero or more steps from nodes the left side binds always, which has a
- * solution for every solution of the left side, is a join (see {@link SqlRecursive#matchesEverySolutionOf}).
+ * solution for every solution of the left side, is a join (see {@link SqlRecursive#matchesEverySolutionOf}). Another
+ * walk on the right side whose start the left side binds always is seeded with the distinct values of the start read
+ * from the left side, shared so that the statement evaluates it once (see {@link SqlShared}).
  */
 public final class SqlLeftJoin extends SqlIntercode
 {
@@ -280,9 +282,28 @@ public final class SqlLeftJoin extends SqlIntercode
         rightRestrictions.add(accepted);
 
 
+        boolean offered = false;
+
         while(true)
         {
             optLeft = optLeft.optimize(request, leftRestrictions, optReduced, evalServices);
+
+            // a join on the right side holding a walk whose start the left side binds always is offered the distinct
+            // values of the start read from the left side, shared so that the statement evaluates it once, before its
+            // own siblings seed the walk (a walk alone is offered them after the loop, when it has not become a join)
+            if(!offered && !(optLeft instanceof SqlShared) && !SqlRecursive.isWalkAlone(optRight))
+            {
+                offered = true;
+
+                Variable seedVar = SqlRecursive.seedVariable(optRight, optLeft.getVariableBindings());
+
+                if(seedVar != null && SqlShared.canShare(request, optLeft))
+                {
+                    optLeft = SqlShared.share(optLeft);
+                    optRight = SqlJoin.join(request, SqlShared.seed(request, optLeft, seedVar, evalServices), optRight);
+                }
+            }
+
             optRight = optRight.optimize(request, rightRestrictions, optReduced, evalServices);
             optConditions = optimize(request, optConditions, optLeft.getVariableBindings(),
                     optRight.getVariableBindings(), evalServices);
@@ -363,6 +384,20 @@ public final class SqlLeftJoin extends SqlIntercode
         // may then seed the walk with the left side)
         if(optConditions.isEmpty() && optRight instanceof SqlRecursive walk && walk.matchesEverySolutionOf(optLeft))
             return SqlJoin.join(request, optLeft, optRight).optimize(request, restrictions, optReduced, evalServices);
+
+        // a walk on the right side whose start the left side binds always is seeded with the distinct values of the
+        // start read from the left side, shared so that the statement evaluates it once
+        Variable seedVar = optLeft instanceof SqlShared ? null :
+                SqlRecursive.seedVariable(optRight, optLeft.getVariableBindings());
+
+        if(seedVar != null && SqlShared.canShare(request, optLeft))
+        {
+            SqlIntercode shared = SqlShared.share(optLeft);
+            SqlIntercode seed = SqlShared.seed(request, shared, seedVar, evalServices);
+
+            return leftJoin(request, shared, SqlJoin.join(request, seed, optRight), optConditions, restrictions)
+                    .optimize(request, restrictions, optReduced, evalServices);
+        }
 
         if(optLeft instanceof SqlTableAccess l && optRight instanceof SqlTableAccess r && optConditions.isEmpty())
         {
