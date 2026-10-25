@@ -17,12 +17,12 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 public class IriNode extends BaseComplexNode implements VarOrIri, Path
 {
     /**
-     * Grammar rule PN_CHARS_BASE as a regular expression.
+     * Grammar rule PN_CHARS_BASE as a regular expression; Java matches the characters above U+FFFF as code points.
      */
     private static String PN_CHARS_BASE = """
             ([A-Za-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\
-            \\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD]|\
-            [\\uD840-\\uDBBF][\\uDC00–\\uDFFF])""";
+            \\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\
+            \\x{10000}-\\x{EFFFF}])""";
 
     /**
      * Grammar rule PN_CHARS_U as a regular expression.

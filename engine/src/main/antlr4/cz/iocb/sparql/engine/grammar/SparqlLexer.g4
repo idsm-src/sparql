@@ -342,7 +342,7 @@ PN_CHARS_BASE
     | '\u3001'..'\uD7FF'
     | '\uF900'..'\uFDCF'
     | '\uFDF0'..'\uFFFD'
-    //| '\u10000'..'\uEFFFF'
+    | '\u{10000}'..'\u{EFFFF}'
     ;
 
 fragment
