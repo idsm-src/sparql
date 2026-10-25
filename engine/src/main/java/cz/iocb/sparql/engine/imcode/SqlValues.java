@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
@@ -30,7 +31,10 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 /**
  * Inline table of constant solutions (VALUES, or small SERVICE results). Every variable has fixed columns per resource
  * class; {@code data} holds the column values row by row and {@code resourceClasses} the class of each variable in each
- * row (null when unbound).
+ * row (null when unbound). The table is written as a common table expression of the statement (see
+ * {@link Request#getCommonTableExpression}), so that the statement evaluates it once however many times the
+ * optimisation has copied it, into the branches of a union or the sources of the nodes seeding a walk; outside a
+ * statement it is written in place.
  */
 public final class SqlValues extends SqlIntercode
 {
@@ -251,6 +255,24 @@ public final class SqlValues extends SqlIntercode
     @Override
     public String translate(Request request)
     {
+        String values = translateValues();
+
+        AliasTable table = request.getCommonTableExpression(values);
+
+        if(table == null)
+            return values;
+
+        return "SELECT " + translateColumns() + " FROM " + table;
+    }
+
+
+    /**
+     * SQL selecting the rows of the inline table from a VALUES list.
+     *
+     * @return SQL selecting the rows of the inline table from a VALUES list
+     */
+    private String translateValues()
+    {
         StringBuilder builder = new StringBuilder();
 
         builder.append("SELECT * FROM (VALUES ");
@@ -277,15 +299,24 @@ public final class SqlValues extends SqlIntercode
         }
 
         builder.append(") AS tab (");
-
-        if(data.size() > 0)
-            builder.append(data.keySet().stream().map(Object::toString).collect(joining(",")));
-        else
-            builder.append("\"#null\"");
-
+        builder.append(translateColumns());
         builder.append(")");
 
         return builder.toString();
+    }
+
+
+    /**
+     * The column list of the inline table: its non-constant columns, or a dummy column when it has none.
+     *
+     * @return the column list of the inline table
+     */
+    private String translateColumns()
+    {
+        if(data.isEmpty())
+            return "\"#null\"";
+
+        return data.keySet().stream().map(Object::toString).collect(joining(","));
     }
 
 

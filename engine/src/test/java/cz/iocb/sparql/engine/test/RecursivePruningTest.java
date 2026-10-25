@@ -715,6 +715,22 @@ public class RecursivePruningTest
 
 
     @Test
+    @DisplayName("an inline table copied into the sources of the nodes is evaluated once by the statement")
+    void valuesSeedShared() throws Exception
+    {
+        String query = "SELECT ?x ?y WHERE { VALUES ?x { <http://other.org/thing> <http://other.org/nothing> } "
+                + "?x ex:next* ?y }";
+
+        assertThat(execute(query), containsInAnyOrder(row(thing, thing)));
+        // every source of the nodes joins the inline table, written once as a common table expression of the statement
+        String sql = translate(query);
+        assertThat(sql, containsString("\"cte0\" AS (SELECT * FROM (VALUES"));
+        assertThat(sql.indexOf("(VALUES"), is(sql.lastIndexOf("(VALUES")));
+        assertThat(sql.indexOf("\"cte0\""), not(is(sql.lastIndexOf("\"cte0\""))));
+    }
+
+
+    @Test
     @DisplayName("an OPTIONAL walk of zero or more steps from nodes the left side binds is a join seeded with it")
     void optionalWalkJoined() throws Exception
     {
