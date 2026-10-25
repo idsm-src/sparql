@@ -112,9 +112,14 @@ public enum MessageType
     unimplementedFunction(ERROR, "Function '%s' is not implemented."),
 
     /**
-     * A function is called with a wrong number of arguments.
+     * A cast or a function without optional parameters is called with a wrong number of arguments.
      */
     wrongCountOfParameters(ERROR, "Function '%s' requires %d parameter(s)"),
+
+    /**
+     * A function with optional parameters is called with fewer arguments than it requires or more than it accepts.
+     */
+    wrongCountOfOptionalParameters(ERROR, "Function '%s' requires %d to %d parameter(s)"),
 
     /**
      * Internal error: an EXISTS expression could not be translated.

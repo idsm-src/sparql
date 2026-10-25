@@ -513,9 +513,16 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
                 messages.add(new TranslateMessage(MessageType.unimplementedFunction, iri.getRange(),
                         iri.toString(prologue)));
             else if(arguments.size() < definition.getRequiredArgumentCount()
-                    && arguments.size() > definition.getArgumentClasses().size())
-                messages.add(new TranslateMessage(MessageType.wrongCountOfParameters, iri.getRange(),
-                        iri.toString(prologue), definition.getArgumentClasses().size()));
+                    || arguments.size() > definition.getArgumentClasses().size())
+            {
+                if(definition.getRequiredArgumentCount() == definition.getArgumentClasses().size())
+                    messages.add(new TranslateMessage(MessageType.wrongCountOfParameters, iri.getRange(),
+                            iri.toString(prologue), definition.getArgumentClasses().size()));
+                else
+                    messages.add(new TranslateMessage(MessageType.wrongCountOfOptionalParameters, iri.getRange(),
+                            iri.toString(prologue), definition.getRequiredArgumentCount(),
+                            definition.getArgumentClasses().size()));
+            }
         }
 
         return result;
