@@ -36,7 +36,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * new {@code endVar}. {@code graphVar} carries the graph when the pattern is evaluated in a variable graph. The
  * recursion carries the start and graph variables along unchanged, and so every other variable of the initial solutions
  * the parent needs: a join seeds a walk with its siblings (see {@link #seed}), whose solutions then start the recursion
- * and whose variables it delivers in place of the join.
+ * and whose variables it delivers in place of the join. When the parent needs neither an end of the walk nor the
+ * multiplicities, the walk reduces to its initial solutions, which reach the same nodes (see {@link #optimize}).
  */
 public final class SqlRecursive extends SqlIntercode
 {
@@ -485,6 +486,15 @@ public final class SqlRecursive extends SqlIntercode
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
+        // when the parent needs neither an end of the walk nor the multiplicities (a DISTINCT over the other end, the
+        // right side of a MINUS, an EXISTS pattern), only the existence of a path from or to a node matters, and a node
+        // has a path iff it has an initial solution (a zero-length path, or a first step, whose last step is one too),
+        // so the walk reduces to its initial solutions; the begin may be left out only when the initial solutions
+        // start anywhere, which those of a seeded walk do not
+        if(reduced && (!restrictions.containsVar(endBinding.getVariable())
+                || reverseNext != null && !restrictions.containsVar(beginVar)))
+            return init.optimize(request, restrictions, true, evalServices);
+
         ClassRelations relations = request.getConfiguration();
 
         // a walk between two variables starts from the end the parent restricts more: the same step walked the other
@@ -531,7 +541,8 @@ public final class SqlRecursive extends SqlIntercode
                     childs.add(create(request, child, nextOpt, beginVar, joinVar, endBinding.getVariable(), graphVar,
                             restrictions, reverseNext, reverseJoinVar));
 
-                return SqlUnion.union(request, childs).optimize(request, restrictions, true, evalServices);
+                // the segments are walks, which care about the multiplicities as much as their parent does
+                return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
             }
         }
 

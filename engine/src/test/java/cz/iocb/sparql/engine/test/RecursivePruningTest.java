@@ -57,7 +57,9 @@ import cz.iocb.sparql.testing.Database;
  * two variables starts from the end the parent restricts more, and a sibling in a join that binds an end of the walk
  * always and distinct solutions over it (the labels, keyed by the node) seeds the walk: its solutions start the
  * recursion, which carries its variables along, so that it is evaluated once and the join needs it no more; read from a
- * source of the nodes, it replaces the zero-length paths altogether.
+ * source of the nodes, it replaces the zero-length paths altogether. A walk of which the parent needs only one end, and
+ * not the multiplicities (a DISTINCT over the end, a MINUS, an EXISTS), reduces to its initial solutions, since a node
+ * has a path iff it has a zero-length path or a first step.
  */
 public class RecursivePruningTest
 {
@@ -648,6 +650,75 @@ public class RecursivePruningTest
                         row(node(3), string("three"), node(3)), row(node(3), string("three"), node(0))));
         // the left side would be evaluated twice (as the seed and for the solutions kept without a partner)
         assertThat(translate(query), containsString("links"));
+    }
+
+
+    @Test
+    @DisplayName("a DISTINCT over the start of a walk needs only the zero-length paths")
+    void distinctStartReducedToZeroPaths() throws Exception
+    {
+        String query = "SELECT DISTINCT ?x WHERE { ?x ex:next* ?y }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(0)), row(node(1)), row(node(2)), row(node(3)), row(other(10)),
+                        row(other(11)), row(other(12)), row(other(20)), row(string("zero")), row(string("one")),
+                        row(string("two")), row(string("three")), row(thing)));
+        assertThat(translate(query), not(containsString("WITH RECURSIVE")));
+    }
+
+
+    @Test
+    @DisplayName("a DISTINCT over the start of a walk of one or more steps needs only the first step")
+    void distinctStartReducedToFirstStep() throws Exception
+    {
+        String query = "SELECT DISTINCT ?x WHERE { ?x ex:next+ ?y }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(1)), row(node(2)), row(node(3))));
+        assertThat(translate(query), not(containsString("WITH RECURSIVE")));
+    }
+
+
+    @Test
+    @DisplayName("a DISTINCT over the end of a walk of one or more steps needs only the first step")
+    void distinctEndReducedToFirstStep() throws Exception
+    {
+        String query = "SELECT DISTINCT ?y WHERE { ?x ex:next+ ?y }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(0)), row(node(1))));
+        assertThat(translate(query), not(containsString("WITH RECURSIVE")));
+    }
+
+
+    @Test
+    @DisplayName("a MINUS over a walk whose end it does not share tests only the first step")
+    void minusReducedToFirstStep() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:label ?l MINUS { ?x ex:next+ ?y } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(0))));
+        assertThat(translate(query), not(containsString("WITH RECURSIVE")));
+    }
+
+
+    @Test
+    @DisplayName("an EXISTS over a walk whose end is bound nowhere else tests only the first step")
+    void existsReducedToFirstStep() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { ?x ex:next+ ?y } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(1)), row(node(2)), row(node(3))));
+        assertThat(translate(query), not(containsString("WITH RECURSIVE")));
+    }
+
+
+    @Test
+    @DisplayName("the walk stays when its multiplicities matter")
+    void walkKeptForMultiplicities() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:next+ ?y }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(1)), row(node(2)), row(node(2)), row(node(3))));
+        assertThat(translate(query), containsString("WITH RECURSIVE"));
     }
 
 
