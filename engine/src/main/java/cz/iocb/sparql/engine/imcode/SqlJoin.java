@@ -909,10 +909,10 @@ public final class SqlJoin extends SqlIntercode
 
     /**
      * Seeds a walk between two variables with its siblings (see {@link SqlRecursive#seed}): the siblings that bind the
-     * start variable always and distinct solutions over it, without binding the end variable, or, when no sibling binds
-     * the start that way, those binding the end variable so, the walk being turned then. The seeds leave the join,
-     * carried through the recursion instead. One walk is seeded per call; the optimisation loop comes back for the
-     * others.
+     * start variable always and distinct solutions over it, without binding the end variable, or those binding the end
+     * variable so, the walk being turned then; when both ends have such siblings, the end whose seeds are expected to
+     * be the fewer wins (see {@link #seedRank}), the start otherwise. The seeds leave the join, carried through the
+     * recursion instead. One walk is seeded per call; the optimisation loop comes back for the others.
      *
      * @param request the current request
      * @param childs the child nodes
@@ -929,14 +929,15 @@ public final class SqlJoin extends SqlIntercode
             Variable beginVar = walk.beginVar;
             Variable endVar = walk.endBinding.getVariable();
 
-            boolean fromEnd = false;
             List<Integer> seeds = selectSeeds(request, childs, i, beginVar, endVar);
+            List<Integer> endSeeds = walk.reverseNext != null ? selectSeeds(request, childs, i, endVar, beginVar) :
+                    List.of();
 
-            if(seeds.isEmpty() && walk.reverseNext != null)
-            {
-                seeds = selectSeeds(request, childs, i, endVar, beginVar);
-                fromEnd = true;
-            }
+            boolean fromEnd = !endSeeds.isEmpty()
+                    && (seeds.isEmpty() || seedRank(childs, endSeeds) < seedRank(childs, seeds));
+
+            if(fromEnd)
+                seeds = endSeeds;
 
             if(seeds.isEmpty())
                 continue;
@@ -957,6 +958,35 @@ public final class SqlJoin extends SqlIntercode
         }
 
         return childs;
+    }
+
+
+    /**
+     * How many rows the seeds are expected to have, roughly, without asking the database: 0 when one of them is inline
+     * data, 1 when one of them is a table access restricted by a constant, 2 otherwise (whole tables, or anything
+     * else). Joined together, the seeds have no more rows than the smallest of them.
+     *
+     * @param childs the child nodes
+     * @param seeds indexes of the seeds
+     * @return the rank of the seeds, the lower the fewer rows they are expected to have
+     */
+    private static int seedRank(List<SqlIntercode> childs, List<Integer> seeds)
+    {
+        int rank = 2;
+
+        for(int i : seeds)
+        {
+            SqlIntercode seed = childs.get(i);
+
+            if(seed instanceof SqlValues)
+                return 0;
+
+            if(seed instanceof SqlTableAccess access && access.getConditions().getAreEqual().stream()
+                    .anyMatch(c -> c.getLeft() instanceof ConstantColumn || c.getRight() instanceof ConstantColumn))
+                rank = 1;
+        }
+
+        return rank;
     }
 
 

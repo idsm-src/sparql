@@ -13,6 +13,7 @@ import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.lessThan;
 import static org.hamcrest.Matchers.not;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -578,6 +579,22 @@ public class RecursivePruningTest
 
 
     @Test
+    @DisplayName("of two ends with seeding siblings, the one restricted by a constant seeds the walk")
+    void constantSiblingSeedsEnd() throws Exception
+    {
+        String query = "SELECT ?x ?l ?y WHERE { ?x ex:label ?l . ?x ex:next* ?y . ?y ex:label 'zero' }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(0), string("zero"), node(0)), row(node(1), string("one"), node(0)),
+                        row(node(2), string("two"), node(0)), row(node(3), string("three"), node(0))));
+        // the label 'zero' starts the recursion, turned towards the subclasses, and the other labels join afterwards
+        String sql = translate(query);
+        int recursion = sql.indexOf("WITH RECURSIVE");
+        assertThat(sql.indexOf("'zero'", recursion), lessThan(sql.indexOf(" UNION ", recursion)));
+    }
+
+
+    @Test
     @DisplayName("a sibling distinct over the start seeds the first step of a walk of one or more steps")
     void firstStepSeeded() throws Exception
     {
@@ -612,7 +629,21 @@ public class RecursivePruningTest
         String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { ?x ex:next+ ?o . ?o ex:label 'zero' } }";
 
         assertThat(execute(query), containsInAnyOrder(row(node(1)), row(node(2)), row(node(3))));
-        // the walk is seeded with the current solution, so the pattern is evaluated laterally for it
+        // the label 'zero' seeds the walk rather than the current solution, which the test then compares with
+        String sql = translate(query);
+        assertThat(sql, containsString("WITH RECURSIVE"));
+        assertThat(sql, not(containsString("LATERAL")));
+    }
+
+
+    @Test
+    @DisplayName("an EXISTS whose walk is seeded with the current solution evaluates the pattern laterally")
+    void existsSeededByContextStaysLateral() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { ?x ex:next* ?o . ?o ex:label ?q } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(0)), row(node(1)), row(node(2)), row(node(3))));
+        // the labels of the end are no fewer than the current solution, so the current solution seeds the walk
         String sql = translate(query);
         assertThat(sql, containsString("WITH RECURSIVE"));
         assertThat(sql, containsString("LATERAL"));
