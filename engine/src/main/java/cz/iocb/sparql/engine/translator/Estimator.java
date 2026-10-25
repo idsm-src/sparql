@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.translator;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Set;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -49,11 +50,10 @@ public class Estimator
         Restrictions restrictions = new Restrictions();
         restrictions.add(var);
 
-        SqlDistinct.create(request, imcode, Set.of(var)).optimize(request, restrictions, false, false);
+        SqlIntercode distinct = SqlDistinct.create(request, imcode, Set.of(var)).optimize(request, restrictions, false,
+                false);
 
-        String code = imcode.translate(request);
-
-        return estimateRowCount(code);
+        return estimateRowCount(distinct.translate(request));
     }
 
 
@@ -76,11 +76,10 @@ public class Estimator
         {
             Restrictions restrictions = new Restrictions(vars);
 
-            SqlDistinct.create(request, imcode, vars).optimize(request, restrictions, false, false);
+            SqlIntercode distinct = SqlDistinct.create(request, imcode, vars).optimize(request, restrictions, false,
+                    false);
 
-            String code = imcode.translate(request);
-
-            return estimateRowCount(code);
+            return estimateRowCount(distinct.translate(request));
         }
         catch(SQLException e)
         {
@@ -91,7 +90,8 @@ public class Estimator
 
 
     /**
-     * Row count estimated by the PostgreSQL planner for the SQL ({@code Plan Rows} of {@code EXPLAIN (FORMAT JSON)}).
+     * Row count estimated by the PostgreSQL planner for the SQL ({@code Plan Rows} of {@code EXPLAIN (FORMAT JSON)}),
+     * explained under a savepoint, so that a failure does not abort the transaction of the request.
      *
      * @param sql the SQL to explain
      * @return row count estimated by the PostgreSQL planner for the SQL ({@code Plan Rows} of {@code EXPLAIN (FORMAT
@@ -104,28 +104,40 @@ public class Estimator
 
         String explainSql = "EXPLAIN (ANALYZE FALSE, FORMAT JSON) " + sql;
 
-        try(ResultSet rs = request.getStatement().executeQuery(explainSql))
+        Statement statement = request.getStatement();
+        String json;
+
+        statement.execute("SAVEPOINT estimate");
+
+        try(ResultSet rs = statement.executeQuery(explainSql))
         {
             if(!rs.next())
                 throw new SQLException("empty result");
 
-            String json = rs.getString(1);
+            json = rs.getString(1);
+        }
+        catch(SQLException e)
+        {
+            statement.execute("ROLLBACK TO SAVEPOINT estimate");
+            throw e;
+        }
 
-            try
-            {
-                JsonNode root = MAPPER.readTree(json);
+        statement.execute("RELEASE SAVEPOINT estimate");
 
-                long planRows = root.path(0).path("Plan").path("Plan Rows").asLong(-1L);
+        try
+        {
+            JsonNode root = MAPPER.readTree(json);
 
-                if(planRows < 0)
-                    throw new SQLException("missing the \"Plan Rows\" field");
+            long planRows = root.path(0).path("Plan").path("Plan Rows").asLong(-1L);
 
-                return planRows;
-            }
-            catch(Exception parseEx)
-            {
-                throw new SQLException("cannot parse explain json", parseEx);
-            }
+            if(planRows < 0)
+                throw new SQLException("missing the \"Plan Rows\" field");
+
+            return planRows;
+        }
+        catch(Exception parseEx)
+        {
+            throw new SQLException("cannot parse explain json", parseEx);
         }
     }
 }

@@ -92,8 +92,9 @@ public class RecursivePruningTest
      * 1) with their labels (keyed by the node, so that the labels are distinct over it and may seed a walk), the others
      * (10 and 20 are subclasses of the node 1, 11 of 10 and 12 of 11), the links from the nodes to whole IRIs (whose
      * general class overlaps every other, so that the zero-length paths are not split by class; the node 3 has two of
-     * them, so the links are not distinct over the node), and the configuration mapping them: {@code ex:sub} over the
-     * nodes and the others, {@code ex:next} over the nodes alone.
+     * them, so the links are not distinct over the node), the name of the root alone (keyed, so that the database
+     * estimates the names smaller than the labels), and the configuration mapping them: {@code ex:sub} over the nodes
+     * and the others, {@code ex:next} over the nodes alone.
      */
     @BeforeAll
     static void init() throws SQLException
@@ -116,6 +117,11 @@ public class RecursivePruningTest
                     + "object varchar not null)");
             statement.execute("insert into recursive_pruning_test.links values (3, 'http://other.org/thing'), "
                     + "(3, 'http://example.org/n/2')");
+            statement.execute(
+                    "create table recursive_pruning_test.names (id integer primary key, " + "name varchar not null)");
+            statement.execute("insert into recursive_pruning_test.names values (0, 'root')");
+            statement.execute("analyze recursive_pruning_test.nodes, recursive_pruning_test.labels, "
+                    + "recursive_pruning_test.others, recursive_pruning_test.links, recursive_pruning_test.names");
         }
 
         DatabaseSchema schema = new DatabaseSchema(connectionPool);
@@ -129,6 +135,7 @@ public class RecursivePruningTest
         DatabaseTable labels = new DatabaseTable("recursive_pruning_test", "labels");
         DatabaseTable others = new DatabaseTable("recursive_pruning_test", "others");
         DatabaseTable links = new DatabaseTable("recursive_pruning_test", "links");
+        DatabaseTable names = new DatabaseTable("recursive_pruning_test", "names");
         ConstantIriMapping graph = config.createIriMapping("<http://example.org/graph>");
 
         config.addQuadMapping(nodes, graph, config.createIriMapping("node", "id"), config.createIriMapping("ex:sub"),
@@ -142,6 +149,9 @@ public class RecursivePruningTest
 
         config.addQuadMapping(labels, graph, config.createIriMapping("node", "id"), config.createIriMapping("ex:label"),
                 config.createLiteralMapping(xsdString, "label"));
+
+        config.addQuadMapping(names, graph, config.createIriMapping("node", "id"), config.createIriMapping("ex:name"),
+                config.createLiteralMapping(xsdString, "name"));
 
         config.addQuadMapping(others, graph, config.createIriMapping("other", "id"), config.createIriMapping("ex:sub"),
                 config.createIriMapping("other", "parent"));
@@ -459,8 +469,8 @@ public class RecursivePruningTest
                         row(node(3), node(3)), row(other(10), other(10)), row(other(11), other(11)),
                         row(other(12), other(12)), row(other(20), other(20)), row(string("zero"), string("zero")),
                         row(string("one"), string("one")), row(string("two"), string("two")),
-                        row(string("three"), string("three")), row(thing, thing), row(node(1), node(0)),
-                        row(node(2), node(1)), row(node(2), node(0)), row(node(3), node(0))));
+                        row(string("three"), string("three")), row(string("root"), string("root")), row(thing, thing),
+                        row(node(1), node(0)), row(node(2), node(1)), row(node(2), node(0)), row(node(3), node(0))));
         assertThat(translate(query), containsString("labels"));
         assertThat(translate(query), containsString("others"));
     }
@@ -593,6 +603,23 @@ public class RecursivePruningTest
         String sql = translate(query);
         int recursion = sql.indexOf("WITH RECURSIVE");
         assertThat(sql.indexOf("'zero'", recursion), lessThan(sql.indexOf(" UNION ", recursion)));
+    }
+
+
+    @Test
+    @DisplayName("of two ends with seeding siblings of the same rank, the one the database estimates smaller wins")
+    void estimateChoosesSmallerSeeds() throws Exception
+    {
+        String query = "SELECT ?x ?l ?n WHERE { ?x ex:label ?l . ?x ex:next* ?y . ?y ex:name ?n }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(0), string("zero"), string("root")),
+                        row(node(1), string("one"), string("root")), row(node(2), string("two"), string("root")),
+                        row(node(3), string("three"), string("root"))));
+        // the single name starts the recursion, turned, rather than the four labels
+        String sql = translate(query);
+        int recursion = sql.indexOf("WITH RECURSIVE");
+        assertThat(sql.indexOf("\"names\"", recursion), lessThan(sql.indexOf(" UNION ", recursion)));
     }
 
 
@@ -919,7 +946,7 @@ public class RecursivePruningTest
 
         // the solution without the start is compatible with every solution of the walk
         List<List<RdfTerm>> rows = execute(query);
-        assertThat(rows, hasSize(21));
+        assertThat(rows, hasSize(22));
         assertThat(rows, hasItem(row(string("zero"), thing, thing)));
         assertThat(rows, hasItem(row(string("zero"), node(2), node(0))));
         assertThat(rows, hasItem(row(string("two"), node(1), node(0))));
@@ -936,7 +963,7 @@ public class RecursivePruningTest
         assertThat(execute(query),
                 containsInAnyOrder(row(node(0)), row(node(1)), row(node(2)), row(node(3)), row(other(10)),
                         row(other(11)), row(other(12)), row(other(20)), row(string("zero")), row(string("one")),
-                        row(string("two")), row(string("three")), row(thing)));
+                        row(string("two")), row(string("three")), row(string("root")), row(thing)));
         assertThat(translate(query), not(containsString("WITH RECURSIVE")));
     }
 

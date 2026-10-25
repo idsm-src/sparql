@@ -914,8 +914,9 @@ public final class SqlJoin extends SqlIntercode
      * Seeds a walk between two variables with its siblings (see {@link SqlRecursive#seed}): the siblings that bind the
      * start variable always and distinct solutions over it, without binding the end variable, or those binding the end
      * variable so, the walk being turned then; when both ends have such siblings, the end whose seeds are expected to
-     * be the fewer wins (see {@link #seedRank}), the start otherwise. The seeds leave the join, carried through the
-     * recursion instead. One walk is seeded per call; the optimisation loop comes back for the others.
+     * be the fewer wins (see {@link #seedRank}, and the row estimates of the database on a tie, see
+     * {@link #fewerSeeds}), the start otherwise. The seeds leave the join, carried through the recursion instead. One
+     * walk is seeded per call; the optimisation loop comes back for the others.
      *
      * @param request the current request
      * @param childs the child nodes
@@ -937,7 +938,9 @@ public final class SqlJoin extends SqlIntercode
                     List.of();
 
             boolean fromEnd = !endSeeds.isEmpty()
-                    && (seeds.isEmpty() || seedRank(childs, endSeeds) < seedRank(childs, seeds));
+                    && (seeds.isEmpty() || seedRank(childs, endSeeds) < seedRank(childs, seeds)
+                            || seedRank(childs, endSeeds) == seedRank(childs, seeds)
+                                    && fewerSeeds(request, childs, endSeeds, endVar, seeds, beginVar));
 
             if(fromEnd)
                 seeds = endSeeds;
@@ -1014,6 +1017,40 @@ public final class SqlJoin extends SqlIntercode
         }
 
         return childs;
+    }
+
+
+    /**
+     * True if the database estimates fewer distinct values of the end variable in the seeds of the end than of the
+     * begin variable in the seeds of the begin (see {@link Estimator}); false on a tie, when an estimate fails, or when
+     * seeds refer to the current solution of an EXISTS or to a lateral join, which cannot be explained on their own.
+     *
+     * @param request the current request
+     * @param childs the child nodes
+     * @param endSeeds indexes of the seeds of the end
+     * @param endVar the end variable
+     * @param beginSeeds indexes of the seeds of the begin
+     * @param beginVar the begin variable
+     * @return true if the seeds of the end are estimated to have the fewer distinct values, false otherwise
+     */
+    private static boolean fewerSeeds(Request request, List<SqlIntercode> childs, List<Integer> endSeeds,
+            Variable endVar, List<Integer> beginSeeds, Variable beginVar)
+    {
+        SqlIntercode endJoin = join(request, endSeeds.stream().map(childs::get).toList());
+        SqlIntercode beginJoin = join(request, beginSeeds.stream().map(childs::get).toList());
+
+        if(endJoin.translate(request).contains("\"lateral") || beginJoin.translate(request).contains("\"lateral"))
+            return false;
+
+        Estimator estimator = new Estimator(request);
+
+        long end = estimator.estimateDistinct(request, endJoin, Set.of(endVar));
+        long begin = estimator.estimateDistinct(request, beginJoin, Set.of(beginVar));
+
+        if(end == Long.MAX_VALUE || begin == Long.MAX_VALUE)
+            return false;
+
+        return end < begin;
     }
 
 
