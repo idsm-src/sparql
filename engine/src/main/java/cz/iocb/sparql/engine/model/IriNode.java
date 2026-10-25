@@ -50,10 +50,12 @@ public class IriNode extends BaseComplexNode implements VarOrIri, Path
     private static String PLX = "(" + PERCENT + "|" + PN_LOCAL_ESC + ")";
 
     /**
-     * Grammar rule PN_LOCAL as a regular expression; a local name must match it to be written as a prefixed name.
+     * Grammar rule PN_LOCAL as a regular expression; a local name must match it to be written as a prefixed name. The
+     * part after the first character, which must not end with a dot, is matched as possessively repeated runs of dots
+     * each followed by another character, so that java.util.regex does not recurse for every character of a long name.
      */
-    private static String PN_LOCAL = "((" + PN_CHARS_U + "|[0-9:]|" + PLX + ")((" + PN_CHARS + "|[.:]|" + PLX + ")*("
-            + PN_CHARS + "|:|" + PLX + "))?)?";
+    private static String PN_LOCAL = "((" + PN_CHARS_U + "|[0-9:]|" + PLX + ")(\\.*+(" + PN_CHARS + "|:|" + PLX
+            + "))*+)?";
 
     /**
      * Full IRI text.
@@ -110,7 +112,7 @@ public class IriNode extends BaseComplexNode implements VarOrIri, Path
             {
                 String name = iri.substring(prefix.getValue().length());
 
-                if((size > name.length()
+                if((result == null || size > name.length()
                         || size == name.length() && result.length() - size - 1 > prefix.getKey().length())
                         && name.matches(PN_LOCAL))
                 {
