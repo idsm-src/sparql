@@ -62,7 +62,9 @@ import cz.iocb.sparql.testing.Database;
  * source of the nodes, it replaces the zero-length paths altogether. A walk of which the parent needs only one end, and
  * not the multiplicities (a DISTINCT over the end, a MINUS, an EXISTS), reduces to its initial solutions, since a node
  * has a path iff it has a zero-length path or a first step. An OPTIONAL walk of zero or more steps from nodes the left
- * side binds always is a join, as the zero-length paths match every node, and the left side then seeds it.
+ * side binds always is a join, as the zero-length paths match every node, and the left side then seeds it. An EXISTS
+ * whose pattern joins the current solution plainly compares the pattern with the solution instead of evaluating it for
+ * every solution, so that the database may turn the test into a semi-join.
  */
 public class RecursivePruningTest
 {
@@ -610,7 +612,79 @@ public class RecursivePruningTest
         String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { ?x ex:next+ ?o . ?o ex:label 'zero' } }";
 
         assertThat(execute(query), containsInAnyOrder(row(node(1)), row(node(2)), row(node(3))));
-        assertThat(translate(query), containsString("WITH RECURSIVE"));
+        // the walk is seeded with the current solution, so the pattern is evaluated laterally for it
+        String sql = translate(query);
+        assertThat(sql, containsString("WITH RECURSIVE"));
+        assertThat(sql, containsString("LATERAL"));
+    }
+
+
+    @Test
+    @DisplayName("an EXISTS whose pattern joins the current solution plainly compares the pattern with the solution")
+    void existsCompared() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { ?x ex:sub* <http://example.org/n/0> } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(0)), row(node(1)), row(node(2)), row(node(3))));
+        // the walk from the constant is evaluated once, and the database joins it with the labels
+        String sql = translate(query);
+        assertThat(sql, not(containsString("LATERAL")));
+        assertThat(sql, containsString("\"exists\""));
+    }
+
+
+    @Test
+    @DisplayName("a NOT EXISTS compares the pattern with the solution the same way")
+    void notExistsCompared() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER NOT EXISTS { ?x ex:link ?z } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(0)), row(node(1)), row(node(2))));
+        assertThat(translate(query), not(containsString("LATERAL")));
+    }
+
+
+    @Test
+    @DisplayName("an EXISTS over a union compares every branch with the solution")
+    void existsUnionCompared() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { { ?x ex:next ?y } UNION { ?x ex:link ?z } } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(1)), row(node(2)), row(node(3))));
+        assertThat(translate(query), not(containsString("LATERAL")));
+    }
+
+
+    @Test
+    @DisplayName("a variable the solution may leave unbound is compatible with every value of the pattern")
+    void existsNullableVariableCompared() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:label ?l OPTIONAL { ?x ex:next ?p } FILTER EXISTS { ?p ex:label ?q } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(0)), row(node(1)), row(node(2)), row(node(3))));
+        assertThat(translate(query), not(containsString("LATERAL")));
+    }
+
+
+    @Test
+    @DisplayName("a pattern using a variable of the solution outside its join is evaluated laterally")
+    void existsFilterOnSolutionStaysLateral() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { ?x ex:next ?y FILTER(?l != 'one') } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(2)), row(node(3))));
+        assertThat(translate(query), containsString("LATERAL"));
+    }
+
+
+    @Test
+    @DisplayName("a pattern whose nested group holds the current solution too is evaluated laterally")
+    void existsNestedGroupStaysLateral() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { ?x ex:next ?y MINUS { ?y ex:link ?z } } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(1)), row(node(2)), row(node(3))));
+        assertThat(translate(query), containsString("LATERAL"));
     }
 
 
