@@ -9,7 +9,8 @@ import cz.iocb.sparql.engine.database.Function;
 /**
  * Definition of a procedure, a set-returning SQL function callable from a graph pattern (see
  * {@link cz.iocb.sparql.engine.model.pattern.ProcedureCall}): the procedure IRI, the SQL function, and its named
- * parameters and results in declaration order.
+ * parameters and results in declaration order. A specialiser may adapt the calls to the classes the query can use the
+ * results in (see {@link #setSpecializer}).
  */
 public class ProcedureDefinition
 {
@@ -32,6 +33,11 @@ public class ProcedureDefinition
      * Results by IRI (null for the single unnamed result), in declaration order.
      */
     private final LinkedHashMap<String, ResultDefinition> results;
+
+    /**
+     * Specialiser of the calls to the classes the query can use the results in (see {@link #setSpecializer}), or null.
+     */
+    private ProcedureSpecializer specializer = null;
 
 
     /**
@@ -80,6 +86,32 @@ public class ProcedureDefinition
     public ParameterDefinition getParameter(String parameterName)
     {
         return parameters.get(parameterName);
+    }
+
+
+    /**
+     * Sets the specialiser of the calls: given, for every result a call delivers, the classes of the result the query
+     * can use a value of, it may have the call use another SQL function or other arguments, and tells the classes the
+     * function then binds the results in (see {@link ProcedureSpecialization}). The engine binds a result to the
+     * classes the query can use in any case, so a function need not be told; a specialiser lets it skip the work for
+     * the other classes.
+     *
+     * @param specializer the specialiser, or null to call the procedure as declared
+     */
+    public void setSpecializer(ProcedureSpecializer specializer)
+    {
+        this.specializer = specializer;
+    }
+
+
+    /**
+     * Specialiser of the calls (see {@link #setSpecializer}), or null.
+     *
+     * @return specialiser of the calls, or null
+     */
+    public ProcedureSpecializer getSpecializer()
+    {
+        return specializer;
     }
 
 
