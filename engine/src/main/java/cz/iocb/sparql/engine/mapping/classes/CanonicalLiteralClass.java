@@ -63,4 +63,16 @@ public sealed abstract class CanonicalLiteralClass extends LiteralClass
 
         return true;
     }
+
+
+    /**
+     * Base class of this class: the class holding the literals of the datatype of this class in every valid lexical
+     * form, keeping the value in the same leading columns as this class, followed by the lexical column (see
+     * {@link BaseLiteralClass}); this class itself when a value of the datatype has a single lexical form, as for the
+     * strings and the language-tagged strings. The base class of a subset class is that of its original, because a
+     * subset narrows the literals a deployment holds, not the values (see {@link SubsetLiteralClass}).
+     *
+     * @return base class of this class
+     */
+    public abstract LiteralClass getBaseClass();
 }

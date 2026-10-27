@@ -9,7 +9,9 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 /**
  * Definition of a SPARQL extension function implemented by an SQL function: the function IRI, the result and argument
  * classes, how many leading arguments are mandatory, whether the result can be NULL for non-NULL arguments, and whether
- * the function is deterministic.
+ * the function is deterministic. An argument class is the class in whose columns the SQL function takes the value of
+ * the argument; which terms supply a value of it is decided as for a procedure parameter (see
+ * {@link ParameterDefinition}), and an argument supplying no value of its class makes the call an error.
  */
 public class FunctionDefinition
 {
@@ -29,7 +31,7 @@ public class FunctionDefinition
     private final ResourceClass result;
 
     /**
-     * Classes of the arguments in order.
+     * Classes in whose columns the SQL function takes the values of the arguments, in order.
      */
     private final List<ResourceClass> arguments;
 
@@ -124,9 +126,9 @@ public class FunctionDefinition
 
 
     /**
-     * Classes of the arguments in order.
+     * Classes in whose columns the SQL function takes the values of the arguments, in order.
      *
-     * @return classes of the arguments in order
+     * @return classes in whose columns the SQL function takes the values of the arguments, in order
      */
     public List<ResourceClass> getArgumentClasses()
     {

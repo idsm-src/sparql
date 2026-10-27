@@ -33,6 +33,7 @@ import cz.iocb.sparql.engine.mapping.classes.BooleanBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.BooleanClass;
 import cz.iocb.sparql.engine.mapping.classes.ByteBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.ByteClass;
+import cz.iocb.sparql.engine.mapping.classes.CanonicalLiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateCompositeBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DateCompositeClass;
@@ -795,6 +796,40 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     public List<Column> get(ClassRelations relations, ResourceClass resClass)
     {
         return variableBinding.deriveMapping(relations, resClass);
+    }
+
+
+    /**
+     * Class of the terms an extension function or a procedure takes a value of the given class from, in the columns of
+     * the class (see {@link #getValue}): the base class of a canonical literal class, because a literal of the datatype
+     * supplies its value in every valid lexical form, as it does to the functions of SPARQL; otherwise the class
+     * itself.
+     *
+     * @param resClass the class the value is taken in
+     * @return class of the terms an extension function or a procedure takes a value of the given class from
+     */
+    public static ResourceClass getAcceptedClass(ResourceClass resClass)
+    {
+        return resClass instanceof CanonicalLiteralClass literalClass ? literalClass.getBaseClass() : resClass;
+    }
+
+
+    /**
+     * Columns of the class holding the value of the expression as an extension function or a procedure takes it: the
+     * columns of the expression converted to the class, except that a literal of the datatype of a canonical literal
+     * class supplies its value in every valid lexical form, i.e. the leading columns of its base class, which are laid
+     * out as the columns of the class (see {@link CanonicalLiteralClass#getBaseClass}).
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param resClass the class the value is taken in
+     * @return columns of the class holding the value of the expression, or null when a needed class has no materialised
+     *         columns
+     */
+    public List<Column> getValue(ClassRelations relations, ResourceClass resClass)
+    {
+        List<Column> columns = get(relations, getAcceptedClass(resClass));
+
+        return columns == null ? null : columns.subList(0, resClass.getColumnCount());
     }
 
 

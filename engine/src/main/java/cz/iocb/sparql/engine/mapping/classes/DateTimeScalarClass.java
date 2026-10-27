@@ -106,4 +106,11 @@ public final class DateTimeScalarClass extends CanonicalLiteralClass
 
         throw new IllegalArgumentException();
     }
+
+
+    @Override
+    public LiteralClass getBaseClass()
+    {
+        return genScalarDateTime;
+    }
 }

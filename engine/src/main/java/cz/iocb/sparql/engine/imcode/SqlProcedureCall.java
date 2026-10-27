@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.imcode;
 
+import static cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.getAcceptedClass;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.intersect;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
@@ -45,11 +46,14 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 /**
  * Call of a procedure (a set-returning SQL function) for every solution of the child: the parameters are expressions
  * over the child's variables, the results are bound to variables (joined with the child when a result variable is
- * already bound). A call over the empty solution, which takes nothing from any context, is evaluated by a common table
- * expression of the statement (see {@link Request#getCommonTableExpression}), so that the statement evaluates it once
- * even when it occurs several times, e.g. in every branch of a union a join above it was distributed over; PostgreSQL
- * folds a common table expression referenced once into the query. A result is bound to the classes the parent accepts a
- * value of only, and a specialiser of the procedure may adapt the call to them (see
+ * already bound). The function takes the values of the parameters in the columns of their declared classes (see
+ * {@link ParameterDefinition}), so a literal of the datatype of a canonical declared class supplies its value in every
+ * valid lexical form (see {@link SqlExpressionIntercode#getValue}), and a parameter supplying no value of its class
+ * gives no solution. A call over the empty solution, which takes nothing from any context, is evaluated by a common
+ * table expression of the statement (see {@link Request#getCommonTableExpression}), so that the statement evaluates it
+ * once even when it occurs several times, e.g. in every branch of a union a join above it was distributed over;
+ * PostgreSQL folds a common table expression referenced once into the query. A result is bound to the classes the
+ * parent accepts a value of only, and a specialiser of the procedure may adapt the call to them (see
  * {@link ProcedureDefinition#setSpecializer}).
  */
 public final class SqlProcedureCall extends SqlIntercode
@@ -170,7 +174,7 @@ public final class SqlProcedureCall extends SqlIntercode
         for(Entry<ParameterDefinition, SqlExpressionIntercode> entry : parameters.entrySet())
         {
             ParameterDefinition definition = entry.getKey();
-            ResourceClass resClass = definition.getParameterClass();
+            ResourceClass resClass = getAcceptedClass(definition.getParameterClass());
             SqlExpressionIntercode node = entry.getValue();
 
             if(node instanceof SqlVariable var)
@@ -190,10 +194,7 @@ public final class SqlProcedureCall extends SqlIntercode
         for(Entry<Variable, Set<ResourceClass>> e : resClasses.entrySet())
         {
             ResourceClass interClass = intersect(relations, e.getValue());
-            Variable variable = e.getKey();
-
-            callBindings.add(new VariableBinding(variable, interClass,
-                    getColumns(relations, child, variable, interClass), false));
+            callBindings.add(getParameterBinding(relations, child, e.getKey(), interClass));
         }
 
         Map<ResultDefinition, Set<ResourceClass>> resultClasses = new HashMap<>();
@@ -291,7 +292,7 @@ public final class SqlProcedureCall extends SqlIntercode
         for(Entry<ParameterDefinition, SqlExpressionIntercode> entry : optParameters.entrySet())
         {
             ParameterDefinition definition = entry.getKey();
-            ResourceClass resClass = definition.getParameterClass();
+            ResourceClass resClass = getAcceptedClass(definition.getParameterClass());
             SqlExpressionIntercode node = entry.getValue();
 
             if(node instanceof SqlVariable var)
@@ -315,10 +316,7 @@ public final class SqlProcedureCall extends SqlIntercode
         for(Entry<Variable, Set<ResourceClass>> e : resClasses.entrySet())
         {
             ResourceClass interClass = intersect(relations, e.getValue());
-            Variable variable = e.getKey();
-
-            callBindings.add(new VariableBinding(variable, interClass,
-                    getColumns(relations, optChild, variable, interClass), false));
+            callBindings.add(getParameterBinding(relations, optChild, e.getKey(), interClass));
         }
 
 
@@ -377,7 +375,7 @@ public final class SqlProcedureCall extends SqlIntercode
 
         for(Entry<ParameterDefinition, SqlExpressionIntercode> e : parameters.entrySet())
             result.put(e.getKey(), e.getValue().optimize(request, context.getVariableBindings(),
-                    new Restriction(e.getKey().getParameterClass()), false));
+                    new Restriction(getAcceptedClass(e.getKey().getParameterClass())), false));
 
         return result;
     }
@@ -419,11 +417,12 @@ public final class SqlProcedureCall extends SqlIntercode
 
 
     /**
-     * SQL calling the function with the parameters converted to their declared classes for every solution of the child.
+     * SQL calling the function with the values of the parameters in the columns of their declared classes for every
+     * solution of the child.
      *
      * @param request the current request
-     * @return SQL calling the function with the parameters converted to their declared classes for every solution of
-     *         the child
+     * @return SQL calling the function with the values of the parameters in the columns of their declared classes for
+     *         every solution of the child
      */
     private String translateCall(Request request)
     {
@@ -435,10 +434,9 @@ public final class SqlProcedureCall extends SqlIntercode
         {
             ResourceClass resClass = entry.getKey().getParameterClass();
             SqlExpressionIntercode node = entry.getValue();
-            List<Column> columns = node.get(relations, resClass);
 
-            for(int i = 0; i < resClass.getColumnCount(); i++)
-                declared.add(columnMap.getOrDefault(columns.get(i), columns.get(i)).toString());
+            for(Column column : node.getValue(relations, resClass))
+                declared.add(columnMap.getOrDefault(column, column).toString());
         }
 
         Function function = specialization == null || specialization.getSqlProcedure() == null ?
@@ -499,23 +497,35 @@ public final class SqlProcedureCall extends SqlIntercode
 
 
     /**
-     * Columns of the variable in the class as provided by the child, or NULL constants when unbound.
+     * Binding of a variable the call takes as parameters accepting the class: the classes the child binds the variable
+     * in, narrowed to the class, so that a class of the child the parameters accept keeps the columns of the child; the
+     * class with NULL constants when the child binds the variable in no class overlapping it.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param child the child node
      * @param variable the variable
-     * @param resClass the resource class
-     * @return columns of the variable in the class as provided by the child, or NULL constants when unbound
+     * @param resClass the class the parameters accept
+     * @return binding of a variable the call takes as parameters accepting the class
      */
-    private static List<Column> getColumns(ClassRelations relations, SqlIntercode child, Variable variable,
+    private static VariableBinding getParameterBinding(ClassRelations relations, SqlIntercode child, Variable variable,
             ResourceClass resClass)
     {
         VariableBinding binding = child.getVariableBindings().get(variable);
+        Map<ResourceClass, List<Column>> mappings = new HashMap<>();
 
-        if(binding == null)
-            return resClass.getSqlTypes().stream().map(t -> (Column) new NullColumn(t)).toList();
+        if(binding != null)
+        {
+            for(ResourceClass childClass : binding.getCompatibleClasses(relations, resClass))
+            {
+                ResourceClass narrowed = intersect(relations, childClass, resClass);
+                mappings.put(narrowed, binding.deriveMapping(relations, narrowed));
+            }
+        }
 
-        return binding.deriveMapping(relations, resClass);
+        if(mappings.isEmpty())
+            mappings.put(resClass, resClass.getSqlTypes().stream().map(t -> (Column) new NullColumn(t)).toList());
+
+        return new VariableBinding(variable, mappings, false);
     }
 
 

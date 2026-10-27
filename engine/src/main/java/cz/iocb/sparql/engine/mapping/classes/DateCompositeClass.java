@@ -112,4 +112,11 @@ public final class DateCompositeClass extends CanonicalLiteralClass
 
         throw new IllegalArgumentException();
     }
+
+
+    @Override
+    public LiteralClass getBaseClass()
+    {
+        return genDate;
+    }
 }

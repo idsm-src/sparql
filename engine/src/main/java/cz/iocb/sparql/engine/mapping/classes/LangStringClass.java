@@ -91,4 +91,11 @@ public final class LangStringClass extends CanonicalLiteralClass
 
         throw new IllegalArgumentException();
     }
+
+
+    @Override
+    public LiteralClass getBaseClass()
+    {
+        return this;
+    }
 }

@@ -141,6 +141,13 @@ public final class LangStringWithTagClass extends CanonicalLiteralClass
 
 
     @Override
+    public LiteralClass getBaseClass()
+    {
+        return this;
+    }
+
+
+    @Override
     public boolean equals(Object object)
     {
         if(object == this)

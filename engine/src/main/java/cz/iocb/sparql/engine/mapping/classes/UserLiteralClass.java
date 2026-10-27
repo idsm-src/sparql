@@ -132,4 +132,11 @@ public non-sealed class UserLiteralClass extends CanonicalLiteralClass
 
         throw new IllegalArgumentException();
     }
+
+
+    @Override
+    public LiteralClass getBaseClass()
+    {
+        return base;
+    }
 }

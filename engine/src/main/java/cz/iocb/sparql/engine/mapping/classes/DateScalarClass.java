@@ -105,4 +105,11 @@ public final class DateScalarClass extends CanonicalLiteralClass
 
         throw new IllegalArgumentException();
     }
+
+
+    @Override
+    public LiteralClass getBaseClass()
+    {
+        return genScalarDate;
+    }
 }

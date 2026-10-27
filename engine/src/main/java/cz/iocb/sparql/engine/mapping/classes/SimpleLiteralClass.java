@@ -122,4 +122,11 @@ public sealed abstract class SimpleLiteralClass extends CanonicalLiteralClass pe
 
         throw new IllegalArgumentException();
     }
+
+
+    @Override
+    public LiteralClass getBaseClass()
+    {
+        return base != null ? base : this;
+    }
 }

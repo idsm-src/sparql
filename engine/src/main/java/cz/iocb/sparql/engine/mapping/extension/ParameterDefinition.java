@@ -6,8 +6,13 @@ import cz.iocb.sparql.engine.model.triple.Node;
 
 
 /**
- * Definition of a procedure parameter: the IRI used as its predicate in the call, its resource class and an optional
- * default value used when the call omits it.
+ * Definition of a procedure parameter: the IRI used as its predicate in the call, the class in whose columns the SQL
+ * function takes the value, and an optional default value used when the call omits it. Which terms supply a value of
+ * the class is decided as SPARQL decides it for its own functions, not by the deployment: a literal of the datatype of
+ * a canonical literal class supplies its value in every valid lexical form (see
+ * {@link cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode#getAcceptedClass}), and a term supplying no
+ * value of the class gives the call no solution. A function working on the terms themselves declares a base class,
+ * which keeps the lexical form, or the box.
  */
 public class ParameterDefinition
 {
@@ -17,7 +22,7 @@ public class ParameterDefinition
     private final String parameterName;
 
     /**
-     * Class of the parameter value.
+     * Class in whose columns the SQL function takes the value.
      */
     private final ResourceClass parameterClass;
 
@@ -31,7 +36,7 @@ public class ParameterDefinition
      * Creates the definition.
      *
      * @param parameterName IRI naming the parameter
-     * @param parameterClass class of the parameter value
+     * @param parameterClass class in whose columns the SQL function takes the value
      * @param defaultValue default value, or null when mandatory
      */
     public ParameterDefinition(String parameterName, ResourceClass parameterClass, Node defaultValue)
@@ -54,9 +59,9 @@ public class ParameterDefinition
 
 
     /**
-     * Class of the parameter value.
+     * Class in whose columns the SQL function takes the value.
      *
-     * @return class of the parameter value
+     * @return class in whose columns the SQL function takes the value
      */
     public final ResourceClass getParameterClass()
     {

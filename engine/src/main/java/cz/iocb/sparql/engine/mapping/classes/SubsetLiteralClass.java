@@ -129,4 +129,11 @@ public non-sealed class SubsetLiteralClass extends CanonicalLiteralClass
 
         return name.equals(other.name) && original.equals(other.original);
     }
+
+
+    @Override
+    public LiteralClass getBaseClass()
+    {
+        return original.getBaseClass();
+    }
 }

@@ -20,8 +20,10 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 /**
- * Call of an extension function defined by the configuration; an argument whose classes are disjoint with the declared
- * argument class makes the call an error.
+ * Call of an extension function defined by the configuration. The function takes the values of the arguments in the
+ * columns of their declared classes (see {@link FunctionDefinition}), so a literal of the datatype of a canonical
+ * declared class supplies its value in every valid lexical form (see {@link SqlExpressionIntercode#getValue}); an
+ * argument supplying no value of its declared class makes the call an error.
  */
 public final class SqlFunctionCall extends SqlExpressionIntercode
 {
@@ -75,14 +77,15 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
 
 
     /**
-     * Call materialising the result only when needed; an argument disjoint with its declared class makes the call NULL.
+     * Call materialising the result only when needed; an argument supplying no value of its declared class makes the
+     * call NULL.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param definition the function definition
      * @param arguments the arguments
      * @param restriction the result classes the parent needs
-     * @return call materialising the result only when needed; an argument disjoint with its declared class makes the
-     *         call NULL
+     * @return call materialising the result only when needed; an argument supplying no value of its declared class
+     *         makes the call NULL
      */
     public static SqlExpressionIntercode create(ClassRelations relations, FunctionDefinition definition,
             List<SqlExpressionIntercode> arguments, Restriction restriction)
@@ -92,7 +95,7 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
         for(int i = 0; i < arguments.size(); i++)
         {
             Set<ResourceClass> resClasses = arguments.get(i).getResourceClasses();
-            ResourceClass refClass = definition.getArgumentClasses().get(i);
+            ResourceClass refClass = getAcceptedClass(definition.getArgumentClasses().get(i));
 
             if(ResourceClass.areDisjunct(relations, refClass, resClasses))
                 return SqlNull.get();
@@ -131,7 +134,7 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
             Restriction argRestriction = new Restriction();
 
             if(restriction.contains(relations, definition.getResultClass()))
-                argRestriction.add(definition.getArgumentClasses().get(i));
+                argRestriction.add(getAcceptedClass(definition.getArgumentClasses().get(i)));
 
             optArguments.add(arguments.get(i).optimize(request, bindings, argRestriction, evalServices));
         }
@@ -144,12 +147,12 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
 
 
     /**
-     * SQL calling the function with the arguments converted to their declared classes.
+     * SQL calling the function with the values of the arguments in the columns of their declared classes.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param definition the function definition
      * @param arguments the arguments
-     * @return SQL calling the function with the arguments converted to their declared classes
+     * @return SQL calling the function with the values of the arguments in the columns of their declared classes
      */
     private static List<Column> translate(ClassRelations relations, FunctionDefinition definition,
             List<SqlExpressionIntercode> arguments)
@@ -168,7 +171,7 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
             if(argClass.equals(stringLiteral)) //FIXME: use different approach
                 builder.append(arguments.get(i).getStringLiteral());
             else
-                builder.append(arguments.get(i).get(relations, argClass).get(0)); //NOTE: only first column is used
+                builder.append(arguments.get(i).getValue(relations, argClass).get(0)); //NOTE: only first column is used
         }
 
         builder.append(")");

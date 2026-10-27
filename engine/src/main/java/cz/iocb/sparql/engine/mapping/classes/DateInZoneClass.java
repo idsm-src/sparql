@@ -181,6 +181,13 @@ public final class DateInZoneClass extends CanonicalLiteralClass implements Date
 
 
     @Override
+    public LiteralClass getBaseClass()
+    {
+        return base;
+    }
+
+
+    @Override
     public boolean equals(Object object)
     {
         if(object == this)
