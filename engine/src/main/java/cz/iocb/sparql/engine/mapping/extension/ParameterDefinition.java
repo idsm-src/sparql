@@ -9,7 +9,9 @@ import cz.iocb.sparql.engine.model.triple.Node;
  * Definition of a procedure parameter: the IRI used as its predicate in the call, the class in whose columns the SQL
  * function takes the value, and an optional default value used when the call omits it. Which terms supply a value of
  * the class is decided as SPARQL decides it for its own functions, not by the deployment: a literal of the datatype of
- * a canonical literal class supplies its value in every valid lexical form (see
+ * a canonical literal class supplies its value in every valid lexical form, a numeric class takes the value of every
+ * numeric XPath substitutes or promotes to its datatype, e.g. an xsd:integer or an xsd:decimal for an xsd:double, but
+ * not an xsd:decimal for an xsd:integer (see
  * {@link cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode#getAcceptedClass}), and a term supplying no
  * value of the class gives the call no solution. A function working on the terms themselves declares a base class,
  * which keeps the lexical form, or the box.

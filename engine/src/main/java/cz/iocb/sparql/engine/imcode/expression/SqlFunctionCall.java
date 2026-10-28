@@ -22,8 +22,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 /**
  * Call of an extension function defined by the configuration. The function takes the values of the arguments in the
  * columns of their declared classes (see {@link FunctionDefinition}), so a literal of the datatype of a canonical
- * declared class supplies its value in every valid lexical form (see {@link SqlExpressionIntercode#getValue}); an
- * argument supplying no value of its declared class makes the call an error.
+ * declared class supplies its value in every valid lexical form, and a numeric declared class takes the value of every
+ * numeric XPath substitutes or promotes to its datatype (see {@link SqlExpressionIntercode#getValue}); an argument
+ * supplying no value of its declared class makes the call an error.
  */
 public final class SqlFunctionCall extends SqlExpressionIntercode
 {
@@ -99,6 +100,10 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
 
             if(ResourceClass.areDisjunct(relations, refClass, resClasses))
                 return SqlNull.get();
+
+            // an argument that may hold a term supplying no value of its class makes the call NULL for such a term
+            if(resClasses.stream().anyMatch(r -> !r.isSubclassOf(refClass)))
+                canBeNull = true;
         }
 
         List<Column> cols = restriction.contains(relations, definition.getResultClass()) ?

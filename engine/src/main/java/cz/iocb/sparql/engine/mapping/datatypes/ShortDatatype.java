@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.mapping.datatypes;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdShortIri;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -41,5 +42,12 @@ public final class ShortDatatype extends FixedSizeIntegerDatatype
     public ResourceClass getNonCanonicalLiteralClass()
     {
         return lexShort;
+    }
+
+
+    @Override
+    public Datatype getSuperType()
+    {
+        return xsdIntType;
     }
 }

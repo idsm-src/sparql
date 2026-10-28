@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdLongType;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
@@ -41,5 +42,12 @@ public final class IntDatatype extends FixedSizeIntegerDatatype
     public ResourceClass getNonCanonicalLiteralClass()
     {
         return lexInt;
+    }
+
+
+    @Override
+    public Datatype getSuperType()
+    {
+        return xsdLongType;
     }
 }

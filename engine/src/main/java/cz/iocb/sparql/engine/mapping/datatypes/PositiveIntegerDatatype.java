@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.mapping.datatypes;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genPositiveInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexPositiveInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdPositiveInteger;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdNonNegativeIntegerType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdPositiveIntegerIri;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -41,5 +42,12 @@ public final class PositiveIntegerDatatype extends VariableSizeIntegerDataType
     public ResourceClass getNonCanonicalLiteralClass()
     {
         return lexPositiveInteger;
+    }
+
+
+    @Override
+    public Datatype getSuperType()
+    {
+        return xsdNonNegativeIntegerType;
     }
 }

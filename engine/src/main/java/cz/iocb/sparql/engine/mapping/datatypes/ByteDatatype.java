@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genByte;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexByte;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdByte;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdByteIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdShortType;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
@@ -41,5 +42,12 @@ public final class ByteDatatype extends FixedSizeIntegerDatatype
     public ResourceClass getNonCanonicalLiteralClass()
     {
         return lexByte;
+    }
+
+
+    @Override
+    public Datatype getSuperType()
+    {
+        return xsdShortType;
     }
 }

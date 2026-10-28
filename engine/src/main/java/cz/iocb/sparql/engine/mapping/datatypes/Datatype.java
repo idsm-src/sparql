@@ -1,5 +1,8 @@
 package cz.iocb.sparql.engine.mapping.datatypes;
 
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDecimalType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDoubleType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdFloatType;
 import java.util.Objects;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Iri;
@@ -103,6 +106,61 @@ public abstract sealed class Datatype permits BooleanDatatype, GenericIntegerDat
     public Iri getTypeIri()
     {
         return typeIri;
+    }
+
+
+    /**
+     * Datatype this datatype is derived from by restriction in XML Schema (its base type definition): xsd:decimal for
+     * xsd:integer, xsd:integer for xsd:long and xsd:nonNegativeInteger, and so on down to xsd:byte and
+     * xsd:unsignedByte. Null for a primitive datatype and for a datatype whose derivation the engine does not model.
+     *
+     * @return datatype this datatype is derived from, or null
+     */
+    public Datatype getSuperType()
+    {
+        return null;
+    }
+
+
+    /**
+     * True if this datatype is the given datatype or is derived from it by restriction, directly or through other
+     * datatypes (see {@link #getSuperType}).
+     *
+     * @param datatype the datatype
+     * @return true if this datatype is the given datatype or is derived from it, false otherwise
+     */
+    public final boolean isDerivedFrom(Datatype datatype)
+    {
+        for(Datatype type = this; type != null; type = type.getSuperType())
+            if(type.equals(datatype))
+                return true;
+
+        return false;
+    }
+
+
+    /**
+     * True if XPath takes a value of this datatype for a value of the given datatype as an argument of a function: this
+     * datatype is derived from it (subtype substitution), or it is xsd:double and this datatype is derived from
+     * xsd:float or xsd:decimal, or it is xsd:float and this datatype is derived from xsd:decimal (numeric type
+     * promotion). A function of SPARQL takes such a value too, and so does an extension function (see
+     * {@link cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode#getAcceptedClass}).
+     *
+     * @param datatype the datatype of the argument the function takes
+     * @return true if XPath takes a value of this datatype for a value of the given datatype, false otherwise
+     */
+    public final boolean isPromotableTo(Datatype datatype)
+    {
+        if(isDerivedFrom(datatype))
+            return true;
+
+        if(datatype.equals(xsdDoubleType))
+            return isDerivedFrom(xsdFloatType) || isDerivedFrom(xsdDecimalType);
+
+        if(datatype.equals(xsdFloatType))
+            return isDerivedFrom(xsdDecimalType);
+
+        return false;
     }
 
 

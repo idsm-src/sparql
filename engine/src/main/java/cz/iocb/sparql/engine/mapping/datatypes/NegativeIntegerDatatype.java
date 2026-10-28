@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genNegativeIn
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexNegativeInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdNegativeInteger;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdNegativeIntegerIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdNonPositiveIntegerType;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
@@ -41,5 +42,12 @@ public final class NegativeIntegerDatatype extends VariableSizeIntegerDataType
     public ResourceClass getNonCanonicalLiteralClass()
     {
         return lexNegativeInteger;
+    }
+
+
+    @Override
+    public Datatype getSuperType()
+    {
+        return xsdNonPositiveIntegerType;
     }
 }

@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.mapping.datatypes;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genNonPositiveInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexNonPositiveInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdNonPositiveInteger;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdNonPositiveIntegerIri;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -41,5 +42,12 @@ public final class NonPositiveIntegerDatatype extends VariableSizeIntegerDataTyp
     public ResourceClass getNonCanonicalLiteralClass()
     {
         return lexNonPositiveInteger;
+    }
+
+
+    @Override
+    public Datatype getSuperType()
+    {
+        return xsdIntegerType;
     }
 }

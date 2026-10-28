@@ -29,15 +29,15 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDecimal;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDerivatedFromInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDerivedFromInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDerivedFromInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDerivedFromLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDerivedFromShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloatPoint;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isRepresentableAsInt;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isRepresentableAsLong;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isRepresentableAsShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isUnsupportedLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
@@ -936,11 +936,14 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
 
 
     /**
-     * Numeric class in which the operands are compared, by promotion of all their classes.
+     * Numeric class in which the operands are compared: the least datatype every class of the operands is derived from
+     * or promoted to, so that taking the operands in it is the function conversion of XPath (see
+     * {@link cz.iocb.sparql.engine.mapping.datatypes.Datatype#isPromotableTo}); xsd:short, xsd:int and xsd:long keep
+     * the comparison of their own and their derived datatypes in their SQL types.
      *
      * @param lset classes of the left operand
      * @param rset classes of the right operand
-     * @return numeric class in which the operands are compared, by promotion of all their classes
+     * @return numeric class in which the operands are compared
      */
     private static ResourceClass determineNumericComparisonType(Set<ResourceClass> lset, Set<ResourceClass> rset)
     {
@@ -955,16 +958,16 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
         if(all.stream().anyMatch(c -> isDecimal(c)))
             return xsdDecimal;
 
-        if(all.stream().allMatch(c -> isRepresentableAsShort(c)))
+        if(all.stream().allMatch(c -> isDerivedFromShort(c)))
             return xsdShort;
 
-        if(all.stream().allMatch(c -> isRepresentableAsInt(c)))
+        if(all.stream().allMatch(c -> isDerivedFromInt(c)))
             return xsdInt;
 
-        if(all.stream().allMatch(c -> isRepresentableAsLong(c)))
+        if(all.stream().allMatch(c -> isDerivedFromLong(c)))
             return xsdLong;
 
-        if(all.stream().allMatch(c -> isDerivatedFromInteger(c)))
+        if(all.stream().allMatch(c -> isDerivedFromInteger(c)))
             return xsdInteger;
 
         throw new IllegalArgumentException();

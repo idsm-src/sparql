@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.mapping.datatypes;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUnsignedLong;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexUnsignedLong;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedLong;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdNonNegativeIntegerType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedLongIri;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -41,5 +42,12 @@ public final class UnsignedLongDatatype extends FixedSizeIntegerDatatype
     public ResourceClass getNonCanonicalLiteralClass()
     {
         return lexUnsignedLong;
+    }
+
+
+    @Override
+    public Datatype getSuperType()
+    {
+        return xsdNonNegativeIntegerType;
     }
 }

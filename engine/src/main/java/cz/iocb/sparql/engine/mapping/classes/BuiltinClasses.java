@@ -3,7 +3,11 @@ package cz.iocb.sparql.engine.mapping.classes;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.subtract;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdLongType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdShortType;
 import java.util.List;
+import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.rdf.DirLangStringLiteral.Direction;
 
 
@@ -504,6 +508,21 @@ public class BuiltinClasses
             genUnsignedShort, genInt, genUnsignedInt, genLong, genUnsignedLong, genInteger, genNonPositiveInteger,
             genNegativeInteger, genNonNegativeInteger, genPositiveInteger, genDecimal, genFloat, genDouble);
 
+    /**
+     * xsd:short and the datatype derived from it (xsd:byte).
+     */
+    public static final ResourceClass shortDerived = derivedFrom(xsdShortType);
+
+    /**
+     * xsd:int and the datatypes derived from it.
+     */
+    public static final ResourceClass intDerived = derivedFrom(xsdIntType);
+
+    /**
+     * xsd:long and the datatypes derived from it.
+     */
+    public static final ResourceClass longDerived = derivedFrom(xsdLongType);
+
 
     /**
      * Not instantiable.
@@ -634,50 +653,80 @@ public class BuiltinClasses
 
 
     /**
-     * True if every value of the class is an integer-derived numeric.
+     * Numeric base classes of the datatype and of the datatypes derived from it by restriction (see
+     * {@link Datatype#getSuperType}), the datatypes XPath substitutes for it.
+     *
+     * @param datatype the datatype
+     * @return numeric base classes of the datatype and of the datatypes derived from it
+     */
+    public static ResourceClass derivedFrom(Datatype datatype)
+    {
+        return unionize(numericBaseClasses.stream()
+                .filter(c -> c instanceof LiteralClass l && l.getDatatype().isDerivedFrom(datatype))
+                .toArray(ResourceClass[]::new));
+    }
+
+
+    /**
+     * Numeric base classes of the datatypes XPath substitutes or promotes to the datatype (see
+     * {@link Datatype#isPromotableTo}).
+     *
+     * @param datatype the datatype
+     * @return numeric base classes of the datatypes XPath substitutes or promotes to the datatype
+     */
+    public static ResourceClass promotableTo(Datatype datatype)
+    {
+        return unionize(numericBaseClasses.stream()
+                .filter(c -> c instanceof LiteralClass l && l.getDatatype().isPromotableTo(datatype))
+                .toArray(ResourceClass[]::new));
+    }
+
+
+    /**
+     * True if every value of the class is of xsd:short or of the datatype derived from it.
      *
      * @param resClass the resource class
-     * @return true if every value of the class is an integer-derived numeric, false otherwise
+     * @return true if every value of the class is of xsd:short or of the datatype derived from it, false otherwise
      */
-    public static boolean isDerivatedFromInteger(ResourceClass resClass)
+    public static boolean isDerivedFromShort(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(shortDerived);
+    }
+
+
+    /**
+     * True if every value of the class is of xsd:int or of a datatype derived from it.
+     *
+     * @param resClass the resource class
+     * @return true if every value of the class is of xsd:int or of a datatype derived from it, false otherwise
+     */
+    public static boolean isDerivedFromInt(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(intDerived);
+    }
+
+
+    /**
+     * True if every value of the class is of xsd:long or of a datatype derived from it.
+     *
+     * @param resClass the resource class
+     * @return true if every value of the class is of xsd:long or of a datatype derived from it, false otherwise
+     */
+    public static boolean isDerivedFromLong(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(longDerived);
+    }
+
+
+    /**
+     * True if every value of the class is of xsd:integer or of a datatype derived from it.
+     *
+     * @param resClass the resource class
+     * @return true if every value of the class is of xsd:integer or of a datatype derived from it, false otherwise
+     */
+    public static boolean isDerivedFromInteger(ResourceClass resClass)
     {
         return resClass.isSubclassOf(integerNumeric);
-    }
-
-
-    /**
-     * True if every value of the class is a numeric representable as smallint.
-     *
-     * @param resClass the resource class
-     * @return true if every value of the class is a numeric representable as smallint, false otherwise
-     */
-    public static boolean isRepresentableAsShort(ResourceClass resClass)
-    {
-        return resClass.isSubclassOf(shortNumeric);
-    }
-
-
-    /**
-     * True if every value of the class is a numeric representable as integer.
-     *
-     * @param resClass the resource class
-     * @return true if every value of the class is a numeric representable as integer, false otherwise
-     */
-    public static boolean isRepresentableAsInt(ResourceClass resClass)
-    {
-        return resClass.isSubclassOf(intNumeric);
-    }
-
-
-    /**
-     * True if every value of the class is a numeric representable as bigint.
-     *
-     * @param resClass the resource class
-     * @return true if every value of the class is a numeric representable as bigint, false otherwise
-     */
-    public static boolean isRepresentableAsLong(ResourceClass resClass)
-    {
-        return resClass.isSubclassOf(longNumeric);
     }
 
 

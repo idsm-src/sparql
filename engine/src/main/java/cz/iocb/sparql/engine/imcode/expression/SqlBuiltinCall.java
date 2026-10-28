@@ -60,7 +60,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDateOrDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDateTime;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDerivatedFromInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDerivedFromInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLanguageTaggedString;
@@ -1826,9 +1826,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     return SqlNull.get();
 
                 boolean additionalCanBeNull = location.canBeNull() || length != null && length.canBeNull()
-                        || location.getResourceClasses().stream().anyMatch(r -> !isDerivatedFromInteger(r))
+                        || location.getResourceClasses().stream().anyMatch(r -> !isDerivedFromInteger(r))
                         || length != null
-                                && length.getResourceClasses().stream().anyMatch(r -> !isDerivatedFromInteger(r));
+                                && length.getResourceClasses().stream().anyMatch(r -> !isDerivedFromInteger(r));
 
                 boolean canBeNull = additionalCanBeNull || argument.canBeNull()
                         || argument.getResourceClasses().stream().anyMatch(r -> !isStringLiteral(r));

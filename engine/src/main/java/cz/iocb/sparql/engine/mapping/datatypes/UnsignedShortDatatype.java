@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.mapping.datatypes;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUnsignedShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexUnsignedShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedShort;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedIntType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedShortIri;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -41,5 +42,12 @@ public final class UnsignedShortDatatype extends FixedSizeIntegerDatatype
     public ResourceClass getNonCanonicalLiteralClass()
     {
         return lexUnsignedShort;
+    }
+
+
+    @Override
+    public Datatype getSuperType()
+    {
+        return xsdUnsignedIntType;
     }
 }
