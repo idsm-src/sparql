@@ -1,0 +1,463 @@
+/*
+ * The styles of the page of the endpoint. The editor, the web component of Ontotext, comes in the colours of Ontotext
+ * and with fonts of its own; these rules give it the look of the SPARQL GUI of IDSM, whose colours and font come from
+ * Bootstrap; the ID outweighs the selectors of the component styles.
+ */
+
+
+*, ::before, ::after {
+  box-sizing: border-box;
+}
+
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial,
+      sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #212529;
+  background-color: #fff;
+}
+
+
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+
+#yasgui ontotext-yasgui {
+
+  /* the menu of the run button offers only the explain plans of GraphDB */
+  query-split-button {
+    display: none;
+  }
+
+  .ontotext-dropdown-button, .ontotext-dropdown-menu-item, .yasqe-footer-buttons .abort-button,
+      .editable-text-field-wrapper .save-btn {
+    background-color: #0d6efd;
+  }
+
+  .ontotext-dropdown-button {
+    padding: 0.375rem 0.75rem;
+    border: 1px solid transparent;
+    border-radius: 0.375rem;
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  .ontotext-dropdown-menu-item:hover, .editable-text-field-wrapper .save-btn:hover {
+    background-color: #0b5ed7;
+  }
+
+  /* the run button is the play icon at the top of the editor, as in the editor used before, with the other buttons
+     below it and in their colours; its second outline runs around it during a query, and an invalid query gets a
+     warning */
+  .yasqe_buttons {
+    align-items: flex-end;
+    gap: 2px;
+
+    /* the run button and the other buttons come in different groups, which are dissolved into one column */
+    .yasqe_buttons-top, .yasqe_buttons-bottom {
+      display: contents;
+    }
+
+    .yasqe_tooltip_queryButton {
+      order: -1;
+    }
+
+    /* the icons of the buttons are equally wide: the line icons take about 0.85 of their font size, the play icon
+       about 0.9 of its height and its outline */
+    .custom-button {
+      width: 36px;
+      height: 36px;
+      margin: 0;
+      padding: 0;
+      font-size: 31px;
+    }
+
+    .keyboard-shortcuts-dialog-button {
+      margin-top: auto;
+    }
+
+    .yasqe_queryButton {
+      position: relative;
+      width: 36px;
+      height: 36px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: none;
+
+      svg {
+        display: block;
+      }
+
+      .queryIcon {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        svg {
+          width: 26px;
+          height: 26px;
+          overflow: visible;
+        }
+
+        path:not(.loadingIcon) {
+          fill: #e7f1ff;
+          stroke: #0d6efd;
+          stroke-width: 2px;
+          vector-effect: non-scaling-stroke;
+        }
+      }
+
+      &:hover .queryIcon path:not(.loadingIcon) {
+        stroke: #0a58ca;
+      }
+
+      .warningIcon {
+        display: none;
+        position: absolute;
+        top: 0;
+        right: 0;
+
+        svg {
+          width: 12px;
+          height: 12px;
+          fill: #dc3545;
+        }
+      }
+
+      &.query_error .warningIcon {
+        display: block;
+      }
+
+      &.busy .loadingIcon {
+        stroke: #0d6efd;
+        stroke-width: 8px;
+        stroke-dasharray: 100;
+        animation: editor-query-busy 1.5s linear infinite;
+      }
+    }
+  }
+
+  /* the menu of the download button is wider than the button, and from its left edge it would reach past the page; it
+     is set off the rounded button as a dropdown of Bootstrap */
+  .ontotext-dropdown {
+    position: relative;
+  }
+
+  .ontotext-dropdown-menu {
+    right: 0;
+    min-width: 100%;
+    margin-top: 0.125rem;
+    border-radius: 0.375rem;
+    overflow: hidden;
+  }
+
+  /* the bar with the views of the results scrolls horizontally, which would clip the menu below the bar; with the
+     pivot table, the charts and the map disabled its items fit */
+  .yasr .yasr_btnGroup {
+    overflow: visible;
+  }
+
+  .copy-link-dialog .primary-button {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+
+    &:hover, &:focus {
+      background-color: #0b5ed7;
+      border-color: #0b5ed7;
+    }
+  }
+
+  /* the lines of the icons are a little thinner, as a stroke in the colour of the background narrows them */
+  .yasqe_buttons .custom-button, .yasr .yasr-fullscreen-button {
+    color: #0d6efd;
+    -webkit-text-stroke: 0.5px #fff;
+
+    &:hover {
+      color: #0a58ca;
+    }
+  }
+
+  /* the fullscreen button of the results looks as the one of the editor; the bold weight would thicken the icon, and
+     the larger icon is lowered to the middle of the labels of the views */
+  .yasr .yasr-fullscreen-button {
+    position: relative;
+    top: 6px;
+    font-size: 31px;
+    font-weight: normal;
+  }
+
+  /* the tabs look as in the editor used before: underlined labels without boxes and a plain plus that adds a tab */
+  .tabsList .tab {
+    align-items: center;
+    justify-content: center;
+    min-width: 120px;
+    min-height: 35px;
+    margin: 0;
+    padding: 0 24px 0 30px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background-color: transparent;
+    color: #6c757d;
+    font-size: 15px;
+    font-weight: 500;
+
+    &:hover {
+      border-bottom-color: #9fc4e4;
+      color: #495057;
+    }
+
+    &.active {
+      border-bottom-color: #337ab7;
+      color: #495057;
+    }
+
+    .closeTab {
+      margin-left: 7px;
+      line-height: 1;
+      color: #000;
+      opacity: 0.2;
+
+      &:hover {
+        color: #000;
+        opacity: 0.5;
+      }
+    }
+
+    &.active .loader {
+      background-color: #9fc4e4;
+    }
+
+    &:hover .loader {
+      background-color: #337ab7;
+    }
+  }
+
+  .tabsList .create-tab-tab {
+    margin: 0;
+    background-color: transparent;
+  }
+
+  .tabsList .addTab {
+    margin-left: 15px;
+    padding: 0 5px 2px;
+    color: #0d6efd;
+
+    i::before {
+      content: "+";
+      font-family: inherit;
+    }
+
+    &:hover {
+      color: #0d6efd;
+      transform: scale(1.1);
+
+      i {
+        transform: none;
+      }
+    }
+  }
+
+  /* the settings button takes a square at the start of the control bar, which Yasgui limits to the height of the tabs
+     and below which it places the menu of the settings */
+  .controlbar .tabContextButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 35px;
+    height: 35px;
+    padding: 0;
+
+    /* the icon sits on a line of text as an inline image, which puts it below the middle of the bar */
+    svg {
+      display: block;
+    }
+  }
+
+  /* the endpoint field has a heavier border than the other fields, and with its margins it is higher than the control
+     bar, so it reaches into the editor; it is lowered to keep a small gap above the editor */
+  .controlbar .autocompleteWrapper {
+    margin-left: 0;
+  }
+
+  .controlbar .autocomplete {
+    margin: 2px 0 3px;
+    padding: 2px 6px;
+    border: 1px solid #d1d1d1;
+
+    &:focus {
+      border-color: #99bddb;
+    }
+  }
+
+  /* the list of endpoints is moved up by the bottom margin of the field */
+  .controlbar .autocompleteList {
+    margin-top: -3px;
+  }
+
+  /* the loader shows the animated logo of Ontotext, so a spinner as the one of Bootstrap takes its place */
+  .ontotext-yasgui-loader .loader-component > div:first-child {
+    svg {
+      display: none;
+    }
+
+    &::before {
+      content: "";
+      display: inline-block;
+      width: 2rem;
+      height: 2rem;
+      margin: 1rem 0 0.5rem;
+      border: 0.25em solid #337ab7;
+      border-right-color: transparent;
+      border-radius: 50%;
+      animation: editor-spinner 0.75s linear infinite;
+    }
+  }
+
+  .yasr .yasr_header, .yasr .yasr_header .yasr_response_chip {
+    background-color: #e9ecef;
+  }
+
+  .yasr table.dataTable thead th {
+    background-color: #f8f9fa;
+  }
+
+  /* the lines around the boxes and between the cells of the table are as dark as in the editor used before */
+  .CodeMirror, .tableFilter {
+    border-color: #d1d1d1;
+  }
+
+  /* every cell draws only its right and bottom lines and the table the top and left ones, as the lines of neighbouring
+     cells would double; the lines between the columns are lighter, the editor used before had none */
+  .yasr table.dataTable {
+    border: solid #d9d9d9;
+    border-width: 1px 0 0 1px;
+
+    th, td {
+      border: solid #d9d9d9;
+      border-width: 0 1px 1px 0;
+      border-right-color: #e9ecef;
+    }
+
+    th:last-child, td:last-child {
+      border-right-color: #d9d9d9;
+    }
+  }
+
+  /* the notices of the results look as the alerts of Bootstrap, and the success ones, such as the one about no results
+     yet, are grey */
+  .yasr .alert-box.alert {
+    margin-bottom: 1rem;
+    border-radius: 0.375rem;
+  }
+
+  .yasr .alert-box.alert-success {
+    color: #2b2f32;
+    background-color: #e2e3e5;
+    border-color: #c4c8cb;
+  }
+
+  /* the arrow of a long error message and the icons of the notices come from a font of Ontotext that its package
+     lacks, so remixicon draws them */
+  .show-full-message-link::after, .show-less-message-link::after, .alert-info::before, .alert-warning::before,
+      .alert-help::before, .alert-danger::before, .alert-success::before {
+    font-family: remixicon !important;
+  }
+
+  .show-full-message-link::after, .show-less-message-link::after {
+    content: "\ea78";
+  }
+
+  .alert-info::before {
+    content: "\ee59";
+  }
+
+  .alert-warning::before {
+    content: "\eca1";
+  }
+
+  .alert-help::before {
+    content: "\f045";
+  }
+
+  .alert-danger::before {
+    content: "\eb97";
+  }
+
+  .alert-success::before {
+    content: "\eb81";
+  }
+
+  /* the check boxes of the table follow their labels, as the markup is meant for toggle switches, so they are moved
+     in front of them and spaced as in Bootstrap */
+  .tableControls .switch {
+    gap: 0.5em;
+    margin-right: 1rem;
+
+    input {
+      order: -1;
+      margin: 0;
+    }
+  }
+
+  /* the label of the download button inherits the icon font of remixicon, and the dialogs ask for Roboto */
+  .keyboard-shortcuts-dialog-button, .ontotext-dropdown-button .button-name, .dialog-overlay, .dialog {
+    font-family: inherit;
+  }
+
+  /* the component lays out the content of the cells as flex items, so the term is a single one, which keeps the spaces
+     between its parts */
+  .sparql-cell {
+    display: flex;
+    align-items: center;
+    word-break: break-all;
+    hyphens: auto;
+
+    .literal-value {
+      white-space: pre-wrap;
+    }
+  }
+
+  /* the compact view of the component shortens only the cells of its own renderer */
+  .extendedTableEllipseTable .sparql-cell {
+    word-break: normal;
+
+    .sparql-term {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .literal-value {
+      white-space: nowrap;
+    }
+  }
+}
+
+
+/* the autocompletion hints are appended to the body */
+.CodeMirror-hints .CodeMirror-hint b {
+  color: #337ab7;
+}
+
+
+@keyframes editor-query-busy {
+  to {
+    stroke-dashoffset: 200;
+  }
+}
+
+
+@keyframes editor-spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}

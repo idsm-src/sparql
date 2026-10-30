@@ -61,8 +61,8 @@ import cz.iocb.sparql.engine.translator.ServiceException;
  * SPARQL 1.2 (by the parameter, by the VERSION declaration or by the {@code version} parameter of an accepted media
  * type), the result announces RDF 1.2 too: by the {@code version} member of the JSON head, by the VERSION directive of
  * Turtle, TriG, N-Triples and N-Quads, and by the {@code version} parameter of their media types. A GET without a query
- * serves the bundled YASGUI page to browsers and the service description otherwise; {@code ?info} returns a JSON
- * summary of prefixes, properties and classes. Init parameters: {@code resource} (JNDI name of the configuration),
+ * serves the page with the SPARQL editor to browsers and the service description otherwise; {@code ?info} returns a
+ * JSON summary of prefixes, properties and classes. Init parameters: {@code resource} (JNDI name of the configuration),
  * {@code fetch-size}, {@code timeout} and {@code max-timeout} (seconds), {@code sql-query-size-limit}.
  */
 public class EndpointServlet extends HttpServlet
@@ -71,6 +71,17 @@ public class EndpointServlet extends HttpServlet
      * Serialization version.
      */
     private static final long serialVersionUID = 1L;
+
+    /**
+     * The SPARQL editor of the page, the web component of Ontotext (ontotext-yasgui-web-component), on a CDN.
+     */
+    private static final String EDITOR_SCRIPT = "https://cdn.jsdelivr.net/npm/ontotext-yasgui-web-component@1.8.5"
+            + "/dist/ontotext-yasgui-web-component/ontotext-yasgui-web-component.esm.js";
+
+    /**
+     * The icon font that the SPARQL editor uses, on a CDN.
+     */
+    private static final String EDITOR_ICONS = "https://cdn.jsdelivr.net/npm/remixicon@4.9.1/fonts/remixicon.css";
 
 
     /**
@@ -861,7 +872,8 @@ public class EndpointServlet extends HttpServlet
 
 
     /**
-     * Serves the bundled YASGUI page with the embedded endpoint script.
+     * Serves the page with the SPARQL editor, which the page loads from a CDN, and with the embedded styles and script
+     * that set the editor up for the endpoint.
      *
      * @param res the HTTP response
      * @throws IOException on output errors
@@ -879,25 +891,18 @@ public class EndpointServlet extends HttpServlet
                         <meta charset='utf-8'>
                         <meta name='viewport' content='width=device-width, initial-scale=1'>
                         <title>YASGUI</title>
+                        <link rel='stylesheet' href='%s'>
+                        <script type='module' src='%s'></script>
                         <style>
-                    """);
+                    """.formatted(EDITOR_ICONS, EDITOR_SCRIPT));
 
-                try(InputStream stream = getClass().getResourceAsStream("yasgui.min.css"))
-                {
-                    stream.transferTo(res.getOutputStream());
-                }
-
-        res.getOutputStream().print(
-                "    </style>\n" +
-                "    <script>\n");
-
-        try(InputStream stream = getClass().getResourceAsStream("yasgui.min.js"))
+        try(InputStream stream = getClass().getResourceAsStream("endpoint.css"))
         {
             stream.transferTo(res.getOutputStream());
         }
 
         res.getOutputStream().print(
-                "    </script>\n" +
+                "    </style>\n" +
                 "    <script>\n");
 
         try(InputStream stream = getClass().getResourceAsStream("endpoint.js"))
@@ -910,7 +915,7 @@ public class EndpointServlet extends HttpServlet
                       </script>
                       </head>
                       <body>
-                        <div id='yasgui'></div>
+                        <div id='yasgui'><ontotext-yasgui></ontotext-yasgui></div>
                       </body>
                     </html>
                     """);
