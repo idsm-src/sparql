@@ -165,16 +165,6 @@ button, input, select, textarea {
     overflow: visible;
   }
 
-  .copy-link-dialog .primary-button {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
-
-    &:hover, &:focus {
-      background-color: #0b5ed7;
-      border-color: #0b5ed7;
-    }
-  }
-
   /* the lines of the icons are a little thinner, as a stroke in the colour of the background narrows them */
   .yasqe_buttons .custom-button, .yasr .yasr-fullscreen-button {
     color: #0d6efd;
@@ -438,6 +428,59 @@ button, input, select, textarea {
 
     .literal-value {
       white-space: nowrap;
+    }
+  }
+}
+
+
+/* the confirmation of closing a tab is appended to the body, outside the editor */
+body > confirmation-dialog {
+  .dialog-overlay, .dialog {
+    font-family: inherit;
+  }
+}
+
+
+/* the dialogs have the orange and square buttons of Ontotext, so they get the buttons of Bootstrap, the secondary one
+   for cancelling; the confirmation of closing a tab focuses its cancel button, which looks hovered only when focused
+   from the keyboard, as in Bootstrap */
+ontotext-dialog-web-component, confirmation-dialog {
+  .dialog .dialog-footer {
+    button {
+      padding: 0.375rem 0.75rem;
+      border-radius: 0.375rem;
+      font-size: 1rem;
+      line-height: 1.5;
+
+      &:focus-visible {
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+      }
+    }
+
+    .confirm-button, .primary-button {
+      &, &:focus {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+        color: #fff;
+      }
+
+      &:hover, &:focus-visible {
+        background-color: #0b5ed7;
+        border-color: #0a58ca;
+      }
+    }
+
+    .cancel-button {
+      &, &:focus {
+        background-color: #6c757d;
+        border-color: #6c757d;
+        color: #fff;
+      }
+
+      &:hover, &:focus-visible {
+        background-color: #5c636a;
+        border-color: #565e64;
+      }
     }
   }
 }
