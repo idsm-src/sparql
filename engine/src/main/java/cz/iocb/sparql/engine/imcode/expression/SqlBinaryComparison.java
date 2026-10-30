@@ -643,11 +643,6 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             return ComparisonMode.BOOLEAN;
         else if(isString(left) && isString(right))
             return ComparisonMode.DIRECT;
-        else if(operator != EQUAL && operator != NOT_EQUAL)
-            return ComparisonMode.NULL;
-        else if(left.getEffectiveClass() instanceof TripleTermClass
-                && right.getEffectiveClass() instanceof TripleTermClass)
-            return ComparisonMode.TRIPLE_TERM;
         else if(hasNumeric(left) && hasNumeric(right))
             return ComparisonMode.BOX;
         else if(hasDateTime(left) && hasDateTime(right))
@@ -658,6 +653,11 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             return ComparisonMode.BOX;
         else if(hasString(left) && hasString(right))
             return ComparisonMode.BOX;
+        else if(operator != EQUAL && operator != NOT_EQUAL)
+            return ComparisonMode.NULL;
+        else if(left.getEffectiveClass() instanceof TripleTermClass
+                && right.getEffectiveClass() instanceof TripleTermClass)
+            return ComparisonMode.TRIPLE_TERM;
         else if(isLiteral(left) && isLiteral(right) && ResourceClass.areDisjunct(relations, left, right))
             return isUnsupportedLiteral(left) || isUnsupportedLiteral(right) ? ComparisonMode.NULL :
                     ComparisonMode.DIFF;
