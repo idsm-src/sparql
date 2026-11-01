@@ -50,16 +50,21 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.sql.DataSource;
+import cz.iocb.sparql.engine.database.CatalogStatistics;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.DatabaseTable;
+import cz.iocb.sparql.engine.database.DefaultStatistics;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.TableColumn;
+import cz.iocb.sparql.engine.database.TableStatistics;
 import cz.iocb.sparql.engine.database.ValueColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.database.VirtualTableDefinition;
@@ -186,6 +191,12 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * Cache of IRI class detections shared by all requests.
      */
     protected final IriCache iriCache = new IriCache(10000);
+
+    /**
+     * Statistics of the tables the mappings read, by table: those registered by the deployment and those read from the
+     * catalog on first use (see {@link #getTableStatistics}).
+     */
+    protected final Map<SourceTable, TableStatistics> tableStatistics = new ConcurrentHashMap<>();
 
     /**
      * Settings of the calls of the remote SERVICE endpoints that have no settings of their own.
@@ -1640,6 +1651,34 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     public final IriCache getIriCache()
     {
         return iriCache;
+    }
+
+
+    /**
+     * Registers the statistics of a table the mappings read, in place of those of the catalog (see
+     * {@link #getTableStatistics}).
+     *
+     * @param table the table
+     * @param statistics the statistics of the table
+     */
+    public void addTableStatistics(SourceTable table, TableStatistics statistics)
+    {
+        tableStatistics.put(table, statistics);
+    }
+
+
+    /**
+     * Statistics of a table the mappings read: those registered for it, else the statistics of the catalog for a
+     * database table (see {@link CatalogStatistics}) and the defaults of the planner for any other table (see
+     * {@link DefaultStatistics}), kept from then on.
+     *
+     * @param table the table
+     * @return statistics of the table
+     */
+    public TableStatistics getTableStatistics(SourceTable table)
+    {
+        return tableStatistics.computeIfAbsent(table, t -> t instanceof DatabaseTable databaseTable ?
+                new CatalogStatistics(databaseTable) : new DefaultStatistics());
     }
 
 
