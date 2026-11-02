@@ -524,6 +524,18 @@ public class Request implements AutoCloseable
 
             logger.trace("query evaluation");
 
+            if(config.isJoinOptimizerEnabled())
+            {
+                // the joins are written in the order and with the methods the engine has chosen: the planner must keep
+                // the order of the explicit joins and hash them (a merge join would sort the values, which is slow for
+                // boxes), the index lookups being forced by lateral subqueries (see JoinOptimizer); the settings last
+                // until the end of the transaction of the request
+                Statement statement = getStatement();
+                statement.execute("SET LOCAL join_collapse_limit = 1");
+                statement.execute("SET LOCAL enable_nestloop = off");
+                statement.execute("SET LOCAL enable_mergejoin = off");
+            }
+
             return new Result(type, imcode.getResultDescription(), getStatement(fetchSize).executeQuery(code), begin,
                     timeout);
         }

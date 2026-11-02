@@ -899,6 +899,19 @@ public final class SqlRecursive extends SqlIntercode
             builder.append(") AS ");
             builder.append(right);
         }
+        else if(request.getConfiguration().isJoinOptimizerEnabled() && next instanceof SqlTableAccess access
+                && access.getTable() != null)
+        {
+            // with the join optimizer on, the planner is told not to nest loops, so a step reading a table is looked
+            // up laterally through an index of the table for every row of the recursion instead of being hashed whole
+            // in every round (see JoinOptimizer)
+            String condition = generateJoinCondition(relations, tmp, access.getInternalVariableBindings(), left, null);
+
+            builder.append(" CROSS JOIN LATERAL (");
+            builder.append(access.translateLateral(request, condition != null ? condition : "true"));
+            builder.append(") AS ");
+            builder.append(right);
+        }
         else
         {
             builder.append(", (");

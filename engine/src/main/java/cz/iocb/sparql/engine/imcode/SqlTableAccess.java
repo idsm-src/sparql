@@ -1600,6 +1600,36 @@ public final class SqlTableAccess extends SqlIntercode
     @Override
     public String translate(Request request)
     {
+        return translate(request, null);
+    }
+
+
+    /**
+     * SQL of the access evaluated for a row of the outer tables it is joined with laterally: the correlated condition,
+     * which refers to the columns of the outer tables, restricts the rows along with the conditions of the access, and
+     * the subquery is fenced by {@code OFFSET 0}, so that the planner does not flatten it into the outer join but looks
+     * the rows up through an index of the table for every outer row (see {@link JoinOptimizer}).
+     *
+     * @param request the current request
+     * @param correlatedCondition SQL condition over the columns of the table and of the outer tables
+     * @return SQL of the access evaluated for a row of the outer tables
+     */
+    public String translateLateral(Request request, String correlatedCondition)
+    {
+        return translate(request, correlatedCondition);
+    }
+
+
+    /**
+     * SQL of the access, restricted and fenced for a lateral join when the correlated condition is given (see
+     * {@link #translateLateral}).
+     *
+     * @param request the current request
+     * @param correlatedCondition SQL condition over the columns of the table and of the outer tables, or null
+     * @return SQL of the access
+     */
+    private String translate(Request request, String correlatedCondition)
+    {
         Map<Column, Column> rev = getExpressions();
 
         boolean canBeLimited = reduced;
@@ -1658,7 +1688,7 @@ public final class SqlTableAccess extends SqlIntercode
             builder.append(table);
         }
 
-        appendConditions(builder, conditions);
+        appendConditions(builder, conditions, correlatedCondition);
 
         if(groupColumns != null)
         {
@@ -1668,6 +1698,9 @@ public final class SqlTableAccess extends SqlIntercode
 
         if(existence)
             builder.append(")");
+
+        if(correlatedCondition != null)
+            builder.append(" OFFSET 0");
 
         return builder.toString();
     }
@@ -1713,10 +1746,33 @@ public final class SqlTableAccess extends SqlIntercode
      */
     private static void appendConditions(StringBuilder builder, Conditions conditions)
     {
-        if(conditions.isTrue())
+        appendConditions(builder, conditions, null);
+    }
+
+
+    /**
+     * Appends the WHERE clause of the conditions and of the extra condition, nothing when the conditions always hold
+     * and there is no extra one.
+     *
+     * @param builder the SQL code being built
+     * @param conditions the conditions
+     * @param extra SQL of an extra condition in conjunction with the conditions, or null
+     */
+    private static void appendConditions(StringBuilder builder, Conditions conditions, String extra)
+    {
+        if(conditions.isTrue() && extra == null)
             return;
 
         builder.append(" WHERE ");
+
+        if(conditions.isTrue())
+        {
+            builder.append(extra);
+            return;
+        }
+
+        if(extra != null)
+            builder.append("(");
 
         boolean hasWhere = false;
 
@@ -1775,6 +1831,12 @@ public final class SqlTableAccess extends SqlIntercode
             }
 
             builder.append(")");
+        }
+
+        if(extra != null)
+        {
+            builder.append(") AND ");
+            builder.append(extra);
         }
     }
 

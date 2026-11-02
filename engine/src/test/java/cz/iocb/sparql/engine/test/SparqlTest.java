@@ -231,6 +231,9 @@ public class SparqlTest
         SparqlDatabaseConfiguration integerConfig = new NeXtProtIntegerConfiguration(null, connectionPool, schema);
         SparqlDatabaseConfiguration combinedConfig = new NeXtProtCombinedConfiguration(null, connectionPool, schema);
 
+        // the string configuration runs with the join optimizer of the engine, the other two with the planner's joins
+        stringConfig.setJoinOptimizer(true);
+
         stringEngine = new Engine(stringConfig);
         integerEngine = new Engine(integerConfig);
         combinedEngine = new Engine(combinedConfig);
@@ -427,6 +430,7 @@ public class SparqlTest
         config.addQuadMapping(quadTable, null, subject, predicate, object,
                 config.createIsNullCondition(quadTable, "g"));
         config.addQuadMapping(quadTable, graph, subject, predicate, object);
+        config.setJoinOptimizer(true);
 
         Engine engine = new Engine(config);
 
@@ -873,16 +877,19 @@ public class SparqlTest
         {
             statement.execute("truncate " + quadTable);
 
-            if(quads.isEmpty())
-                return;
+            if(!quads.isEmpty())
+            {
+                List<String> rows = new ArrayList<>(quads.size());
 
-            List<String> rows = new ArrayList<>(quads.size());
+                for(Quad quad : quads)
+                    rows.add("(" + getBoxedTerm(request, quad.graph) + ", " + getBoxedTerm(request, quad.subject) + ", "
+                            + getBoxedTerm(request, quad.predicate) + ", " + getBoxedTerm(request, quad.object) + ")");
 
-            for(Quad quad : quads)
-                rows.add("(" + getBoxedTerm(request, quad.graph) + ", " + getBoxedTerm(request, quad.subject) + ", "
-                        + getBoxedTerm(request, quad.predicate) + ", " + getBoxedTerm(request, quad.object) + ")");
+                statement.execute("insert into " + quadTable + " (g, s, p, o) values " + String.join(", ", rows));
+            }
 
-            statement.execute("insert into " + quadTable + " (g, s, p, o) values " + String.join(", ", rows));
+            // the join optimizer of the engine estimates the joins from the statistics of the table
+            statement.execute("analyze " + quadTable);
         }
     }
 

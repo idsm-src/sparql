@@ -19,10 +19,10 @@ import cz.iocb.sparql.engine.database.VirtualTableDefinition.UnjoinableColumns;
 
 /**
  * Catalog facts about the source tables used by the optimiser and the translator: the columns with their SQL types,
- * nullable columns, unique keys, foreign keys, column pairs known never to join, the collations of the character
- * columns that do not use the default one, and character columns with a collation that does not order by code points.
- * The facts about database tables are read from the PostgreSQL catalog (or filled in by hand); the facts about virtual
- * tables are merged in from their definitions by {@link #addVirtualTable}.
+ * nullable columns, unique keys, foreign keys, the key columns of the indexes, column pairs known never to join, the
+ * collations of the character columns that do not use the default one, and character columns with a collation that does
+ * not order by code points. The facts about database tables are read from the PostgreSQL catalog (or filled in by
+ * hand); the facts about virtual tables are merged in from their definitions by {@link #addVirtualTable}.
  */
 public class DatabaseSchema
 {
@@ -76,6 +76,26 @@ public class DatabaseSchema
             CROSS JOIN LATERAL unnest(i.indkey::int2[]) WITH ORDINALITY AS k(attnum, position)
             JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum
             WHERE i.indisunique AND i.indisvalid AND i.indpred IS NULL AND i.indexprs IS NULL
+                AND k.position <= i.indnkeyatts
+                AND c.relkind IN ('r', 'v', 'm', 'p', 'f')
+                AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+            ORDER BY i.indexrelid, k.position""";
+
+    /**
+     * Catalog query listing the key columns of every valid btree or hash index of a user relation that is not over an
+     * expression, ordered by the index and the position; a partial index is listed too, its predicate being left
+     * unread, and the included non-key columns are left out.
+     */
+    private static final String indexQuery = """
+            SELECT i.indexrelid, n.nspname, c.relname, a.attname
+            FROM pg_index i
+            JOIN pg_class c ON c.oid = i.indrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            JOIN pg_class ic ON ic.oid = i.indexrelid
+            JOIN pg_am am ON am.oid = ic.relam
+            CROSS JOIN LATERAL unnest(i.indkey::int2[]) WITH ORDINALITY AS k(attnum, position)
+            JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum
+            WHERE i.indisvalid AND i.indexprs IS NULL AND am.amname IN ('btree', 'hash')
                 AND k.position <= i.indnkeyatts
                 AND c.relkind IN ('r', 'v', 'm', 'p', 'f')
                 AND n.nspname NOT IN ('pg_catalog', 'information_schema')
@@ -138,6 +158,11 @@ public class DatabaseSchema
      * Unique keys per table, each as its list of columns.
      */
     protected final Map<SourceTable, List<List<Column>>> primaryKeys = new HashMap<>();
+
+    /**
+     * Indexes per table, each as its list of key columns in the order of the index.
+     */
+    protected final Map<SourceTable, List<List<Column>>> indexes = new HashMap<>();
 
     /**
      * Foreign keys per (parent table, foreign table) pair, each as its set of column pairs.
@@ -215,6 +240,32 @@ public class DatabaseSchema
 
                     if(table != null)
                         addPrimaryKeys(table, columns);
+                }
+
+
+                try(ResultSet keys = statement.executeQuery(indexQuery))
+                {
+                    long index = 0;
+                    SourceTable table = null;
+                    List<Column> columns = new ArrayList<>();
+
+                    while(keys.next())
+                    {
+                        if(keys.getLong(1) != index)
+                        {
+                            if(table != null)
+                                addIndex(table, columns);
+
+                            index = keys.getLong(1);
+                            table = new DatabaseTable(keys.getString(2), keys.getString(3));
+                            columns = new ArrayList<>();
+                        }
+
+                        columns.add(requireColumn(table, keys.getString(4)));
+                    }
+
+                    if(table != null)
+                        addIndex(table, columns);
                 }
 
 
@@ -355,6 +406,9 @@ public class DatabaseSchema
         for(Entry<SourceTable, List<List<Column>>> e : other.primaryKeys.entrySet())
             primaryKeys.put(e.getKey(), new ArrayList<>(e.getValue()));
 
+        for(Entry<SourceTable, List<List<Column>>> e : other.indexes.entrySet())
+            indexes.put(e.getKey(), new ArrayList<>(e.getValue()));
+
         for(Entry<TablePair, List<Set<ColumnPair>>> e : other.foreignKeys.entrySet())
             foreignKeys.put(e.getKey(), new ArrayList<>(e.getValue()));
 
@@ -484,6 +538,51 @@ public class DatabaseSchema
         }
 
         primaryKeyList.add(new ArrayList<>(columns));
+    }
+
+
+    /**
+     * Declares an index of the table over the columns, in the order of the index.
+     *
+     * @param table the table
+     * @param columns the key columns of the index
+     */
+    public void addIndex(SourceTable table, List<Column> columns)
+    {
+        indexes.computeIfAbsent(table, _ -> new ArrayList<>()).add(new ArrayList<>(columns));
+    }
+
+
+    /**
+     * True if the rows of the table with a given value of the column can be looked up by an index when the given other
+     * columns are bound to values too: some index has the column among its key columns and every key column before it
+     * is one of the bound columns.
+     *
+     * @param table the table
+     * @param column the column looked up by
+     * @param bound columns bound to values
+     * @return true if the rows with a given value of the column can be looked up by an index, false otherwise
+     */
+    public boolean canLookUp(SourceTable table, Column column, Set<Column> bound)
+    {
+        List<List<Column>> indexList = indexes.get(table);
+
+        if(indexList == null)
+            return false;
+
+        for(List<Column> index : indexList)
+        {
+            for(Column key : index)
+            {
+                if(key.equals(column))
+                    return true;
+
+                if(!bound.contains(key))
+                    break;
+            }
+        }
+
+        return false;
     }
 
 

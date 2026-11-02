@@ -110,8 +110,10 @@ public final class CatalogStatistics extends TableStatisticsBase
 
 
     /**
-     * Reads the frequency of the value in the column from the list of the most common values of the catalog; the list
-     * is cast to the type of the column so that the value is compared by the equality of the type.
+     * Reads the frequency of the value in the column from the list of the most common values of the catalog, the value
+     * and the values of the list being compared by their text forms (so that a value whose text form the input of the
+     * type does not take back cannot fail the lookup); a failing lookup counts as the value not being among the most
+     * common ones.
      *
      * @param request the current request
      * @param column the column
@@ -120,17 +122,24 @@ public final class CatalogStatistics extends TableStatisticsBase
      */
     private double readFrequency(Request request, TableColumn column, Column value)
     {
-        String sql = "SELECT s.most_common_freqs[array_position(s.most_common_vals::text::" + column.getType() + "[], "
-                + value + ")] FROM pg_stats s WHERE s.schemaname = " + literal(table.getSchema())
-                + " AND s.tablename = " + literal(table.getName()) + " AND s.attname = " + literal(column.getName());
+        String sql = "SELECT s.most_common_freqs[array_position(s.most_common_vals::text::text[], (" + value
+                + ")::text)] FROM pg_stats s WHERE s.schemaname = " + literal(table.getSchema()) + " AND s.tablename = "
+                + literal(table.getName()) + " AND s.attname = " + literal(column.getName());
 
-        return query(request, sql, result -> {
-            if(!result.next())
-                return Double.NaN;
+        try
+        {
+            return query(request, sql, result -> {
+                if(!result.next())
+                    return Double.NaN;
 
-            double frequency = result.getDouble(1);
+                double frequency = result.getDouble(1);
 
-            return result.wasNull() ? Double.NaN : frequency;
-        });
+                return result.wasNull() ? Double.NaN : frequency;
+            });
+        }
+        catch(SQLRuntimeException e)
+        {
+            return Double.NaN;
+        }
     }
 }

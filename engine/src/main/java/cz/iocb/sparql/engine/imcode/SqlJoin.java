@@ -64,6 +64,11 @@ public final class SqlJoin extends SqlIntercode
      */
     private final Map<Column, Column> columnMap;
 
+    /**
+     * The join tree chosen by the optimizer (see {@link #getPlan}), once computed.
+     */
+    private JoinOptimizer.Plan plan;
+
 
     /**
      * Creates the node.
@@ -819,6 +824,21 @@ public final class SqlJoin extends SqlIntercode
     }
 
 
+    /**
+     * The join tree chosen by the optimizer for the children (see {@link JoinOptimizer}), computed on the first call.
+     *
+     * @param request the current request
+     * @return the join tree chosen by the optimizer for the children
+     */
+    JoinOptimizer.Plan getPlan(Request request)
+    {
+        if(plan == null)
+            plan = JoinOptimizer.plan(request, childs);
+
+        return plan;
+    }
+
+
     @Override
     public String translate(Request request)
     {
@@ -837,6 +857,12 @@ public final class SqlJoin extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM ");
+
+        if(request.getConfiguration().isJoinOptimizerEnabled() && childs.size() > 1)
+        {
+            translateTree(request, getPlan(request).root(), builder);
+            return builder.toString();
+        }
 
         for(int i = 0; i < childs.size(); i++)
         {
@@ -859,6 +885,109 @@ public final class SqlJoin extends SqlIntercode
         }
 
         return builder.toString();
+    }
+
+
+    /**
+     * Writes the join tree chosen by the optimizer: a child as its subquery, an index lookup as a lateral subquery of
+     * the access restricted by its equalities with the children of the outer tree (see
+     * {@link SqlTableAccess#translateLateral}), and a hash join as an explicit join of its sides on the equalities
+     * between their children (a cross join when there are none), so that the planner keeps the tree (see
+     * {@link cz.iocb.sparql.engine.request.Request#execute}).
+     *
+     * @param request the current request
+     * @param node the tree
+     * @param builder the SQL code being built
+     * @return the children of the tree, as a bit per child
+     */
+    private int translateTree(Request request, JoinOptimizer.Node node, StringBuilder builder)
+    {
+        ClassRelations relations = request.getConfiguration();
+
+        if(node instanceof JoinOptimizer.Leaf leaf)
+        {
+            builder.append("(");
+            builder.append(childs.get(leaf.child()).translate(request));
+            builder.append(") AS ");
+            builder.append(tables.get(leaf.child()));
+
+            return 1 << leaf.child();
+        }
+
+        if(node instanceof JoinOptimizer.Lookup lookup)
+        {
+            int outer = translateTree(request, lookup.outer(), builder);
+            SqlTableAccess access = (SqlTableAccess) childs.get(lookup.child());
+
+            List<String> conditions = new ArrayList<>();
+
+            for(int i = 0; i < childs.size(); i++)
+            {
+                if((outer >> i & 1) == 0)
+                    continue;
+
+                String condition = generateJoinCondition(relations, childs.get(i).getVariableBindings(),
+                        access.getInternalVariableBindings(), tables.get(i), null);
+
+                if(condition != null)
+                    conditions.add(condition);
+            }
+
+            builder.append(" CROSS JOIN LATERAL (");
+            builder.append(access.translateLateral(request,
+                    conditions.isEmpty() ? "true" : conditions.stream().collect(joining(" AND ", "(", ")"))));
+            builder.append(") AS ");
+            builder.append(tables.get(lookup.child()));
+
+            return outer | 1 << lookup.child();
+        }
+
+        JoinOptimizer.HashJoin join = (JoinOptimizer.HashJoin) node;
+
+        int left = translateTree(request, join.left(), builder);
+
+        StringBuilder rightBuilder = new StringBuilder();
+        int right = translateTree(request, join.right(), rightBuilder);
+
+        List<String> conditions = new ArrayList<>();
+
+        for(int i = 0; i < childs.size(); i++)
+        {
+            if((left >> i & 1) == 0)
+                continue;
+
+            for(int j = 0; j < childs.size(); j++)
+            {
+                if((right >> j & 1) == 0)
+                    continue;
+
+                String condition = generateJoinCondition(relations, childs.get(i).getVariableBindings(),
+                        childs.get(j).getVariableBindings(), tables.get(i), tables.get(j));
+
+                if(condition != null)
+                    conditions.add(condition);
+            }
+        }
+
+        boolean nested = !(join.right() instanceof JoinOptimizer.Leaf);
+
+        builder.append(conditions.isEmpty() ? " CROSS JOIN " : " JOIN ");
+
+        if(nested)
+            builder.append("(");
+
+        builder.append(rightBuilder);
+
+        if(nested)
+            builder.append(")");
+
+        if(!conditions.isEmpty())
+        {
+            builder.append(" ON ");
+            builder.append(conditions.stream().collect(joining(" AND ", "(", ")")));
+        }
+
+        return left | right;
     }
 
 
@@ -1254,6 +1383,10 @@ public final class SqlJoin extends SqlIntercode
     public void generateExplanation(StringBuilder builder, String indent)
     {
         builder.append("join");
+
+        // the tree chosen by the optimizer, when the join has been translated with it
+        if(plan != null)
+            builder.append(" ").append(JoinOptimizer.describe(plan.root()));
 
         for(int i = 0; i < childs.size(); i++)
         {

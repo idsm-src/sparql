@@ -224,6 +224,17 @@ public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpre
     }
 
 
+    /**
+     * The operator.
+     *
+     * @return the operator
+     */
+    public LogicalOperator getOperator()
+    {
+        return operator;
+    }
+
+
     @Override
     public NonConstantBooleanValue getBooleanValue()
     {

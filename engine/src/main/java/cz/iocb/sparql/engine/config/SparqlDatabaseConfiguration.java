@@ -199,6 +199,11 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     protected final Map<SourceTable, TableStatistics> tableStatistics = new ConcurrentHashMap<>();
 
     /**
+     * Whether the engine chooses the order and the methods of the joins it generates (see {@link #setJoinOptimizer}).
+     */
+    protected boolean joinOptimizer = false;
+
+    /**
      * Settings of the calls of the remote SERVICE endpoints that have no settings of their own.
      */
     protected ServiceSettings serviceSettings = ServiceSettings.DEFAULT;
@@ -1679,6 +1684,31 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     {
         return tableStatistics.computeIfAbsent(table, t -> t instanceof DatabaseTable databaseTable ?
                 new CatalogStatistics(databaseTable) : new DefaultStatistics());
+    }
+
+
+    /**
+     * Turns the join optimizer of the engine on or off: when on, the engine chooses the order and the methods of the
+     * joins it generates from the statistics of the tables (see {@link #getTableStatistics}) and makes the planner keep
+     * them, instead of leaving them to the planner (see {@link cz.iocb.sparql.engine.imcode.JoinOptimizer}). Off by
+     * default.
+     *
+     * @param enabled whether the join optimizer is on
+     */
+    public void setJoinOptimizer(boolean enabled)
+    {
+        joinOptimizer = enabled;
+    }
+
+
+    /**
+     * True if the engine chooses the order and the methods of the joins it generates (see {@link #setJoinOptimizer}).
+     *
+     * @return true if the engine chooses the order and the methods of the joins it generates, false otherwise
+     */
+    public boolean isJoinOptimizerEnabled()
+    {
+        return joinOptimizer;
     }
 
 

@@ -1032,6 +1032,17 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     }
 
 
+    /**
+     * The operator.
+     *
+     * @return the operator
+     */
+    public ComparisonOperator getOperator()
+    {
+        return operator;
+    }
+
+
     @Override
     public NonConstantBooleanValue getBooleanValue()
     {
