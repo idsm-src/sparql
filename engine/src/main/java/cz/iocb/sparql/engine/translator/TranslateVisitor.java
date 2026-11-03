@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.translator;
 
 import static cz.iocb.sparql.engine.imcode.SqlConstruct.ConstructColumn.PREDICATE;
 import static cz.iocb.sparql.engine.imcode.SqlConstruct.ConstructColumn.SUBJECT;
+import static cz.iocb.sparql.engine.imcode.SqlIntercode.mergeOverlappingClasses;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.translator.TermGenerator.getIri;
 import static cz.iocb.sparql.engine.translator.TermGenerator.getLiteral;
@@ -1334,6 +1335,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             if(resClasses.size() == 0)
                 continue;
+
+            // the terms are classified one by one, so their classes may overlap (e.g. the IRIs of a class and of its
+            // subclass), but the classes of a variable have to be disjoint: the overlapping ones are merged into their
+            // union, which stores the terms of all of them
+            Map<ResourceClass, ResourceClass> merged = mergeOverlappingClasses(request.getConfiguration(), resClasses);
+            nodeResourceClasses.replaceAll(c -> c == null ? null : merged.get(c));
+            resClasses = new LinkedHashSet<>(merged.values());
 
             resourceClasses.put(variableNames.get(i), nodeResourceClasses);
 

@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -71,9 +72,11 @@ public class StoredResultHandler extends ResultHandler
     private LinkedHashMap<Column, SqlType> columns = new LinkedHashMap<>();
 
     /**
-     * Bindings of the received variables.
+     * Columns of each class each received variable is stored in. The terms are classified one by one, so the classes of
+     * a variable may overlap until {@link #mergeOverlappingClasses()} merges them, which is why they are not kept as a
+     * {@link VariableBinding}.
      */
-    private final VariableBindings bindings = new VariableBindings();
+    private final Map<Variable, Map<ResourceClass, List<Column>>> classColumns = new LinkedHashMap<>();
 
     /**
      * Number of rows in which each variable is bound.
@@ -94,6 +97,12 @@ public class StoredResultHandler extends ResultHandler
      * Class of each variable in each row of the current batch.
      */
     Map<Variable, List<ResourceClass>> resourceClasses = new HashMap<>();
+
+    /**
+     * Term of each variable in each row of the current batch, from which a result kept as a VALUES list stores the
+     * terms of overlapping classes in their union (see {@link #mergeOverlappingClasses()}).
+     */
+    private final Map<Variable, List<RdfTerm>> terms = new HashMap<>();
 
     /**
      * Column values of the current batch.
@@ -154,13 +163,8 @@ public class StoredResultHandler extends ResultHandler
 
             counts.merge(entry.getKey(), 1, Integer::sum);
 
-            VariableBinding binding = bindings.get(entry.getKey());
-
-            if(binding == null)
-            {
-                binding = new VariableBinding(entry.getKey(), true);
-                bindings.add(binding);
-            }
+            Map<ResourceClass, List<Column>> stored = classColumns.computeIfAbsent(entry.getKey(),
+                    _ -> new HashMap<>());
 
             ResourceClass resClass = classes.get(entry.getKey());
 
@@ -172,14 +176,17 @@ public class StoredResultHandler extends ResultHandler
             resourceClasses.computeIfAbsent(entry.getKey(), _ -> new ArrayList<>(nCopies(batchSize, null)))
                     .set(batchCount, resClass);
 
+            terms.computeIfAbsent(entry.getKey(), _ -> new ArrayList<>(nCopies(batchSize, null))).set(batchCount,
+                    entry.getValue());
+
             List<Column> vals = getColumns(request, resClass, entry.getValue());
-            List<Column> cols = binding.getMapping(resClass);
+            List<Column> cols = stored.get(resClass);
             List<SqlType> types = resClass.getSqlTypes();
 
             if(cols == null)
             {
                 cols = resClass.createColumns(request.getColumnMap(), entry.getKey());
-                binding.addMapping(resClass, cols);
+                stored.put(resClass, cols);
 
                 for(int i = 0; i < resClass.getColumnCount(); i++)
                     columns.put(cols.get(i), types.get(i));
@@ -224,20 +231,25 @@ public class StoredResultHandler extends ResultHandler
         if(rowCount == 0)
             return SqlNoSolution.get();
 
+        // a result stored in the table is stored completely before its columns are merged
+        if(rowCount >= minTableSize && batchCount > 0)
+            flushValues();
+
+        mergeOverlappingClasses();
+
 
         VariableBindings varBindings = new VariableBindings();
 
-        for(VariableBinding binding : bindings.getValues())
+        for(Entry<Variable, Map<ResourceClass, List<Column>>> entry : classColumns.entrySet())
         {
-            VariableBinding v = new VariableBinding(binding.getVariable(),
-                    counts.getOrDefault(binding.getVariable(), 0) < rowCount);
+            Variable variable = entry.getKey();
+            VariableBinding v = new VariableBinding(variable, counts.getOrDefault(variable, 0) < rowCount);
 
-            for(Entry<ResourceClass, List<Column>> e : binding.getMappings().entrySet())
+            for(Entry<ResourceClass, List<Column>> e : entry.getValue().entrySet())
             {
                 // a column is constant only when the class is stored in every row: a value shared by the rows of the
                 // class alone would hide in which rows the variable takes the class
-                boolean complete = classCounts.getOrDefault(binding.getVariable(), Map.of()).getOrDefault(e.getKey(),
-                        0) == rowCount;
+                boolean complete = classCounts.getOrDefault(variable, Map.of()).getOrDefault(e.getKey(), 0) == rowCount;
 
                 v.addMapping(e.getKey(),
                         e.getValue().stream().map(c -> complete ? constants.getOrDefault(c, c) : c).toList());
@@ -322,6 +334,110 @@ public class StoredResultHandler extends ResultHandler
 
 
     /**
+     * Merges the overlapping classes of each variable into their union (see
+     * {@link SqlIntercode#mergeOverlappingClasses}), as the received terms are classified one by one, while the classes
+     * of a variable have to be disjoint: a result kept as a VALUES list stores the terms of the merged classes in the
+     * union, a result stored in the table gets the columns of the union filled with their values converted to it.
+     *
+     * @throws SQLException on database errors
+     */
+    private void mergeOverlappingClasses() throws SQLException
+    {
+        ClassRelations relations = request.getConfiguration();
+
+        for(Entry<Variable, Map<ResourceClass, List<Column>>> entry : classColumns.entrySet())
+        {
+            Variable variable = entry.getKey();
+            Map<ResourceClass, List<Column>> stored = entry.getValue();
+            Map<ResourceClass, ResourceClass> merged = SqlIntercode.mergeOverlappingClasses(relations, stored.keySet());
+
+            if(merged.entrySet().stream().allMatch(e -> e.getKey().equals(e.getValue())))
+                continue;
+
+            Map<ResourceClass, List<Column>> result = new HashMap<>();
+            Map<ResourceClass, Integer> rowsPerClass = classCounts.get(variable);
+
+            for(ResourceClass union : new LinkedHashSet<>(merged.values()))
+            {
+                List<ResourceClass> group = merged.keySet().stream().filter(c -> merged.get(c).equals(union)).toList();
+
+                if(group.equals(List.of(union)))
+                {
+                    result.put(union, stored.get(union));
+                    continue;
+                }
+
+                List<Column> cols = union.createColumns(request.getColumnMap(), variable);
+                result.put(union, cols);
+
+                rowsPerClass.put(union, group.stream().mapToInt(c -> rowsPerClass.remove(c)).sum());
+
+                for(ResourceClass resClass : group)
+                    for(Column column : stored.get(resClass))
+                        constants.remove(column);
+
+                if(table == null)
+                {
+                    // all the rows are in the current batch
+                    List<ResourceClass> rowClasses = resourceClasses.get(variable);
+                    List<RdfTerm> rowTerms = terms.get(variable);
+                    List<List<Column>> values = new ArrayList<>();
+
+                    for(int i = 0; i < union.getColumnCount(); i++)
+                        values.add(new ArrayList<>(nCopies(batchSize, null)));
+
+                    for(int k = 0; k < batchCount; k++)
+                    {
+                        if(!group.contains(rowClasses.get(k)))
+                            continue;
+
+                        List<Column> vals = getColumns(request, union, rowTerms.get(k));
+
+                        for(int i = 0; i < union.getColumnCount(); i++)
+                            values.get(i).set(k, vals.get(i));
+
+                        rowClasses.set(k, union);
+                    }
+
+                    for(ResourceClass resClass : group)
+                        stored.get(resClass).forEach(data::remove);
+
+                    for(int i = 0; i < union.getColumnCount(); i++)
+                    {
+                        List<Column> column = values.get(i).subList(0, batchCount);
+                        data.put(cols.get(i), values.get(i));
+
+                        // the column is constant when every row stores the same value in it
+                        if(column.stream().allMatch(v -> v != null && v.equals(column.getFirst())))
+                            constants.put(cols.get(i), column.getFirst());
+                    }
+                }
+                else
+                {
+                    // the columns of a merged class that is the union itself are filled in place
+                    if(!group.contains(union))
+                        for(int i = 0; i < union.getColumnCount(); i++)
+                            request.getStatement().execute(
+                                    "alter table " + table + " add " + cols.get(i) + " " + union.getSqlTypes().get(i));
+
+                    List<List<Column>> variants = group.stream()
+                            .map(c -> c.equals(union) ? stored.get(c) : c.toGeneralClass(union, stored.get(c), true))
+                            .toList();
+
+                    request.getStatement().execute("update " + table + " set " + IntStream
+                            .range(0, union.getColumnCount())
+                            .mapToObj(i -> cols.get(i) + " = COALESCE("
+                                    + variants.stream().map(v -> v.get(i).toString()).collect(joining(", ")) + ")")
+                            .collect(joining(", ")));
+                }
+            }
+
+            entry.setValue(result);
+        }
+    }
+
+
+    /**
      * SQL text of a value column, {@code NULL} for a missing one.
      *
      * @param column the value column, or null
@@ -365,6 +481,7 @@ public class StoredResultHandler extends ResultHandler
 
         data.clear();
         resourceClasses.clear();
+        terms.clear();
         batchCount = 0;
     }
 }

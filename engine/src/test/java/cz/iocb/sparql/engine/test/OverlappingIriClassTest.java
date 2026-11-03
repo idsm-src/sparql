@@ -327,6 +327,37 @@ public class OverlappingIriClassTest
 
 
     @Test
+    @DisplayName("a variable bound in a class next to its subclass keeps the terms of the subclass in the class")
+    void classWithSubclass() throws Exception
+    {
+        // VALUES binds compound 41 in the subclass and compound 141 in the class itself; a union stores both in the
+        // class, and a comparison with a term of the class compares them in it, so the terms held by the columns of
+        // the subclass have to be converted to the class
+        String values = "VALUES ?s { <http://example.org/compound/41> <http://example.org/compound/141> }";
+        String union = "{ { " + values + " } UNION { BIND(<http://example.org/compound/142> AS ?s) } }";
+
+        assertThat(execute("SELECT DISTINCT ?s WHERE " + union),
+                containsInAnyOrder(row(compound(41)), row(compound(141)), row(compound(142))));
+
+        assertThat(execute("SELECT ?s (COUNT(*) AS ?c) WHERE " + union + " GROUP BY ?s"), containsInAnyOrder(
+                row(compound(41), integer(1)), row(compound(141), integer(1)), row(compound(142), integer(1))));
+
+        assertThat(execute("SELECT ?s WHERE " + union + " ORDER BY ?s"),
+                contains(row(compound(141)), row(compound(142)), row(compound(41))));
+
+        // the join with VALUES goes into the branches, so that the first one binds the class and the subclass
+        assertThat(execute("SELECT DISTINCT ?s ?o WHERE { " + values + " { ?s ex:label ?o } UNION { ?s ex:flag ?o } }"),
+                containsInAnyOrder(row(compound(41), string("forty-one")), row(compound(41), string("b")),
+                        row(compound(141), string("hundred forty-one"))));
+
+        assertThat(
+                execute("SELECT ?s (COUNT(*) AS ?c) WHERE { " + values + " ?t ex:label ?l FILTER(?t != ?s) } "
+                        + "GROUP BY ?s"),
+                containsInAnyOrder(row(compound(41), integer(4)), row(compound(141), integer(4))));
+    }
+
+
+    @Test
     @DisplayName("OPTIONAL, MINUS and NOT EXISTS between overlapping classes")
     void optional() throws Exception
     {

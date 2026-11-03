@@ -13,6 +13,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -701,23 +702,46 @@ public abstract class SqlIntercode extends SqlBaseClass
      */
     protected static Set<ResourceClass> unionResourceClasses(ClassRelations relations, List<VariableBinding> defs)
     {
-        Set<ResourceClass> result = new HashSet<>();
+        List<ResourceClass> classes = defs.stream().flatMap(d -> d.getClasses().stream()).toList();
 
-        for(VariableBinding def : defs)
+        return new HashSet<>(mergeOverlappingClasses(relations, classes).values());
+    }
+
+
+    /**
+     * The classes a variable can take when it takes the given ones: the overlapping classes are merged into their
+     * union, so that the classes are pairwise disjoint, as the classes of a variable have to be (a class present in its
+     * binding holds all the values of the class, see
+     * {@link VariableBinding#deriveMapping(ClassRelations, ResourceClass, Table)}), and every given class is a subclass
+     * of one of them. The terms of a VALUES clause or of SERVICE results, classified one by one, may take overlapping
+     * classes, e.g. a class and its subclass.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param classes the classes
+     * @return the class each of the given classes is merged into, in the order of the given classes
+     */
+    public static Map<ResourceClass, ResourceClass> mergeOverlappingClasses(ClassRelations relations,
+            Collection<ResourceClass> classes)
+    {
+        Set<ResourceClass> unions = new HashSet<>();
+
+        for(ResourceClass resClass : classes)
         {
-            for(ResourceClass resClass : def.getClasses())
-            {
-                Set<ResourceClass> group = new HashSet<>();
-                group.add(resClass);
+            Set<ResourceClass> group = new HashSet<>();
+            group.add(resClass);
 
-                for(ResourceClass other : result)
-                    if(!ResourceClass.areDisjunct(relations, other, resClass))
-                        group.add(other);
+            for(ResourceClass other : unions)
+                if(!ResourceClass.areDisjunct(relations, other, resClass))
+                    group.add(other);
 
-                result.removeAll(group);
-                result.add(unionize(group));
-            }
+            unions.removeAll(group);
+            unions.add(unionize(group));
         }
+
+        Map<ResourceClass, ResourceClass> result = new LinkedHashMap<>();
+
+        for(ResourceClass resClass : classes)
+            result.put(resClass, unions.stream().filter(u -> resClass.isSubclassOf(u)).findFirst().orElseThrow());
 
         return result;
     }

@@ -41,7 +41,9 @@ import cz.iocb.sparql.engine.rdf.Variable;
 /**
  * How a variable is represented in a piece of intermediate code: for each resource class it may take, the columns
  * holding the value in that class (null columns mean the class is possible but not materialised), plus whether the
- * variable can be unbound. In a solution at most one class has non-null columns.
+ * variable can be unbound. The classes are pairwise disjoint, so that a value is held by the columns of the one class
+ * it belongs to; classes that would overlap are merged into their union (see
+ * {@link cz.iocb.sparql.engine.imcode.SqlIntercode#mergeOverlappingClasses}).
  */
 public class VariableBinding
 {
@@ -85,6 +87,8 @@ public class VariableBinding
         this.variable = null;
         this.canBeNull = canBeNull;
         this.mappings.putAll(mappings);
+
+        assert hasNoNestedClasses(): "nested classes " + mappings.keySet();
     }
 
 
@@ -102,6 +106,8 @@ public class VariableBinding
 
         if(mappings != null)
             this.mappings.putAll(mappings);
+
+        assert hasNoNestedClasses(): "nested classes of " + variable + ": " + this.mappings.keySet();
     }
 
 
@@ -145,6 +151,28 @@ public class VariableBinding
         assert !mappings.containsKey(resClass);
 
         mappings.put(resClass, columns);
+
+        assert hasNoNestedClasses(): "nested classes of " + variable + ": " + mappings.keySet();
+    }
+
+
+    /**
+     * True if no class of the variable with materialised columns is a subclass of another one: the part of the pairwise
+     * disjointness of the classes that can be checked without the declarations of overlapping user IRI classes.
+     *
+     * @return true if no class with materialised columns is a subclass of another one, false otherwise
+     */
+    private boolean hasNoNestedClasses()
+    {
+        List<ResourceClass> classes = mappings.entrySet().stream().filter(e -> e.getValue() != null).map(Entry::getKey)
+                .toList();
+
+        for(ResourceClass a : classes)
+            for(ResourceClass b : classes)
+                if(!a.equals(b) && a.isSubclassOf(b))
+                    return false;
+
+        return true;
     }
 
 

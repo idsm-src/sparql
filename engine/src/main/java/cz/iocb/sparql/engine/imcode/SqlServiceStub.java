@@ -611,6 +611,9 @@ public final class SqlServiceStub extends SqlIntercode
         request.getConfiguration().getDatatypes()
                 .forEach(d -> resourceClasses.addAll(estimateAsUnion(d.getBaseLiteralClass())));
 
+        // the classes of a variable have to be disjoint, but user IRI classes may overlap, e.g. nested ones
+        Set<ResourceClass> classes = new HashSet<>(mergeOverlappingClasses(relations, resourceClasses).values());
+
         VariableBindings bindings = new VariableBindings();
 
         for(VariableBinding v : context.getVariableBindings().getValues())
@@ -620,7 +623,7 @@ public final class SqlServiceStub extends SqlIntercode
                 Variable var = v.getVariable();
                 VariableBinding binding = new VariableBinding(var, v.canBeNull());
 
-                for(ResourceClass c : resourceClasses)
+                for(ResourceClass c : classes)
                     binding.addMapping(c, c.createColumns(request.getColumnMap(), var));
 
                 bindings.add(binding);
@@ -633,7 +636,7 @@ public final class SqlServiceStub extends SqlIntercode
             {
                 VariableBinding binding = new VariableBinding(var, true);
 
-                for(ResourceClass c : resourceClasses)
+                for(ResourceClass c : classes)
                     binding.addMapping(c, c.createColumns(request.getColumnMap(), var));
 
                 bindings.add(binding);
