@@ -1088,10 +1088,11 @@ public final class SqlJoin extends SqlIntercode
     /**
      * Seeds a walk between two variables with its siblings (see {@link SqlRecursive#seed}): the siblings that bind the
      * start variable always and distinct solutions over it, without binding the end variable, or those binding the end
-     * variable so, the walk being turned then; when both ends have such siblings, the end whose seeds are expected to
-     * be the fewer wins (see {@link #seedRank}, and the row estimates of the database on a tie, see
-     * {@link #fewerSeeds}), the start otherwise. The seeds leave the join, carried through the recursion instead. One
-     * walk is seeded per call; the optimisation loop comes back for the others.
+     * variable so, the walk being turned then when it may be (see {@link SqlRecursive#canSeedFromEnd}); when both ends
+     * have such siblings, the end whose seeds are expected to be the fewer wins (see {@link #seedRank}, and the row
+     * estimates of the database on a tie, see {@link #fewerSeeds}), the start otherwise. The seeds leave the join,
+     * carried through the recursion instead. One walk is seeded per call; the optimisation loop comes back for the
+     * others.
      *
      * @param request the current request
      * @param childs the child nodes
@@ -1108,9 +1109,18 @@ public final class SqlJoin extends SqlIntercode
             Variable beginVar = walk.beginVar;
             Variable endVar = walk.endBinding.getVariable();
 
+            // the seeded walk exposes what the parent and the remaining siblings need of it (the needs of the parent
+            // alone would drop an end variable a sibling joins)
+            Restrictions walkRestrictions = getRestrictions(request.getConfiguration(), walk, childs, restrictions);
+
             List<Integer> seeds = selectSeeds(request, childs, i, beginVar, endVar);
             List<Integer> endSeeds = walk.reverseNext != null ? selectSeeds(request, childs, i, endVar, beginVar) :
                     List.of();
+
+            // the walk turned to start from its end has to agree with the seeds (see SqlRecursive.canSeedFromEnd)
+            if(!endSeeds.isEmpty()
+                    && !walk.canSeedFromEnd(request, endSeeds.stream().map(childs::get).toList(), walkRestrictions))
+                endSeeds = List.of();
 
             boolean fromEnd = !endSeeds.isEmpty()
                     && (seeds.isEmpty() || seedRank(childs, endSeeds) < seedRank(childs, seeds)
@@ -1128,10 +1138,6 @@ public final class SqlJoin extends SqlIntercode
             for(int j = 0; j < childs.size(); j++)
                 if(j != i && !seeds.contains(j))
                     result.add(childs.get(j));
-
-            // the seeded walk exposes what the parent and the remaining siblings need of it (the needs of the parent
-            // alone would drop an end variable a sibling joins)
-            Restrictions walkRestrictions = getRestrictions(request.getConfiguration(), walk, childs, restrictions);
 
             result.add(walk.seed(request, seeds.stream().map(j -> childs.get(j)).toList(), fromEnd, walkRestrictions));
 
