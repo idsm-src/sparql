@@ -126,8 +126,7 @@ public final class SqlAggregation extends SqlIntercode
         boolean isDeterministic = child.isDeterministic();
 
         for(Entry<Variable, SqlExpressionIntercode> entry : aggregations.entrySet())
-            if(restrictions == null
-                    || restrictions.contains(relations, entry.getKey(), entry.getValue().getResourceClasses()))
+            if(restrictions == null || restrictions.containsVar(entry.getKey()))
                 isDeterministic &= entry.getValue().isDeterministic();
 
         return new SqlAggregation(bindings, isDeterministic, groupVariables, aggregations, child);
@@ -301,8 +300,6 @@ public final class SqlAggregation extends SqlIntercode
             Map<Variable, SqlExpressionIntercode> aggregations, SqlIntercode child, Restrictions restrictions,
             boolean evalServices)
     {
-        ClassRelations relations = request.getConfiguration();
-
         DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
 
         LinkedHashMap<Variable, SqlExpressionIntercode> opt = new LinkedHashMap<>();
@@ -312,7 +309,10 @@ public final class SqlAggregation extends SqlIntercode
             SqlExpressionIntercode optExpr = e.getValue().optimize(request, child.getVariableBindings(),
                     restrictions.getRestriction(e.getKey()), evalServices);
 
-            if(optExpr.getResourceClasses().stream().anyMatch(r -> restrictions.contains(relations, e.getKey(), r)))
+            // the parent may need a result in no class (a join comparing it with classes it never takes), and it has
+            // to stay bound then, as its classes decide whether the parent finds a solution; a result never bound is
+            // the same as one not bound at all
+            if(restrictions.containsVar(e.getKey()) && !optExpr.equals(SqlNull.get()))
                 opt.put(e.getKey(), optExpr);
         }
 
@@ -358,9 +358,18 @@ public final class SqlAggregation extends SqlIntercode
             if(restrictions.getAcceptedClasses(variable) != null)
                 childRestrictions.addAcceptedClasses(variable, restrictions.getAcceptedClasses(variable));
 
+        // the variables of a needed aggregate stay bound even where none of their values is needed, as they give the
+        // classes of the aggregate
         for(Entry<Variable, SqlExpressionIntercode> entry : aggregations.entrySet())
-            if(restrictions.contains(relations, entry.getKey(), entry.getValue().getResourceClasses()))
+        {
+            if(restrictions.containsVar(entry.getKey()))
+            {
                 childRestrictions.add(entry.getValue().getRequirements(relations));
+
+                for(Variable referenced : entry.getValue().getReferencedVariables())
+                    childRestrictions.add(referenced, Set.of());
+            }
+        }
 
         return childRestrictions;
     }
@@ -381,6 +390,9 @@ public final class SqlAggregation extends SqlIntercode
         builder.append("SELECT ");
         boolean hasSelect = false;
 
+        // whether a selected value aggregates the solutions, which makes them a single group without a GROUP BY
+        boolean aggregated = false;
+
         for(Entry<Variable, SqlExpressionIntercode> entry : aggregations.entrySet())
         {
             Variable var = entry.getKey();
@@ -391,7 +403,13 @@ public final class SqlAggregation extends SqlIntercode
             {
                 ResourceClass resClass = e.getKey();
                 List<Column> names = binding.getMapping(resClass);
+
+                // a class the parent needs no value of is not computed (a result may stay bound only for its classes)
+                if(names == null)
+                    continue;
+
                 List<Column> cols = expression.get(request.getConfiguration(), resClass);
+                aggregated |= expression instanceof SqlBuiltinCall c && c.isAggregateFunction();
 
                 for(int i = 0; i < resClass.getColumnCount(); i++)
                 {
@@ -424,7 +442,7 @@ public final class SqlAggregation extends SqlIntercode
             builder.append(groupByColumns.stream().map(Object::toString).collect(joining(", ", " GROUP BY ", "")));
         else if(!groupVariables.isEmpty())
             builder.append(" GROUP BY true::boolean");
-        else if(aggregations.values().stream().noneMatch(e -> e instanceof SqlBuiltinCall c && c.isAggregateFunction()))
+        else if(!aggregated)
             builder.append(" GROUP BY ()");
 
 

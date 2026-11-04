@@ -256,8 +256,10 @@ public final class SqlProcedureCall extends SqlIntercode
 
         LinkedHashMap<ResultDefinition, Variable> optResults = new LinkedHashMap<>();
 
+        // the parent may need a result in no class (a join comparing it with classes the call never binds), and it has
+        // to stay bound then, as its classes decide whether the parent finds a solution
         for(Entry<ResultDefinition, Variable> result : results.entrySet())
-            if(restrictions.contains(relations, result.getValue(), result.getKey().getMappings().keySet()))
+            if(restrictions.containsVar(result.getValue()))
                 optResults.put(result.getKey(), result.getValue());
 
 

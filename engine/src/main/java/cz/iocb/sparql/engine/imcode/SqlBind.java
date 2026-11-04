@@ -143,14 +143,20 @@ public final class SqlBind extends SqlIntercode
 
         Restriction varRestriction = restrictions.getRestriction(variable);
 
-        if(varRestriction == null)
-            return optChild.optimize(request, restrictions, reduced, false);
+        // the parent may need the variable in no class (a join comparing it with classes it is never bound in), and it
+        // has to stay bound then, as its classes decide whether the parent finds a solution; the variables of the
+        // expression give the classes, so they stay bound in the child too, even where none of their values is needed
+        boolean needed = restrictions.containsVar(variable);
 
         while(true)
         {
             boolean optReduced = reduced && optExpression.isDeterministic();
             Restrictions expressionRequirements = optExpression.getRequirements(relations);
             Restrictions childRestrictions = new Restrictions(restrictions, expressionRequirements);
+
+            if(needed)
+                for(Variable referenced : optExpression.getReferencedVariables())
+                    childRestrictions.add(referenced, Set.of());
 
             // a copy of a variable takes its value, so the classes the parent accepts for the copy are accepted for the
             // variable too (the zero-length paths of a walk bind their end this way)
@@ -170,8 +176,8 @@ public final class SqlBind extends SqlIntercode
         if(optChild.equals(SqlNoSolution.get()))
             return SqlNoSolution.get();
 
-        if(optExpression.equals(SqlNull.get())
-                || !restrictions.contains(relations, variable, optExpression.getResourceClasses()))
+        // a variable the parent does not need at all is left out, and so is one never bound
+        if(optExpression.equals(SqlNull.get()) || !needed)
             return optChild.optimize(request, restrictions, reduced, false);
 
         if(optChild instanceof SqlUnion union)
