@@ -171,7 +171,8 @@ public final class SqlMinus extends SqlIntercode
                         unionList.add(child);
 
                 if(!unionList.equals(union.getChilds()))
-                    optRight = SqlUnion.union(request, unionList).optimize(request, restrictions, true, evalServices);
+                    optRight = SqlUnion.union(request, unionList).optimize(request, rightRestrictions, true,
+                            evalServices);
             }
 
             boolean newLeftReduced = reduced & optRight.isDeterministic;
