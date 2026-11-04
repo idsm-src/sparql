@@ -3,7 +3,9 @@ package cz.iocb.sparql.engine.imcode;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
@@ -24,7 +26,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * The single solution an EXISTS pattern is evaluated for (the ContextSolution of SPARQL 1.2): the solution of the
  * surrounding pattern that the filter is being evaluated on, restricted to the variables the EXISTS pattern refers to.
  * Every group graph pattern inside the EXISTS pattern starts from it, so the pattern is joined with the current
- * solution wherever it binds a shared variable, and its filters and binds see the current values.
+ * solution wherever it binds a shared variable, and its filters and binds see the current values. A join of a group
+ * with a group nested in it holds the solution once (see {@link #merge}).
  *
  * The values are taken from the surrounding solution through the alias of the EXISTS expression (see
  * {@link cz.iocb.sparql.engine.imcode.expression.SqlExists}): the solution exposes them under column names fixed when
@@ -112,6 +115,46 @@ public final class SqlContextSolution extends SqlIntercode
             return SqlEmptySolution.get();
 
         return new SqlContextSolution(bindings, table);
+    }
+
+
+    /**
+     * The join of the context solution with another one of the same EXISTS pattern: both stand for the single current
+     * solution, which joined with itself stays the same, so the join exposes the variables and the columns that either
+     * of them exposes.
+     *
+     * @param other context solution of the same EXISTS pattern
+     * @return context solution exposing what either of the context solutions exposes
+     */
+    SqlContextSolution merge(SqlContextSolution other)
+    {
+        assert table.equals(other.table);
+
+        VariableBindings merged = new VariableBindings(bindings);
+
+        for(VariableBinding binding : other.bindings.getValues())
+        {
+            VariableBinding current = merged.get(binding.getVariable());
+
+            if(current == null)
+            {
+                merged.add(binding);
+                continue;
+            }
+
+            Map<ResourceClass, List<Column>> mappings = new HashMap<>(current.getMappings());
+
+            for(Entry<ResourceClass, List<Column>> entry : binding.getMappings().entrySet())
+                if(entry.getValue() != null)
+                    mappings.put(entry.getKey(), entry.getValue());
+                else
+                    mappings.putIfAbsent(entry.getKey(), null);
+
+            merged.add(
+                    new VariableBinding(binding.getVariable(), mappings, current.canBeNull() && binding.canBeNull()));
+        }
+
+        return merged.equals(bindings) ? this : new SqlContextSolution(merged, table);
     }
 
 

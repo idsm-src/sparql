@@ -39,13 +39,13 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 /**
- * Natural join of several children on their shared variables. Optimisation flattens nested joins, merges accesses to
- * the same table or along keys ({@link SqlTableAccess}), distributes the join over unions (a leading OPTIONAL sharing a
- * variable with another child being turned into one first, see {@link SqlLeftJoin#toUnion}), seeds the walks of
- * property paths with the siblings that bind their start (see {@link SqlRecursive#seed}; a walk binding the start
- * without being distinct over it is shared, so that its distinct values seed the other walk, see {@link SqlShared}),
- * evaluates nondeterministic children last, and decides the evaluation of SERVICE stubs by row estimates when service
- * reordering is enabled.
+ * Natural join of several children on their shared variables. Optimisation flattens nested joins (holding the context
+ * solution of an EXISTS pattern once, see {@link #mergeContextSolutions}), merges accesses to the same table or along
+ * keys ({@link SqlTableAccess}), distributes the join over unions (a leading OPTIONAL sharing a variable with another
+ * child being turned into one first, see {@link SqlLeftJoin#toUnion}), seeds the walks of property paths with the
+ * siblings that bind their start (see {@link SqlRecursive#seed}; a walk binding the start without being distinct over
+ * it is shared, so that its distinct values seed the other walk, see {@link SqlShared}), evaluates nondeterministic
+ * children last, and decides the evaluation of SERVICE stubs by row estimates when service reordering is enabled.
  */
 public final class SqlJoin extends SqlIntercode
 {
@@ -126,6 +126,8 @@ public final class SqlJoin extends SqlIntercode
      */
     protected static SqlIntercode join(Request request, List<SqlIntercode> childs, Restrictions restrictions)
     {
+        childs = mergeContextSolutions(childs);
+
         List<AliasTable> tables = IntStream.range(0, childs.size()).mapToObj(i -> new AliasTable("tab" + i)).toList();
 
         Map<Column, Column> columnMap = new HashMap<>();
@@ -191,7 +193,7 @@ public final class SqlJoin extends SqlIntercode
         {
             List<SqlIntercode> newChilds = reduceDistinctUnion(relations, reduceJoin(relations,
                     optimize(request, optChilds, newRestrictions, reduced, evalServices), newRestrictions, schema),
-                    newRestrictions, schema);
+                    schema);
 
             newChilds = expandLeadingOptionals(request, newChilds, evalServices);
             newChilds = seedWalks(request, newChilds, newRestrictions);
@@ -346,7 +348,47 @@ public final class SqlJoin extends SqlIntercode
                 output.add(child);
         }
 
-        return output;
+        return mergeContextSolutions(output);
+    }
+
+
+    /**
+     * Merges the context solutions of each EXISTS pattern among the children into one, at the position of the first of
+     * them (see {@link SqlContextSolution#merge}). Every group graph pattern inside an EXISTS pattern starts from the
+     * context solution, so the join of a group with a group nested in it (the pattern of a GRAPH clause, a nested
+     * group) holds it twice. The copies must not stay apart: the restrictions of a child are derived from the other
+     * children (see {@link #getRestrictions}), among which the child itself is not counted, so each copy leaves without
+     * columns the classes that only the other copy could join, and the joins of the copies with each other (the
+     * combinations of {@link #expandJoin}, the join conditions) would then read those columns.
+     *
+     * @param childs the child nodes
+     * @return the child nodes holding a single context solution of each EXISTS pattern, or the given list when they
+     *         hold no copies
+     */
+    private static List<SqlIntercode> mergeContextSolutions(List<SqlIntercode> childs)
+    {
+        List<SqlIntercode> result = new ArrayList<>(childs.size());
+        Map<AliasTable, Integer> positions = new HashMap<>();
+        boolean merged = false;
+
+        for(SqlIntercode child : childs)
+        {
+            if(child instanceof SqlContextSolution context)
+            {
+                Integer position = positions.putIfAbsent(context.getLateralTable(), result.size());
+
+                if(position != null)
+                {
+                    result.set(position, ((SqlContextSolution) result.get(position)).merge(context));
+                    merged = true;
+                    continue;
+                }
+            }
+
+            result.add(child);
+        }
+
+        return merged ? result : childs;
     }
 
 
@@ -656,7 +698,7 @@ public final class SqlJoin extends SqlIntercode
                     }
                     else if(optChilds.get(j) instanceof SqlDistinct d && d.getChild() instanceof SqlTableAccess right)
                     {
-                        merged = tryReduceDistinct(relations, schema, left, right, null);
+                        merged = tryReduceDistinct(relations, schema, left, right);
                     }
 
                     if(Objects.equals(merged, SqlNoSolution.get()))
@@ -681,51 +723,54 @@ public final class SqlJoin extends SqlIntercode
 
     /**
      * Replaces a distinct union of table accesses joined with another access to a related table by the merged access,
-     * when the distinct part only restricts the rows of that access.
+     * when the distinct part only restricts the rows of that access. The merged access keeps the variables of both
+     * children it replaces (see {@link #tryReduceDistinct}), and the scan starts again after every replacement, which
+     * changes the children.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param childs the child nodes
-     * @param restrictions what the parent needs of the variables
      * @param schema the database schema
      * @return the simplified children
      */
     private static List<SqlIntercode> reduceDistinctUnion(ClassRelations relations, List<SqlIntercode> childs,
-            Restrictions restrictions, DatabaseSchema schema)
+            DatabaseSchema schema)
     {
         List<SqlIntercode> newChilds = new ArrayList<>(childs);
 
         loop:
-        for(SqlIntercode child : newChilds)
+        while(true)
         {
-            if(!(child instanceof SqlDistinct distinct && distinct.getChild() instanceof SqlUnion union))
-                continue;
-
-            for(SqlIntercode c : newChilds)
+            for(SqlIntercode child : newChilds)
             {
-                if(!(c instanceof SqlTableAccess candidate)
-                        || !canBeDistinctUnionReduced(relations, distinct, candidate))
+                if(!(child instanceof SqlDistinct distinct && distinct.getChild() instanceof SqlUnion union))
                     continue;
 
-                for(SqlIntercode d : union.getChilds())
+                for(SqlIntercode c : newChilds)
                 {
-                    if(!(d instanceof SqlTableAccess distinctPart))
+                    if(!(c instanceof SqlTableAccess candidate)
+                            || !canBeDistinctUnionReduced(relations, distinct, candidate))
                         continue;
 
-                    SqlIntercode intercode = tryReduceDistinct(relations, schema, candidate, distinctPart,
-                            restrictions);
-
-                    if(intercode instanceof SqlTableAccess a && a.getConditions().equals(candidate.getConditions()))
+                    for(SqlIntercode d : union.getChilds())
                     {
-                        newChilds.remove(distinct);
-                        newChilds.remove(candidate);
-                        newChilds.add(intercode);
-                        continue loop;
+                        if(!(d instanceof SqlTableAccess distinctPart))
+                            continue;
+
+                        SqlIntercode intercode = tryReduceDistinct(relations, schema, candidate, distinctPart);
+
+                        if(intercode instanceof SqlTableAccess a && a.getConditions().equals(candidate.getConditions()))
+                        {
+                            newChilds.remove(distinct);
+                            newChilds.remove(candidate);
+                            newChilds.add(intercode);
+                            continue loop;
+                        }
                     }
                 }
             }
-        }
 
-        return newChilds;
+            return newChilds;
+        }
     }
 
 
@@ -773,17 +818,18 @@ public final class SqlJoin extends SqlIntercode
 
     /**
      * Merges the distinct table access into the candidate access when the join along shared columns or a foreign key
-     * pins the distinct rows; null otherwise.
+     * pins the distinct rows; null otherwise. The merged access binds the variables of both accesses, as the other
+     * children of the join may join any of them; the next round of the optimisation restricts it (see
+     * {@link #getRestrictions}).
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param schema the database schema
      * @param candidate the access joined with the distinct pattern
      * @param distinct the deduplicated access
-     * @param restrictions what the parent needs of the variables
      * @return the merged access, or null
      */
     private static SqlIntercode tryReduceDistinct(ClassRelations relations, DatabaseSchema schema,
-            SqlTableAccess candidate, SqlTableAccess distinct, Restrictions restrictions)
+            SqlTableAccess candidate, SqlTableAccess distinct)
     {
         if(Objects.equals(distinct.getTable(), candidate.getTable()))
         {
@@ -793,7 +839,7 @@ public final class SqlJoin extends SqlIntercode
             if(!SqlTableAccess.canBeJoinedByDistinctColumns(relations, candidate, distinct, distinctColumns))
                 return null;
 
-            return SqlTableAccess.joinByDistinctColumns(relations, candidate, distinct, restrictions);
+            return SqlTableAccess.joinByDistinctColumns(relations, candidate, distinct, null);
         }
         else
         {
@@ -817,7 +863,7 @@ public final class SqlJoin extends SqlIntercode
             for(Set<ColumnPair> key : keys)
                 if(key.containsAll(columns)
                         && key.stream().allMatch(p -> candidate.isKnownNotNull(schema, p.getRight())))
-                    return SqlTableAccess.joinByForeignKey(relations, distinct, candidate, columns, restrictions);
+                    return SqlTableAccess.joinByForeignKey(relations, distinct, candidate, columns, null);
         }
 
         return null;
@@ -1315,6 +1361,7 @@ public final class SqlJoin extends SqlIntercode
                     List<SqlIntercode> merged = new ArrayList<>();
                     merged.addAll(e);
                     merged.addAll(r);
+                    merged = mergeContextSolutions(merged);
 
                     if(isJoinable(relations, merged))
                         subresult.add(merged);
