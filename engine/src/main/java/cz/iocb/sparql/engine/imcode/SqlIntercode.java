@@ -1115,7 +1115,40 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
     /**
-     * SQL condition joining every pair of children on their shared variables, or null if none is needed.
+     * Classes each variable takes in the join of children with the given bindings: for a variable two or more children
+     * bind without a null, the classes of {@link #joinResourceClasses} over those children; no entry for the other
+     * variables. A pair of classes of the variable that two of the children compare and that meets none of these
+     * classes holds no solution of the whole join, as another child excludes the values, so the join condition need not
+     * compare it (see
+     * {@link #generateJoinCondition(ClassRelations, VariableBindings, VariableBindings, Table, Table, Map)}). A child
+     * restricted in a join that was flattened into this one, or expanded with it, may even lack the columns of such a
+     * class, as the child that excludes the class was its partner there.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param vars bindings of the children
+     * @return classes per variable bound without a null by two or more of the children
+     */
+    public static Map<Variable, Set<ResourceClass>> getJoinedClasses(ClassRelations relations,
+            List<VariableBindings> vars)
+    {
+        Map<Variable, Set<ResourceClass>> result = new HashMap<>();
+
+        for(Variable variable : vars.stream().flatMap(v -> v.getVariables().stream()).collect(toSet()))
+        {
+            List<VariableBinding> defs = vars.stream().map(v -> v.get(variable))
+                    .filter(v -> v != null && !v.canBeNull()).toList();
+
+            if(defs.size() > 1)
+                result.put(variable, joinResourceClasses(relations, defs));
+        }
+
+        return result;
+    }
+
+
+    /**
+     * SQL condition joining every pair of children on their shared variables, or null if none is needed. Only the pairs
+     * of classes that meet a class of the variable in the whole join are compared (see {@link #getJoinedClasses}).
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param vars the variables
@@ -1126,10 +1159,11 @@ public abstract class SqlIntercode extends SqlBaseClass
             List<? extends Table> tables)
     {
         int size = vars.size();
+        Map<Variable, Set<ResourceClass>> joined = getJoinedClasses(relations, vars);
 
         List<String> conditions = IntStream.range(0, size)
-                .mapToObj(i -> IntStream.range(i + 1, size).mapToObj(
-                        j -> generateJoinCondition(relations, vars.get(i), vars.get(j), tables.get(i), tables.get(j))))
+                .mapToObj(i -> IntStream.range(i + 1, size).mapToObj(j -> generateJoinCondition(relations, vars.get(i),
+                        vars.get(j), tables.get(i), tables.get(j), joined)))
                 .flatMap(c -> c).filter(c -> c != null).toList();
 
         if(conditions.isEmpty())
@@ -1154,11 +1188,32 @@ public abstract class SqlIntercode extends SqlBaseClass
     public static String generateJoinCondition(ClassRelations relations, VariableBindings left, VariableBindings right,
             Table leftTable, Table rightTable)
     {
+        return generateJoinCondition(relations, left, right, leftTable, rightTable, Map.of());
+    }
+
+
+    /**
+     * SQL condition that every shared variable of two children of a join is compatible on both sides, comparing only
+     * the pairs of classes that meet a class the variable takes in the whole join (see {@link #getJoinedClasses}), or
+     * null if it always holds.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param left bindings of the left side
+     * @param right bindings of the right side
+     * @param leftTable the left table
+     * @param rightTable the right table
+     * @param joined classes per variable in the whole join; a variable without an entry compares all its classes
+     * @return SQL condition that every shared variable is compatible on both sides, or null if it always holds
+     */
+    public static String generateJoinCondition(ClassRelations relations, VariableBindings left, VariableBindings right,
+            Table leftTable, Table rightTable, Map<Variable, Set<ResourceClass>> joined)
+    {
         Set<String> join = new HashSet<>();
 
         for(VariableBindingPair pair : VariableBindingPair.getPairs(relations, left, right))
         {
-            String condition = generateJoinCondition(pair, leftTable, rightTable);
+            String condition = generateJoinCondition(relations, pair, leftTable, rightTable,
+                    joined.get(pair.getVariable()));
 
             if(condition != null)
                 join.add(condition);
@@ -1188,21 +1243,26 @@ public abstract class SqlIntercode extends SqlBaseClass
         if(leftBinding == null || rightBinding == null)
             return null;
 
-        return generateJoinCondition(new VariableBindingPair(relations, leftBinding, rightBinding), leftTable,
-                rightTable);
+        return generateJoinCondition(relations, new VariableBindingPair(relations, leftBinding, rightBinding),
+                leftTable, rightTable, null);
     }
 
 
     /**
      * SQL condition that the paired variable is compatible on both sides: unbound on either side, or equal values after
-     * conversion to a common class. Null if the condition always holds, {@code (false)} if it never holds.
+     * conversion to a common class. Null if the condition always holds, {@code (false)} if it never holds. When the
+     * classes the variable takes in the whole join are given, a pair of classes meeting none of them is not compared,
+     * as no solution of the join holds such a value (see {@link #getJoinedClasses}).
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param pair the paired bindings of the variable
      * @param leftTable the left table
      * @param rightTable the right table
+     * @param joined classes the variable takes in the whole join, or null to compare all pairs of classes
      * @return SQL condition that the paired variable is compatible on both sides, or null if it always holds
      */
-    private static String generateJoinCondition(VariableBindingPair pair, Table leftTable, Table rightTable)
+    private static String generateJoinCondition(ClassRelations relations, VariableBindingPair pair, Table leftTable,
+            Table rightTable, Set<ResourceClass> joined)
     {
         VariableBinding leftBinding = pair.getLeftVariableBinding();
         VariableBinding rightBinding = pair.getRightVariableBinding();
@@ -1221,6 +1281,10 @@ public abstract class SqlIntercode extends SqlBaseClass
             ResourceClass rightClass = pairedClass.getRightClass();
 
             if(leftClass == null || rightClass == null)
+                continue;
+
+            if(joined != null && joined.stream().allMatch(c -> ResourceClass.areDisjunct(relations, c, leftClass)
+                    || ResourceClass.areDisjunct(relations, c, rightClass)))
                 continue;
 
             ResourceClass unionClass = unionize(leftClass, rightClass);
@@ -1529,6 +1593,12 @@ public abstract class SqlIntercode extends SqlBaseClass
                             continue;
 
                         List<Column> cols = binding.getMapping(resClass);
+
+                        // a child restricted in a join that was flattened into this one, or expanded with it, lacks the
+                        // columns of a class another child of that join excludes (see getJoinedClasses), which a part
+                        // of the children (see SqlJoin.expandJoin) may hold without the excluding child
+                        if(cols == null)
+                            continue;
 
                         for(int j = 0; j < resClass.getColumnCount(); j++)
                             if(cols.get(j) instanceof ConstantColumn c && !consts.computeIfAbsent(j, _ -> c).equals(c))

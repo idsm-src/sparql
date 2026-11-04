@@ -906,7 +906,10 @@ public final class SqlJoin extends SqlIntercode
 
         if(request.getConfiguration().isJoinOptimizerEnabled() && childs.size() > 1)
         {
-            translateTree(request, getPlan(request).root(), builder);
+            Map<Variable, Set<ResourceClass>> joined = getJoinedClasses(relations,
+                    childs.stream().map(c -> c.getVariableBindings()).toList());
+
+            translateTree(request, getPlan(request).root(), joined, builder);
             return builder.toString();
         }
 
@@ -939,14 +942,17 @@ public final class SqlJoin extends SqlIntercode
      * the access restricted by its equalities with the children of the outer tree (see
      * {@link SqlTableAccess#translateLateral}), and a hash join as an explicit join of its sides on the equalities
      * between their children (a cross join when there are none), so that the planner keeps the tree (see
-     * {@link cz.iocb.sparql.engine.request.Request#execute}).
+     * {@link cz.iocb.sparql.engine.request.Request#execute}). The equalities compare only the classes of a variable
+     * that meet a class it takes in the whole join (see {@link #getJoinedClasses}).
      *
      * @param request the current request
      * @param node the tree
+     * @param joined classes per variable in the whole join (see {@link #getJoinedClasses})
      * @param builder the SQL code being built
      * @return the children of the tree, as a bit per child
      */
-    private int translateTree(Request request, JoinOptimizer.Node node, StringBuilder builder)
+    private int translateTree(Request request, JoinOptimizer.Node node, Map<Variable, Set<ResourceClass>> joined,
+            StringBuilder builder)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -962,7 +968,7 @@ public final class SqlJoin extends SqlIntercode
 
         if(node instanceof JoinOptimizer.Lookup lookup)
         {
-            int outer = translateTree(request, lookup.outer(), builder);
+            int outer = translateTree(request, lookup.outer(), joined, builder);
             SqlTableAccess access = (SqlTableAccess) childs.get(lookup.child());
 
             List<String> conditions = new ArrayList<>();
@@ -973,7 +979,7 @@ public final class SqlJoin extends SqlIntercode
                     continue;
 
                 String condition = generateJoinCondition(relations, childs.get(i).getVariableBindings(),
-                        access.getInternalVariableBindings(), tables.get(i), null);
+                        access.getInternalVariableBindings(), tables.get(i), null, joined);
 
                 if(condition != null)
                     conditions.add(condition);
@@ -990,10 +996,10 @@ public final class SqlJoin extends SqlIntercode
 
         JoinOptimizer.HashJoin join = (JoinOptimizer.HashJoin) node;
 
-        int left = translateTree(request, join.left(), builder);
+        int left = translateTree(request, join.left(), joined, builder);
 
         StringBuilder rightBuilder = new StringBuilder();
-        int right = translateTree(request, join.right(), rightBuilder);
+        int right = translateTree(request, join.right(), joined, rightBuilder);
 
         List<String> conditions = new ArrayList<>();
 
@@ -1008,7 +1014,7 @@ public final class SqlJoin extends SqlIntercode
                     continue;
 
                 String condition = generateJoinCondition(relations, childs.get(i).getVariableBindings(),
-                        childs.get(j).getVariableBindings(), tables.get(i), tables.get(j));
+                        childs.get(j).getVariableBindings(), tables.get(i), tables.get(j), joined);
 
                 if(condition != null)
                     conditions.add(condition);
