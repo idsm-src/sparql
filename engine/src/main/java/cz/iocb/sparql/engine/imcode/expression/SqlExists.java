@@ -6,6 +6,7 @@ import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static java.util.Collections.singletonMap;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -244,7 +245,8 @@ public final class SqlExists extends SqlExpressionIntercode
      * pattern refers to it nowhere else. The rest is optimised under the classes the context solution binds the shared
      * variables in, as the join would optimise it, but without taking the context solution in. Null when the pattern
      * cannot be detached, notably when a child of the join has taken the context solution in (a walk seeded with it),
-     * whose evaluation for every current solution the join then asks for.
+     * whose evaluation for every current solution the join then asks for, and when the comparison with the current
+     * solution would not be exact (see {@link #isComparable}).
      *
      * @param request the current request
      * @param pattern the optimised pattern
@@ -268,11 +270,62 @@ public final class SqlExists extends SqlExpressionIntercode
         if(optimized.equals(SqlNoSolution.get()) || optimized.equals(SqlEmptySolution.get()))
             return null;
 
+        if(!isComparable(request.getConfiguration(), optimized.getVariableBindings(), context.getVariableBindings()))
+            return null;
+
         // a nested group of the pattern may refer to the context solution too, which its SQL shows
         if(optimized.translate(request).contains(context.getLateralTable().toString()))
             return null;
 
         return optimized;
+    }
+
+
+    /**
+     * True if the comparison with the current solution (see {@link #translate}) tells the solutions of the detached
+     * pattern apart exactly. The detached pattern may bind a shared variable in a class without columns (known but not
+     * materialised): a branch joined with the context solution needs the variable only in the classes overlapping those
+     * of the current solution, and the union of the detached branches merges such a class with the overlapping classes
+     * of the other branches. A solution binding the variable in a class without columns has null columns, so the
+     * comparison can neither compare it with an overlapping class of the current solution nor, when the pattern may
+     * leave the variable unbound, tell it from a solution leaving the variable unbound, compatible with every current
+     * solution. Otherwise, a class without columns disjoint with all the classes of the current solution is compared
+     * with none of them, so its solutions are compatible only with a current solution leaving the variable unbound, as
+     * they have to be.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param detached bindings of the detached pattern
+     * @param context bindings of the context solution as created for the pattern, whose classes with columns are the
+     *            classes of the current solution
+     * @return true if every shared variable the detached pattern binds in a class without columns is always bound by
+     *         the pattern, and every such class is disjoint with all the classes of the current solution, false
+     *         otherwise
+     */
+    private static boolean isComparable(ClassRelations relations, VariableBindings detached, VariableBindings context)
+    {
+        for(VariableBinding binding : context.getValues())
+        {
+            VariableBinding compared = detached.get(binding.getVariable());
+
+            if(compared == null)
+                continue;
+
+            Set<ResourceClass> unmaterialised = compared.getMappings().entrySet().stream()
+                    .filter(e -> e.getValue() == null).map(Entry::getKey).collect(toSet());
+
+            if(unmaterialised.isEmpty())
+                continue;
+
+            // a solution binding the variable in such a class has the null columns of one leaving it unbound
+            if(compared.canBeNull())
+                return false;
+
+            for(Entry<ResourceClass, List<Column>> entry : binding.getMappings().entrySet())
+                if(entry.getValue() != null && !ResourceClass.areDisjunct(relations, entry.getKey(), unmaterialised))
+                    return false;
+        }
+
+        return true;
     }
 
 
