@@ -189,11 +189,15 @@ public final class SqlJoin extends SqlIntercode
 
         DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
 
+        // the children could swap their presentations of a shared variable in every round
+        Settlement settlement = new Settlement();
+
         while(true)
         {
-            List<SqlIntercode> newChilds = reduceDistinctUnion(relations, reduceJoin(relations,
-                    optimize(request, optChilds, newRestrictions, reduced, evalServices), newRestrictions, schema),
-                    schema);
+            List<SqlIntercode> optimized = optimize(request, optChilds, newRestrictions, reduced, evalServices,
+                    settlement.getClasses());
+            List<SqlIntercode> newChilds = reduceDistinctUnion(relations,
+                    reduceJoin(relations, optimized, newRestrictions, schema), schema);
 
             newChilds = expandLeadingOptionals(request, newChilds, evalServices);
             newChilds = seedWalks(request, newChilds, newRestrictions);
@@ -219,6 +223,10 @@ public final class SqlJoin extends SqlIntercode
             }
 
             if(optChilds != newChilds)
+                break;
+
+            // the children in their order, as the next round depends on it (the first walk that can be seeded is)
+            if(!settlement.record(List.copyOf(optChilds), optChilds))
                 break;
         }
 
@@ -445,13 +453,32 @@ public final class SqlJoin extends SqlIntercode
     public static List<SqlIntercode> optimize(Request request, List<SqlIntercode> childs, Restrictions restrictions,
             boolean reduced, boolean evalServices)
     {
+        return optimize(request, childs, restrictions, reduced, evalServices, Map.of());
+    }
+
+
+    /**
+     * Optimises each child with the restrictions implied by the parent, by the other children and by the settled
+     * classes of the optimisation loop (see {@link Settlement}).
+     *
+     * @param request the current request
+     * @param childs the child nodes
+     * @param restrictions what the parent needs of the variables
+     * @param reduced whether duplicate solutions may be dropped
+     * @param evalServices whether SERVICE stubs are evaluated
+     * @param settled settled classes per variable, see {@link Settlement#getClasses}
+     * @return the optimised children
+     */
+    private static List<SqlIntercode> optimize(Request request, List<SqlIntercode> childs, Restrictions restrictions,
+            boolean reduced, boolean evalServices, Map<Variable, Set<ResourceClass>> settled)
+    {
         ClassRelations relations = request.getConfiguration();
 
         List<SqlIntercode> optimized = new ArrayList<>(childs.size());
 
         for(SqlIntercode child : childs)
-            optimized.add(child.optimize(request, getRestrictions(relations, child, childs, restrictions), reduced,
-                    evalServices));
+            optimized.add(child.optimize(request, getRestrictions(relations, child, childs, restrictions, settled),
+                    reduced, evalServices));
 
         return optimized;
     }
@@ -1055,10 +1082,28 @@ public final class SqlJoin extends SqlIntercode
     private static Restrictions getRestrictions(ClassRelations relations, SqlIntercode child, List<SqlIntercode> childs,
             Restrictions restrictions)
     {
+        return getRestrictions(relations, child, childs, restrictions, Map.of());
+    }
+
+
+    /**
+     * Restrictions for one child given the other children and the settled classes of the optimisation loop (see
+     * {@link Settlement}).
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param child the child node
+     * @param childs the child nodes
+     * @param restrictions what the parent needs of the variables
+     * @param settled settled classes per variable, see {@link Settlement#getClasses}
+     * @return restrictions for one child given the other children and the settled classes
+     */
+    private static Restrictions getRestrictions(ClassRelations relations, SqlIntercode child, List<SqlIntercode> childs,
+            Restrictions restrictions, Map<Variable, Set<ResourceClass>> settled)
+    {
         List<VariableBindings> others = childs.stream().filter(c -> c != child).map(c -> c.getVariableBindings())
                 .toList();
 
-        return getJoinRestrictions(relations, child.getVariableBindings(), others, restrictions, true);
+        return getJoinRestrictions(relations, child.getVariableBindings(), others, restrictions, true, settled);
     }
 
 

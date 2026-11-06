@@ -492,6 +492,107 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
     /**
+     * Guard of a loop that optimises the sides of a join, each with restrictions derived from the bindings the other
+     * sides had at the end of the previous round, until nothing changes any more. A side presents the classes of a
+     * shared variable overlapping one of its join classes, the classes of the other sides, as their union (see
+     * {@link Restrictions#getJoinClasses}), so two sides binding the variable in the same classes, one presenting them
+     * merged and the other one apart, follow each other's presentation of the previous round: they swap their
+     * presentations in every round, and the loop would never end. The guard records the states the loop passes through;
+     * a state coming back closes a cycle, and the classes the variables take in the states of the cycle become settled
+     * classes, which the restrictions of every side add to the classes of the other sides of each shared variable from
+     * then on: a side then merges the classes as far as any state of the cycle merged them, and it needs the variable
+     * in every class overlapping a settled class, so that a merge never takes in a class whose columns the side has
+     * dropped. The settled classes only grow and are drawn from finitely many classes, so only finitely many cycles add
+     * new ones; a cycle adding none is not caused by the presentations, which follow the same join classes in all its
+     * rounds then, and ends the loop in its current state. A loop records the state of a round only when its own test
+     * of a fixpoint has failed, so a loop that reaches a fixpoint without cycling is not affected at all.
+     *
+     * @see SqlIntercode#getJoinRestrictions(ClassRelations, VariableBindings, Collection, Restrictions, boolean, Map)
+     */
+    protected static final class Settlement
+    {
+        /**
+         * The states recorded since the settled classes last changed, in the order the loop passed through them.
+         */
+        private final List<Object> states = new ArrayList<>();
+
+        /**
+         * The bindings of the sides in each recorded state.
+         */
+        private final List<List<VariableBindings>> bindings = new ArrayList<>();
+
+        /**
+         * Settled classes per variable.
+         */
+        private final Map<Variable, Set<ResourceClass>> classes = new HashMap<>();
+
+
+        /**
+         * Creates a guard with no state recorded and no settled classes.
+         */
+        public Settlement()
+        {
+        }
+
+
+        /**
+         * Settled classes per variable: the classes the variables took in the states of the cycles the loop has passed
+         * through, none until the loop cycles.
+         *
+         * @return settled classes per variable
+         */
+        public Map<Variable, Set<ResourceClass>> getClasses()
+        {
+            return classes;
+        }
+
+
+        /**
+         * Records the state the loop reached at the end of a round: the sides the next round starts from, with the
+         * other values the round depends on. A state recorded since the settled classes last changed, other than the
+         * last one, closes a cycle: the classes the variables of the sides take in the states of the cycle are added to
+         * the settled classes, and the record starts again from the state.
+         *
+         * @param state the state, compared by equality
+         * @param sides the sides the next round starts from
+         * @return false if the state closes a cycle adding no settled class, so that the loop has to end, true
+         *         otherwise
+         */
+        public boolean record(Object state, Collection<SqlIntercode> sides)
+        {
+            int index = states.indexOf(state);
+
+            if(index >= 0 && index == states.size() - 1)
+                return true;
+
+            List<VariableBindings> sideBindings = sides.stream().map(s -> s.getVariableBindings()).toList();
+
+            if(index < 0)
+            {
+                states.add(state);
+                bindings.add(sideBindings);
+                return true;
+            }
+
+            boolean grown = false;
+
+            for(List<VariableBindings> cycle : bindings.subList(index, bindings.size()))
+                for(VariableBindings side : cycle)
+                    for(VariableBinding binding : side.getValues())
+                        grown |= classes.computeIfAbsent(binding.getVariable(), _ -> new HashSet<>())
+                                .addAll(binding.getClasses());
+
+            states.clear();
+            bindings.clear();
+            states.add(state);
+            bindings.add(sideBindings);
+
+            return grown;
+        }
+    }
+
+
+    /**
      * Variables bound by the subtree.
      */
     protected final VariableBindings bindings;
@@ -1463,6 +1564,31 @@ public abstract class SqlIntercode extends SqlBaseClass
     protected static Restrictions getJoinRestrictions(ClassRelations relations, VariableBindings bindings,
             Collection<VariableBindings> others, Restrictions restrictions, boolean filtered)
     {
+        return getJoinRestrictions(relations, bindings, others, restrictions, filtered, Map.of());
+    }
+
+
+    /**
+     * Restrictions for a join child against several other children whose optimisation loop has settled classes (see
+     * {@link Settlement}): the restrictions of
+     * {@link #getJoinRestrictions(ClassRelations, VariableBindings, Collection, Restrictions, boolean)}, where the
+     * settled classes of a shared variable count as the classes of one more side that may leave the variable unbound.
+     * They are join classes of the variable, and the child needs the variable in every class overlapping one of them,
+     * so that a class a presentation merges for a settled class always keeps its columns; they are no accepted classes,
+     * which the sides themselves give.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param bindings the variable bindings
+     * @param others bindings of the other children
+     * @param restrictions what the parent needs of the variables
+     * @param filtered true if the join drops the solutions of the child it cannot join with the other children
+     * @param settled settled classes per variable, see {@link Settlement#getClasses}
+     * @return restrictions for a join child against several other children whose optimisation loop has settled classes
+     */
+    protected static Restrictions getJoinRestrictions(ClassRelations relations, VariableBindings bindings,
+            Collection<VariableBindings> others, Restrictions restrictions, boolean filtered,
+            Map<Variable, Set<ResourceClass>> settled)
+    {
         Restrictions joinRestrictions = new Restrictions();
 
         for(VariableBinding binding : bindings.getValues())
@@ -1474,8 +1600,13 @@ public abstract class SqlIntercode extends SqlBaseClass
 
             if(!vars.isEmpty())
             {
+                Set<ResourceClass> settledClasses = settled.getOrDefault(variable, Set.of());
+
                 for(VariableBinding v : vars)
                     joinRestrictions.addJoinClasses(variable, v.getClasses());
+
+                if(!settledClasses.isEmpty())
+                    joinRestrictions.addJoinClasses(variable, settledClasses);
 
                 // a side that may leave the variable unbound joins a value of any class
                 if(filtered)
@@ -1492,7 +1623,8 @@ public abstract class SqlIntercode extends SqlBaseClass
                     Set<ResourceClass> set = new HashSet<>();
 
                     for(ResourceClass rc : binding.getMappings().keySet())
-                        if(vars.stream().anyMatch(v -> !ResourceClass.areDisjunct(relations, rc, v.getClasses())))
+                        if(vars.stream().anyMatch(v -> !ResourceClass.areDisjunct(relations, rc, v.getClasses()))
+                                || !ResourceClass.areDisjunct(relations, rc, settledClasses))
                             set.add(rc);
 
                     joinRestrictions.set(variable, set);

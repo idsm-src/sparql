@@ -284,6 +284,9 @@ public final class SqlLeftJoin extends SqlIntercode
 
         boolean offered = false;
 
+        // the sides could swap their presentations of a shared variable in every round
+        Settlement settlement = new Settlement();
+
         while(true)
         {
             optLeft = optLeft.optimize(request, leftRestrictions, optReduced, evalServices);
@@ -336,15 +339,19 @@ public final class SqlLeftJoin extends SqlIntercode
                 newCndRestrictions.add(condition.getRequirements(relations));
 
             Restrictions newLeftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
-                    optRight.getVariableBindings(), newCndRestrictions, false);
+                    Set.of(optRight.getVariableBindings()), newCndRestrictions, false, settlement.getClasses());
             Restrictions newRightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
-                    optLeft.getVariableBindings(), newCndRestrictions, true);
+                    Set.of(optLeft.getVariableBindings()), newCndRestrictions, true, settlement.getClasses());
             newRightRestrictions.retainAcceptedClasses(getNonNullVariables(optLeft.getVariableBindings()));
             newRightRestrictions.add(accepted);
 
 
             if(newOptReduced == optReduced && newLeftRestrictions.equals(leftRestrictions)
                     && newRightRestrictions.equals(rightRestrictions))
+                break;
+
+            if(!settlement.record(List.of(optLeft, optRight, optConditions, newOptReduced, offered),
+                    List.of(optLeft, optRight)))
                 break;
 
             optReduced = newOptReduced;

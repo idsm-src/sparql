@@ -38,7 +38,8 @@ import cz.iocb.sparql.testing.Database;
 /**
  * A variable computed by a BIND, an aggregate or a procedure that a join compares only with classes it is never bound
  * in: the parent needs the variable in no class, yet the variable has to stay bound, as its classes make the join empty
- * (or leave the right side of an OPTIONAL unmatched); left out, it gave a cross product.
+ * (or leave the right side of an OPTIONAL unmatched); left out, it gave a cross product, or a join over missing columns
+ * when the BIND, inside EXISTS, was merged with the variable of the current solution.
  */
 public class DisjointComputedVariableTest
 {
@@ -239,6 +240,28 @@ public class DisjointComputedVariableTest
         String query = "SELECT ?l WHERE { BIND(<http://example.org/b/10> AS ?v) OPTIONAL { ?v ex:q ?l } }";
 
         assertThat(execute(query), containsInAnyOrder(unbound));
+    }
+
+
+    @Test
+    @DisplayName("a BIND of a constant in an OPTIONAL inside EXISTS")
+    void bindOptionalExists() throws Exception
+    {
+        String query = "SELECT ?v WHERE { OPTIONAL { ?v ex:p ?q } "
+                + "FILTER EXISTS { OPTIONAL { BIND(<http://example.org/b/10> AS ?v) } } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(a(1)), row(a(2))));
+    }
+
+
+    @Test
+    @DisplayName("a BIND of a constant in an OPTIONAL inside EXISTS, the variable not projected")
+    void bindOptionalExistsUnprojected() throws Exception
+    {
+        String query = "SELECT ?u WHERE { OPTIONAL { ?v ex:p ?q } "
+                + "FILTER EXISTS { OPTIONAL { BIND(<http://example.org/b/10> AS ?v) } } }";
+
+        assertThat(execute(query), containsInAnyOrder(unbound, unbound));
     }
 
 

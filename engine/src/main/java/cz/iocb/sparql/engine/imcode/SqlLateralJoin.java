@@ -308,6 +308,9 @@ public final class SqlLateralJoin extends SqlIntercode
                 optLeft.getVariableBindings(), restrictions, true);
 
 
+        // the sides could swap their presentations of a shared variable in every round
+        Settlement settlement = new Settlement();
+
         while(true)
         {
             optLeft = optLeft.optimize(request, leftRestrictions, leftReduced, evalServices);
@@ -329,13 +332,16 @@ public final class SqlLateralJoin extends SqlIntercode
 
             boolean newLeftReduced = reduced && optRight.isDeterministic();
             Restrictions newLeftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
-                    optRight.getVariableBindings(), leftBaseRestrictions, true);
+                    Set.of(optRight.getVariableBindings()), leftBaseRestrictions, true, settlement.getClasses());
             Restrictions newRightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
-                    optLeft.getVariableBindings(), restrictions, true);
+                    Set.of(optLeft.getVariableBindings()), restrictions, true, settlement.getClasses());
 
 
             if(newLeftReduced == leftReduced && newLeftRestrictions.equals(leftRestrictions)
                     && newRightRestrictions.equals(rightRestrictions))
+                break;
+
+            if(!settlement.record(List.of(optLeft, optRight, newLeftReduced), List.of(optLeft, optRight)))
                 break;
 
             leftReduced = newLeftReduced;
