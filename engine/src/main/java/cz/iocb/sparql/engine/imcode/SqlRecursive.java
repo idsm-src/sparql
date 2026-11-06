@@ -134,10 +134,12 @@ public final class SqlRecursive extends SqlIntercode
     private final Set<ResourceClass> segmentClasses;
 
     /**
-     * Variables of the initial solutions carried through the recursion unchanged (the start and graph variables and the
-     * others the parent needs), including those the bindings do not expose.
+     * Bindings of the variables of the initial solutions carried through the recursion unchanged (the start and graph
+     * variables and the others the parent needs) in the columns of the recursion, as the initial solutions bind them:
+     * also the variables and the classes the bindings leave out, since the bindings hold what the parent needs, whereas
+     * the recursion carries the variables whole and joins the step with them.
      */
-    private final Set<Variable> carried;
+    private final VariableBindings carried;
 
     /**
      * True when the initial solutions are seeds taken from the siblings (see {@link #seed}); such a walk is seeded no
@@ -162,13 +164,13 @@ public final class SqlRecursive extends SqlIntercode
      * @param reverseJoinVar variable of the reverse step bound to the node it reaches, or null
      * @param reverseInit the initial solutions of the walk turned the other way round, or null
      * @param segmentClasses classes of the start variable the initial solutions of a segment are restricted to, or null
-     * @param carried variables of the initial solutions carried through the recursion
+     * @param carried bindings of the variables of the initial solutions carried through the recursion in its columns
      * @param seeded whether the initial solutions are seeds taken from the siblings
      */
     protected SqlRecursive(VariableBindings bindings, SqlIntercode init, SqlIntercode next, VariableBinding endBinding,
             Variable joinVar, Variable beginVar, List<Column> iv, List<Column> ev, Variable graphVar,
             SqlIntercode reverseNext, Variable reverseJoinVar, SqlIntercode reverseInit,
-            Set<ResourceClass> segmentClasses, Set<Variable> carried, boolean seeded)
+            Set<ResourceClass> segmentClasses, VariableBindings carried, boolean seeded)
     {
         super(bindings, init.isDeterministic() && next.isDeterministic());
         this.init = init;
@@ -260,7 +262,7 @@ public final class SqlRecursive extends SqlIntercode
         ClassRelations relations = request.getConfiguration();
 
         Map<Column, Column> map = new HashMap<>();
-        VariableBindings bindings = new VariableBindings();
+        VariableBindings inner = new VariableBindings();
         VariableBindings carried = new VariableBindings();
 
         for(VariableBinding binding : init.getVariableBindings().getValues())
@@ -274,7 +276,7 @@ public final class SqlRecursive extends SqlIntercode
                     && (restrictions == null || !restrictions.containsVar(variable)))
                 continue;
 
-            carried.add(binding);
+            inner.add(binding);
 
             VariableBinding v = new VariableBinding(variable, binding.canBeNull());
 
@@ -298,21 +300,22 @@ public final class SqlRecursive extends SqlIntercode
                 }).toList());
             }
 
-            bindings.add(v);
+            carried.add(v);
         }
 
+        VariableBindings bindings = new VariableBindings(carried);
         VariableBinding endBinding = createEndVariableBinding(request, endVar, init, next);
 
         if(endBinding != null)
             bindings.add(endBinding);
 
 
-        List<Column> innerColumns = new ArrayList<>(carried.getNonConstantColumns());
+        List<Column> innerColumns = new ArrayList<>(inner.getNonConstantColumns());
         List<Column> outerColumns = innerColumns.stream().map(c -> map.get(c)).toList();
 
         return new SqlRecursive(bindings.restrict(relations, restrictions), init, next, endBinding, joinVar, beginVar,
-                innerColumns, outerColumns, graphVar, reverseNext, reverseJoinVar, reverseInit, segmentClasses,
-                carried.getVariables(), seeded);
+                innerColumns, outerColumns, graphVar, reverseNext, reverseJoinVar, reverseInit, segmentClasses, carried,
+                seeded);
     }
 
 
@@ -1001,8 +1004,9 @@ public final class SqlRecursive extends SqlIntercode
         builder.append(" FROM recursion AS ");
         builder.append(left);
 
-        VariableBindings tmp = new VariableBindings(bindings);
-        tmp.remove(endBinding.getVariable());
+        // the step is joined with the carried variables as the recursion holds them, so that a path stays in its graph
+        // also when the parent needs the graph variable in fewer classes or not at all
+        VariableBindings tmp = new VariableBindings(carried);
         tmp.add(new VariableBinding(joinVar, endBinding.getMappings(), endBinding.canBeNull()));
 
         if(lateral)
@@ -1144,7 +1148,7 @@ public final class SqlRecursive extends SqlIntercode
         if(!selected.contains(endBinding.getVariable()))
             return false;
 
-        return carried.stream().allMatch(v -> selected.contains(v) || init.getVariableBindings().get(v).isConstant());
+        return carried.getValues().stream().allMatch(b -> selected.contains(b.getVariable()) || b.isConstant());
     }
 
 
