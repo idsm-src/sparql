@@ -256,8 +256,9 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             return matchTripleTerm(pattern, node, visitElement(repeatedPath, subject, node));
         }
 
-        Set<Variable> distinct = Stream.of(subject, object).filter(e -> e instanceof Variable).map(e -> (Variable) e)
-                .collect(toSet());
+        // the solutions are distinct in every graph, so the graph variable, which both branches bind, is kept
+        Set<Variable> distinct = Stream.of(subject, object, graph).filter(e -> e instanceof Variable)
+                .map(e -> (Variable) e).collect(toSet());
 
         if(repeatedPath.getKind() == Kind.ZeroOrOne)
             return SqlDistinct.create(request, SqlUnion.union(request, List.of(translateZeroPath(subject, object),
@@ -471,7 +472,9 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
     /**
      * Translates the zero-length path: the subject equals the object, ranging over all nodes of the graph when both are
-     * variables.
+     * variables. A constant matches itself in every graph, also where it is no node, so its solution is placed in the
+     * graph by {@link TranslateVisitor#translateInGraph}: it binds the graph variable like the solutions of the
+     * triples, and a walk starting from it carries the graph.
      *
      * @param subject the subject term
      * @param object the object term
@@ -505,13 +508,13 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         {
             SqlExpressionIntercode expression = getExpression(request, object, new VariableBindings());
 
-            return SqlBind.bind(request, variable, expression, SqlEmptySolution.get());
+            return parent.translateInGraph(graph, SqlBind.bind(request, variable, expression, SqlEmptySolution.get()));
         }
         else if(object instanceof Variable variable)
         {
             SqlExpressionIntercode expression = getExpression(request, subject, new VariableBindings());
 
-            return SqlBind.bind(request, variable, expression, SqlEmptySolution.get());
+            return parent.translateInGraph(graph, SqlBind.bind(request, variable, expression, SqlEmptySolution.get()));
         }
         else
         {
@@ -520,7 +523,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             SqlExpressionIntercode filter = getComparisonExpression(request, subject, object, false,
                     child.getVariableBindings());
 
-            return SqlFilter.filter(request, List.of(filter), child);
+            return parent.translateInGraph(graph, SqlFilter.filter(request, List.of(filter), child));
         }
     }
 

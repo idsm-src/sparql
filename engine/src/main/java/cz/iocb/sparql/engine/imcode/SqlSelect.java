@@ -445,7 +445,9 @@ public final class SqlSelect extends SqlIntercode
             throw new UnsupportedOperationException();
 
 
-        Restrictions childRestrictions = new Restrictions(restrictions);
+        // the parent may restrict variables the sub-select does not project, which its pattern may bind in a scope of
+        // its own (the graph variable in effect) and which must not leak out of the sub-select when it is inlined
+        Restrictions childRestrictions = restrictTo(restrictions, bindings.getVariables());
         childRestrictions.add(orderBy.keySet());
         childRestrictions.add(simpleOrderBy);
 
@@ -504,8 +506,36 @@ public final class SqlSelect extends SqlIntercode
                 && optDistinct == distinct && stripedOrderBy.equals(orderBy))
             return this;
 
-        return create(request, optDistinct ? bindings.getVariables() : restrictions.getNames(), optChild, optDistinct,
-                stripedOrderBy, offset, limit);
+        return create(request,
+                optDistinct ? bindings.getVariables() : restrictTo(restrictions, bindings.getVariables()).getNames(),
+                optChild, optDistinct, stripedOrderBy, offset, limit);
+    }
+
+
+    /**
+     * The restrictions of the given variables only, with their join and accepted classes.
+     *
+     * @param restrictions the restrictions
+     * @param variables the variables
+     * @return the restrictions of the given variables only
+     */
+    private static Restrictions restrictTo(Restrictions restrictions, Set<Variable> variables)
+    {
+        Restrictions result = new Restrictions();
+
+        for(Variable variable : variables)
+        {
+            if(restrictions.containsVar(variable))
+                result.add(variable, restrictions.get(variable));
+
+            if(!restrictions.getJoinClasses(variable).isEmpty())
+                result.addJoinClasses(variable, restrictions.getJoinClasses(variable));
+
+            if(restrictions.getAcceptedClasses(variable) != null)
+                result.addAcceptedClasses(variable, restrictions.getAcceptedClasses(variable));
+        }
+
+        return result;
     }
 
 

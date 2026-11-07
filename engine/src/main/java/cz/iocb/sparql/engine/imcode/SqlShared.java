@@ -85,6 +85,27 @@ public final class SqlShared extends SqlIntercode
 
 
     /**
+     * The node optimised for the variable alone and shared when it can be (see {@link #canShare}): solutions that
+     * several parts of a pattern join, like the named graphs every zero-length path from a constant is paired with, are
+     * then evaluated once by the statement.
+     *
+     * @param request the current request
+     * @param node the node
+     * @param variable the only variable needed of the node
+     * @return the node optimised for the variable and shared when it can be
+     */
+    public static SqlIntercode shareOptimized(Request request, SqlIntercode node, Variable variable)
+    {
+        SqlIntercode optimized = node.optimize(request, new Restrictions(Set.of(variable)), false, false);
+
+        if(!canShare(request, optimized))
+            return optimized;
+
+        return share(optimized);
+    }
+
+
+    /**
      * Distinct values of the variable in the shared solutions, shared themselves, to seed a walk with (see
      * {@link SqlRecursive#seed}).
      *

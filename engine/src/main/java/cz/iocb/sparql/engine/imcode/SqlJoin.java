@@ -1100,8 +1100,17 @@ public final class SqlJoin extends SqlIntercode
     private static Restrictions getRestrictions(ClassRelations relations, SqlIntercode child, List<SqlIntercode> childs,
             Restrictions restrictions, Map<Variable, Set<ResourceClass>> settled)
     {
-        List<VariableBindings> others = childs.stream().filter(c -> c != child).map(c -> c.getVariableBindings())
-                .toList();
+        // a node may be a child twice (the shared named graphs of two zero-length paths), each copy counting the other
+        List<VariableBindings> others = new ArrayList<>(childs.size());
+        boolean skipped = false;
+
+        for(SqlIntercode other : childs)
+        {
+            if(other == child && !skipped)
+                skipped = true;
+            else
+                others.add(other.getVariableBindings());
+        }
 
         return getJoinRestrictions(relations, child.getVariableBindings(), others, restrictions, true, settled);
     }
@@ -1164,9 +1173,9 @@ public final class SqlJoin extends SqlIntercode
             // alone would drop an end variable a sibling joins)
             Restrictions walkRestrictions = getRestrictions(request.getConfiguration(), walk, childs, restrictions);
 
-            List<Integer> seeds = selectSeeds(request, childs, i, beginVar, endVar);
-            List<Integer> endSeeds = walk.reverseNext != null ? selectSeeds(request, childs, i, endVar, beginVar) :
-                    List.of();
+            List<Integer> seeds = selectSeeds(request, childs, i, beginVar, endVar, walk.graphVar);
+            List<Integer> endSeeds = walk.reverseNext != null ?
+                    selectSeeds(request, childs, i, endVar, beginVar, walk.graphVar) : List.of();
 
             // the walk turned to start from its end has to agree with the seeds (see SqlRecursive.canSeedFromEnd)
             if(!endSeeds.isEmpty()
@@ -1225,7 +1234,7 @@ public final class SqlJoin extends SqlIntercode
             {
                 Variable other = variable.equals(beginVar) ? endVar : beginVar;
 
-                if(!selectSeeds(request, childs, i, variable, other).isEmpty())
+                if(!selectSeeds(request, childs, i, variable, other, walk.graphVar).isEmpty())
                     continue;
 
                 for(int j = 0; j < childs.size(); j++)
@@ -1321,17 +1330,20 @@ public final class SqlJoin extends SqlIntercode
 
     /**
      * Indexes of the children that can seed the walk at the given index from the start variable: those binding it
-     * always and distinct solutions over it, and not binding the end variable.
+     * always and distinct solutions over it, and not binding the end variable. A child binding the graph the walk
+     * carries always needs distinct solutions over the start and the graph only, as the recursion keeps the solutions
+     * of different graphs apart.
      *
      * @param request the current request
      * @param childs the child nodes
      * @param index index of the walk
      * @param startVar the variable the walk starts from
      * @param endVar the variable the walk ends in
+     * @param graphVar the graph variable the walk carries, or null
      * @return indexes of the children that can seed the walk from the start variable
      */
     private static List<Integer> selectSeeds(Request request, List<SqlIntercode> childs, int index, Variable startVar,
-            Variable endVar)
+            Variable endVar, Variable graphVar)
     {
         List<Integer> seeds = new ArrayList<>();
 
@@ -1340,8 +1352,13 @@ public final class SqlJoin extends SqlIntercode
             SqlIntercode child = childs.get(i);
             VariableBinding binding = child.getVariable(startVar);
 
-            if(i != index && binding != null && !binding.canBeNull() && child.getVariable(endVar) == null
-                    && child.isDistinct(request, Set.of(startVar)))
+            if(i == index || binding == null || binding.canBeNull() || child.getVariable(endVar) != null)
+                continue;
+
+            VariableBinding graph = graphVar != null ? child.getVariable(graphVar) : null;
+
+            if(child.isDistinct(request, Set.of(startVar))
+                    || (graph != null && !graph.canBeNull() && child.isDistinct(request, Set.of(startVar, graphVar))))
                 seeds.add(i);
         }
 

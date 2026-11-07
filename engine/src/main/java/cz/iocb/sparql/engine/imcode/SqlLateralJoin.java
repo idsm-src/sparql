@@ -17,6 +17,7 @@ import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.mapping.classes.UnsupportedIriClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBinding;
@@ -272,7 +273,7 @@ public final class SqlLateralJoin extends SqlIntercode
                 if(exposed == null)
                     continue;
 
-                List<Column> columns = provided == null ? null : provided.deriveMapping(relations, resClass);
+                List<Column> columns = provided == null ? null : deriveExposed(relations, provided, resClass);
 
                 for(int i = 0; i < resClass.getColumnCount(); i++)
                 {
@@ -288,6 +289,49 @@ public final class SqlLateralJoin extends SqlIntercode
         }
 
         return values;
+    }
+
+
+    /**
+     * Columns of the exposed class holding the value the binding provides (see {@link VariableBinding#deriveMapping}).
+     * Whether an IRI of a more general class belongs to no user IRI class (see {@link UnsupportedIriClass}) cannot be
+     * checked, so such an IRI is converted to that class unchecked: the exposed value is only compared with IRIs of the
+     * class, which an IRI of a user class never equals, so an IRI of a user class converted unchecked matches nothing.
+     * A value provided in several classes such an IRI could come from is left to {@link VariableBinding#deriveMapping},
+     * which cannot convert it either.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param provided the binding providing the value
+     * @param resClass the exposed class
+     * @return columns of the exposed class holding the value, or null when the class providing it has no columns
+     */
+    private static List<Column> deriveExposed(ClassRelations relations, VariableBinding provided,
+            ResourceClass resClass)
+    {
+        if(!(resClass instanceof UnsupportedIriClass) || provided.canDeriveMapping(relations, resClass))
+            return provided.deriveMapping(relations, resClass);
+
+        List<Column> result = null;
+
+        for(Entry<ResourceClass, List<Column>> entry : provided.getMappings().entrySet())
+        {
+            ResourceClass sourceClass = entry.getKey();
+
+            if(ResourceClass.areDisjunct(relations, resClass, sourceClass)
+                    || !resClass.isSubclassOf(sourceClass.getEffectiveClass()))
+                continue;
+
+            if(entry.getValue() == null)
+                return null;
+
+            // a value provided in several classes would need a choice among them
+            if(result != null)
+                return provided.deriveMapping(relations, resClass);
+
+            result = resClass.fromGeneralClass(sourceClass, entry.getValue(), true);
+        }
+
+        return result != null ? result : provided.deriveMapping(relations, resClass);
     }
 
 

@@ -16,7 +16,10 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
 import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
@@ -253,12 +256,17 @@ public final class SqlRecursive extends SqlIntercode
      * @param reverseInit the initial solutions of the walk turned the other way round, or null
      * @param segmentClasses classes of the start variable the initial solutions of a segment are restricted to, or null
      * @param seeded whether the initial solutions are seeds taken from the siblings
-     * @return recursion exposing only what the parent needs; the carried variables get fresh output columns
+     * @return recursion exposing only what the parent needs; the carried variables get fresh output columns; no
+     *         solution when the initial solutions do not bind the end variable
      */
     protected static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, Variable beginVar,
             Variable joinVar, Variable endVar, Variable graphVar, Restrictions restrictions, SqlIntercode reverseNext,
             Variable reverseJoinVar, SqlIntercode reverseInit, Set<ResourceClass> segmentClasses, boolean seeded)
     {
+        // initial solutions that do not bind the end variable have no solution, so no path starts
+        if(init.getVariableBindings().get(endVar) == null)
+            return SqlNoSolution.get();
+
         ClassRelations relations = request.getConfiguration();
 
         Map<Column, Column> map = new HashMap<>();
@@ -326,16 +334,19 @@ public final class SqlRecursive extends SqlIntercode
      * through the recursion, so that the join needs the seeds no more and they are evaluated once. A seed has to bind
      * the start variable without a null and distinct solutions over it: the recursion unites its rows as a set, so
      * several solutions of a seed for one start would collapse into one, and the paths walked would multiply by their
-     * number. A seed read from a table that is a source of the zero-length paths delivers nodes of the graph, so the
-     * zero-length paths are its own rows; otherwise plain table accesses and values are joined under the deduplication
-     * of the zero-length paths (the join is then distributed over the sources, which the database looks up by their
-     * indexes), and other seeds are joined with the initial solutions as a whole, so that they are not repeated. A walk
-     * seeded from its end is turned, starting from the initial solutions it was created with (see {@link #turnedInit}),
-     * which only the parent restricts at the new end. The seeded walk is not turned any more, because the carried
-     * variables belong to its start.
+     * number. A seed binding the graph the walk carries without a null needs distinct solutions over the start and the
+     * graph only, as the carried graph keeps the solutions of different graphs apart. A seed read from a table that is
+     * a source of the zero-length paths delivers nodes of the graph, so the zero-length paths are its own rows;
+     * otherwise plain table accesses and values are joined under the deduplication of the zero-length paths (the join
+     * is then distributed over the sources, which the database looks up by their indexes), and other seeds are joined
+     * with the initial solutions as a whole, so that they are not repeated. A walk seeded from its end is turned,
+     * starting from the initial solutions it was created with (see {@link #turnedInit}), which only the parent
+     * restricts at the new end. The seeded walk is not turned any more, because the carried variables belong to its
+     * start.
      *
      * @param request the current request
-     * @param seeds the siblings seeding the walk, every one distinct over the start variable and binding it always
+     * @param seeds the siblings seeding the walk, every one binding the start variable always and distinct over it (or
+     *            over it and the graph the walk carries, which it binds always)
      * @param fromEnd true when the seeds bind the end variable, so that the walk is turned (see {@link #reverseNext});
      *            only when the walk may be seeded from its end so (see {@link #canSeedFromEnd})
      * @param restrictions what the parent and the siblings of the walk need of its variables
@@ -876,6 +887,48 @@ public final class SqlRecursive extends SqlIntercode
     }
 
 
+    /**
+     * True if the branch of the step is a table access whose rows with a given start node can be looked up by an index
+     * of the table, the columns of the carried graph and the columns compared with constants counting as bound (see
+     * {@link DatabaseSchema#canLookUp}).
+     *
+     * @param request the current request
+     * @param branch a branch of the step
+     * @return true if the rows of the branch with a given start node can be looked up by an index
+     */
+    private boolean canLookUpStep(Request request, SqlIntercode branch)
+    {
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+
+        if(schema == null || !(branch instanceof SqlTableAccess access) || access.getTable() == null)
+            return false;
+
+        Set<Column> bound = new HashSet<>();
+
+        for(ColumnComparison comparison : access.getConditions().getAreEqual())
+        {
+            if(comparison.getLeft() instanceof TableColumn column && !(comparison.getRight() instanceof TableColumn))
+                bound.add(column);
+            else if(comparison.getRight() instanceof TableColumn column
+                    && !(comparison.getLeft() instanceof TableColumn))
+                bound.add(column);
+        }
+
+        VariableBinding graph = graphVar != null ? access.getInternalVariableBinding(graphVar) : null;
+
+        if(graph != null)
+            for(Column column : graph.getNonConstantColumns())
+                if(column instanceof TableColumn)
+                    bound.add(column);
+
+        VariableBinding start = access.getInternalVariableBinding(joinVar);
+        Set<Column> columns = start != null ? start.getNonConstantColumns() : Set.of();
+
+        return columns.size() == 1 && columns.iterator().next() instanceof TableColumn column
+                && schema.canLookUp(access.getTable(), column, bound);
+    }
+
+
     @Override
     public String translate(Request request)
     {
@@ -965,8 +1018,14 @@ public final class SqlRecursive extends SqlIntercode
         // branch by branch with a condition of its own: the condition of the union as a whole is a disjunction over the
         // class pairs, which the database can neither hash nor look up by an index, whereas it joins a single pair
         // through the index of the branch (the step of a single class stays a plain join, so that the database may
-        // still choose a hash join when the recursion grows large)
-        boolean lateral = next instanceof SqlUnion && endBinding.getClasses().size() > 1;
+        // still choose a hash join when the recursion grows large); a step of a walk carrying the graph in several
+        // classes keeps the equality of the node, which the database can hash, and only its condition on the graph is
+        // a disjunction over the class pairs, so it is joined laterally only when every branch can be looked up by an
+        // index (otherwise the database would scan the branch for every row of the recursion)
+        VariableBinding carriedGraph = graphVar != null ? carried.get(graphVar) : null;
+        boolean lateral = next instanceof SqlUnion union
+                && (endBinding.getClasses().size() > 1 || (carriedGraph != null && carriedGraph.getClasses().size() > 1
+                        && union.getChilds().stream().allMatch(b -> canLookUpStep(request, b))));
         AliasTable left = lateral ? walkTable : leftTable;
         AliasTable right = lateral ? stepTable : rightTable;
 

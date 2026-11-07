@@ -28,6 +28,7 @@ import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.imcode.SqlJoin;
 import cz.iocb.sparql.engine.imcode.SqlLateralJoin;
 import cz.iocb.sparql.engine.imcode.SqlNoSolution;
+import cz.iocb.sparql.engine.imcode.SqlShared;
 import cz.iocb.sparql.engine.imcode.SqlUnion;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -331,7 +332,8 @@ public final class SqlExists extends SqlExpressionIntercode
 
     /**
      * The pattern without its context solution, as built (see {@link #detach}), or null when the context solution
-     * cannot be detached from it.
+     * cannot be detached from it, notably when the other children of a join cannot be joined without it (see
+     * {@link #canJoinWithout}).
      *
      * @param request the current request
      * @param pattern the pattern
@@ -346,6 +348,9 @@ public final class SqlExists extends SqlExpressionIntercode
             List<SqlIntercode> others = join.getChilds().stream().filter(c -> !isContext(c, context)).toList();
 
             if(contexts.isEmpty() || others.isEmpty())
+                return null;
+
+            if(!canJoinWithout(request.getConfiguration(), others, contexts))
                 return null;
 
             SqlIntercode rest = others.get(0);
@@ -383,6 +388,43 @@ public final class SqlExists extends SqlExpressionIntercode
         }
 
         return null;
+    }
+
+
+    /**
+     * True if the children of a join can be joined without its context solutions. They were optimised as partners of
+     * the context solution, which excludes the classes it does not bind the shared variables in: a child may then keep
+     * such a class without columns (a shared node keeps all its solutions, see {@link SqlShared}), and another child
+     * binding the variable in an overlapping class, with or without columns, would have to be compared with it, which
+     * the columns do not allow.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param others the children of the join other than the context solutions
+     * @param contexts the context solutions among the children
+     * @return true if no two of the children would compare a variable shared with the context solution in a class one
+     *         of them binds without columns
+     */
+    private static boolean canJoinWithout(ClassRelations relations, List<SqlIntercode> others,
+            List<SqlIntercode> contexts)
+    {
+        Set<Variable> shared = contexts.stream().flatMap(c -> c.getVariableBindings().getVariables().stream())
+                .collect(toSet());
+
+        for(Variable variable : shared)
+        {
+            List<VariableBinding> bindings = others.stream().map(c -> c.getVariableBindings().get(variable))
+                    .filter(b -> b != null).toList();
+
+            for(int i = 0; i < bindings.size(); i++)
+                for(Entry<ResourceClass, List<Column>> entry : bindings.get(i).getMappings().entrySet())
+                    if(entry.getValue() == null)
+                        for(int j = 0; j < bindings.size(); j++)
+                            if(j != i && bindings.get(j).getMappings().keySet().stream()
+                                    .anyMatch(c -> !ResourceClass.areDisjunct(relations, c, entry.getKey())))
+                                return false;
+        }
+
+        return true;
     }
 
 

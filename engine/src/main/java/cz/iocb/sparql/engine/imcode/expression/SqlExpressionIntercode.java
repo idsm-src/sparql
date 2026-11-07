@@ -339,7 +339,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     public boolean hasExpressionColumn(ClassRelations relations, ResourceClass resClass)
     {
         for(Entry<ResourceClass, List<Column>> e : variableBinding.getMappings().entrySet())
-            if(!areDisjunct(relations, resClass, e.getKey())
+            if(e.getValue() != null && !areDisjunct(relations, resClass, e.getKey())
                     && e.getValue().stream().anyMatch(c -> c instanceof ExpressionColumn))
                 return true;
 

@@ -58,6 +58,7 @@ import cz.iocb.sparql.engine.imcode.SqlNoSolution;
 import cz.iocb.sparql.engine.imcode.SqlProcedureCall;
 import cz.iocb.sparql.engine.imcode.SqlSelect;
 import cz.iocb.sparql.engine.imcode.SqlServiceStub;
+import cz.iocb.sparql.engine.imcode.SqlShared;
 import cz.iocb.sparql.engine.imcode.SqlTableAccess;
 import cz.iocb.sparql.engine.imcode.SqlUnion;
 import cz.iocb.sparql.engine.imcode.SqlValues;
@@ -98,6 +99,7 @@ import cz.iocb.sparql.engine.model.SelectQuery;
 import cz.iocb.sparql.engine.model.VarOrIri;
 import cz.iocb.sparql.engine.model.VariableNode;
 import cz.iocb.sparql.engine.model.VariableOrBlankNode;
+import cz.iocb.sparql.engine.model.base.Element;
 import cz.iocb.sparql.engine.model.base.Range;
 import cz.iocb.sparql.engine.model.expression.BuiltInCallExpression;
 import cz.iocb.sparql.engine.model.expression.ExistsExpression;
@@ -176,6 +178,23 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      * inside them (see {@link #visit(Select)}).
      */
     private final Map<Variable, SqlExpressionIntercode> lateralGraphs = new HashMap<>();
+
+    /**
+     * Inner graph variables of the evaluations per graph whose pattern holds no SERVICE call: a zero-length path from a
+     * constant inside an EXISTS pattern of such an evaluation takes the lateral value of the graph the pattern is
+     * evaluated in (see {@link #translateInGraph}), which the context of a SERVICE call could not read.
+     */
+    private final Set<Variable> graphsWithoutService = new HashSet<>();
+
+    /**
+     * Code enumerating the named graphs, by the variable bound to them (see {@link #getGraphEnumeration}).
+     */
+    private final Map<Variable, SqlIntercode> graphEnumerations = new HashMap<>();
+
+    /**
+     * The named graphs shared by the statement, by the variable bound to them (see {@link #getNamedGraphs}).
+     */
+    private final Map<Variable, SqlIntercode> namedGraphs = new HashMap<>();
 
     /**
      * Context solutions of the EXISTS patterns being translated, innermost last (the empty solution at the bottom): the
@@ -382,7 +401,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
          * is evaluated per graph by itself; the result binds the graph variable of the enclosing clause.
          */
         if(select.isSubSelect() && getGraph() instanceof Variable graph && !lateralGraphs.containsKey(graph))
-            return translatePerGraph(graph, () -> translateSelect(select));
+            return translatePerGraph(graph, select, () -> translateSelect(select));
 
         return translateSelect(select);
     }
@@ -618,7 +637,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(GroupGraph groupGraph)
     {
-        SqlIntercode translatedGroupGraphPattern = translatePatternList(groupGraph.getPatterns(), getContextSolution());
+        SqlIntercode translatedGroupGraphPattern = translatePatternList(groupGraph.getPatterns(),
+                getGroupStart(groupGraph.getPatterns()));
 
         return translatedGroupGraphPattern;
     }
@@ -631,10 +651,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         /* NOTE: When not every solution of the pattern comes from a triple of the graph, the pattern does not bind the
          * graph variable by itself, and a MINUS, OPTIONAL or EXISTS in it whose triples do would be evaluated over all
-         * graphs at once. Such a pattern is evaluated separately in every named graph.
+         * graphs at once. Such a pattern is evaluated separately in every named graph. In the other patterns, a group
+         * whose MINUS, OPTIONAL or EXISTS comes before the triples that bind the graph starts from the named graphs
+         * (see getGroupStart).
          */
-        if(graph.getName() instanceof VariableNode graphNode && !isGraphWitnessed(graph, graphTerm))
-            return translatePerGraph(getVariable(graphNode),
+        if(graph.getName() instanceof VariableNode graphNode && !isGraphWitnessed(graph.getPattern(), graphTerm))
+            return translatePerGraph(getVariable(graphNode), graph.getPattern(),
                     () -> restrictToCurrentGraph(translateGroupGraphPattern(graph.getPattern())));
 
         SqlIntercode quads = null;
@@ -692,10 +714,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             //NOTE: a witnessed pattern binds the variable in every solution; otherwise it is evaluated per graph
             if(binding == null || binding.canBeNull())
-                return translatePerGraph(var,
+                return translatePerGraph(var, graph.getPattern(),
                         () -> restrictToCurrentGraph(translateGroupGraphPattern(graph.getPattern())));
         }
-        else if(!isGraphWitnessed(graph, graphTerm))
+        else if(!isGraphWitnessed(graph.getPattern(), graphTerm))
         {
             //NOTE: the pattern has solutions even if the graph does not exist, so the existence has to be checked
             SqlExpressionIntercode exists = SqlExists.create(request, false, quads, new VariableBindings());
@@ -735,6 +757,39 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     /**
+     * Solutions holding in every graph whatever its triples (the zero-length path from a constant) as solutions in the
+     * given graph: in a variable graph, they are paired with every named graph, so that they bind the graph like the
+     * solutions of a triple, the named graphs being shared by the statement (see {@link #getNamedGraphs}); in a
+     * constant graph, they hold only when the graph exists; in the default graph, they are returned unchanged. The SQL
+     * of an EXISTS pattern is written in place, where the shared named graphs would be repeated, so inside an
+     * evaluation per graph (see {@link #translatePerGraph}) the solutions of an EXISTS pattern take the lateral value
+     * of the graph the pattern is evaluated in, unless the evaluation holds a SERVICE call, whose context could not
+     * read it.
+     *
+     * @param graph the graph term, or null for the default graph
+     * @param solutions the solutions
+     * @return the solutions in the given graph
+     */
+    SqlIntercode translateInGraph(RdfTerm graph, SqlIntercode solutions)
+    {
+        // the context solutions of the EXISTS patterns being translated lie above the empty one
+        if(graph instanceof Variable variable && graphsWithoutService.contains(variable) && contextSolutions.size() > 1)
+            return SqlBind.bind(request, variable, lateralGraphs.get(variable), solutions);
+
+        if(graph instanceof Variable variable)
+            return SqlJoin.join(request, getNamedGraphs(variable), solutions);
+
+        if(graph == null)
+            return solutions;
+
+        SqlExpressionIntercode exists = SqlExists.create(request, false, translateGraphQuads(graph),
+                new VariableBindings());
+
+        return SqlFilter.filter(request, List.of(exists), solutions);
+    }
+
+
+    /**
      * Evaluates the pattern given by the translation separately in every named graph bound to the variable: the graphs
      * are enumerated, the pattern is translated with a fresh variable standing for the graph of its triples and joined
      * laterally, evaluated for the graph of the current solution. The lateral value of that graph is remembered in
@@ -743,12 +798,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      * and the pattern of an EXISTS. The result binds the variable to the graph.
      *
      * @param variable the graph variable
+     * @param pattern the pattern, searched for SERVICE calls (see {@link #graphsWithoutService})
      * @param translation translation of the pattern, run with the fresh variable as the graph in effect
      * @return the resulting intermediate code
      */
-    private SqlIntercode translatePerGraph(Variable variable, Supplier<SqlIntercode> translation)
+    private SqlIntercode translatePerGraph(Variable variable, Element pattern, Supplier<SqlIntercode> translation)
     {
-        SqlIntercode graphs = translateGraphs(variable);
+        SqlIntercode graphs = getGraphEnumeration(variable);
         VariableBinding graphBinding = graphs.getVariableBindings().get(variable);
 
         if(graphBinding == null)
@@ -764,8 +820,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         lateralGraphs.put(innerGraph, SqlLateralVariable.create(lateral.get(variable)));
         graphRestrictions.push(innerGraph);
 
+        if(!holds(pattern, Service.class))
+            graphsWithoutService.add(innerGraph);
+
         SqlIntercode translated = translation.get();
 
+        graphsWithoutService.remove(innerGraph);
         graphRestrictions.pop();
         lateralGraphs.remove(innerGraph);
 
@@ -873,6 +933,79 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     /**
+     * The solution a group starts from: the context solution, joined with the named graphs inside GRAPH ?g evaluated
+     * over all graphs at once (see {@link #visit(Graph)}) when a member of the group would see the graph unbound: an
+     * OPTIONAL, a MINUS or a BIND holding an EXISTS before the first member witnessing the graph (see
+     * {@link #isGraphWitnessed}), or a FILTER holding an EXISTS in a group witnessing it nowhere. Started from the
+     * named graphs, the group is evaluated in every graph by a join on the graph variable. A context solution binding
+     * the graph always places the group in a graph by itself; the triples witnessing the graph keep the named graphs
+     * only. The named graphs are not shared here (see {@link #getNamedGraphs}): the join splits them by the classes of
+     * the graph variable and compares each class by plain equality.
+     *
+     * @param patterns the members of the group
+     * @return the solution the group starts from
+     */
+    private SqlIntercode getGroupStart(List<Pattern> patterns)
+    {
+        if(!(getGraph() instanceof Variable graph) || lateralGraphs.containsKey(graph))
+            return getContextSolution();
+
+        VariableBinding contextGraph = getContextSolution().getVariableBindings().get(graph);
+
+        if(contextGraph != null && !contextGraph.canBeNull())
+            return getContextSolution();
+
+        boolean witnessed = false;
+        boolean filtersExists = false;
+        boolean needed = false;
+
+        for(Pattern member : patterns)
+        {
+            if(member instanceof Optional || member instanceof Minus)
+                needed |= !witnessed;
+            else if(member instanceof Bind bind)
+                needed |= !witnessed && holds(bind.getExpression(), ExistsExpression.class);
+            else if(member instanceof Filter filter)
+                filtersExists |= holds(filter, ExistsExpression.class);
+            else
+                witnessed |= isGraphWitnessed(member, graph);
+        }
+
+        if(!needed && (witnessed || !filtersExists))
+            return getContextSolution();
+
+        return SqlJoin.join(request, getContextSolution(), getGraphEnumeration(graph));
+    }
+
+
+    /**
+     * Code enumerating the named graphs as solutions of the variable (see {@link #translateGraphs}), built once per
+     * variable, because enumerating the graphs of every quad mapping is costly to translate.
+     *
+     * @param variable the variable bound to the graphs
+     * @return code enumerating the named graphs as solutions of the variable
+     */
+    private SqlIntercode getGraphEnumeration(Variable variable)
+    {
+        return graphEnumerations.computeIfAbsent(variable, v -> translateGraphs(v));
+    }
+
+
+    /**
+     * The named graphs as solutions of the variable, optimised for it and shared by the statement (see
+     * {@link SqlShared#shareOptimized}), built once per variable. Inside an expression, whose SQL cannot declare the
+     * shared table, they are written in place.
+     *
+     * @param variable the variable bound to the graphs
+     * @return the named graphs as solutions of the variable
+     */
+    private SqlIntercode getNamedGraphs(Variable variable)
+    {
+        return namedGraphs.computeIfAbsent(variable, v -> SqlShared.shareOptimized(request, getGraphEnumeration(v), v));
+    }
+
+
+    /**
      * Translates a pattern standing in the syntax for a group graph pattern: a group starts from the context solution
      * itself (see {@link #visit(GroupGraph)}), whereas a sub-select standing for the whole group is joined with it.
      *
@@ -891,18 +1024,19 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     /**
-     * True if every solution of the GRAPH pattern necessarily comes from a triple evaluated in the graph, which then
-     * binds a graph variable and is known to exist; false for patterns like {@code {}}, VALUES or BIND alone, which are
-     * evaluated per graph (a variable graph) or have to check that the graph exists (a constant one).
+     * True if every solution of the pattern of a GRAPH clause (or of a member of it) necessarily comes from a triple
+     * evaluated in the graph, which then binds a graph variable and is known to exist; false for patterns like
+     * {@code {}}, VALUES or BIND alone, which are evaluated per graph (a variable graph) or have to check that the
+     * graph exists (a constant one). A zero-length path from a constant is paired with the named graphs (see
+     * {@link #translateInGraph}), so it witnesses the graph as well.
      *
-     * @param graph the GRAPH pattern
+     * @param pattern the pattern
      * @param graphTerm the graph term
-     * @return true if every solution of the GRAPH pattern necessarily comes from a triple evaluated in the graph, which
-     *         then binds a graph variable and is known to exist; false for patterns like {@code {}}, VALUES or BIND
-     *         alone, which are evaluated per graph (a variable graph) or have to check that the graph exists (a
-     *         constant one)
+     * @return true if every solution of the pattern necessarily comes from a triple evaluated in the graph, which then
+     *         binds a graph variable and is known to exist; false for patterns like {@code {}}, VALUES or BIND alone,
+     *         which are evaluated per graph (a variable graph) or have to check that the graph exists (a constant one)
      */
-    private boolean isGraphWitnessed(Graph graph, RdfTerm graphTerm)
+    private boolean isGraphWitnessed(Element pattern, RdfTerm graphTerm)
     {
         return new ElementVisitor<Boolean>()
         {
@@ -1004,7 +1138,35 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             {
                 return false;
             }
-        }.visitElement(graph.getPattern());
+        }.visitElement(pattern);
+    }
+
+
+    /**
+     * True if the element holds an element of the given kind.
+     *
+     * @param element the element
+     * @param kind the kind of the elements
+     * @return true if the element holds an element of the given kind, false otherwise
+     */
+    private static boolean holds(Element element, Class<? extends Element> kind)
+    {
+        Boolean holds = new ElementVisitor<Boolean>()
+        {
+            @Override
+            public Boolean visitElement(Element child)
+            {
+                return kind.isInstance(child) ? Boolean.TRUE : super.visitElement(child);
+            }
+
+            @Override
+            protected Boolean aggregateResult(List<Boolean> results)
+            {
+                return results.stream().anyMatch(e -> e != null && e);
+            }
+        }.visitElement(element);
+
+        return holds != null && holds;
     }
 
 
@@ -1131,7 +1293,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                             optionalPatterns.add(subpattern);
                     }
 
-                    translatedPattern = translatePatternList(optionalPatterns, getContextSolution());
+                    translatedPattern = translatePatternList(optionalPatterns, getGroupStart(optionalPatterns));
                 }
                 else
                 {
