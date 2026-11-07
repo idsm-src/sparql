@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.test;
 
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdBooleanIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -63,7 +64,10 @@ import cz.iocb.sparql.testing.Database;
  * for the graph of the current solution, in the right sides of OPTIONAL and MINUS, in sub-selects, in UNION branches
  * and in nested graphs; the context limit counts the context solutions of all graphs. The copies of a call that a union
  * splits for differently restricted parents do not share a result built for narrower restrictions, and a failing SILENT
- * endpoint is asked once. The graphs {@code a:100}, {@code a:101} (class {@code a}), {@code b:200} (class {@code b}),
+ * endpoint is asked once. A variable of the context that a context solution leaves unbound stays unbound in the
+ * received solutions merged with it, also when the context is a union; a variable only the context binds keeps the
+ * classes of the context, a blank node among them, and the copies of a call that accept it in different classes share
+ * one request. The graphs {@code a:100}, {@code a:101} (class {@code a}), {@code b:200} (class {@code b}),
  * {@code a:102} and {@code <http://other.org/G>} (constant graphs) hold {@code ex:s} triples, two graphs name an
  * endpoint by {@code ex:ep}. The endpoints are servers on the loopback interface honouring the VALUES row of a request:
  * {@code svc} answers {@code (?x ?y)} = {@code (a:1 b:10)}, {@code (b:20 "lit")}, {@code svc2} answers {@code (?x ?z)}
@@ -629,5 +633,76 @@ public class GraphServiceTest
                         row(a(101), a(3), a(101), null, null, null), row(a(102), a(6), a(7), null, null, null),
                         row(b(200), a(1), a(5), a(1), b(10), a(5)), row(b(200), a(5), a(1), a(1), b(10), a(5)),
                         row(g, a(3), a(4), null, null, null)));
+    }
+
+
+    @Test
+    @DisplayName("a context solution leaving a variable unbound keeps it unbound in the received solutions")
+    void unboundContextVariables() throws Exception
+    {
+        assertThat(execute(
+                "SELECT ?x ?w ?y WHERE { VALUES (?x ?w) { (a:1 UNDEF) (a:2 a:3) } SERVICE <svc> { " + "?x ex:p ?y } }"),
+                containsInAnyOrder(row(a(1), null, b(10))));
+
+        assertThat(
+                execute("SELECT ?x ?z ?y WHERE { { SELECT ?x ?z ?y WHERE { VALUES ?x { a:1 b:20 } "
+                        + "OPTIONAL { ?x ex:s ?z } SERVICE <svc> { ?x ex:p ?y } } } }"),
+                containsInAnyOrder(row(a(1), a(2), b(10)), row(a(1), a(5), b(10)), row(b(20), null, lit)));
+
+        assertThat(
+                execute("SELECT ?g ?x ?w ?y WHERE { GRAPH ?g { {} UNION { ?x ex:s ?w } SERVICE <svc> { "
+                        + "?x ex:p ?y } } }"),
+                containsInAnyOrder(row(a(100), a(1), a(2), b(10)), row(b(200), a(1), a(5), b(10)),
+                        row(a(100), a(1), null, b(10)), row(a(100), b(20), null, lit), row(a(101), a(1), null, b(10)),
+                        row(a(101), b(20), null, lit), row(a(102), a(1), null, b(10)), row(a(102), b(20), null, lit),
+                        row(b(200), a(1), null, b(10)), row(b(200), b(20), null, lit), row(g, a(1), null, b(10)),
+                        row(g, b(20), null, lit)));
+    }
+
+
+    @Test
+    @DisplayName("the graph variable in a position where it may be unbound before a call does not repeat the call")
+    void unboundGraphVariable() throws Exception
+    {
+        assertThat(
+                execute("SELECT ?g ?x ?y ?z WHERE { GRAPH ?g { OPTIONAL { ?z ex:s ?g } "
+                        + "SERVICE <svc> { ?x ex:p ?y } } }"),
+                containsInAnyOrder(row(a(101), a(1), b(10), a(3)), row(a(101), b(20), lit, a(3))));
+        assertThat(requests("svc"), is(1));
+    }
+
+
+    @Test
+    @DisplayName("a context variable left unbound by a context solution is read above the call")
+    void unboundContextVariableAbove() throws Exception
+    {
+        assertThat(
+                execute("SELECT ?x ?y WHERE { VALUES (?x ?w) { (a:1 a:5) (a:1 b:7) (a:1 UNDEF) } "
+                        + "SERVICE <svc> { ?x ex:p ?y } FILTER(?w = a:5 || !BOUND(?w)) }"),
+                containsInAnyOrder(row(a(1), b(10)), row(a(1), b(10))));
+
+        assertThat(
+                execute("SELECT (COUNT(*) AS ?n) WHERE { VALUES (?x ?w) { (a:1 a:5) (a:1 b:7) (a:1 UNDEF) } "
+                        + "SERVICE <svc> { ?x ex:p ?y } MINUS { VALUES ?w { a:5 } } }"),
+                containsInAnyOrder(row(integer(2))));
+
+        assertThat(
+                execute("SELECT ?x ?w ?y WHERE { VALUES (?x ?w) { (a:1 1) (b:20 UNDEF) } "
+                        + "SERVICE <svc> { ?x ex:p ?y } FILTER(!BOUND(?w) || ?w = 1) }"),
+                containsInAnyOrder(row(a(1), integer(1), b(10)), row(b(20), null, lit)));
+    }
+
+
+    @Test
+    @DisplayName("a blank node of the context a context solution may leave unbound")
+    void unboundContextBlankNode() throws Exception
+    {
+        TypedLiteral yes = new TypedLiteral("true", xsdBooleanIri);
+
+        assertThat(
+                execute("SELECT ?k ?r ?x ?y WHERE { VALUES ?k { 1 2 } BIND(IF(?k = 1, BNODE(), ?nothing) AS ?b) "
+                        + "SERVICE <svc> { ?x ex:p ?y } BIND(isBlank(?b) AS ?r) }"),
+                containsInAnyOrder(row(integer(1), yes, a(1), b(10)), row(integer(1), yes, b(20), lit),
+                        row(integer(2), null, a(1), b(10)), row(integer(2), null, b(20), lit)));
     }
 }

@@ -705,7 +705,10 @@ public final class SqlServiceStub extends SqlIntercode
 
 
     /**
-     * Stub with the given shared state, exposing only what the parent needs.
+     * Stub with the given shared state, exposing only what the parent needs. The stub binds every variable of the
+     * context, also one a context solution may leave unbound, which keeps it unbound in the received solutions merged
+     * with that solution: a variable only the context binds in the classes of the context, and a variable of the
+     * pattern in any class the received values may take.
      *
      * @param request the current request
      * @param name the endpoint IRI
@@ -745,16 +748,16 @@ public final class SqlServiceStub extends SqlIntercode
 
         for(VariableBinding v : context.getVariableBindings().getValues())
         {
-            if(!v.canBeNull())
-            {
-                Variable var = v.getVariable();
-                VariableBinding binding = new VariableBinding(var, v.canBeNull());
+            Variable var = v.getVariable();
+            VariableBinding binding = new VariableBinding(var, v.canBeNull());
 
-                for(ResourceClass c : classes)
-                    binding.addMapping(c, c.createColumns(request.getColumnMap(), var));
+            // a variable that only the context binds takes the values of the context solutions
+            Set<ResourceClass> varClasses = !serviceVariables.containsValue(var) ? v.getClasses() : classes;
 
-                bindings.add(binding);
-            }
+            for(ResourceClass c : varClasses)
+                binding.addMapping(c, c.createColumns(request.getColumnMap(), var));
+
+            bindings.add(binding);
         }
 
         for(Variable var : serviceVariables.values())
@@ -872,6 +875,8 @@ public final class SqlServiceStub extends SqlIntercode
      */
     public SqlIntercode eval(Request request, SqlIntercode context, Restrictions restrictions)
     {
+        restrictions = getEvaluationRestrictions(context, restrictions);
+
         Set<Variable> variables = new HashSet<>(context.getVariableBindings().getVariables());
         variables.addAll(serviceVariables.values());
 
@@ -994,7 +999,8 @@ public final class SqlServiceStub extends SqlIntercode
             {
                 Integer idx = varIndexes.get(variable);
 
-                if(idx != null)
+                // a variable the context solution leaves unbound is absent from it
+                if(idx != null && row[idx] != null)
                     solution.put(variable, row[idx]);
             }
 
@@ -1117,6 +1123,30 @@ public final class SqlServiceStub extends SqlIntercode
         {
             throw new SQLRuntimeException(e);
         }
+    }
+
+
+    /**
+     * What an evaluation of the call for the context keeps of the variables: what the parent needs of them, except that
+     * every value of a variable that only the context binds, and that a context solution may leave unbound, is kept.
+     * The values of such a variable come from the context alone, and the copies of the stub in the branches of a union,
+     * e.g. those of the graph classes of a pattern evaluated per graph, accept them in different classes; a result
+     * keeping all of them serves every copy (see {@link Evaluation#serves}), as it did when the stub left such a
+     * variable out, instead of asking the endpoint again for each of them.
+     *
+     * @param context solutions the call is evaluated for
+     * @param restrictions what the parent needs of the variables
+     * @return what the evaluation keeps of the variables
+     */
+    private Restrictions getEvaluationRestrictions(SqlIntercode context, Restrictions restrictions)
+    {
+        Restrictions result = new Restrictions(restrictions);
+
+        for(VariableBinding binding : context.getVariableBindings().getValues())
+            if(binding.canBeNull() && !serviceVariables.containsValue(binding.getVariable()))
+                result.removeAcceptedClasses(binding.getVariable());
+
+        return result;
     }
 
 

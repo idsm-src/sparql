@@ -239,13 +239,14 @@ public final class SqlMerge extends SqlIntercode
 
 
     /**
-     * Restrictions for one of the merged variables: the classes compatible with the other (all when it may be unbound).
+     * Restrictions for one of the merged variables: the classes compatible with the other, or all of them when either
+     * may be unbound, as a solution leaving the other unbound takes the value of this one in any of its classes.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param binding the variable binding
      * @param other binding of the other variable
-     * @return restrictions for one of the merged variables: the classes compatible with the other (all when it may be
-     *         unbound)
+     * @return restrictions for one of the merged variables: the classes compatible with the other, or all of them when
+     *         either may be unbound
      */
     protected static Restrictions getJoinRestrictions(ClassRelations relations, VariableBinding binding,
             VariableBinding other)
@@ -258,7 +259,7 @@ public final class SqlMerge extends SqlIntercode
         Variable variable = binding.getVariable();
         Set<ResourceClass> classes = binding.getClasses();
 
-        if(binding.canBeNull())
+        if(binding.canBeNull() || other.canBeNull())
             restrictions.set(variable, binding.getClasses());
         else
             restrictions.set(variable,
