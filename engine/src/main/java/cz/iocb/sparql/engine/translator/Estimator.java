@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.iocb.sparql.engine.imcode.SqlDistinct;
 import cz.iocb.sparql.engine.imcode.SqlIntercode;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
+import cz.iocb.sparql.engine.imcode.SqlSelect;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 
@@ -53,7 +54,7 @@ public class Estimator
         SqlIntercode distinct = SqlDistinct.create(request, imcode, Set.of(var)).optimize(request, restrictions, false,
                 false);
 
-        return estimateRowCount(distinct.translate(request));
+        return estimateRowCount(translateStatement(distinct));
     }
 
 
@@ -79,13 +80,31 @@ public class Estimator
             SqlIntercode distinct = SqlDistinct.create(request, imcode, vars).optimize(request, restrictions, false,
                     false);
 
-            return estimateRowCount(distinct.translate(request));
+            return estimateRowCount(translateStatement(distinct));
         }
         catch(SQLException e)
         {
             e.printStackTrace();
             return Long.MAX_VALUE;
         }
+    }
+
+
+    /**
+     * SQL of a statement evaluating the intermediate code: its SQL preceded by the {@code WITH} clause declaring the
+     * virtual tables and the common table expressions it refers to (see {@link SqlSelect#translateWithClause}). The SQL
+     * of the code is then wrapped in a query, since it need not be a plain {@code SELECT}: a walk begins with a
+     * {@code WITH RECURSIVE} clause of its own, which cannot follow another {@code WITH} clause.
+     *
+     * @param imcode the intermediate code
+     * @return SQL of a statement evaluating the intermediate code
+     */
+    private String translateStatement(SqlIntercode imcode)
+    {
+        String sql = imcode.translate(request);
+        String with = SqlSelect.translateWithClause(request, imcode.getVirtualTables(), sql);
+
+        return with.isEmpty() ? sql : with + "SELECT * FROM (" + sql + ") AS tab";
     }
 
 

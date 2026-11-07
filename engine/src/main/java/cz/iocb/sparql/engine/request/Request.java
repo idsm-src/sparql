@@ -5,12 +5,19 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,11 +27,13 @@ import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
+import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.error.MessageCategory;
 import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.error.TranslateMessage;
 import cz.iocb.sparql.engine.imcode.SqlSelect;
+import cz.iocb.sparql.engine.imcode.SqlShared;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
 import cz.iocb.sparql.engine.mapping.classes.DerivedClass;
 import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeInSegmentClass;
@@ -204,6 +213,11 @@ public class Request implements AutoCloseable
     private static final Logger logger = LoggerFactory.getLogger(Request.class);
 
     /**
+     * Pattern of an alias of a common table expression (see {@link #getCommonTableExpression}) in SQL.
+     */
+    private static final Pattern commonTableExpressionName = Pattern.compile("\"cte[0-9]+\"");
+
+    /**
      * Configuration of the endpoint.
      */
     private final SparqlDatabaseConfiguration config;
@@ -244,10 +258,15 @@ public class Request implements AutoCloseable
     private int lateralId = 0;
 
     /**
-     * Common table expressions of the statement being translated, by their queries; null outside the translation of a
-     * statement.
+     * Common table expressions of the query being evaluated, by their queries, in the order they were asked for (see
+     * {@link #getCommonTableExpression}).
      */
-    private LinkedHashMap<String, AliasTable> commonTableExpressions = null;
+    private final LinkedHashMap<String, AliasTable> commonTableExpressions = new LinkedHashMap<>();
+
+    /**
+     * Virtual tables the queries of the common table expressions read, by the aliases of the expressions.
+     */
+    private final Map<String, Set<VirtualTable>> commonTableExpressionTables = new HashMap<>();
 
     /**
      * Depth of the patterns of expressions being optimised (see {@link #isWithinExpression}).
@@ -480,6 +499,9 @@ public class Request implements AutoCloseable
 
             BigInteger newOffset = syntaxTree instanceof AskQuery || offset <= 0 ? null : BigInteger.valueOf(offset);
             BigInteger newLimit = syntaxTree instanceof AskQuery || limit <= 0 ? null : BigInteger.valueOf(limit);
+
+            commonTableExpressions.clear();
+            commonTableExpressionTables.clear();
 
             TranslateVisitor translateVisitor = new TranslateVisitor(this);
             SqlSelect imcode = translateVisitor.translate(syntaxTree, newOffset, newLimit, order);
@@ -880,30 +902,6 @@ public class Request implements AutoCloseable
 
 
     /**
-     * Begins the translation of a statement: the common table expressions asked for until {@link #endStatement()} are
-     * collected for the {@code WITH} clause of the statement.
-     */
-    public void beginStatement()
-    {
-        commonTableExpressions = new LinkedHashMap<>();
-    }
-
-
-    /**
-     * Ends the translation of a statement.
-     *
-     * @return the common table expressions of the statement by their queries, in the order they were asked for; null
-     *         when no statement was being translated
-     */
-    public LinkedHashMap<String, AliasTable> endStatement()
-    {
-        LinkedHashMap<String, AliasTable> result = commonTableExpressions;
-        commonTableExpressions = null;
-        return result;
-    }
-
-
-    /**
      * Begins the optimisation of a pattern of an expression (see {@link #isWithinExpression}).
      */
     public void beginExpression()
@@ -922,9 +920,11 @@ public class Request implements AutoCloseable
 
 
     /**
-     * True while a pattern of an expression is being optimised: its SQL is rendered into the expression at once,
-     * outside the translation of a statement, so nothing in it can be declared as a common table expression of the
-     * statement.
+     * True while a pattern of an expression (EXISTS) is being optimised. Only the existence of a solution of such a
+     * pattern matters, and the database stops evaluating it at its first solution, so a walk in it is not seeded from
+     * shared solutions (see {@link SqlShared#canShare}): the seeds would be computed from the whole shared side before
+     * the walk yields anything. The SQL of the pattern is rendered into the expression at once, and the common table
+     * expressions it refers to are declared by the statement holding it (see {@link #getCommonTableExpressions}).
      *
      * @return true while a pattern of an expression is being optimised, false otherwise
      */
@@ -935,27 +935,118 @@ public class Request implements AutoCloseable
 
 
     /**
-     * Alias of the common table expression of the statement being translated that evaluates the query, declared when
-     * first asked for, so that a query asked for several times is evaluated once by the statement; null outside the
-     * translation of a statement, when the query has to be written in place.
+     * Alias of the common table expression that evaluates the query, declared when first asked for, so that a query
+     * asked for several times is evaluated once by a statement. Every statement declares the common table expressions
+     * its SQL refers to (see {@link #getCommonTableExpressions}), also those referred to by the SQL of an expression,
+     * which is rendered at once during the optimisation, before any statement is translated. SQL using the alias has to
+     * run under the {@code WITH} clause of {@link SqlSelect#translateWithClause}; code rendering a node outside
+     * {@link SqlSelect#translate} prepends the clause and wraps the SQL of the node, which may begin with a
+     * {@code WITH RECURSIVE} clause of its own.
      *
      * @param query the query
-     * @return alias of the common table expression evaluating the query, or null outside the translation of a statement
+     * @return alias of the common table expression evaluating the query
      */
     public AliasTable getCommonTableExpression(String query)
     {
-        if(commonTableExpressions == null)
-            return null;
+        return getCommonTableExpression(query, Set.of());
+    }
 
+
+    /**
+     * Alias of the common table expression that evaluates the query reading the virtual tables (see
+     * {@link #getCommonTableExpression(String)}); a statement declaring the expression declares the tables too.
+     *
+     * @param query the query
+     * @param tables the virtual tables the query reads
+     * @return alias of the common table expression evaluating the query
+     */
+    public AliasTable getCommonTableExpression(String query, Set<VirtualTable> tables)
+    {
         AliasTable table = commonTableExpressions.get(query);
 
         if(table == null)
         {
             table = new AliasTable("cte" + commonTableExpressions.size());
             commonTableExpressions.put(query, table);
+            commonTableExpressionTables.put(table.toString(), Set.copyOf(tables));
         }
 
         return table;
+    }
+
+
+    /**
+     * Virtual tables the queries of the common table expressions the SQL refers to read (see
+     * {@link #getCommonTableExpressions}).
+     *
+     * @param sql the SQL
+     * @return virtual tables the common table expressions the SQL refers to read
+     */
+    public Set<VirtualTable> getCommonTableExpressionTables(String sql)
+    {
+        Set<VirtualTable> tables = new HashSet<>();
+
+        for(String name : getReferredCommonTableExpressions(sql))
+            tables.addAll(commonTableExpressionTables.getOrDefault(name, Set.of()));
+
+        return tables;
+    }
+
+
+    /**
+     * Definitions of the common table expressions the SQL refers to, directly or through the definitions of others, as
+     * {@code alias AS (query)}, in the order they were asked for: the query of a common table expression is rendered
+     * before it is asked for, together with those it refers to, so each one follows the ones it refers to.
+     *
+     * @param sql the SQL
+     * @return definitions of the common table expressions the SQL refers to, in the order they were asked for
+     */
+    public List<String> getCommonTableExpressions(String sql)
+    {
+        Set<String> referred = getReferredCommonTableExpressions(sql);
+
+        List<String> definitions = new ArrayList<>(referred.size());
+
+        for(Entry<String, AliasTable> entry : commonTableExpressions.entrySet())
+            if(referred.contains(entry.getValue().toString()))
+                definitions.add(entry.getValue() + " AS (" + entry.getKey() + ")");
+
+        return definitions;
+    }
+
+
+    /**
+     * Aliases of the common table expressions the SQL refers to, directly or through the definitions of others. The
+     * aliases are found in the text, so one spelled in a string constant counts as well; its definition is then
+     * declared without being read, which is harmless, since its query reads nothing the statement does not declare.
+     *
+     * @param sql the SQL
+     * @return aliases of the common table expressions the SQL refers to
+     */
+    private Set<String> getReferredCommonTableExpressions(String sql)
+    {
+        Map<String, Entry<String, AliasTable>> byName = new HashMap<>();
+
+        for(Entry<String, AliasTable> entry : commonTableExpressions.entrySet())
+            byName.put(entry.getValue().toString(), entry);
+
+        Set<String> referred = new HashSet<>();
+        Deque<String> pending = new ArrayDeque<>(List.of(sql));
+
+        while(!pending.isEmpty())
+        {
+            Matcher matcher = commonTableExpressionName.matcher(pending.pop());
+
+            while(matcher.find())
+            {
+                Entry<String, AliasTable> entry = byName.get(matcher.group());
+
+                if(entry != null && referred.add(matcher.group()))
+                    pending.push(entry.getKey());
+            }
+        }
+
+        return referred;
     }
 
 

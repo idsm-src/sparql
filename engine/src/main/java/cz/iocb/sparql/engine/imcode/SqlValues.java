@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
-import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
@@ -31,10 +30,10 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 /**
  * Inline table of constant solutions (VALUES, or small SERVICE results). Every variable has fixed columns per resource
  * class; {@code data} holds the column values row by row and {@code resourceClasses} the class of each variable in each
- * row (null when unbound). The table is written as a common table expression of the statement (see
+ * row (null when unbound). The table is written as a common table expression (see
  * {@link Request#getCommonTableExpression}), so that the statement evaluates it once however many times the
- * optimisation has copied it, into the branches of a union or the sources of the nodes seeding a walk; outside a
- * statement it is written in place.
+ * optimisation has copied it, into the branches of a union, the sources of the nodes seeding a walk or the patterns of
+ * expressions.
  */
 public final class SqlValues extends SqlIntercode
 {
@@ -257,12 +256,7 @@ public final class SqlValues extends SqlIntercode
     {
         String values = translateValues();
 
-        AliasTable table = request.getCommonTableExpression(values);
-
-        if(table == null)
-            return values;
-
-        return "SELECT " + translateColumns() + " FROM " + table;
+        return "SELECT " + translateColumns() + " FROM " + request.getCommonTableExpression(values);
     }
 
 

@@ -285,4 +285,16 @@ public class ProcedureContextTest
         assertThat(execute(query),
                 containsInAnyOrder(row(thing("a")), row(thing("b")), row(thing("c")), row(thing("d"))));
     }
+
+
+    @Test
+    @DisplayName("a call with a constant parameter in an exists pattern evaluated for every solution is evaluated once")
+    void independentCallInExistsOnce() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:tag ?t "
+                + "FILTER EXISTS { ?y ex:search [ ex:query 'red' ] FILTER(?y = ?x) } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(thing("a")), row(thing("b"))));
+        assertThat(calls(query), is(1L));
+    }
 }

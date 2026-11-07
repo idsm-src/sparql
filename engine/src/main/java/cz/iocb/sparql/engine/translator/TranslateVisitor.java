@@ -760,11 +760,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      * Solutions holding in every graph whatever its triples (the zero-length path from a constant) as solutions in the
      * given graph: in a variable graph, they are paired with every named graph, so that they bind the graph like the
      * solutions of a triple, the named graphs being shared by the statement (see {@link #getNamedGraphs}); in a
-     * constant graph, they hold only when the graph exists; in the default graph, they are returned unchanged. The SQL
-     * of an EXISTS pattern is written in place, where the shared named graphs would be repeated, so inside an
-     * evaluation per graph (see {@link #translatePerGraph}) the solutions of an EXISTS pattern take the lateral value
-     * of the graph the pattern is evaluated in, unless the evaluation holds a SERVICE call, whose context could not
-     * read it.
+     * constant graph, they hold only when the graph exists; in the default graph, they are returned unchanged. Inside
+     * an evaluation per graph (see {@link #translatePerGraph}), the solutions of an EXISTS pattern take the lateral
+     * value of the graph the pattern is evaluated in instead of being paired with every named graph, so that a walk
+     * starting from them stays in that graph, unless the evaluation holds a SERVICE call, whose context could not read
+     * it.
      *
      * @param graph the graph term, or null for the default graph
      * @param solutions the solutions
@@ -993,8 +993,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
     /**
      * The named graphs as solutions of the variable, optimised for it and shared by the statement (see
-     * {@link SqlShared#shareOptimized}), built once per variable. Inside an expression, whose SQL cannot declare the
-     * shared table, they are written in place.
+     * {@link SqlShared#shareOptimized}), also inside the SQL of an expression, built once per variable.
      *
      * @param variable the variable bound to the graphs
      * @return the named graphs as solutions of the variable

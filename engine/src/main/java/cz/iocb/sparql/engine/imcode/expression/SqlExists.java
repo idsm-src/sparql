@@ -456,7 +456,7 @@ public final class SqlExists extends SqlExpressionIntercode
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
-        // the SQL of the pattern is rendered into the expression at once, outside a statement
+        // a walk in the pattern is not seeded from shared solutions (see Request.isWithinExpression)
         request.beginExpression();
 
         try

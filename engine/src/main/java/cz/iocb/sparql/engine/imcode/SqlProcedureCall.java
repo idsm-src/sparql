@@ -51,11 +51,11 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * valid lexical form and a numeric declared class takes the value of every numeric XPath substitutes or promotes to its
  * datatype (see {@link SqlExpressionIntercode#getValue}), and a parameter supplying no value of its class gives no
  * solution. A call over the empty solution, which takes nothing from any context, is evaluated by a common table
- * expression of the statement (see {@link Request#getCommonTableExpression}), so that the statement evaluates it once
- * even when it occurs several times, e.g. in every branch of a union a join above it was distributed over; PostgreSQL
- * folds a common table expression referenced once into the query. A result is bound to the classes the parent accepts a
- * value of only, and a specialiser of the procedure may adapt the call to them (see
- * {@link ProcedureDefinition#setSpecializer}).
+ * expression (see {@link Request#getCommonTableExpression}), so that the statement evaluates it once even when it
+ * occurs several times, e.g. in every branch of a union a join above it was distributed over, or in the pattern of an
+ * EXISTS evaluated for every current solution; PostgreSQL folds a common table expression referenced once into the
+ * query unless the function is volatile. A result is bound to the classes the parent accepts a value of only, and a
+ * specialiser of the procedure may adapt the call to them (see {@link ProcedureDefinition#setSpecializer}).
  */
 public final class SqlProcedureCall extends SqlIntercode
 {

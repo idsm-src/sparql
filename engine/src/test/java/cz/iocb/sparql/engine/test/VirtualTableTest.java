@@ -314,6 +314,19 @@ public class VirtualTableTest
 
 
     @Test
+    @DisplayName("a string spelling an alias of a common table expression reading a virtual table")
+    void aliasInString() throws Exception
+    {
+        List<List<RdfTerm>> result = execute("""
+                SELECT ?l WHERE { { ?s ex:label ?l \
+                FILTER(?l NOT IN ('"cte0"', '"cte1"', '"cte2"')) } UNION { ?q ex:synonym ?w \
+                FILTER EXISTS { GRAPH ?g { <http://example.org/compound/1> ex:synonym* ?w } } \
+                FILTER(?q = <http://example.org/other/1>) } }""");
+        assertThat(result, containsInAnyOrder(row(string("first")), row(string("second")), row(string("third"))));
+    }
+
+
+    @Test
     @DisplayName("the facts of a virtual table are known to the configuration's schema only")
     void schemaFacts() throws Exception
     {

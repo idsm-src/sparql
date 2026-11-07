@@ -57,7 +57,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
-import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
@@ -540,33 +539,38 @@ public final class SqlSelect extends SqlIntercode
 
 
     /**
-     * {@code WITH} clause declaring the virtual tables the query reads and, transitively, the virtual tables their
-     * definitions read, each one after the tables it depends on, followed by the common table expressions of the
-     * statement; empty when there is nothing to declare.
+     * {@code WITH} clause of a statement: it declares the virtual tables the statement reads and, transitively, the
+     * virtual tables their definitions read, each one after the tables it depends on, followed by the common table
+     * expressions the SQL of the statement refers to (see {@link Request#getCommonTableExpressions}); empty when there
+     * is nothing to declare.
      *
      * @param request the current request
-     * @param expressions the common table expressions of the statement by their queries
+     * @param tables the virtual tables the statement reads
+     * @param sql the SQL of the statement without the clause
      * @return the {@code WITH} clause followed by a space, or the empty string
      * @throws IllegalStateException if a virtual table has no definition in the configuration or the dependencies of
      *             the virtual tables are cyclic
      */
-    private String translateWithClause(Request request, LinkedHashMap<String, AliasTable> expressions)
+    public static String translateWithClause(Request request, Set<VirtualTable> tables, String sql)
     {
-        Set<VirtualTable> tables = getVirtualTables();
+        List<String> expressions = request.getCommonTableExpressions(sql);
 
-        if(tables.isEmpty() && expressions.isEmpty())
+        // the queries of the common table expressions may read virtual tables the statement itself does not read
+        Set<VirtualTable> declared = new HashSet<>(tables);
+        declared.addAll(request.getCommonTableExpressionTables(sql));
+
+        if(declared.isEmpty() && expressions.isEmpty())
             return "";
 
         LinkedHashMap<VirtualTable, VirtualTableDefinition> ordered = new LinkedHashMap<>();
 
-        for(VirtualTable table : tables.stream().sorted(comparing(VirtualTable::getName)).toList())
+        for(VirtualTable table : declared.stream().sorted(comparing(VirtualTable::getName)).toList())
             orderVirtualTable(request.getConfiguration(), table, ordered, new HashSet<>());
 
         Stream<String> definitions = ordered.entrySet().stream()
                 .map(e -> e.getKey() + " AS (" + e.getValue().getQuery() + ")");
-        Stream<String> queries = expressions.entrySet().stream().map(e -> e.getValue() + " AS (" + e.getKey() + ")");
 
-        return Stream.concat(definitions, queries).collect(joining(", ", "WITH ", " "));
+        return Stream.concat(definitions, expressions.stream()).collect(joining(", ", "WITH ", " "));
     }
 
 
@@ -608,20 +612,9 @@ public final class SqlSelect extends SqlIntercode
         if(!isTopLevel())
             return translateSelect(request);
 
-        request.beginStatement();
-        LinkedHashMap<String, AliasTable> expressions;
-        String select;
+        String select = translateSelect(request);
 
-        try
-        {
-            select = translateSelect(request);
-        }
-        finally
-        {
-            expressions = request.endStatement();
-        }
-
-        return translateWithClause(request, expressions) + select;
+        return translateWithClause(request, getVirtualTables(), select) + select;
     }
 
 

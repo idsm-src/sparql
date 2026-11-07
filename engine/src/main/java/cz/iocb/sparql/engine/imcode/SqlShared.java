@@ -21,8 +21,11 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * not distinct over the start of the walk or stands outside the join (the left side of an OPTIONAL or MINUS, the other
  * walk of a chain), is shared this way: the distinct values of the start, read from the shared solutions and shared
  * themselves (see {@link #seed}), seed the walk, while the node keeps its place. The child is kept as optimised when
- * shared, so that every reference renders the same SQL, and a reference exposes what its parent needs of it. Outside
- * the translation of a statement, where no common table expression can be declared, the child is written in place.
+ * shared, so that every reference renders the same SQL, and a reference exposes what its parent needs of it. The SQL of
+ * an expression, rendered at once during the optimisation, refers to the common table expression as well; the statement
+ * whose SQL holds the expression declares it. A common table expression referred to more than once is materialised, so
+ * a restriction of a reference (a constant graph, the graph of the current solution of an EXISTS) does not enter it:
+ * the shared child is evaluated in full once per statement.
  */
 public final class SqlShared extends SqlIntercode
 {
@@ -64,8 +67,11 @@ public final class SqlShared extends SqlIntercode
     /**
      * True if the node can be shared: it is deterministic, holds no SERVICE call not evaluated yet, refers neither to
      * the current solution of an EXISTS nor to a lateral join (its SQL would read an alias a common table expression
-     * cannot see), and no pattern of an expression is being optimised (its SQL is rendered into the expression at once,
-     * outside a statement).
+     * cannot see), and no pattern of an expression is being optimised (see {@link Request#isWithinExpression}): seeding
+     * a walk inside an EXISTS from shared solutions would evaluate them in full before the first solution of the
+     * pattern, which the database would otherwise stop at. The named graphs the translation pairs zero-length paths
+     * from constants with are shared before any expression is optimised, so EXISTS patterns read them from the common
+     * table expression too.
      *
      * @param request the current request
      * @param node the node
@@ -141,12 +147,7 @@ public final class SqlShared extends SqlIntercode
     @Override
     public String translate(Request request)
     {
-        String query = child.translate(request);
-
-        AliasTable table = request.getCommonTableExpression(query);
-
-        if(table == null)
-            return query;
+        AliasTable table = request.getCommonTableExpression(child.translate(request), child.getVirtualTables());
 
         Set<Column> columns = getVariableBindings().getNonConstantColumns();
 
