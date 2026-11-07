@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.imcode;
 
+import static cz.iocb.sparql.engine.database.Table.toTableColumns;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLtrLangString;
@@ -37,9 +38,16 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import cz.iocb.sparql.engine.config.ServiceSettings;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
+import cz.iocb.sparql.engine.database.AliasTable;
+import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.error.MessageType;
+import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
+import cz.iocb.sparql.engine.imcode.expression.SqlEffectiveBooleanValue;
+import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.sparql.engine.imcode.expression.SqlLateralVariable;
+import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeInSegmentClass;
@@ -80,9 +88,9 @@ public final class SqlServiceStub extends SqlIntercode
     private static class SharedState
     {
         /**
-         * Evaluated results by context.
+         * Evaluated results by context, with the restrictions they were built for.
          */
-        public Map<SqlIntercode, SqlIntercode> results = new HashMap<>();
+        public Map<SqlIntercode, List<Evaluation>> results = new HashMap<>();
 
 
         /**
@@ -103,6 +111,116 @@ public final class SqlServiceStub extends SqlIntercode
      */
     private static record Call(String endpoint, String query)
     {
+    }
+
+
+    /**
+     * Result of an evaluation of the call for a context. The result depends on the restrictions it was built for, which
+     * decide the variables and classes of the received solutions it keeps and the solutions it leaves out, and the
+     * copies of a stub may be evaluated for parents restricting them differently: the branches of a union sharing the
+     * stub, or the rounds of an optimisation narrowing what they need.
+     *
+     * @param restrictions what the parent the result was built for needed of the variables
+     * @param result the received solutions joined with the context
+     */
+    private static record Evaluation(Restrictions restrictions, SqlIntercode result)
+    {
+        /**
+         * True if the result serves a parent with the given needs as well: of the variables the call may bind, it keeps
+         * every variable in every class the parent needs, and it leaves out only solutions the parent drops too, i.e.
+         * the variables whose values it accepts in some classes only are needed by the parent and accepted in those
+         * classes at most. What the parent needs of other variables does not change the result.
+         *
+         * @param needed what the parent needs of the variables
+         * @param variables the variables the call may bind: those of the context and of the pattern
+         * @return true if the result serves a parent with the given needs as well, false otherwise
+         */
+        boolean serves(Restrictions needed, Set<Variable> variables)
+        {
+            for(Variable var : needed.getNames())
+                if(variables.contains(var)
+                        && (!restrictions.containsVar(var) || !restrictions.get(var).containsAll(needed.get(var))))
+                    return false;
+
+            for(Variable var : restrictions.getNames())
+            {
+                Set<ResourceClass> accepted = restrictions.getAcceptedClasses(var);
+
+                if(accepted == null || !variables.contains(var))
+                    continue;
+
+                Set<ResourceClass> required = needed.containsVar(var) ? needed.getAcceptedClasses(var) : null;
+
+                if(required == null || !accepted.containsAll(required))
+                    return false;
+            }
+
+            return true;
+        }
+    }
+
+
+    /**
+     * Lateral join whose right side holds the call: an evaluation of a pattern in every named graph (see
+     * {@code TranslateVisitor.translatePerGraph}), whose right side refers to the graph of the current solution of the
+     * left side through the alias of the join. The context of the call may refer to it as well, but a statement
+     * evaluating the context by itself does not define the alias. Such a context is evaluated joined laterally with the
+     * left side once more, so that every context solution binds the variable of the left side to the solution it was
+     * computed for, and the received solutions are restricted to the current solution of the enclosing join (see
+     * {@link SqlServiceStub#eval}).
+     *
+     * @param solutions solutions of the left side binding nothing but the variable, which no pattern mentions
+     * @param table alias through which the right side refers to the left side
+     * @param binding binding of the variable as the left side exposes it to the right side: the columns the right side
+     *            reads through the alias
+     */
+    public static record Enclosure(SqlIntercode solutions, AliasTable table, VariableBinding binding)
+    {
+        /**
+         * True if the code refers to the current solution of the left side: it mentions the alias, which is unique
+         * within the request (see {@link Request#createLateralTable}) and defined only by the enclosing join.
+         *
+         * @param code SQL code of the context
+         * @return true if the code refers to the current solution of the left side, false otherwise
+         */
+        boolean isReferredBy(String code)
+        {
+            return code.contains(table + ".");
+        }
+
+
+        /**
+         * The context joined laterally with the left side: the solutions of the context computed for every solution of
+         * the left side, binding the variable to it.
+         *
+         * @param request the current request
+         * @param context the context, referring to the current solution of the left side
+         * @return the context joined laterally with the left side
+         */
+        SqlIntercode join(Request request, SqlIntercode context)
+        {
+            VariableBindings lateral = new VariableBindings();
+            lateral.add(binding);
+
+            return SqlLateralJoin.lateralJoin(request, solutions, context, table, lateral, null);
+        }
+
+
+        /**
+         * Reference to the current solution of the left side, as the right side refers to it (see
+         * {@link SqlLateralJoin#getLateralVariableBindings}).
+         *
+         * @return reference to the current solution of the left side
+         */
+        SqlExpressionIntercode getCurrentValue()
+        {
+            VariableBinding current = new VariableBinding(binding.getVariable(), binding.canBeNull());
+
+            for(Entry<ResourceClass, List<Column>> entry : binding.getMappings().entrySet())
+                current.addMapping(entry.getKey(), toTableColumns(table, entry.getValue()));
+
+            return SqlLateralVariable.create(current);
+        }
     }
 
 
@@ -512,6 +630,11 @@ public final class SqlServiceStub extends SqlIntercode
     private final StrBlankNodeInSegmentClass blankNodeClass;
 
     /**
+     * Lateral joins whose right sides hold the call, outermost first: the context may refer to their current solutions.
+     */
+    private final List<Enclosure> enclosures;
+
+    /**
      * State shared with the other copies of the stub.
      */
     private final SharedState state;
@@ -539,11 +662,12 @@ public final class SqlServiceStub extends SqlIntercode
      * @param context solutions the call is evaluated for
      * @param blankNodeClass the blank node class
      * @param silent the SILENT modifier
+     * @param enclosures lateral joins whose right sides hold the call, outermost first
      * @param state state shared by the copies of the stub
      */
     protected SqlServiceStub(VariableBindings bindings, RdfTerm name, String serviceCode,
             Map<String, Variable> serviceVariables, SqlIntercode context, StrBlankNodeInSegmentClass blankNodeClass,
-            boolean silent, SharedState state)
+            boolean silent, List<Enclosure> enclosures, SharedState state)
     {
         super(bindings, false);
 
@@ -553,6 +677,7 @@ public final class SqlServiceStub extends SqlIntercode
         this.serviceVariables = serviceVariables;
         this.silent = silent;
         this.blankNodeClass = blankNodeClass;
+        this.enclosures = enclosures;
         this.state = state;
     }
 
@@ -567,13 +692,14 @@ public final class SqlServiceStub extends SqlIntercode
      * @param context solutions the call is evaluated for
      * @param blankNodeClass the blank node class
      * @param silent the SILENT modifier
+     * @param enclosures lateral joins whose right sides hold the call, outermost first
      * @return stub with fresh shared state; the received values may take any configured class
      */
     public static SqlIntercode create(Request request, RdfTerm name, String serviceCode,
             Map<String, Variable> serviceVariables, SqlIntercode context, StrBlankNodeInSegmentClass blankNodeClass,
-            boolean silent)
+            boolean silent, List<Enclosure> enclosures)
     {
-        return create(request, name, serviceCode, serviceVariables, context, blankNodeClass, silent, null,
+        return create(request, name, serviceCode, serviceVariables, context, blankNodeClass, silent, enclosures, null,
                 new SharedState());
     }
 
@@ -588,13 +714,14 @@ public final class SqlServiceStub extends SqlIntercode
      * @param context solutions the call is evaluated for
      * @param blankNodeClass the blank node class
      * @param silent the SILENT modifier
+     * @param enclosures lateral joins whose right sides hold the call, outermost first
      * @param restrictions what the parent needs of the variables
      * @param state state shared by the copies of the stub
      * @return stub with the given shared state, exposing only what the parent needs
      */
     protected static SqlIntercode create(Request request, RdfTerm name, String serviceCode,
             Map<String, Variable> serviceVariables, SqlIntercode context, StrBlankNodeInSegmentClass blankNodeClass,
-            boolean silent, Restrictions restrictions, SharedState state)
+            boolean silent, List<Enclosure> enclosures, Restrictions restrictions, SharedState state)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -644,7 +771,7 @@ public final class SqlServiceStub extends SqlIntercode
         }
 
         return new SqlServiceStub(bindings.restrict(relations, restrictions), name, serviceCode, serviceVariables,
-                context, blankNodeClass, silent, state);
+                context, blankNodeClass, silent, enclosures, state);
     }
 
 
@@ -679,7 +806,7 @@ public final class SqlServiceStub extends SqlIntercode
 
             for(SqlIntercode child : union.getChilds())
                 childs.add(create(request, name, serviceCode, serviceVariables, child, blankNodeClass, silent,
-                        restrictions, state));
+                        enclosures, restrictions, state));
 
             return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
         }
@@ -688,8 +815,8 @@ public final class SqlServiceStub extends SqlIntercode
         if(optContext == context && restrictions.isOptimized(relations, bindings))
             return this;
 
-        return create(request, name, serviceCode, serviceVariables, optContext, blankNodeClass, silent, restrictions,
-                state);
+        return create(request, name, serviceCode, serviceVariables, optContext, blankNodeClass, silent, enclosures,
+                restrictions, state);
     }
 
 
@@ -728,10 +855,15 @@ public final class SqlServiceStub extends SqlIntercode
      * for each context solution, the context solutions asking the same query of the same endpoint sharing one request
      * (within this evaluation; the members of a union context are evaluated by stubs of their own), the XML results are
      * collected by a {@link StoredResultHandler}, and the result joined with the context is returned. Results are
-     * cached per context in the state shared by the stubs of one call; a failing endpoint is an error unless the
-     * service is SILENT, when the call yields the solutions of the context with the variables of the call unbound. The
-     * context and result limits are those of the endpoint when the call names it, and the defaults of the configuration
-     * when the endpoint is a variable; the other settings are those of the endpoint of each request.
+     * cached per context in the state shared by the stubs of one call, and a result serves the later evaluations for
+     * the same context whose parents need no more of it (see {@link Evaluation#serves}); a failing endpoint is an error
+     * unless the service is SILENT, when the call yields the solutions of the context with the variables of the call
+     * unbound, which is cached as well. The context and result limits are those of the endpoint when the call names it,
+     * and the defaults of the configuration when the endpoint is a variable; the other settings are those of the
+     * endpoint of each request. A context referring to the current solutions of enclosing lateral joins (see
+     * {@link Enclosure}) is evaluated for all their solutions at once, joined laterally with their left sides, and the
+     * result keeps the received solutions computed for the current ones; the limits then apply to the solutions of all
+     * of them.
      *
      * @param request the current request
      * @param context solutions the call is evaluated for
@@ -740,8 +872,14 @@ public final class SqlServiceStub extends SqlIntercode
      */
     public SqlIntercode eval(Request request, SqlIntercode context, Restrictions restrictions)
     {
-        if(state.results.containsKey(context))
-            return state.results.get(context);
+        Set<Variable> variables = new HashSet<>(context.getVariableBindings().getVariables());
+        variables.addAll(serviceVariables.values());
+
+        List<Evaluation> evaluations = state.results.computeIfAbsent(context, _ -> new ArrayList<>());
+
+        for(Evaluation evaluation : evaluations)
+            if(evaluation.serves(restrictions, variables))
+                return evaluation.result();
 
 
         SparqlDatabaseConfiguration config = request.getConfiguration();
@@ -762,6 +900,13 @@ public final class SqlServiceStub extends SqlIntercode
         List<RdfTerm[]> rows = new ArrayList<>();
         Map<Variable, Integer> varIndexes = null;
 
+        // the variables of the context solutions, followed by those of the enclosures the context refers to
+        List<Variable> vars = new ArrayList<>(contextVariables);
+        List<Enclosure> referred = new ArrayList<>();
+
+        // the context with its earlier calls evaluated, as it stands in place of the call
+        SqlIntercode local = context;
+
         if(context.equals(SqlEmptySolution.get()))
         {
             rows.add(new RdfTerm[0]);
@@ -772,10 +917,33 @@ public final class SqlServiceStub extends SqlIntercode
             /* evaluate context pattern */
 
             BigInteger limit = BigInteger.valueOf(settings.contextLimit() + 1);
-            List<Variable> vars = new ArrayList<>(contextVariables);
-            SqlSelect query = SqlSelect.createTopLevel(request, vars, context, null, limit).optimize(request, true);
 
+            /* NOTE: The context is optimised as the optimisation of the select would optimise it, which evaluates the
+             * earlier calls it holds; the code then tells whether it refers to the current solutions of enclosing
+             * lateral joins, and only then the evaluated context is joined with their left sides, so that no call is
+             * evaluated twice.
+             */
+            local = context.optimize(request, new Restrictions(vars), false, true);
+
+            SqlIntercode evaluated = local;
+            SqlSelect query = SqlSelect.createTopLevel(request, vars, evaluated, null, limit);
             String code = query.translate(request);
+
+            for(Enclosure enclosure : enclosures)
+            {
+                if(enclosure.isReferredBy(code))
+                {
+                    evaluated = enclosure.join(request, evaluated);
+                    vars.add(enclosure.binding().getVariable());
+                    referred.add(enclosure);
+                }
+            }
+
+            if(!referred.isEmpty())
+            {
+                query = SqlSelect.createTopLevel(request, vars, evaluated, null, limit).optimize(request, true);
+                code = query.translate(request);
+            }
 
             try(Result result = new Result(ResultType.SELECT, query.getResultDescription(),
                     request.getStatement().executeQuery(code), request.getBegin(), request.getTimeout()))
@@ -822,7 +990,7 @@ public final class SqlServiceStub extends SqlIntercode
 
             Map<Variable, RdfTerm> solution = new HashMap<>();
 
-            for(Variable variable : contextVariables)
+            for(Variable variable : vars)
             {
                 Integer idx = varIndexes.get(variable);
 
@@ -840,7 +1008,12 @@ public final class SqlServiceStub extends SqlIntercode
 
         /* create result */
 
-        try(ResultHandler results = new StoredResultHandler(request, restrictions))
+        Restrictions resultRestrictions = new Restrictions(restrictions);
+
+        for(Enclosure enclosure : referred)
+            resultRestrictions.add(enclosure.binding().getVariable());
+
+        try(ResultHandler results = new StoredResultHandler(request, resultRestrictions))
         {
             int call = 0;
 
@@ -887,8 +1060,14 @@ public final class SqlServiceStub extends SqlIntercode
                     if(!silent)
                         throw new ServiceException(String.format(MessageType.badServiceEndpoint.getText(), endpoint));
 
-                    // the context may hold earlier calls, which the result must not keep unevaluated
-                    return context.optimize(request, getContextRestrictions(restrictions), false, true);
+                    // the earlier calls of the context are evaluated already, and the copies of the stub share the
+                    // result instead of asking the failing endpoint again
+                    SqlIntercode result = local.optimize(request, getContextRestrictions(restrictions), false, true);
+
+                    if(context.isDeterministic())
+                        evaluations.add(new Evaluation(new Restrictions(restrictions), result));
+
+                    return result;
                 }
 
 
@@ -923,10 +1102,10 @@ public final class SqlServiceStub extends SqlIntercode
                 }
             }
 
-            SqlIntercode result = results.get();
+            SqlIntercode result = restrictToEnclosures(request, results.get(), referred, restrictions);
 
             if(context.isDeterministic())
-                state.results.put(context, result);
+                evaluations.add(new Evaluation(new Restrictions(restrictions), result));
 
             return result;
         }
@@ -938,6 +1117,38 @@ public final class SqlServiceStub extends SqlIntercode
         {
             throw new SQLRuntimeException(e);
         }
+    }
+
+
+    /**
+     * Keeps the solutions computed for the current solutions of the enclosing lateral joins: those binding the variable
+     * of each enclosure to the term its current solution refers to (see {@link Enclosure#getCurrentValue}).
+     *
+     * @param request the current request
+     * @param result solutions computed for all solutions of the enclosures, binding their variables
+     * @param enclosures the enclosures the context refers to
+     * @param restrictions what the parent needs of the variables
+     * @return solutions computed for the current solutions of the enclosing lateral joins
+     */
+    private static SqlIntercode restrictToEnclosures(Request request, SqlIntercode result, List<Enclosure> enclosures,
+            Restrictions restrictions)
+    {
+        if(enclosures.isEmpty() || result.equals(SqlNoSolution.get()))
+            return result;
+
+        ClassRelations relations = request.getConfiguration();
+        List<SqlExpressionIntercode> conditions = new ArrayList<>();
+
+        for(Enclosure enclosure : enclosures)
+        {
+            VariableBinding binding = result.getVariableBindings().get(enclosure.binding().getVariable());
+            SqlExpressionIntercode condition = SqlBuiltinCall.create(request, "sameterm", false,
+                    List.of(SqlVariable.create(relations, binding), enclosure.getCurrentValue()));
+
+            conditions.add(SqlEffectiveBooleanValue.create(relations, condition));
+        }
+
+        return SqlFilter.filter(request, conditions, result, restrictions).optimize(request, restrictions, false, true);
     }
 
 
@@ -1046,6 +1257,15 @@ public final class SqlServiceStub extends SqlIntercode
             builder.append(line);
         }
 
+        for(Enclosure enclosure : enclosures)
+        {
+            indentInfo(builder, indent, true);
+            builder.append("enclosed by ");
+            builder.append(enclosure.table());
+            builder.append(" as ");
+            builder.append(enclosure.binding().getVariable());
+        }
+
         indentChild(builder, indent, true);
         context.generateExplanation(builder, getIndent(indent, true));
     }
@@ -1114,6 +1334,9 @@ public final class SqlServiceStub extends SqlIntercode
         if(!Objects.equals(context, imcode.context))
             return false;
 
+        if(!Objects.equals(enclosures, imcode.enclosures))
+            return false;
+
         return true;
     }
 
@@ -1121,6 +1344,6 @@ public final class SqlServiceStub extends SqlIntercode
     @Override
     protected int getHashCode()
     {
-        return Objects.hash(silent, name, blankNodeClass, serviceCode, serviceVariables, context);
+        return Objects.hash(silent, name, blankNodeClass, serviceCode, serviceVariables, context, enclosures);
     }
 }

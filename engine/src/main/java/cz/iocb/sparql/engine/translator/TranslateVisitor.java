@@ -58,6 +58,7 @@ import cz.iocb.sparql.engine.imcode.SqlNoSolution;
 import cz.iocb.sparql.engine.imcode.SqlProcedureCall;
 import cz.iocb.sparql.engine.imcode.SqlSelect;
 import cz.iocb.sparql.engine.imcode.SqlServiceStub;
+import cz.iocb.sparql.engine.imcode.SqlServiceStub.Enclosure;
 import cz.iocb.sparql.engine.imcode.SqlShared;
 import cz.iocb.sparql.engine.imcode.SqlTableAccess;
 import cz.iocb.sparql.engine.imcode.SqlUnion;
@@ -180,11 +181,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private final Map<Variable, SqlExpressionIntercode> lateralGraphs = new HashMap<>();
 
     /**
-     * Inner graph variables of the evaluations per graph whose pattern holds no SERVICE call: a zero-length path from a
-     * constant inside an EXISTS pattern of such an evaluation takes the lateral value of the graph the pattern is
-     * evaluated in (see {@link #translateInGraph}), which the context of a SERVICE call could not read.
+     * Lateral joins of the evaluations per graph being translated whose pattern holds a SERVICE call, outermost first:
+     * the context of a call may refer to the graphs of their current solutions (see {@link #translatePerGraph}).
      */
-    private final Set<Variable> graphsWithoutService = new HashSet<>();
+    private final Stack<Enclosure> enclosures = new Stack<>();
 
     /**
      * Code enumerating the named graphs, by the variable bound to them (see {@link #getGraphEnumeration}).
@@ -763,8 +763,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      * constant graph, they hold only when the graph exists; in the default graph, they are returned unchanged. Inside
      * an evaluation per graph (see {@link #translatePerGraph}), the solutions of an EXISTS pattern take the lateral
      * value of the graph the pattern is evaluated in instead of being paired with every named graph, so that a walk
-     * starting from them stays in that graph, unless the evaluation holds a SERVICE call, whose context could not read
-     * it.
+     * starting from them stays in that graph.
      *
      * @param graph the graph term, or null for the default graph
      * @param solutions the solutions
@@ -773,7 +772,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     SqlIntercode translateInGraph(RdfTerm graph, SqlIntercode solutions)
     {
         // the context solutions of the EXISTS patterns being translated lie above the empty one
-        if(graph instanceof Variable variable && graphsWithoutService.contains(variable) && contextSolutions.size() > 1)
+        if(graph instanceof Variable variable && lateralGraphs.containsKey(variable) && contextSolutions.size() > 1)
             return SqlBind.bind(request, variable, lateralGraphs.get(variable), solutions);
 
         if(graph instanceof Variable variable)
@@ -795,10 +794,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      * laterally, evaluated for the graph of the current solution. The lateral value of that graph is remembered in
      * {@link #lateralGraphs}, and {@link #restrictToCurrentGraph} compares the fresh variable with it wherever the
      * graph matters: the pattern as a whole, the WHERE clause of a sub-select, the right side of a MINUS or an OPTIONAL
-     * and the pattern of an EXISTS. The result binds the variable to the graph.
+     * and the pattern of an EXISTS. The result binds the variable to the graph. When the pattern holds a SERVICE call,
+     * the join is remembered in {@link #enclosures} too, because the context of the call may refer to the lateral value
+     * and is evaluated by a statement of its own: the call evaluates it for all graphs, joined laterally with the
+     * graphs bound to a fresh variable again, and keeps the received solutions of the current graph (see
+     * {@link Enclosure}).
      *
      * @param variable the graph variable
-     * @param pattern the pattern, searched for SERVICE calls (see {@link #graphsWithoutService})
+     * @param pattern the pattern, searched for SERVICE calls
      * @param translation translation of the pattern, run with the fresh variable as the graph in effect
      * @return the resulting intermediate code
      */
@@ -820,12 +823,24 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         lateralGraphs.put(innerGraph, SqlLateralVariable.create(lateral.get(variable)));
         graphRestrictions.push(innerGraph);
 
-        if(!holds(pattern, Service.class))
-            graphsWithoutService.add(innerGraph);
+        boolean service = holds(pattern, Service.class);
+
+        if(service)
+        {
+            // the graphs bound to a variable that no pattern mentions, with the columns the pattern refers to
+            Variable current = createVariable("@lateral");
+            VariableBinding exposed = graphs.getVariableBindings().restrict(request.getConfiguration(), requirements)
+                    .get(variable);
+
+            enclosures.push(new Enclosure(SqlMerge.create(request, current, variable, graphs), lateralTable,
+                    new VariableBinding(current, exposed.getMappings(), exposed.canBeNull())));
+        }
 
         SqlIntercode translated = translation.get();
 
-        graphsWithoutService.remove(innerGraph);
+        if(service)
+            enclosures.pop();
+
         graphRestrictions.pop();
         lateralGraphs.remove(innerGraph);
 
@@ -1717,7 +1732,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
     /**
      * Translates a SERVICE pattern: a service known to the configuration is translated in place with its own mappings,
-     * any other becomes a {@link SqlServiceStub} evaluated later against the remote endpoint.
+     * any other becomes a {@link SqlServiceStub} evaluated later against the remote endpoint, which knows the lateral
+     * joins of the evaluations per graph it lies in (see {@link #enclosures}).
      *
      * @param service the SERVICE pattern
      * @param context solutions the call is evaluated for
@@ -1750,19 +1766,22 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 .collect(toMap(e -> e.getName(), e -> getVariable(e)));
 
         /* NOTE: The context solution of an EXISTS pattern refers to the current solution of the filter, so a call
-         * cannot be evaluated for a context containing it; the call is evaluated by itself and joined afterwards.
+         * cannot be evaluated for a context containing it; the call is evaluated by itself and joined afterwards. With
+         * the reordering of calls, the join evaluates the call for the solutions of its other members, which may refer
+         * to the graph of an evaluation per graph too.
          */
         if(request.isServiceReorderEnabled() || !getContextSolution().equals(SqlEmptySolution.get()))
         {
             SqlIntercode call = SqlServiceStub.create(request, name, serviceCode, serviceVariables,
-                    SqlEmptySolution.get(), new StrBlankNodeInSegmentClass(--serviceId), service.isSilent());
+                    SqlEmptySolution.get(), new StrBlankNodeInSegmentClass(--serviceId), service.isSilent(),
+                    List.copyOf(enclosures));
 
             return SqlJoin.join(request, call, context);
         }
         else
         {
             return SqlServiceStub.create(request, name, serviceCode, serviceVariables, context,
-                    new StrBlankNodeInSegmentClass(--serviceId), service.isSilent());
+                    new StrBlankNodeInSegmentClass(--serviceId), service.isSilent(), List.copyOf(enclosures));
         }
     }
 
