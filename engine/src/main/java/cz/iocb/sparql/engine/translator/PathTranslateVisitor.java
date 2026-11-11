@@ -322,26 +322,22 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(NegatedPath negatedPath)
     {
+        Path negatedChild = negatedPath.getChild();
+
+        while(negatedChild instanceof BracketedPath bracket)
+            negatedChild = bracket.getChild();
+
         List<Iri> negIriSet = new LinkedList<>();
         List<Iri> invNegIriSet = new LinkedList<>();
 
-        if(negatedPath.getChild() instanceof IriNode node)
+        for(Path child : negatedChild instanceof AlternativePath alt ? alt.getChildren() : List.of(negatedChild))
         {
-            negIriSet.add(getIri(node));
-        }
-        else if(negatedPath.getChild() instanceof InversePath path)
-        {
-            invNegIriSet.add(getIri((IriNode) path.getChild()));
-        }
-        else
-        {
-            for(Path child : ((AlternativePath) ((BracketedPath) negatedPath.getChild()).getChild()).getChildren())
-            {
-                if(child instanceof IriNode node)
-                    negIriSet.add(getIri(node));
-                else if(child instanceof InversePath inversePath)
-                    invNegIriSet.add(getIri((IriNode) inversePath.getChild()));
-            }
+            if(child instanceof IriNode node)
+                negIriSet.add(getIri(node));
+            else if(child instanceof InversePath inversePath)
+                invNegIriSet.add(getIri((IriNode) inversePath.getChild()));
+            else
+                throw new IllegalArgumentException();
         }
 
         if(!negIriSet.isEmpty() && invNegIriSet.isEmpty())
