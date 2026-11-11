@@ -14,6 +14,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -96,13 +97,18 @@ public final class SqlDistinct extends SqlIntercode
     {
         ClassRelations relations = request.getConfiguration();
 
-        // the deduplication needs every variable in every class, but a solution of a class the parent does not accept
-        // is dropped above whether deduplicated or not, so the child may leave such solutions out
+        // the deduplication needs every variable in every class, but a solution of a class or with a value the parent
+        // does not accept is dropped above whether deduplicated or not, so the child may leave such solutions out
         Restrictions childRestrictions = new Restrictions(distinctVariables);
 
         for(Variable variable : distinctVariables)
+        {
             if(restrictions.getAcceptedClasses(variable) != null)
                 childRestrictions.addAcceptedClasses(variable, restrictions.getAcceptedClasses(variable));
+
+            if(restrictions.getAcceptedValue(variable) != null)
+                childRestrictions.setAcceptedValue(variable, restrictions.getAcceptedValue(variable));
+        }
 
         SqlIntercode optChild = child.optimize(request, childRestrictions, true, evalServices);
 
@@ -428,6 +434,13 @@ public final class SqlDistinct extends SqlIntercode
     public boolean isDistinct(Request request, Collection<Variable> selected)
     {
         return selected.containsAll(distinctVariables);
+    }
+
+
+    @Override
+    protected boolean isRestricted(Variable variable, SqlExpressionIntercode value)
+    {
+        return child.isRestricted(variable, value);
     }
 
 

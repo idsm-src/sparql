@@ -60,7 +60,10 @@ public abstract class SqlIntercode extends SqlBaseClass
      * Where that other side also drops the solutions it cannot join (an inner join, the right side of a left join), the
      * classes it binds without a null are the accepted classes of the variable (see {@link #getAcceptedClasses}): a
      * solution binding the variable to a value of a class disjoint with all of them never reaches the result, so a
-     * child may leave such solutions out.
+     * child may leave such solutions out. Inside an EXISTS pattern, a variable merged with its value in the current
+     * solution the pattern is evaluated for has that value as its accepted value (see {@link #getAcceptedValue}): a
+     * solution binding the variable to another term never reaches the result either, and a table access binding the
+     * variable takes the value into its conditions (see {@link SqlTableAccess}).
      */
     public static class Restrictions
     {
@@ -81,6 +84,13 @@ public abstract class SqlIntercode extends SqlBaseClass
         private final Map<Variable, Set<ResourceClass>> acceptedClasses = new HashMap<>();
 
         /**
+         * Accepted value per variable: the term a bound value of the variable has to be for its solution to reach the
+         * result, given by an expression that has the same value for all the solutions (a value of the current solution
+         * of an EXISTS pattern); a variable without an entry is accepted with any value.
+         */
+        private final Map<Variable, SqlExpressionIntercode> acceptedValues = new HashMap<>();
+
+        /**
          * Creates empty restrictions (nothing is needed).
          */
         public Restrictions()
@@ -98,6 +108,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             map.putAll(restrictions.map);
             addJoinClasses(restrictions.joinClasses);
             addAcceptedClasses(restrictions.acceptedClasses);
+            addAcceptedValues(restrictions.acceptedValues);
         }
 
 
@@ -151,6 +162,8 @@ public abstract class SqlIntercode extends SqlBaseClass
             addJoinClasses(b.joinClasses);
             addAcceptedClasses(a.acceptedClasses);
             addAcceptedClasses(b.acceptedClasses);
+            addAcceptedValues(a.acceptedValues);
+            addAcceptedValues(b.acceptedValues);
         }
 
 
@@ -323,6 +336,7 @@ public abstract class SqlIntercode extends SqlBaseClass
 
             addJoinClasses(restrictions.joinClasses);
             addAcceptedClasses(restrictions.acceptedClasses);
+            addAcceptedValues(restrictions.acceptedValues);
         }
 
 
@@ -407,24 +421,89 @@ public abstract class SqlIntercode extends SqlBaseClass
         /**
          * Accepts the given variables in any class, keeping the accepted classes of the others. A node whose solutions
          * are not all dropped above (a slice, the left side of a left join) calls it for the variables it passes on
-         * without that guarantee.
+         * without that guarantee. The accepted values are kept and dropped along with the accepted classes.
          *
-         * @param vars the variables that keep their accepted classes
+         * @param vars the variables that keep their accepted classes and values
          */
         public void retainAcceptedClasses(Collection<Variable> vars)
         {
             acceptedClasses.keySet().retainAll(vars);
+            acceptedValues.keySet().retainAll(vars);
         }
 
 
         /**
-         * Accepts the variable in any class.
+         * Accepts the variable in any class and with any value.
          *
          * @param var the variable
          */
         public void removeAcceptedClasses(Variable var)
         {
             acceptedClasses.remove(var);
+            acceptedValues.remove(var);
+        }
+
+
+        /**
+         * Sets the accepted value of the variable, see {@link #getAcceptedValue(Variable)}.
+         *
+         * @param var the variable
+         * @param value expression giving the only term a bound value of the variable may be, the same for all the
+         *            solutions
+         */
+        public void setAcceptedValue(Variable var, SqlExpressionIntercode value)
+        {
+            acceptedValues.put(var, value);
+        }
+
+
+        /**
+         * Adds accepted values of several variables, see {@link #getAcceptedValue(Variable)}. A variable that has an
+         * accepted value already keeps it: both are requirements of the nodes above, so either of them holds.
+         *
+         * @param values accepted value per variable
+         */
+        private void addAcceptedValues(Map<Variable, SqlExpressionIntercode> values)
+        {
+            for(Entry<Variable, SqlExpressionIntercode> entry : values.entrySet())
+                acceptedValues.putIfAbsent(entry.getKey(), entry.getValue());
+        }
+
+
+        /**
+         * Accepted value of the variable: the term a bound value of the variable has to be for its solution to reach
+         * the result, because a node above merges the variable with the value. It is given by an expression that has
+         * the same value for all the solutions: a value of the current solution of the EXISTS pattern being optimised
+         * (see {@link cz.iocb.sparql.engine.imcode.expression.SqlOuterVariable}). A solution leaving the variable
+         * unbound is accepted. Null when the variable is accepted with any value.
+         *
+         * @param var the variable
+         * @return expression giving the accepted value of the variable, or null when it is accepted with any value
+         */
+        public SqlExpressionIntercode getAcceptedValue(Variable var)
+        {
+            return acceptedValues.get(var);
+        }
+
+
+        /**
+         * Accepts the variable with any value, keeping its accepted classes.
+         *
+         * @param var the variable
+         */
+        public void removeAcceptedValue(Variable var)
+        {
+            acceptedValues.remove(var);
+        }
+
+
+        /**
+         * Accepts every variable with any value. A node whose children are evaluated by a statement of their own (the
+         * context of a SERVICE call) calls it, because the values of a current solution are not known there.
+         */
+        public void removeAcceptedValues()
+        {
+            acceptedValues.clear();
         }
 
 
@@ -449,7 +528,8 @@ public abstract class SqlIntercode extends SqlBaseClass
                 return false;
 
             return map.equals(((Restrictions) other).map) && joinClasses.equals(((Restrictions) other).joinClasses)
-                    && acceptedClasses.equals(((Restrictions) other).acceptedClasses);
+                    && acceptedClasses.equals(((Restrictions) other).acceptedClasses)
+                    && acceptedValues.equals(((Restrictions) other).acceptedValues);
         }
 
 
@@ -1497,6 +1577,25 @@ public abstract class SqlIntercode extends SqlBaseClass
      *         otherwise
      */
     public boolean isDistinct(Request request, Collection<Variable> selected)
+    {
+        return false;
+    }
+
+
+    /**
+     * True if every solution of the node binds the variable to the value of the expression, which is the same for all
+     * the solutions (a value of the current solution of an EXISTS pattern), and the node keeps doing so however it is
+     * optimised later: a table access restricted to the value by its conditions (see {@link SqlTableAccess}), or a node
+     * that takes the variable over from such a node. Merging the variable with the value then changes nothing, so the
+     * merge is left out for good (see {@link SqlMerge}). A walk does not qualify, although it may start from the value:
+     * it gives the start up when its siblings seed it from its other end or when it reduces to its initial solutions
+     * (see {@link SqlRecursive}).
+     *
+     * @param variable the variable
+     * @param value expression giving the value
+     * @return true if every solution of the node binds the variable to the value of the expression, false otherwise
+     */
+    protected boolean isRestricted(Variable variable, SqlExpressionIntercode value)
     {
         return false;
     }

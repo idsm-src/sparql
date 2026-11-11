@@ -586,6 +586,14 @@ public final class SqlLeftJoin extends SqlIntercode
 
 
     @Override
+    protected boolean isRestricted(Variable variable, SqlExpressionIntercode value)
+    {
+        //NOTE: a variable the left side binds always keeps its value in every solution of the left join
+        return left.isRestricted(variable, value);
+    }
+
+
+    @Override
     public boolean hasServiceSubpattern()
     {
         return left.hasServiceSubpattern() || right.hasServiceSubpattern()

@@ -842,6 +842,9 @@ public final class SqlServiceStub extends SqlIntercode
     {
         Restrictions contextRestrictions = new Restrictions(restrictions);
 
+        // the context is read by a statement of its own, where the values of a current solution are not known
+        contextRestrictions.removeAcceptedValues();
+
         for(Variable var : serviceVariables.values())
             contextRestrictions.add(var);
 

@@ -246,6 +246,13 @@ public final class SqlFilter extends SqlIntercode
 
 
     @Override
+    protected boolean isRestricted(Variable variable, SqlExpressionIntercode value)
+    {
+        return child.isRestricted(variable, value);
+    }
+
+
+    @Override
     public boolean hasServiceSubpattern()
     {
         return child.hasServiceSubpattern() || conditions.stream().anyMatch(c -> c.hasServiceSubpattern());

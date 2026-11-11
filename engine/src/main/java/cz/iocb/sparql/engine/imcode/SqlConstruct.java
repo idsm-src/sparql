@@ -500,7 +500,7 @@ public final class SqlConstruct extends SqlIntercode
             return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
         }
 
-        if(optTemplates.size() == 1 && optChild instanceof SqlTableAccess acc
+        if(optTemplates.size() == 1 && optChild instanceof SqlTableAccess acc && !acc.hasValues()
                 && !hasVariableInTripleTerm(optTemplates.get(0)))
         {
             Template template = optTemplates.get(0);

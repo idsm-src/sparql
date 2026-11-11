@@ -949,6 +949,20 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * True if the expression gives the same value as the other one, whatever classes each of them materialises: two
+     * forms of one expression that the optimisation built for different needs. In general, only equal expressions are
+     * known to.
+     *
+     * @param other the other expression
+     * @return true if the expression gives the same value as the other one, false otherwise
+     */
+    public boolean hasSameValue(SqlExpressionIntercode other)
+    {
+        return equals(other);
+    }
+
+
     @Override
     public boolean equals(Object object)
     {

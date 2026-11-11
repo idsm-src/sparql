@@ -11,6 +11,8 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.sparql.engine.imcode.expression.SqlOuterVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -126,13 +128,18 @@ public final class SqlMerge extends SqlIntercode
 
         SqlIntercode optChild = child;
 
-        Restrictions childRestrictions = getRestrictions(relations, optChild, variable1, variable2, restrictions);
+        // the value merged into the kept variable is read from the child as it is, so that the restrictions of the
+        // rounds do not depend on what the optimised child turns into
+        SqlExpressionIntercode value = getMergedValue(child, variable2);
+
+        Restrictions childRestrictions = getRestrictions(relations, optChild, variable1, variable2, value,
+                restrictions);
 
         while(true)
         {
             optChild = child.optimize(request, childRestrictions, reduced, evalServices);
 
-            Restrictions newChildRestrictions = getRestrictions(relations, optChild, variable1, variable2,
+            Restrictions newChildRestrictions = getRestrictions(relations, optChild, variable1, variable2, value,
                     restrictions);
 
             if(newChildRestrictions.equals(childRestrictions))
@@ -156,6 +163,12 @@ public final class SqlMerge extends SqlIntercode
 
         if(binding2 == null)
             return optChild.optimize(request, restrictions, reduced, evalServices);
+
+        // a child whose every solution binds the kept variable to the value merged into it needs no merge: its table
+        // accesses have taken the value into their conditions
+        if(value != null && optChild instanceof SqlBind bind && bind.getVariable().equals(variable2)
+                && bind.getChild().isRestricted(variable1, value))
+            return bind.getChild().optimize(request, restrictions, reduced, evalServices);
 
         if(optChild instanceof SqlUnion union)
         {
@@ -212,17 +225,20 @@ public final class SqlMerge extends SqlIntercode
 
     /**
      * Restrictions for the child: the parent's (what it needs of the kept variable is needed of the merged one too,
-     * which supplies it after the renaming) plus the compatibility requirements between the two variables.
+     * which supplies it after the renaming) plus the compatibility requirements between the two variables. A value of
+     * the current solution of an EXISTS pattern merged into the kept variable is the only value the child is accepted
+     * to bind the variable to (see {@link Restrictions#getAcceptedValue}).
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param child the child node
      * @param variable1 the variable kept
      * @param variable2 the variable merged into the first one
+     * @param value expression giving the value merged into the kept variable (see {@link #getMergedValue}), or null
      * @param restrictions what the parent needs of the variables
      * @return restrictions for the child
      */
     protected static Restrictions getRestrictions(ClassRelations relations, SqlIntercode child, Variable variable1,
-            Variable variable2, Restrictions restrictions)
+            Variable variable2, SqlExpressionIntercode value, Restrictions restrictions)
     {
         VariableBinding binding1 = child.getVariable(variable1);
         VariableBinding binding2 = child.getVariable(variable2);
@@ -234,7 +250,32 @@ public final class SqlMerge extends SqlIntercode
         result.add(getJoinRestrictions(relations, binding1, binding2));
         result.add(getJoinRestrictions(relations, binding2, binding1));
 
+        // a solution binding the kept variable to another term than the value merged into it does not pass the merge,
+        // so the child may leave such solutions out
+        if(value != null)
+            result.setAcceptedValue(variable1, value);
+
         return result;
+    }
+
+
+    /**
+     * The value merged into the kept variable, when the child binds the merged variable to a value of the current
+     * solution of the EXISTS pattern being optimised that is never unbound (see {@link SqlOuterVariable}): the same
+     * term for all the solutions of the child, which the kept variable then has to be. Null otherwise.
+     *
+     * @param child the child node
+     * @param variable2 the variable merged into the first one
+     * @return expression giving the value merged into the kept variable, or null
+     */
+    private static SqlExpressionIntercode getMergedValue(SqlIntercode child, Variable variable2)
+    {
+        if(!(child instanceof SqlBind bind) || !bind.getVariable().equals(variable2))
+            return null;
+
+        SqlExpressionIntercode value = bind.getExpression();
+
+        return value instanceof SqlOuterVariable && !value.canBeNull() ? value : null;
     }
 
 
@@ -266,6 +307,14 @@ public final class SqlMerge extends SqlIntercode
                     classes.stream().filter(c -> !areDisjunct(relations, c, other.getClasses())).collect(toSet()));
 
         return restrictions;
+    }
+
+
+    @Override
+    protected boolean isRestricted(Variable variable, SqlExpressionIntercode value)
+    {
+        //NOTE: a solution passing the merge keeps the value the child binds the variable to
+        return !variable.equals(variable2) && child.isRestricted(variable, value);
     }
 
 

@@ -136,8 +136,9 @@ public final class SqlRecursive extends SqlIntercode
     /**
      * Initial solutions of the walk turned the other way round (see {@link #reverseNext}): those the walk was created
      * with (the first steps, or the zero-length paths), valid in either direction, before the optimisation restricted
-     * them to what the start variable may take (the classes the parent accepts, or the classes of a segment), which is
-     * no restriction of the turned walk, as the start variable becomes its end. Null when the walk cannot be turned.
+     * them to what the start variable may take (the classes the parent accepts, the classes of a segment, or the value
+     * the walk starts from, see {@link #start}), which is no restriction of the turned walk, as the start variable
+     * becomes its end. Null when the walk cannot be turned.
      */
     private final SqlIntercode reverseInit;
 
@@ -167,12 +168,16 @@ public final class SqlRecursive extends SqlIntercode
      * variable, and the graph variable when the walk stays in one graph): expressions over the current solution of the
      * EXISTS pattern the walk lies in, which every solution of the walk extends. The recursion takes only the initial
      * solutions compatible with the values, so it enumerates the paths from the node the current solution gives instead
-     * of the paths from all nodes, of which the pattern would keep the same ones. The values are read only when the
-     * recursion is evaluated: a walk reduced to its initial solutions (see {@link #optimize}) leaves the comparison
-     * with the current solution to the pattern, which the database then evaluates once for all current solutions, and
-     * so does a walk its siblings seed from its other end (see {@link #seed}), which gives the values up. Such a walk
-     * is not turned by the restrictions of its parent, because it starts from a single node already. Empty when the
-     * walk starts from all its initial solutions.
+     * of the paths from all nodes, of which the pattern would keep the same ones: the table accesses of the initial
+     * solutions take the values into their conditions (see {@link Restrictions#getAcceptedValue}), so that the database
+     * looks the node up by the indexes of the tables, and the non-recursive term compares the values they have not
+     * taken; the steps of a walk that starts in a graph are restricted to that graph likewise. The values restrict the
+     * recursion only: a walk reduced to its initial solutions (see {@link #optimize}) takes them as it was created with
+     * them, when it has kept them (see {@link #reverseInit}), and leaves the comparison with the current solution to
+     * the pattern, which the database then evaluates once for all current solutions, and so does a walk its siblings
+     * seed from its other end (see {@link #seed}), which gives the values up. Such a walk is not turned by the
+     * restrictions of its parent, because it starts from a single node already. Empty when the walk starts from all its
+     * initial solutions.
      */
     private final Map<Variable, SqlExpressionIntercode> start;
 
@@ -249,8 +254,8 @@ public final class SqlRecursive extends SqlIntercode
      * Recursive closure of {@code next} started from {@code init} between two variables, which may also be walked the
      * other way round by {@code reverseNext} (see {@link #reverseNext}), and which may start directly from the values
      * of expressions (see {@link #start}): the initial solutions, which start in all nodes, are then restricted to
-     * those compatible with the values when the recursion is evaluated, and only the siblings of the walk make it walk
-     * the other way round (see {@link #seed}).
+     * those compatible with the values, and only the siblings of the walk make it walk the other way round (see
+     * {@link #seed}).
      *
      * @param request the current request
      * @param init the initial solutions
@@ -571,8 +576,9 @@ public final class SqlRecursive extends SqlIntercode
         if(init instanceof SqlUnion union)
             return union.getChilds().stream().anyMatch(branch -> enumeratesNodesOf(branch, seed, startVar, endVar));
 
+        // a source restricted to a value of the current solution of an EXISTS pattern does not hold every node
         if(!(init instanceof SqlTableAccess source) || source.getTable() == null
-                || !source.getTable().equals(seed.getTable()))
+                || !source.getTable().equals(seed.getTable()) || source.hasValues())
             return false;
 
         if(!seed.getConditions().implies(source.getConditions()))
@@ -819,10 +825,12 @@ public final class SqlRecursive extends SqlIntercode
         // has a path iff it has an initial solution (a zero-length path, or a first step, whose last step is one too),
         // so the walk reduces to its initial solutions; the begin may be left out only when the initial solutions start
         // anywhere, which those of a seeded walk do not; the initial solutions of a walk starting from the values of
-        // expressions are left as they are, compared with the current solution by the pattern they lie in
+        // expressions are taken as the walk was created with them, not restricted to the values, when the walk has kept
+        // them (it may be turned and is no segment), and compared with the current solution by the pattern they lie in
         if(reduced && (!restrictions.containsVar(endBinding.getVariable())
                 || reverseNext != null && !restrictions.containsVar(beginVar)))
-            return init.optimize(request, restrictions, true, evalServices);
+            return (!start.isEmpty() && reverseInit != null && segmentClasses == null ? reverseInit : init)
+                    .optimize(request, restrictions, true, evalServices);
 
         ClassRelations relations = request.getConfiguration();
 
@@ -855,15 +863,30 @@ public final class SqlRecursive extends SqlIntercode
             childRestrictions.add(beginVar);
 
         // the values the walk starts from are read from the current solution as it is now, and the initial solutions
-        // are optimised as a join with them would optimise them
+        // are optimised as a join with them would optimise them: only an initial solution holding the values starts a
+        // path, so their table accesses take the values into their conditions (see Restrictions.getAcceptedValue)
         Map<Variable, SqlExpressionIntercode> optStart = optimizeStart(request, evalServices);
         VariableBindings startBindings = getStartBindings(optStart);
 
-        Restrictions initRestrictions = optStart.isEmpty() ? childRestrictions :
-                getJoinRestrictions(relations, init.getVariableBindings(), startBindings, childRestrictions, true);
+        Restrictions initRestrictions = childRestrictions;
+        Restrictions nextRestrictions = childRestrictions;
+
+        if(!optStart.isEmpty())
+        {
+            initRestrictions = getJoinRestrictions(relations, init.getVariableBindings(), startBindings,
+                    childRestrictions, true);
+            optStart.forEach(initRestrictions::setAcceptedValue);
+
+            // the steps of a walk that starts in a graph stay in that graph
+            if(graphVar != null && optStart.containsKey(graphVar))
+            {
+                nextRestrictions = new Restrictions(childRestrictions);
+                nextRestrictions.setAcceptedValue(graphVar, optStart.get(graphVar));
+            }
+        }
 
         SqlIntercode initOpt = init.optimize(request, initRestrictions, reduced, evalServices);
-        SqlIntercode nextOpt = next.optimize(request, childRestrictions, reduced, evalServices);
+        SqlIntercode nextOpt = next.optimize(request, nextRestrictions, reduced, evalServices);
 
 
         if(initOpt.equals(SqlNoSolution.get()))
@@ -909,7 +932,7 @@ public final class SqlRecursive extends SqlIntercode
             if(childs.size() == union.getChilds().size())
                 break;
 
-            nextOpt = SqlUnion.union(request, childs).optimize(request, childRestrictions, true, evalServices);
+            nextOpt = SqlUnion.union(request, childs).optimize(request, nextRestrictions, true, evalServices);
         }
 
 
@@ -1128,8 +1151,12 @@ public final class SqlRecursive extends SqlIntercode
         builder.append(initTable);
 
         // a walk starting from the values of expressions takes only the initial solutions compatible with them; the
-        // values are columns of the current solution of the enclosing EXISTS pattern, addressed already
-        String startCondition = generateJoinCondition(relations, getStartBindings(start), init.getVariableBindings(),
+        // values are columns of the current solution of the enclosing EXISTS pattern, addressed already, and they are
+        // compared here unless the table accesses of the initial solutions have taken them into their conditions
+        Map<Variable, SqlExpressionIntercode> compared = new LinkedHashMap<>(start);
+        compared.entrySet().removeIf(e -> init.isRestricted(e.getKey(), e.getValue()));
+
+        String startCondition = generateJoinCondition(relations, getStartBindings(compared), init.getVariableBindings(),
                 null, initTable);
 
         if(startCondition != null)

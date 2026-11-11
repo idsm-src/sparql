@@ -433,6 +433,13 @@ public final class SqlMinus extends SqlIntercode
 
 
     @Override
+    protected boolean isRestricted(Variable variable, SqlExpressionIntercode value)
+    {
+        return left.isRestricted(variable, value);
+    }
+
+
+    @Override
     public boolean hasServiceSubpattern()
     {
         return left.hasServiceSubpattern() || right.hasServiceSubpattern();

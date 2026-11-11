@@ -25,6 +25,9 @@ import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
+import cz.iocb.sparql.engine.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -42,10 +45,31 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * are merged into a single access ({@link #tryReduceJoin} and friends), and a union of two accesses telling their rows
  * apart by the null test of a column is written as a single scan ({@link #translateUnion}). {@code reduced} means the
  * parent does not care about duplicates; {@code distinctColumns} asks for deduplication over those columns (see
- * {@link cz.iocb.sparql.engine.mapping.SingleTableQuadMapping}).
+ * {@link cz.iocb.sparql.engine.mapping.SingleTableQuadMapping}). Inside an EXISTS pattern, an access whose variable the
+ * nodes above merge with its value in the current solution of the pattern takes the value into its own conditions,
+ * compared in the class of its columns like a constant (see {@link ValueCondition}).
  */
 public final class SqlTableAccess extends SqlIntercode
 {
+    /**
+     * Restriction of the rows of an access to those holding a value of the current solution of the EXISTS pattern the
+     * access lies in: the term held by the columns is the value of the expression. The value is converted to the class
+     * of the columns, so that the database can look the rows up by an index of the table, whereas the node merging the
+     * variable with the value compares them in their common class. The condition is kept apart from the conditions on
+     * the rows, because the columns of the current solution change whenever the node holding the EXISTS expression is
+     * optimised: the expression is read again on every optimisation of the access (see
+     * {@link cz.iocb.sparql.engine.imcode.expression.SqlOuterVariable}).
+     *
+     * @param resourceClass class of the term held by the columns
+     * @param columns the columns of the table holding the term, as the internal bindings give them
+     * @param value expression giving the value, which refers to the current solution only; it is never unbound when the
+     *            access takes it in, and should the current solution leave it unbound later, every row passes
+     */
+    record ValueCondition(ResourceClass resourceClass, List<Column> columns, SqlExpressionIntercode value)
+    {
+    }
+
+
     /**
      * Database schema the table belongs to; null for constants only.
      */
@@ -76,6 +100,12 @@ public final class SqlTableAccess extends SqlIntercode
      */
     private final boolean reduced;
 
+    /**
+     * Values of the current solution of the enclosing EXISTS pattern the rows are restricted to, in conjunction with
+     * the conditions (see {@link ValueCondition}); empty outside such a pattern.
+     */
+    private final List<ValueCondition> values;
+
 
     /**
      * Creates the node; the exposed bindings use one representative per set of columns equated by the conditions and
@@ -87,9 +117,10 @@ public final class SqlTableAccess extends SqlIntercode
      * @param internal bindings in terms of the table's own columns
      * @param reduced whether duplicate solutions may be dropped
      * @param distinctColumns columns over which deduplication is requested
+     * @param values values of the current solution the rows are restricted to
      */
     protected SqlTableAccess(DatabaseSchema schema, SourceTable table, Conditions conditions, VariableBindings internal,
-            boolean reduced, Set<Column> distinctColumns)
+            boolean reduced, Set<Column> distinctColumns, List<ValueCondition> values)
     {
         super(getExternalVariableBindings(schema, table, internal, conditions), true);
 
@@ -99,6 +130,7 @@ public final class SqlTableAccess extends SqlIntercode
         this.internal = internal;
         this.reduced = reduced;
         this.distinctColumns = distinctColumns;
+        this.values = values;
     }
 
 
@@ -186,7 +218,7 @@ public final class SqlTableAccess extends SqlIntercode
     static SqlIntercode create(DatabaseSchema schema, SourceTable table, Conditions conditions,
             VariableBindings internal, boolean reduced, Set<Column> distinctColumns)
     {
-        return new SqlTableAccess(schema, table, conditions, internal, reduced, distinctColumns);
+        return new SqlTableAccess(schema, table, conditions, internal, reduced, distinctColumns, List.of());
     }
 
 
@@ -409,9 +441,12 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * Returns the table columns that are bound to a constant by every disjunct of the conditions.
+     * Returns the table columns that are bound to a constant by every disjunct of the conditions, or to a value of the
+     * current solution of the enclosing EXISTS pattern that is never unbound, which is a constant for one evaluation of
+     * the pattern.
      *
-     * @return the table columns that are bound to a constant by every disjunct of the conditions
+     * @return the table columns that are bound to a constant by every disjunct of the conditions or to a value of the
+     *         current solution
      */
     private Set<Column> getConstantBoundColumns()
     {
@@ -426,7 +461,105 @@ public final class SqlTableAccess extends SqlIntercode
                 columns.add(p.getLeft());
         }
 
+        columns.addAll(getValueColumns(true));
+
         return columns;
+    }
+
+
+    /**
+     * Returns the table columns restricted to a value of the current solution of the enclosing EXISTS pattern (see
+     * {@link #values}).
+     *
+     * @param bound whether only the columns restricted to a value that is never unbound are returned, which hold that
+     *            value in every row; a row passes any value that is unbound
+     * @return the table columns restricted to a value of the current solution
+     */
+    private Set<Column> getValueColumns(boolean bound)
+    {
+        Set<Column> columns = new HashSet<>();
+
+        for(ValueCondition value : values)
+            if(!bound || !value.value().canBeNull())
+                value.columns().stream().filter(c -> c instanceof TableColumn).forEach(columns::add);
+
+        return columns;
+    }
+
+
+    /**
+     * True if the rows are restricted to a value of the current solution of the enclosing EXISTS pattern (see
+     * {@link #values}).
+     *
+     * @return true if the rows are restricted to a value of the current solution, false otherwise
+     */
+    boolean hasValues()
+    {
+        return !values.isEmpty();
+    }
+
+
+    /**
+     * True if the access restricts its rows to the same values of the current solution as the other access (see
+     * {@link #values}).
+     *
+     * @param other the other access
+     * @return true if both accesses restrict their rows to the same values of the current solution, false otherwise
+     */
+    boolean hasSameValues(SqlTableAccess other)
+    {
+        return containsAll(values, other.values) && containsAll(other.values, values);
+    }
+
+
+    /**
+     * True if the first restrictions to values of the current solution include all the other ones: for each of them,
+     * the same columns are restricted to the same value.
+     *
+     * @param values the restrictions
+     * @param others the other restrictions
+     * @return true if the first restrictions include all the other ones, false otherwise
+     */
+    private static boolean containsAll(List<ValueCondition> values, List<ValueCondition> others)
+    {
+        return others.stream().allMatch(o -> values.stream().anyMatch(v -> v.resourceClass().equals(o.resourceClass())
+                && v.columns().equals(o.columns()) && v.value().hasSameValue(o.value())));
+    }
+
+
+    /**
+     * The restrictions to values of the current solution of two accesses merged into one, each taken once.
+     *
+     * @param left the restrictions of one access
+     * @param right the restrictions of the other access
+     * @return the restrictions of both accesses
+     */
+    private static List<ValueCondition> mergeValues(List<ValueCondition> left, List<ValueCondition> right)
+    {
+        if(right.isEmpty() || containsAll(left, right))
+            return left;
+
+        List<ValueCondition> result = new ArrayList<>(left);
+
+        for(ValueCondition value : right)
+            if(!containsAll(result, List.of(value)))
+                result.add(value);
+
+        return result;
+    }
+
+
+    /**
+     * The access with other conditions and internal bindings, which keeps its table, its deduplication and the values
+     * of the current solution its rows are restricted to.
+     *
+     * @param conditions the conditions
+     * @param internal bindings in terms of the table's own columns
+     * @return the access with the given conditions and internal bindings
+     */
+    SqlTableAccess with(Conditions conditions, VariableBindings internal)
+    {
+        return new SqlTableAccess(schema, table, conditions, internal, reduced, distinctColumns, values);
     }
 
 
@@ -770,6 +903,11 @@ public final class SqlTableAccess extends SqlIntercode
         if(parent.hasExpression())
             return null;
 
+        // the parent is dropped, so a value of the current solution it is restricted to would have to be moved onto the
+        // child columns
+        if(parent.hasValues())
+            return null;
+
         // the parent is dropped, which is exact only when its rows are unique with respect to the key columns
         if(!parent.distinctColumns.isEmpty())
             return null;
@@ -810,6 +948,11 @@ public final class SqlTableAccess extends SqlIntercode
                 .anyMatch(n -> !left.internal.get(n).getMappings().equals(right.internal.get(n).getMappings())))
             return false;
 
+        // the merged access takes the disjunction of the conditions, which the values restricting both alike stay in
+        // conjunction with
+        if(!left.hasSameValues(right))
+            return false;
+
         return true;
     }
 
@@ -837,6 +980,10 @@ public final class SqlTableAccess extends SqlIntercode
 
         // because we cannot rewrite expressions
         if(child.hasExpression())
+            return false;
+
+        // nor are the values of the current solution moved between the tables
+        if(parent.hasValues() || child.hasValues())
             return false;
 
         // the sets of variables (and their resource classes) have to be the same
@@ -910,6 +1057,10 @@ public final class SqlTableAccess extends SqlIntercode
             SqlTableAccess left, SqlTableAccess right)
     {
         if(!canBeJoinedByPrimaryKey(relations, schema, left, right))
+            return false;
+
+        // a value of the current solution restricting the right side alone would be a condition of the optional part
+        if(!containsAll(left.values, right.values))
             return false;
 
         Set<Column> extraNotNulls = new HashSet<>(right.conditions.getIsNotNull());
@@ -993,8 +1144,7 @@ public final class SqlTableAccess extends SqlIntercode
         Conditions conditions = Conditions.and(left.conditions,
                 right.asConditions(left.schema, left.table, left.internal));
 
-        return create(left.schema, left.table, conditions, left.internal.restrict(relations, restrictions),
-                left.reduced, left.distinctColumns);
+        return left.with(conditions, left.internal.restrict(relations, restrictions));
     }
 
 
@@ -1025,6 +1175,10 @@ public final class SqlTableAccess extends SqlIntercode
             return false;
 
         if(!joinColumns.containsAll(distinct.conditions.getNonConstantColumns()))
+            return false;
+
+        // nor is it decided by the row itself when the distinct access restricts a column outside the join
+        if(!joinColumns.containsAll(distinct.getValueColumns(false)))
             return false;
 
         return true;
@@ -1129,7 +1283,7 @@ public final class SqlTableAccess extends SqlIntercode
             return SqlNoSolution.get();
 
         return new SqlTableAccess(left.schema, left.table, conditions, bindings, left.reduced && right.reduced,
-                distinctColumns);
+                distinctColumns, mergeValues(left.values, right.values));
     }
 
 
@@ -1192,7 +1346,7 @@ public final class SqlTableAccess extends SqlIntercode
 
         // each child row has exactly one parent row, so only the deduplication of the child remains
         return new SqlTableAccess(child.schema, child.table, conditions, bindings, child.reduced && parent.reduced,
-                child.distinctColumns);
+                child.distinctColumns, child.values);
     }
 
 
@@ -1250,7 +1404,7 @@ public final class SqlTableAccess extends SqlIntercode
         bindings = bindings.restrict(relations, restrictions);
 
         return new SqlTableAccess(left.schema, left.table, conditions, bindings, left.reduced && right.reduced,
-                union(left.distinctColumns, right.distinctColumns));
+                union(left.distinctColumns, right.distinctColumns), left.values);
     }
 
 
@@ -1274,7 +1428,8 @@ public final class SqlTableAccess extends SqlIntercode
             bindings.add(new VariableBinding(binding.getVariable(), binding.getMappings(), canBeNull));
         }
 
-        return new SqlTableAccess(parent.schema, parent.table, conditions, bindings, true, parent.distinctColumns);
+        return new SqlTableAccess(parent.schema, parent.table, conditions, bindings, true, parent.distinctColumns,
+                parent.values);
     }
 
 
@@ -1299,7 +1454,7 @@ public final class SqlTableAccess extends SqlIntercode
         }
 
         return new SqlTableAccess(left.schema, left.table, conditions, bindings, true,
-                union(left.distinctColumns, right.distinctColumns));
+                union(left.distinctColumns, right.distinctColumns), left.values);
     }
 
 
@@ -1583,6 +1738,12 @@ public final class SqlTableAccess extends SqlIntercode
         if(conditions.isFalse())
             return SqlNoSolution.get();
 
+        // the values of the current solution the parent accepts for the variables restrict the rows by themselves
+        List<ValueCondition> optimizedValues = optimizeValues(request, restrictions, evalServices);
+
+        if(optimizedValues == null)
+            return SqlNoSolution.get();
+
         VariableBindings optimizedBindings = internal.restrict(relations, restrictions);
 
         Set<Column> optimizedDistinct = distinctColumns;
@@ -1590,10 +1751,180 @@ public final class SqlTableAccess extends SqlIntercode
         if(!distinctColumns.isEmpty() && isDistinctImpliedByKey(request.getConfiguration().getDatabaseSchema()))
             optimizedDistinct = Set.of();
 
-        if(this.reduced == reduced && optimizedBindings.equals(internal) && optimizedDistinct == distinctColumns)
+        if(this.reduced == reduced && optimizedBindings.equals(internal) && optimizedDistinct == distinctColumns
+                && optimizedValues == values)
             return this;
 
-        return create(schema, table, conditions, optimizedBindings, reduced, optimizedDistinct);
+        return new SqlTableAccess(schema, table, conditions, optimizedBindings, reduced, optimizedDistinct,
+                optimizedValues);
+    }
+
+
+    /**
+     * The values of the current solution the rows are restricted to (see {@link #values}) as the current solution
+     * provides them now, together with the values the parent accepts for the variables the access binds always (see
+     * {@link Restrictions#getAcceptedValue}): a row holding another term in the columns of such a variable gives a
+     * solution that never reaches the result. A value is taken in when it is never unbound and can be converted to the
+     * class of the columns with the check of its representability; otherwise the node merging the variable with the
+     * value goes on comparing them. A value taken in before stays, because that node may be gone (see
+     * {@link #isRestricted}), unless the current solution does not bind it at all any more, which leaves every row
+     * compatible. A value that is never unbound and of no class overlapping the class of the columns, or differing from
+     * the constants the columns are, is held by no row.
+     *
+     * @param request the current request
+     * @param restrictions what the parent needs of the variables
+     * @param evalServices whether SERVICE stubs are evaluated
+     * @return the values the rows are restricted to (the list of this access when nothing has changed), or null when no
+     *         row can hold a value
+     */
+    private List<ValueCondition> optimizeValues(Request request, Restrictions restrictions, boolean evalServices)
+    {
+        ClassRelations relations = request.getConfiguration();
+
+        List<ValueCondition> result = new ArrayList<>();
+
+        for(ValueCondition condition : values)
+        {
+            // the value is read from the current solution as the node holding the EXISTS expression provides it now
+            SqlExpressionIntercode value = condition.value().optimize(request, new VariableBindings(), Restriction.ALL,
+                    evalServices);
+
+            if(value.equals(SqlNull.get()))
+                continue;
+
+            if(isHeldByNoRow(relations, condition.resourceClass(), condition.columns(), value))
+                return null;
+
+            result.add(value == condition.value() ? condition :
+                    new ValueCondition(condition.resourceClass(), condition.columns(), value));
+        }
+
+        for(VariableBinding binding : internal.getValues())
+        {
+            SqlExpressionIntercode accepted = restrictions.getAcceptedValue(binding.getVariable());
+
+            if(accepted == null || binding.canBeNull() || binding.getMappings().size() != 1)
+                continue;
+
+            Entry<ResourceClass, List<Column>> mapping = binding.getMappings().entrySet().iterator().next();
+
+            if(mapping.getValue() == null)
+                continue;
+
+            if(containsAll(result, List.of(new ValueCondition(mapping.getKey(), mapping.getValue(), accepted))))
+                continue;
+
+            SqlExpressionIntercode value = accepted.optimize(request, new VariableBindings(), Restriction.ALL,
+                    evalServices);
+
+            if(value.equals(SqlNull.get()) || !isComparedInClass(relations, mapping.getKey(), value))
+                continue;
+
+            if(isHeldByNoRow(relations, mapping.getKey(), mapping.getValue(), value))
+                return null;
+
+            result.add(new ValueCondition(mapping.getKey(), mapping.getValue(), value));
+        }
+
+        return result.equals(values) ? values : result;
+    }
+
+
+    /**
+     * True if the value can be compared with columns of the class in that class: it is never unbound and it can be
+     * converted to the class with the check of its representability (see {@link VariableBinding#canDeriveMapping}).
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param resClass class of the columns
+     * @param value expression giving the value
+     * @return true if the value can be compared in the class of the columns, false otherwise
+     */
+    private static boolean isComparedInClass(ClassRelations relations, ResourceClass resClass,
+            SqlExpressionIntercode value)
+    {
+        return !value.canBeNull() && value.getBinding().canDeriveMapping(relations, resClass)
+                && value.getBinding().deriveMapping(relations, resClass) != null;
+    }
+
+
+    /**
+     * True if no row can hold the value in the columns: the value is never unbound and either it is of no class
+     * overlapping the class of the columns, or it differs from the constants the columns are.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param resClass class of the columns
+     * @param columns the columns
+     * @param value expression giving the value
+     * @return true if no row can hold the value in the columns, false otherwise
+     */
+    private static boolean isHeldByNoRow(ClassRelations relations, ResourceClass resClass, List<Column> columns,
+            SqlExpressionIntercode value)
+    {
+        if(value.canBeNull())
+            return false;
+
+        if(!value.getBinding().contains(relations, resClass))
+            return true;
+
+        if(!isComparedInClass(relations, resClass, value))
+            return false;
+
+        List<Column> derived = value.getBinding().deriveMapping(relations, resClass);
+
+        for(int i = 0; i < derived.size(); i++)
+            if(derived.get(i) instanceof ConstantColumn && columns.get(i) instanceof ConstantColumn
+                    && !derived.get(i).equals(columns.get(i)))
+                return true;
+
+        return false;
+    }
+
+
+    /**
+     * SQL condition restricting the rows to the values of the current solution (see {@link #values}): the columns equal
+     * the value converted to their class, which yields nulls for a value outside the class, so that the database can
+     * look the rows up by an index. A value that cannot be compared so (which it could when it was taken in) is
+     * compared as a join would compare it: in the common class, any row being compatible with an unbound value. Null
+     * when there is nothing to compare.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @return SQL condition restricting the rows to the values of the current solution, or null
+     */
+    private String translateValues(ClassRelations relations)
+    {
+        List<String> comparisons = new ArrayList<>();
+
+        for(ValueCondition condition : values)
+        {
+            ResourceClass resClass = condition.resourceClass();
+            SqlExpressionIntercode value = condition.value();
+
+            VariableBinding held = new VariableBinding(Map.of(resClass, condition.columns()), false);
+            VariableBinding required = !isComparedInClass(relations, resClass, value) ? value.getBinding() :
+                    new VariableBinding(Map.of(resClass, value.getBinding().deriveMapping(relations, resClass)), false);
+
+            String comparison = generateJoinCondition(relations, held, required, null, null);
+
+            if(comparison != null)
+                comparisons.add(comparison);
+        }
+
+        return comparisons.isEmpty() ? null : String.join(" AND ", comparisons);
+    }
+
+
+    @Override
+    protected boolean isRestricted(Variable variable, SqlExpressionIntercode value)
+    {
+        VariableBinding binding = internal.get(variable);
+
+        if(binding == null || binding.canBeNull() || binding.getMappings().size() != 1)
+            return false;
+
+        Entry<ResourceClass, List<Column>> mapping = binding.getMappings().entrySet().iterator().next();
+
+        return mapping.getValue() != null
+                && containsAll(values, List.of(new ValueCondition(mapping.getKey(), mapping.getValue(), value)));
     }
 
 
@@ -1630,6 +1961,11 @@ public final class SqlTableAccess extends SqlIntercode
      */
     private String translate(Request request, String correlatedCondition)
     {
+        // the values of the current solution restrict the rows along with the conditions
+        String valueCondition = translateValues(request.getConfiguration());
+        String extraCondition = valueCondition == null ? correlatedCondition :
+                correlatedCondition == null ? valueCondition : valueCondition + " AND " + correlatedCondition;
+
         Map<Column, Column> rev = getExpressions();
 
         boolean canBeLimited = reduced;
@@ -1688,7 +2024,7 @@ public final class SqlTableAccess extends SqlIntercode
             builder.append(table);
         }
 
-        appendConditions(builder, conditions, correlatedCondition);
+        appendConditions(builder, conditions, extraCondition);
 
         if(groupColumns != null)
         {
@@ -1857,6 +2193,9 @@ public final class SqlTableAccess extends SqlIntercode
             return false;
 
         if(!left.distinctColumns.isEmpty() || !right.distinctColumns.isEmpty())
+            return false;
+
+        if(left.hasValues() || right.hasValues())
             return false;
 
         if(left.bindings.getNonConstantColumns().isEmpty() || right.bindings.getNonConstantColumns().isEmpty())
@@ -2181,6 +2520,14 @@ public final class SqlTableAccess extends SqlIntercode
         }
 
 
+        for(ValueCondition value : values)
+        {
+            indentInfo(builder, indent, false);
+            builder.append(value.columns().stream().map(c -> c.getName()).collect(joining(",", "(", ")")));
+            builder.append(" = ");
+            value.value().generateExplanation(builder, indent + "  ");
+        }
+
         for(VariableBinding binding : internal.getValues())
         {
             indentInfo(builder, indent, false);
@@ -2227,6 +2574,9 @@ public final class SqlTableAccess extends SqlIntercode
         if(!Objects.equals(distinctColumns, imcode.distinctColumns))
             return false;
 
+        if(!Objects.equals(values, imcode.values))
+            return false;
+
         return true;
     }
 
@@ -2234,6 +2584,6 @@ public final class SqlTableAccess extends SqlIntercode
     @Override
     protected int getHashCode()
     {
-        return Objects.hash(reduced, table, internal, conditions, distinctColumns);
+        return Objects.hash(reduced, table, internal, conditions, distinctColumns, values);
     }
 }

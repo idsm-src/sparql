@@ -12,6 +12,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
@@ -175,6 +176,13 @@ public final class SqlStripConstantColumns extends SqlIntercode
     public boolean isDistinct(Request request, Collection<Variable> selected)
     {
         return child.isDistinct(request, selected);
+    }
+
+
+    @Override
+    protected boolean isRestricted(Variable variable, SqlExpressionIntercode value)
+    {
+        return child.isRestricted(variable, value);
     }
 
 

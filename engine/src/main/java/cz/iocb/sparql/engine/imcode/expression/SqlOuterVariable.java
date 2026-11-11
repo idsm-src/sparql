@@ -120,6 +120,14 @@ public final class SqlOuterVariable extends SqlExpressionIntercode
 
 
     @Override
+    public boolean hasSameValue(SqlExpressionIntercode other)
+    {
+        //NOTE: the value is read from the current solution in effect, which the optimisation changes for both alike
+        return other instanceof SqlOuterVariable outer && variable.equals(outer.variable);
+    }
+
+
+    @Override
     public Set<VirtualTable> getVirtualTables()
     {
         return Set.of();

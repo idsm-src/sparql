@@ -18,6 +18,7 @@ import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -419,6 +420,13 @@ public final class SqlUnion extends SqlIntercode
                 return j;
 
         return -1;
+    }
+
+
+    @Override
+    protected boolean isRestricted(Variable variable, SqlExpressionIntercode value)
+    {
+        return childs.stream().allMatch(child -> child.isRestricted(variable, value));
     }
 
 

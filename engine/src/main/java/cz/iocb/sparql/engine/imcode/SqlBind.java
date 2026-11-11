@@ -154,15 +154,22 @@ public final class SqlBind extends SqlIntercode
             Restrictions expressionRequirements = optExpression.getRequirements(relations);
             Restrictions childRestrictions = new Restrictions(restrictions, expressionRequirements);
 
+            // the variable takes its value here, so the value the parent accepts for it does not restrict the child
+            childRestrictions.removeAcceptedValue(variable);
+
             if(needed)
                 for(Variable referenced : optExpression.getReferencedVariables())
                     childRestrictions.add(referenced, Set.of());
 
-            // a copy of a variable takes its value, so the classes the parent accepts for the copy are accepted for the
-            // variable too (the zero-length paths of a walk bind their end this way)
+            // a copy of a variable takes its value, so the classes and the value the parent accepts for the copy are
+            // accepted for the variable too (the zero-length paths of a walk bind their end this way)
             if(optExpression instanceof SqlVariable && restrictions.getAcceptedClasses(variable) != null)
                 for(Variable copied : optExpression.getReferencedVariables())
                     childRestrictions.addAcceptedClasses(copied, restrictions.getAcceptedClasses(variable));
+
+            if(optExpression instanceof SqlVariable && restrictions.getAcceptedValue(variable) != null)
+                for(Variable copied : optExpression.getReferencedVariables())
+                    childRestrictions.setAcceptedValue(copied, restrictions.getAcceptedValue(variable));
 
             optChild = optChild.optimize(request, childRestrictions, optReduced, evalServices);
             optExpression = optExpression.optimize(request, optChild.getVariableBindings(), varRestriction,
@@ -201,9 +208,7 @@ public final class SqlBind extends SqlIntercode
             VariableBindings internal = new VariableBindings(access.getInternalVariableBindings());
             internal.add(new VariableBinding(variable, binding.getMappings(), binding.canBeNull()));
 
-            return SqlTableAccess.create(request, access.getTable(), access.getConditions(), internal,
-                    access.getReduced(), access.getDistinctColumns())
-                    .optimize(request, restrictions, reduced, evalServices);
+            return access.with(access.getConditions(), internal).optimize(request, restrictions, reduced, evalServices);
         }
 
 
@@ -304,6 +309,28 @@ public final class SqlBind extends SqlIntercode
     public final Variable getVariable()
     {
         return variable;
+    }
+
+
+    /**
+     * The expression computing the value.
+     *
+     * @return the expression computing the value
+     */
+    public final SqlExpressionIntercode getExpression()
+    {
+        return expression;
+    }
+
+
+    @Override
+    protected boolean isRestricted(Variable variable, SqlExpressionIntercode value)
+    {
+        // the bound variable takes the value when the expression gives it, any other one is taken over from the child
+        if(variable.equals(this.variable))
+            return !expression.canBeNull() && expression.hasSameValue(value);
+
+        return child.isRestricted(variable, value);
     }
 
 

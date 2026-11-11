@@ -25,6 +25,7 @@ import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -145,6 +146,14 @@ public final class SqlJoin extends SqlIntercode
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
+
+        // a reordered SERVICE call is evaluated for the solutions of its siblings, which a statement of its own reads,
+        // so they must not take in the values of a current solution of an EXISTS pattern
+        if(request.isServiceReorderEnabled() && childs.stream().anyMatch(SqlIntercode::hasServiceSubpattern))
+        {
+            restrictions = new Restrictions(restrictions);
+            restrictions.removeAcceptedValues();
+        }
 
         List<SqlIntercode> flatChilds = flatChilds(optimize(request, flatChilds(childs), restrictions, reduced));
 
@@ -548,8 +557,7 @@ public final class SqlJoin extends SqlIntercode
                                 internal.add(access.getInternalVariableBinding(variable));
                         }
 
-                        optChilds.set(i, SqlTableAccess.create(schema, access.getTable(), cnds, internal,
-                                access.getReduced(), access.getDistinctColumns()));
+                        optChilds.set(i, access.with(cnds, internal));
                     }
                 }
             }
@@ -748,7 +756,8 @@ public final class SqlJoin extends SqlIntercode
 
                         SqlIntercode intercode = tryReduceDistinct(relations, schema, candidate, distinctPart);
 
-                        if(intercode instanceof SqlTableAccess a && a.getConditions().equals(candidate.getConditions()))
+                        if(intercode instanceof SqlTableAccess a && a.getConditions().equals(candidate.getConditions())
+                                && a.hasSameValues(candidate))
                         {
                             newChilds.remove(distinct);
                             newChilds.remove(candidate);
@@ -833,7 +842,8 @@ public final class SqlJoin extends SqlIntercode
         }
         else
         {
-            if(distinct.hasExpression())
+            // neither expressions nor values of a current solution are moved onto the columns of the other table
+            if(distinct.hasExpression() || distinct.hasValues())
                 return null;
 
             Set<ColumnPair> columns = SqlTableAccess.getJoinColumnPairs(relations, distinct, candidate);
@@ -1457,6 +1467,14 @@ public final class SqlJoin extends SqlIntercode
     public final List<SqlIntercode> getChilds()
     {
         return childs;
+    }
+
+
+    @Override
+    protected boolean isRestricted(Variable variable, SqlExpressionIntercode value)
+    {
+        //NOTE: the join makes the other children agree with the one that binds the variable to the value
+        return childs.stream().anyMatch(child -> child.isRestricted(variable, value));
     }
 
 
