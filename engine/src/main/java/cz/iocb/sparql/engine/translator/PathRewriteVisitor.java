@@ -113,7 +113,7 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
                 return visitElement(new SequencePath(rev));
 
             case InversePath child:
-                return visitElement(child);
+                return visitElement(child.getChild());
 
             case RepeatedPath child:
                 return visitElement(new RepeatedPath(child.getKind(), new InversePath(child.getChild())));
