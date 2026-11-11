@@ -44,16 +44,6 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 public final class SqlLeftJoin extends SqlIntercode
 {
     /**
-     * Alias of the left side.
-     */
-    private static final AliasTable leftTable = new AliasTable("tab0");
-
-    /**
-     * Alias of the right side.
-     */
-    private static final AliasTable rightTable = new AliasTable("tab1");
-
-    /**
      * Left side, always kept.
      */
     private final SqlIntercode left;
@@ -69,6 +59,18 @@ public final class SqlLeftJoin extends SqlIntercode
     private final List<SqlExpressionIntercode> conditions;
 
     /**
+     * Alias of the left side (see {@link Request#getLeftInputTable}), fixed when the join is created, because the
+     * column map and the conditions address the columns of the side through it.
+     */
+    private final AliasTable leftTable;
+
+    /**
+     * Alias of the right side (see {@link Request#getRightInputTable}), fixed when the join is created like the alias
+     * of the left side.
+     */
+    private final AliasTable rightTable;
+
+    /**
      * For each output column, the side column it is taken from.
      */
     private final Map<Column, Column> columnMap;
@@ -81,10 +83,13 @@ public final class SqlLeftJoin extends SqlIntercode
      * @param left the left side
      * @param right the right side
      * @param conditions the conditions
+     * @param leftTable alias of the left side
+     * @param rightTable alias of the right side
      * @param columnMap the column map
      */
     protected SqlLeftJoin(VariableBindings bindings, SqlIntercode left, SqlIntercode right,
-            List<SqlExpressionIntercode> conditions, Map<Column, Column> columnMap)
+            List<SqlExpressionIntercode> conditions, AliasTable leftTable, AliasTable rightTable,
+            Map<Column, Column> columnMap)
     {
         super(bindings, left.isDeterministic() && right.isDeterministic()
                 && conditions.stream().allMatch(c -> c.isDeterministic()));
@@ -92,6 +97,8 @@ public final class SqlLeftJoin extends SqlIntercode
         this.left = left;
         this.right = right;
         this.conditions = conditions;
+        this.leftTable = leftTable;
+        this.rightTable = rightTable;
         this.columnMap = columnMap;
     }
 
@@ -139,11 +146,14 @@ public final class SqlLeftJoin extends SqlIntercode
         if(hasConstantColumn)
             right = SqlStripConstantColumns.strip(right);
 
+        AliasTable leftTable = request.getLeftInputTable();
+        AliasTable rightTable = request.getRightInputTable();
+
         Map<Column, Column> map = new HashMap<>();
         VariableBindings bindings = getJoinVariableBindings(request, left.getVariableBindings(),
                 setCanBeNull(right.getVariableBindings()), leftTable, rightTable, restrictions, map);
 
-        return new SqlLeftJoin(bindings, left, right, conditions, map);
+        return new SqlLeftJoin(bindings, left, right, conditions, leftTable, rightTable, map);
     }
 
 
@@ -186,7 +196,8 @@ public final class SqlLeftJoin extends SqlIntercode
 
     /**
      * Bindings under which the join conditions are evaluated: the variables of both sides addressed through the aliases
-     * of the join.
+     * of the join, which are those of a left join created at the current depth of the patterns of expressions (see
+     * {@link Request#getLeftInputTable}).
      *
      * @param request the current request
      * @param left bindings of the left side
@@ -197,6 +208,9 @@ public final class SqlLeftJoin extends SqlIntercode
     public static VariableBindings getExpressionVariableBindings(Request request, VariableBindings left,
             VariableBindings right)
     {
+        AliasTable leftTable = request.getLeftInputTable();
+        AliasTable rightTable = request.getRightInputTable();
+
         Map<Column, Column> map = new HashMap<>();
         VariableBindings joinBindings = getJoinVariableBindings(request, left, right, leftTable, rightTable, null, map);
 

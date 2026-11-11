@@ -276,7 +276,8 @@ public final class SqlBind extends SqlIntercode
         {
             builder.append(" FROM (");
             builder.append(child.translate(request));
-            builder.append(" ) AS tab");
+            builder.append(" ) AS ");
+            builder.append(request.getInputTable());
         }
 
 

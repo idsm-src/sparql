@@ -274,6 +274,11 @@ public class Request implements AutoCloseable
     private int expressionDepth = 0;
 
     /**
+     * Depth of the patterns of expressions being translated or optimised (see {@link #getInputTable}).
+     */
+    private int patternDepth = 0;
+
+    /**
      * Start of the execution in {@link System#nanoTime} units.
      */
     private long begin;
@@ -931,6 +936,62 @@ public class Request implements AutoCloseable
     public boolean isWithinExpression()
     {
         return expressionDepth > 0;
+    }
+
+
+    /**
+     * Begins the translation or the optimisation of a pattern of an expression (EXISTS): the nodes of the pattern lie
+     * one level deeper than the node holding the expression (see {@link #getInputTable}).
+     */
+    public void beginPattern()
+    {
+        patternDepth++;
+    }
+
+
+    /**
+     * Ends the translation or the optimisation of a pattern of an expression (see {@link #beginPattern}).
+     */
+    public void endPattern()
+    {
+        patternDepth--;
+    }
+
+
+    /**
+     * Alias of the input of a node holding expressions (a filter, a bind, an aggregation or a procedure call): a name
+     * followed by the depth of the patterns of expressions the node lies in. A pattern of an expression held by the
+     * node can refer to the columns of the input through the alias from any depth, because no subquery between such a
+     * reference and the node declares the alias again: the subqueries belong to the pattern, whose nodes lie deeper.
+     *
+     * @return alias of the input of a node holding expressions at the current depth
+     */
+    public AliasTable getInputTable()
+    {
+        return new AliasTable("outer" + patternDepth);
+    }
+
+
+    /**
+     * Alias of the left side of a left join, whose conditions are expressions over the solutions of both sides (see
+     * {@link #getInputTable}).
+     *
+     * @return alias of the left side of a left join at the current depth
+     */
+    public AliasTable getLeftInputTable()
+    {
+        return new AliasTable("left" + patternDepth);
+    }
+
+
+    /**
+     * Alias of the right side of a left join (see {@link #getLeftInputTable}).
+     *
+     * @return alias of the right side of a left join at the current depth
+     */
+    public AliasTable getRightInputTable()
+    {
+        return new AliasTable("right" + patternDepth);
     }
 
 

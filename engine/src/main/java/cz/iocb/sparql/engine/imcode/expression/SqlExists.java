@@ -459,6 +459,9 @@ public final class SqlExists extends SqlExpressionIntercode
         // a walk in the pattern is not seeded from shared solutions (see Request.isWithinExpression)
         request.beginExpression();
 
+        // the nodes of the pattern lie one level deeper than the node holding the expression
+        request.beginPattern();
+
         try
         {
             //NOTE: only the existence of a solution matters, no column of the pattern is needed
@@ -471,6 +474,7 @@ public final class SqlExists extends SqlExpressionIntercode
         }
         finally
         {
+            request.endPattern();
             request.endExpression();
         }
     }

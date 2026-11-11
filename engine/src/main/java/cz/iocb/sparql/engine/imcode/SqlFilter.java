@@ -204,7 +204,8 @@ public final class SqlFilter extends SqlIntercode
 
         builder.append(" FROM (");
         builder.append(child.translate(request));
-        builder.append(" ) AS tab");
+        builder.append(" ) AS ");
+        builder.append(request.getInputTable());
 
         builder.append(" WHERE ");
 

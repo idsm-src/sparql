@@ -266,9 +266,21 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         setDatasets(askQuery.getSelect().getDataSets());
 
         Variable variable = new Variable("@ask");
+        SqlExpressionIntercode expression;
 
-        SqlIntercode translatedSelect = visitElement(askQuery.getSelect());
-        SqlExpressionIntercode expression = SqlExists.create(request, false, translatedSelect, new VariableBindings());
+        // the select is the pattern of an existence test, so its nodes lie one level deeper than the node holding it
+        request.beginPattern();
+
+        try
+        {
+            SqlIntercode translatedSelect = visitElement(askQuery.getSelect());
+            expression = SqlExists.create(request, false, translatedSelect, new VariableBindings());
+        }
+        finally
+        {
+            request.endPattern();
+        }
+
         SqlIntercode bind = SqlBind.bind(request, variable, expression, SqlEmptySolution.get());
 
         return SqlSelect.createTopLevel(request, List.of(variable), bind);
@@ -924,14 +936,24 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         contextSolutions.push(context);
 
-        SqlIntercode translated = restrictToCurrentGraph(translateGroupGraphPattern(pattern));
+        // the nodes of the pattern lie one level deeper than the node holding the expression
+        request.beginPattern();
 
-        contextSolutions.pop();
+        try
+        {
+            SqlIntercode translated = restrictToCurrentGraph(translateGroupGraphPattern(pattern));
 
-        if(context instanceof SqlContextSolution solution)
-            return SqlExists.create(request, exists.isNegated(), translated, bindings, solution);
+            contextSolutions.pop();
 
-        return SqlExists.create(request, exists.isNegated(), translated, bindings);
+            if(context instanceof SqlContextSolution solution)
+                return SqlExists.create(request, exists.isNegated(), translated, bindings, solution);
+
+            return SqlExists.create(request, exists.isNegated(), translated, bindings);
+        }
+        finally
+        {
+            request.endPattern();
+        }
     }
 
 

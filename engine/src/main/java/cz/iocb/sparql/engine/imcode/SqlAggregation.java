@@ -436,7 +436,8 @@ public final class SqlAggregation extends SqlIntercode
 
         builder.append(" FROM (");
         builder.append(child.translate(request));
-        builder.append(" ) AS tab");
+        builder.append(" ) AS ");
+        builder.append(request.getInputTable());
 
         if(!groupByColumns.isEmpty())
             builder.append(groupByColumns.stream().map(Object::toString).collect(joining(", ", " GROUP BY ", "")));
