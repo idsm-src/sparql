@@ -45,19 +45,21 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * are merged into a single access ({@link #tryReduceJoin} and friends), and a union of two accesses telling their rows
  * apart by the null test of a column is written as a single scan ({@link #translateUnion}). {@code reduced} means the
  * parent does not care about duplicates; {@code distinctColumns} asks for deduplication over those columns (see
- * {@link cz.iocb.sparql.engine.mapping.SingleTableQuadMapping}). Inside an EXISTS pattern, an access whose variable the
- * nodes above merge with its value in the current solution of the pattern takes the value into its own conditions,
- * compared in the class of its columns like a constant (see {@link ValueCondition}).
+ * {@link cz.iocb.sparql.engine.mapping.SingleTableQuadMapping}). Inside a pattern evaluated for a current solution (an
+ * EXISTS pattern, or a pattern evaluated per graph, whose current solution gives the graph), an access whose variable
+ * the nodes above merge with its value in the current solution takes the value into its own conditions, compared in the
+ * class of its columns like a constant (see {@link ValueCondition}).
  */
 public final class SqlTableAccess extends SqlIntercode
 {
     /**
-     * Restriction of the rows of an access to those holding a value of the current solution of the EXISTS pattern the
-     * access lies in: the term held by the columns is the value of the expression. The value is converted to the class
-     * of the columns, so that the database can look the rows up by an index of the table, whereas the node merging the
-     * variable with the value compares them in their common class. The condition is kept apart from the conditions on
-     * the rows, because the columns of the current solution change whenever the node holding the EXISTS expression is
-     * optimised: the expression is read again on every optimisation of the access (see
+     * Restriction of the rows of an access to those holding a value of the current solution that the pattern the access
+     * lies in is evaluated for (see {@link SqlExpressionIntercode#isCurrentValue}): the term held by the columns is the
+     * value of the expression. The value is converted to the class of the columns, so that the database can look the
+     * rows up by an index of the table, whereas the node merging the variable with the value compares them in their
+     * common class. The condition is kept apart from the conditions on the rows, because the columns of the current
+     * solution of an EXISTS pattern change whenever the node holding the EXISTS expression is optimised: the expression
+     * is read again on every optimisation of the access (see
      * {@link cz.iocb.sparql.engine.imcode.expression.SqlOuterVariable}).
      *
      * @param resourceClass class of the term held by the columns
@@ -101,8 +103,8 @@ public final class SqlTableAccess extends SqlIntercode
     private final boolean reduced;
 
     /**
-     * Values of the current solution of the enclosing EXISTS pattern the rows are restricted to, in conjunction with
-     * the conditions (see {@link ValueCondition}); empty outside such a pattern.
+     * Values of the current solution of the enclosing pattern the rows are restricted to, in conjunction with the
+     * conditions (see {@link ValueCondition}); empty outside a pattern evaluated for a current solution.
      */
     private final List<ValueCondition> values;
 
@@ -442,8 +444,8 @@ public final class SqlTableAccess extends SqlIntercode
 
     /**
      * Returns the table columns that are bound to a constant by every disjunct of the conditions, or to a value of the
-     * current solution of the enclosing EXISTS pattern that is never unbound, which is a constant for one evaluation of
-     * the pattern.
+     * current solution of the enclosing pattern that is never unbound, which is a constant for one evaluation of the
+     * pattern.
      *
      * @return the table columns that are bound to a constant by every disjunct of the conditions or to a value of the
      *         current solution
@@ -468,7 +470,7 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * Returns the table columns restricted to a value of the current solution of the enclosing EXISTS pattern (see
+     * Returns the table columns restricted to a value of the current solution of the enclosing pattern (see
      * {@link #values}).
      *
      * @param bound whether only the columns restricted to a value that is never unbound are returned, which hold that
@@ -488,7 +490,7 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * True if the rows are restricted to a value of the current solution of the enclosing EXISTS pattern (see
+     * True if the rows are restricted to a value of the current solution of the enclosing pattern (see
      * {@link #values}).
      *
      * @return true if the rows are restricted to a value of the current solution, false otherwise

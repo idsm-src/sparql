@@ -833,7 +833,9 @@ public final class SqlServiceStub extends SqlIntercode
     /**
      * Restrictions for the context of the call: what the parent needs of the variables, extended by the variables of
      * the call, which the context may bind as well, and by the variable naming the endpoint, whose value each context
-     * solution has to supply.
+     * solution has to supply. A variable the parent needs in some classes only is needed whole, because the context
+     * solutions are read as terms by a statement of its own (see {@link #eval}), which cannot read a value of a class
+     * left without columns.
      *
      * @param restrictions what the parent needs of the variables
      * @return restrictions for the context of the call
@@ -844,6 +846,8 @@ public final class SqlServiceStub extends SqlIntercode
 
         // the context is read by a statement of its own, where the values of a current solution are not known
         contextRestrictions.removeAcceptedValues();
+
+        contextRestrictions.add(List.copyOf(restrictions.getNames()));
 
         for(Variable var : serviceVariables.values())
             contextRestrictions.add(var);

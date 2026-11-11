@@ -838,13 +838,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      * Evaluates the pattern given by the translation separately in every named graph bound to the variable: the graphs
      * are enumerated, the pattern is translated with a fresh variable standing for the graph of its triples and joined
      * laterally, evaluated for the graph of the current solution. The lateral value of that graph is remembered in
-     * {@link #lateralGraphs}, and {@link #restrictToCurrentGraph} compares the fresh variable with it wherever the
-     * graph matters: the pattern as a whole, the WHERE clause of a sub-select, the right side of a MINUS or an OPTIONAL
-     * and the pattern of an EXISTS. The result binds the variable to the graph. When the pattern holds a SERVICE call,
-     * the join is remembered in {@link #enclosures} too, because the context of the call may refer to the lateral value
-     * and is evaluated by a statement of its own: the call evaluates it for all graphs, joined laterally with the
-     * graphs bound to a fresh variable again, and keeps the received solutions of the current graph (see
-     * {@link Enclosure}).
+     * {@link #lateralGraphs}, and {@link #restrictToCurrentGraph} merges the fresh variable with it wherever the graph
+     * matters: the pattern as a whole, the WHERE clause of a sub-select, the right side of a MINUS or an OPTIONAL and
+     * the pattern of an EXISTS. The result binds the variable to the graph. When the pattern holds a SERVICE call, the
+     * join is remembered in {@link #enclosures} too, because the context of the call may refer to the lateral value and
+     * is evaluated by a statement of its own: the call evaluates it for all graphs, joined laterally with the graphs
+     * bound to a fresh variable again, and keeps the received solutions of the current graph (see {@link Enclosure}).
      *
      * @param variable the graph variable
      * @param pattern the pattern, searched for SERVICE calls
@@ -897,7 +896,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     /**
      * In an evaluation per graph (see {@link #translatePerGraph}), keeps the solutions of the pattern that hold in the
      * graph of the current solution: those whose variable of the graph in effect holds the same term, and those binding
-     * no graph, which hold in every graph. Outside such an evaluation, the pattern is returned unchanged.
+     * no graph, which hold in every graph. The variable is merged with the lateral value of the graph the way a
+     * variable of an EXISTS pattern is merged with its value in the current solution (see
+     * {@link #restrictToCurrentSolution}): the value is bound to a fresh variable merged into the variable, so the
+     * table accesses of the pattern take it into their conditions and the database looks the triples of the graph up
+     * instead of reading the triples of every graph for each of them. Outside such an evaluation, the pattern is
+     * returned unchanged.
      *
      * @param pattern the pattern
      * @return solutions of the pattern that hold in the graph of the current solution
@@ -907,19 +911,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         if(!(getGraph() instanceof Variable graph) || !lateralGraphs.containsKey(graph))
             return pattern;
 
-        VariableBinding binding = pattern.getVariableBindings().get(graph);
-
-        if(binding == null)
+        if(pattern.getVariableBindings().get(graph) == null)
             return pattern;
 
-        SqlExpressionIntercode condition = SqlBuiltinCall.create(request, "sameterm", false,
-                List.of(SqlVariable.create(request.getConfiguration(), binding), lateralGraphs.get(graph)));
+        Variable fresh = createVariable(variablePrefix);
 
-        if(binding.canBeNull())
-            condition = SqlBuiltinCall.create(request, "coalesce", false, List.of(condition, trueValue));
-
-        return SqlFilter.filter(request,
-                List.of(SqlEffectiveBooleanValue.create(request.getConfiguration(), condition)), pattern);
+        return SqlMerge.create(request, graph, fresh, SqlBind.bind(request, fresh, lateralGraphs.get(graph), pattern));
     }
 
 

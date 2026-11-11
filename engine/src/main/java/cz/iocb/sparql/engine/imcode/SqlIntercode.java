@@ -60,10 +60,11 @@ public abstract class SqlIntercode extends SqlBaseClass
      * Where that other side also drops the solutions it cannot join (an inner join, the right side of a left join), the
      * classes it binds without a null are the accepted classes of the variable (see {@link #getAcceptedClasses}): a
      * solution binding the variable to a value of a class disjoint with all of them never reaches the result, so a
-     * child may leave such solutions out. Inside an EXISTS pattern, a variable merged with its value in the current
-     * solution the pattern is evaluated for has that value as its accepted value (see {@link #getAcceptedValue}): a
-     * solution binding the variable to another term never reaches the result either, and a table access binding the
-     * variable takes the value into its conditions (see {@link SqlTableAccess}).
+     * child may leave such solutions out. Inside a pattern evaluated for a current solution (an EXISTS pattern, or a
+     * pattern evaluated per graph), a variable merged with its value in the current solution has that value as its
+     * accepted value (see {@link #getAcceptedValue}): a solution binding the variable to another term never reaches the
+     * result either, and a table access binding the variable takes the value into its conditions (see
+     * {@link SqlTableAccess}).
      */
     public static class Restrictions
     {
@@ -86,7 +87,7 @@ public abstract class SqlIntercode extends SqlBaseClass
         /**
          * Accepted value per variable: the term a bound value of the variable has to be for its solution to reach the
          * result, given by an expression that has the same value for all the solutions (a value of the current solution
-         * of an EXISTS pattern); a variable without an entry is accepted with any value.
+         * the pattern is evaluated for); a variable without an entry is accepted with any value.
          */
         private final Map<Variable, SqlExpressionIntercode> acceptedValues = new HashMap<>();
 
@@ -473,9 +474,9 @@ public abstract class SqlIntercode extends SqlBaseClass
         /**
          * Accepted value of the variable: the term a bound value of the variable has to be for its solution to reach
          * the result, because a node above merges the variable with the value. It is given by an expression that has
-         * the same value for all the solutions: a value of the current solution of the EXISTS pattern being optimised
-         * (see {@link cz.iocb.sparql.engine.imcode.expression.SqlOuterVariable}). A solution leaving the variable
-         * unbound is accepted. Null when the variable is accepted with any value.
+         * the same value for all the solutions: a value of the current solution the pattern being optimised is
+         * evaluated for (see {@link SqlExpressionIntercode#isCurrentValue}). A solution leaving the variable unbound is
+         * accepted. Null when the variable is accepted with any value.
          *
          * @param var the variable
          * @return expression giving the accepted value of the variable, or null when it is accepted with any value
@@ -1584,12 +1585,12 @@ public abstract class SqlIntercode extends SqlBaseClass
 
     /**
      * True if every solution of the node binds the variable to the value of the expression, which is the same for all
-     * the solutions (a value of the current solution of an EXISTS pattern), and the node keeps doing so however it is
-     * optimised later: a table access restricted to the value by its conditions (see {@link SqlTableAccess}), or a node
-     * that takes the variable over from such a node. Merging the variable with the value then changes nothing, so the
-     * merge is left out for good (see {@link SqlMerge}). A walk does not qualify, although it may start from the value:
-     * it gives the start up when its siblings seed it from its other end or when it reduces to its initial solutions
-     * (see {@link SqlRecursive}).
+     * the solutions (a value of the current solution the pattern is evaluated for), and the node keeps doing so however
+     * it is optimised later: a table access restricted to the value by its conditions (see {@link SqlTableAccess}), or
+     * a node that takes the variable over from such a node. Merging the variable with the value then changes nothing,
+     * so the merge is left out for good (see {@link SqlMerge}). A walk does not qualify, although it may start from the
+     * value: it gives the start up when its siblings seed it from its other end or when it reduces to its initial
+     * solutions (see {@link SqlRecursive}).
      *
      * @param variable the variable
      * @param value expression giving the value

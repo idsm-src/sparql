@@ -128,6 +128,13 @@ public final class SqlOuterVariable extends SqlExpressionIntercode
 
 
     @Override
+    public boolean isCurrentValue()
+    {
+        return true;
+    }
+
+
+    @Override
     public Set<VirtualTable> getVirtualTables()
     {
         return Set.of();

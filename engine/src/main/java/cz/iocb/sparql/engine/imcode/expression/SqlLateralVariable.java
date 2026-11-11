@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.imcode.expression;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
@@ -96,6 +97,29 @@ public final class SqlLateralVariable extends SqlExpressionIntercode
     public Variable getVariable()
     {
         return variable;
+    }
+
+
+    @Override
+    public boolean hasSameValue(SqlExpressionIntercode other)
+    {
+        if(!(other instanceof SqlLateralVariable lateral) || !variable.equals(lateral.variable))
+            return false;
+
+        //NOTE: every join exposes its columns through an alias of its own, so the columns of a class tell the joins
+        // apart, whatever classes each of the two references is restricted to
+        for(Entry<ResourceClass, List<Column>> entry : getMappings().entrySet())
+            if(entry.getValue() != null && entry.getValue().equals(lateral.getMappings().get(entry.getKey())))
+                return true;
+
+        return false;
+    }
+
+
+    @Override
+    public boolean isCurrentValue()
+    {
+        return true;
     }
 
 

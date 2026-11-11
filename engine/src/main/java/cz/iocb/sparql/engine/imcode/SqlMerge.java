@@ -12,7 +12,6 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
-import cz.iocb.sparql.engine.imcode.expression.SqlOuterVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -226,8 +225,8 @@ public final class SqlMerge extends SqlIntercode
     /**
      * Restrictions for the child: the parent's (what it needs of the kept variable is needed of the merged one too,
      * which supplies it after the renaming) plus the compatibility requirements between the two variables. A value of
-     * the current solution of an EXISTS pattern merged into the kept variable is the only value the child is accepted
-     * to bind the variable to (see {@link Restrictions#getAcceptedValue}).
+     * the current solution the pattern is evaluated for merged into the kept variable is the only value the child is
+     * accepted to bind the variable to (see {@link Restrictions#getAcceptedValue}).
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param child the child node
@@ -261,8 +260,9 @@ public final class SqlMerge extends SqlIntercode
 
     /**
      * The value merged into the kept variable, when the child binds the merged variable to a value of the current
-     * solution of the EXISTS pattern being optimised that is never unbound (see {@link SqlOuterVariable}): the same
-     * term for all the solutions of the child, which the kept variable then has to be. Null otherwise.
+     * solution the pattern being optimised is evaluated for that is never unbound (see
+     * {@link SqlExpressionIntercode#isCurrentValue}): the same term for all the solutions of the child, which the kept
+     * variable then has to be. Null otherwise.
      *
      * @param child the child node
      * @param variable2 the variable merged into the first one
@@ -275,7 +275,7 @@ public final class SqlMerge extends SqlIntercode
 
         SqlExpressionIntercode value = bind.getExpression();
 
-        return value instanceof SqlOuterVariable && !value.canBeNull() ? value : null;
+        return value.isCurrentValue() && !value.canBeNull() ? value : null;
     }
 
 

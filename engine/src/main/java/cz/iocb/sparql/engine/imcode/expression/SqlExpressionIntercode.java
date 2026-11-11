@@ -963,6 +963,20 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * True if the expression gives a value of the current solution a pattern is evaluated for, so the same value for
+     * all the solutions of the pattern: a value of the current solution of an EXISTS pattern (see
+     * {@link SqlOuterVariable}), or of the solution of the left side that the right side of a lateral join is evaluated
+     * for (see {@link SqlLateralVariable}).
+     *
+     * @return true if the expression gives a value of the current solution a pattern is evaluated for, false otherwise
+     */
+    public boolean isCurrentValue()
+    {
+        return false;
+    }
+
+
     @Override
     public boolean equals(Object object)
     {
