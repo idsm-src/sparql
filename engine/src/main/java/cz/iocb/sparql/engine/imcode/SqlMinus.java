@@ -1,5 +1,8 @@
 package cz.iocb.sparql.engine.imcode;
 
+import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.falseValue;
+import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -9,6 +12,9 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
+import cz.iocb.sparql.engine.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -21,9 +27,10 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 /**
  * Set difference (MINUS): the solutions of the left side for which there is no compatible solution of the right side
- * sharing at least one bound variable. A walk on the right side whose start the left side binds always is seeded with
- * the distinct values of the start read from the left side, shared so that the statement evaluates it once (see
- * {@link SqlShared}).
+ * sharing at least one bound variable. Inside an EXISTS pattern, every solution of both sides extends the current
+ * solution the pattern is evaluated for, so the sides share its variables without binding them (see
+ * {@link #solutionBound}). A walk on the right side whose start the left side binds always is seeded with the distinct
+ * values of the start read from the left side, shared so that the statement evaluates it once (see {@link SqlShared}).
  */
 public final class SqlMinus extends SqlIntercode
 {
@@ -54,6 +61,14 @@ public final class SqlMinus extends SqlIntercode
      */
     private final Variable graph;
 
+    /**
+     * Condition that the current solution of the EXISTS pattern the difference lies in binds a variable, or null
+     * outside such a pattern and when that solution binds none. Every solution of both sides extends the current
+     * solution, so a variable it binds is bound on both sides, although the sides do not bind it themselves: a right
+     * solution then removes every left solution compatible with it.
+     */
+    private final SqlExpressionIntercode solutionBound;
+
 
     /**
      * Creates the node.
@@ -62,14 +77,18 @@ public final class SqlMinus extends SqlIntercode
      * @param left the left side
      * @param right the right side
      * @param graph variable of the enclosing GRAPH clause bound by the triples of both sides, or null
+     * @param solutionBound condition that the current solution of the enclosing EXISTS pattern binds a variable, or
+     *            null
      */
-    protected SqlMinus(VariableBindings bindings, SqlIntercode left, SqlIntercode right, Variable graph)
+    protected SqlMinus(VariableBindings bindings, SqlIntercode left, SqlIntercode right, Variable graph,
+            SqlExpressionIntercode solutionBound)
     {
         super(bindings, left.isDeterministic() && right.isDeterministic());
 
         this.left = left;
         this.right = right;
         this.graph = graph;
+        this.solutionBound = solutionBound;
     }
 
 
@@ -83,7 +102,7 @@ public final class SqlMinus extends SqlIntercode
      */
     public static SqlIntercode minus(Request request, SqlIntercode left, SqlIntercode right)
     {
-        return minus(request, left, right, null, null);
+        return minus(request, left, right, null, null, null);
     }
 
 
@@ -99,7 +118,27 @@ public final class SqlMinus extends SqlIntercode
      */
     public static SqlIntercode minus(Request request, SqlIntercode left, SqlIntercode right, Variable graph)
     {
-        return minus(request, left, right, graph, null);
+        return minus(request, left, right, graph, null, null);
+    }
+
+
+    /**
+     * Difference of the two sides inside an EXISTS pattern, evaluated in the graph of the given variable (see
+     * {@link #minus(Request, SqlIntercode, SqlIntercode, Variable)}): the sides share the variables of the current
+     * solution the pattern is evaluated for.
+     *
+     * @param request the current request
+     * @param left the left side
+     * @param right the right side
+     * @param graph variable of the enclosing GRAPH clause bound by the triples of both sides, or null
+     * @param solutionBound condition that the current solution of the EXISTS pattern binds a variable, an expression
+     *            over the values of that solution only, or null
+     * @return difference of the two sides inside an EXISTS pattern
+     */
+    public static SqlIntercode minus(Request request, SqlIntercode left, SqlIntercode right, Variable graph,
+            SqlExpressionIntercode solutionBound)
+    {
+        return minus(request, left, right, graph, solutionBound, null);
     }
 
 
@@ -110,14 +149,16 @@ public final class SqlMinus extends SqlIntercode
      * @param left the left side
      * @param right the right side
      * @param graph variable of the enclosing GRAPH clause bound by the triples of both sides, or null
+     * @param solutionBound condition that the current solution of the enclosing EXISTS pattern binds a variable, or
+     *            null
      * @param restrictions what the parent needs of the variables
      * @return difference exposing only what the parent needs
      */
     protected static SqlIntercode minus(Request request, SqlIntercode left, SqlIntercode right, Variable graph,
-            Restrictions restrictions)
+            SqlExpressionIntercode solutionBound, Restrictions restrictions)
     {
         return new SqlMinus(left.getVariableBindings().restrict(request.getConfiguration(), restrictions), left, right,
-                graph);
+                graph, solutionBound);
     }
 
 
@@ -199,7 +240,15 @@ public final class SqlMinus extends SqlIntercode
         }
 
 
-        boolean shareVariables = false;
+        // the condition follows the current solution as the node holding the EXISTS expression provides it now; a
+        // solution binding no variable leaves the sides with the variables they bind themselves
+        SqlExpressionIntercode optSolutionBound = solutionBound == null ? null :
+                solutionBound.optimize(request, new VariableBindings(), new Restriction(xsdBoolean), evalServices);
+
+        if(optSolutionBound != null && (optSolutionBound.equals(SqlNull.get()) || optSolutionBound.equals(falseValue)))
+            optSolutionBound = null;
+
+        boolean shareVariables = optSolutionBound != null;
 
         for(VariableBindingPair pair : VariableBindingPair.getPairs(relations, optLeft.getVariableBindings(),
                 optRight.getVariableBindings()))
@@ -219,7 +268,7 @@ public final class SqlMinus extends SqlIntercode
             List<SqlIntercode> childs = new ArrayList<>();
 
             for(SqlIntercode child : union.getChilds())
-                childs.add(minus(request, child, optRight, graph, restrictions));
+                childs.add(minus(request, child, optRight, graph, optSolutionBound, restrictions));
 
             return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
         }
@@ -235,14 +284,15 @@ public final class SqlMinus extends SqlIntercode
             SqlIntercode shared = SqlShared.share(optLeft);
             SqlIntercode seed = SqlShared.seed(request, shared, seedVar, evalServices);
 
-            return minus(request, shared, SqlJoin.join(request, seed, optRight), graph, restrictions).optimize(request,
-                    restrictions, reduced, evalServices);
+            return minus(request, shared, SqlJoin.join(request, seed, optRight), graph, optSolutionBound, restrictions)
+                    .optimize(request, restrictions, reduced, evalServices);
         }
 
-        if(restrictions.isOptimized(relations, bindings) && optLeft == left && optRight == right)
+        if(restrictions.isOptimized(relations, bindings) && optLeft == left && optRight == right
+                && Objects.equals(optSolutionBound, solutionBound))
             return this;
 
-        return minus(request, optLeft, optRight, graph, restrictions);
+        return minus(request, optLeft, optRight, graph, optSolutionBound, restrictions);
     }
 
 
@@ -289,7 +339,8 @@ public final class SqlMinus extends SqlIntercode
 
     /**
      * SQL condition that a right solution removes a left one: the shared variables (the graph variable included) are
-     * compatible and at least one of them (the graph variable excluded) is bound on both sides.
+     * compatible and at least one of them (the graph variable excluded) is bound on both sides, a variable the current
+     * solution of the enclosing EXISTS pattern binds counting as bound on both sides (see {@link #solutionBound}).
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param left bindings of the left side
@@ -310,6 +361,9 @@ public final class SqlMinus extends SqlIntercode
         for(VariableBindingPair pair : pairs)
             if(!pair.getLeftVariableBinding().canBeNull() && !pair.getRightVariableBinding().canBeNull())
                 return joinCondition;
+
+        if(solutionBound != null && solutionBound.equals(trueValue))
+            return joinCondition;
 
 
         List<String> condition = new ArrayList<>();
@@ -332,6 +386,9 @@ public final class SqlMinus extends SqlIntercode
 
             condition.add(builder.toString());
         }
+
+        if(solutionBound != null)
+            condition.add(solutionBound.get(relations, xsdBoolean).get(0).toString());
 
         String domCondition = condition.stream().sorted().collect(joining(" OR "));
 
@@ -385,6 +442,7 @@ public final class SqlMinus extends SqlIntercode
     @Override
     public Set<VirtualTable> getVirtualTables()
     {
+        //NOTE: the condition on the current solution reads no table
         return getVirtualTables(left, right);
     }
 
@@ -419,6 +477,12 @@ public final class SqlMinus extends SqlIntercode
             builder.append(graph);
         }
 
+        if(solutionBound != null)
+        {
+            indentInfo(builder, indent, true);
+            builder.append("sharing the current solution");
+        }
+
         indentChild(builder, indent, false);
         left.generateExplanation(builder, getIndent(indent, false));
 
@@ -448,6 +512,9 @@ public final class SqlMinus extends SqlIntercode
         if(!Objects.equals(graph, imcode.graph))
             return false;
 
+        if(!Objects.equals(solutionBound, imcode.solutionBound))
+            return false;
+
         return true;
     }
 
@@ -455,6 +522,6 @@ public final class SqlMinus extends SqlIntercode
     @Override
     protected int getHashCode()
     {
-        return Objects.hash(left, right, graph);
+        return Objects.hash(left, right, graph, solutionBound);
     }
 }

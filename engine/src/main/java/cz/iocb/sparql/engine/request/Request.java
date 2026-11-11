@@ -34,6 +34,8 @@ import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.error.TranslateMessage;
 import cz.iocb.sparql.engine.imcode.SqlSelect;
 import cz.iocb.sparql.engine.imcode.SqlShared;
+import cz.iocb.sparql.engine.imcode.expression.SqlExists;
+import cz.iocb.sparql.engine.imcode.expression.SqlOuterVariable;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
 import cz.iocb.sparql.engine.mapping.classes.DerivedClass;
 import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeInSegmentClass;
@@ -65,6 +67,7 @@ import cz.iocb.sparql.engine.request.Result.ResultType;
 import cz.iocb.sparql.engine.translator.ServiceException;
 import cz.iocb.sparql.engine.translator.ServiceRuntimeException;
 import cz.iocb.sparql.engine.translator.TranslateVisitor;
+import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
@@ -218,6 +221,22 @@ public class Request implements AutoCloseable
     private static final Pattern commonTableExpressionName = Pattern.compile("\"cte[0-9]+\"");
 
     /**
+     * Name of the alias of the input of a node holding expressions, which the depth of the patterns of expressions
+     * follows (see {@link #getInputTable}).
+     */
+    private static final String inputTableName = "outer";
+
+    /**
+     * Name of the alias of the left side of a left join (see {@link #getLeftInputTable}).
+     */
+    private static final String leftInputTableName = "left";
+
+    /**
+     * Name of the alias of the right side of a left join (see {@link #getRightInputTable}).
+     */
+    private static final String rightInputTableName = "right";
+
+    /**
      * Configuration of the endpoint.
      */
     private final SparqlDatabaseConfiguration config;
@@ -274,9 +293,11 @@ public class Request implements AutoCloseable
     private int expressionDepth = 0;
 
     /**
-     * Depth of the patterns of expressions being translated or optimised (see {@link #getInputTable}).
+     * Bindings of the current solutions of the patterns of expressions being translated or optimised, innermost last,
+     * null for a pattern that has none of its own (see {@link #beginPattern}); their number is the depth of the
+     * patterns (see {@link #getInputTable}).
      */
-    private int patternDepth = 0;
+    private final List<VariableBindings> currentSolutions = new ArrayList<>();
 
     /**
      * Start of the execution in {@link System#nanoTime} units.
@@ -941,11 +962,20 @@ public class Request implements AutoCloseable
 
     /**
      * Begins the translation or the optimisation of a pattern of an expression (EXISTS): the nodes of the pattern lie
-     * one level deeper than the node holding the expression (see {@link #getInputTable}).
+     * one level deeper than the node holding the expression (see {@link #getInputTable}). A pattern evaluated for the
+     * current solution of the solutions its expression is evaluated for gets the bindings of that solution, from which
+     * the expressions of the pattern read its values (see {@link SqlOuterVariable}): the bindings the node holding the
+     * expression provides at the moment, joined with the current solution of the pattern the node itself lies in (see
+     * {@link SqlExists#getCurrentSolution}). A pattern independent of those solutions has no current solution of its
+     * own (null); the current solution of the pattern its expression lies in stays in effect for its nodes, because the
+     * optimisation builds such a pattern from nodes of that pattern (the existence test of a leading OPTIONAL).
+     *
+     * @param solution bindings of the current solution of the pattern, its columns addressed through the aliases of the
+     *            inputs of the nodes providing them, or null for a pattern without a current solution of its own
      */
-    public void beginPattern()
+    public void beginPattern(VariableBindings solution)
     {
-        patternDepth++;
+        currentSolutions.add(solution);
     }
 
 
@@ -954,7 +984,45 @@ public class Request implements AutoCloseable
      */
     public void endPattern()
     {
-        patternDepth--;
+        currentSolutions.removeLast();
+    }
+
+
+    /**
+     * Bindings of the current solution in effect: that of the innermost pattern of an expression being translated or
+     * optimised which has one of its own (see {@link #beginPattern}), or null outside any such pattern.
+     *
+     * @return bindings of the current solution in effect, or null outside any pattern evaluated for a current solution
+     */
+    public VariableBindings getCurrentSolution()
+    {
+        for(int i = currentSolutions.size() - 1; i >= 0; i--)
+            if(currentSolutions.get(i) != null)
+                return currentSolutions.get(i);
+
+        return null;
+    }
+
+
+    /**
+     * True if the SQL refers to the input of a node holding an expression whose pattern is being translated or
+     * optimised (see {@link #getInputTable}), so to a value of a current solution: such SQL has a meaning only at its
+     * place inside the pattern, it can neither be moved into a common table expression nor explained on its own. The
+     * aliases are found in the text, so one spelled in a string constant counts as well, which only keeps the SQL at
+     * its place.
+     *
+     * @param sql the SQL
+     * @return true if the SQL refers to the input of a node holding an expression whose pattern is being translated or
+     *         optimised, false otherwise
+     */
+    public boolean refersToEnclosingInput(String sql)
+    {
+        for(int depth = 0; depth < currentSolutions.size(); depth++)
+            for(String name : List.of(inputTableName, leftInputTableName, rightInputTableName))
+                if(sql.contains("\"" + name + depth + "\"."))
+                    return true;
+
+        return false;
     }
 
 
@@ -968,7 +1036,7 @@ public class Request implements AutoCloseable
      */
     public AliasTable getInputTable()
     {
-        return new AliasTable("outer" + patternDepth);
+        return new AliasTable(inputTableName + currentSolutions.size());
     }
 
 
@@ -980,7 +1048,7 @@ public class Request implements AutoCloseable
      */
     public AliasTable getLeftInputTable()
     {
-        return new AliasTable("left" + patternDepth);
+        return new AliasTable(leftInputTableName + currentSolutions.size());
     }
 
 
@@ -991,7 +1059,7 @@ public class Request implements AutoCloseable
      */
     public AliasTable getRightInputTable()
     {
-        return new AliasTable("right" + patternDepth);
+        return new AliasTable(rightInputTableName + currentSolutions.size());
     }
 
 

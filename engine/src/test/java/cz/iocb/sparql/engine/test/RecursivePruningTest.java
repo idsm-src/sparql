@@ -64,10 +64,12 @@ import cz.iocb.sparql.testing.Database;
  * not the multiplicities (a DISTINCT over the end, a MINUS, an EXISTS), reduces to its initial solutions, since a node
  * has a path iff it has a zero-length path or a first step. An OPTIONAL walk of zero or more steps from nodes the left
  * side binds always is a join, as the zero-length paths match every node, and the left side then seeds it. An EXISTS
- * whose pattern joins the current solution plainly compares the pattern with the solution instead of evaluating it for
- * every solution, so that the database may turn the test into a semi-join. A node that binds the start of a walk
- * without being distinct over it, or the left side of an OPTIONAL or MINUS, is shared as a common table expression, so
- * that its distinct starts seed the walk while it is evaluated once.
+ * compares the solutions of its pattern with the current solution instead of evaluating the pattern for every solution,
+ * so that the database may turn the test into a semi-join, unless the pattern reads the current solution elsewhere: a
+ * filter using its variable, or a walk from a node of the current solution, which starts from that node when no sibling
+ * restricted by a constant seeds it from its other end. A node that binds the start of a walk without being distinct
+ * over it, or the left side of an OPTIONAL or MINUS, is shared as a common table expression, so that its distinct
+ * starts seed the walk while it is evaluated once.
  */
 public class RecursivePruningTest
 {
@@ -80,6 +82,12 @@ public class RecursivePruningTest
      * The node outside the classes of the nodes and the others, held as a whole IRI.
      */
     private static final Iri thing = new Iri("http://other.org/thing");
+
+    /**
+     * Alias through which the pattern of an EXISTS in a filter of the query refers to the current solution: the input
+     * of the filter.
+     */
+    private static final String currentSolution = "\"outer0\"";
 
     /**
      * Configuration mapping the test tables.
@@ -210,6 +218,34 @@ public class RecursivePruningTest
 
             return imcode.optimize(request, false).optimize(request, true).translate(request);
         }
+    }
+
+
+    /**
+     * Returns the SQL code of the pattern of the first EXISTS test in the SQL code, without the condition that compares
+     * its solutions with the current solution.
+     */
+    private static String pattern(String sql)
+    {
+        String head = "EXISTS (SELECT 1 FROM (";
+        int begin = sql.indexOf(head) + head.length();
+        int end = begin;
+
+        for(int depth = 1; depth > 0; end++)
+            depth += sql.charAt(end) == '(' ? 1 : sql.charAt(end) == ')' ? -1 : 0;
+
+        return sql.substring(begin, end - 1);
+    }
+
+
+    /**
+     * Returns the non-recursive term of the first walk in the SQL code, which selects the initial solutions.
+     */
+    private static String walkStart(String sql)
+    {
+        int begin = sql.indexOf("WITH RECURSIVE");
+
+        return sql.substring(begin, sql.indexOf(" UNION SELECT ", begin));
     }
 
 
@@ -661,21 +697,81 @@ public class RecursivePruningTest
         // the label 'zero' seeds the walk rather than the current solution, which the test then compares with
         String sql = translate(query);
         assertThat(sql, containsString("WITH RECURSIVE"));
-        assertThat(sql, not(containsString("LATERAL")));
+        assertThat(pattern(sql), not(containsString(currentSolution)));
     }
 
 
     @Test
-    @DisplayName("an EXISTS whose walk is seeded with the current solution evaluates the pattern laterally")
-    void existsSeededByContextStaysLateral() throws Exception
+    @DisplayName("an EXISTS keeps the walk to a node of the current solution whose start a sibling joins")
+    void existsKeepsWalkWithJoinedStart() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { ?o ex:next+ ?x . ?o ex:label 'two' } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(0)), row(node(1))));
+        // the label 'two' seeds the walk rather than the current solution, which the test then compares with
+        String sql = translate(query);
+        assertThat(sql, containsString("WITH RECURSIVE"));
+        assertThat(pattern(sql), not(containsString(currentSolution)));
+    }
+
+
+    @Test
+    @DisplayName("a walk inside an EXISTS whose end no sibling restricts starts from the node of the current solution")
+    void existsWalkStartsFromCurrentSolution() throws Exception
     {
         String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { ?x ex:next* ?o . ?o ex:label ?q } }";
 
         assertThat(execute(query), containsInAnyOrder(row(node(0)), row(node(1)), row(node(2)), row(node(3))));
-        // the labels of the end are no fewer than the current solution, so the current solution seeds the walk
+        // the labels of the end are no fewer than a whole table, so the walk starts from the current solution
+        assertThat(walkStart(translate(query)), containsString(currentSolution));
+    }
+
+
+    @Test
+    @DisplayName("a walk inside an EXISTS starts from the node of the current solution at its object too")
+    void existsWalkStartsFromObject() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { ?o ex:next+ ?x . ?o ex:label ?q } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(0)), row(node(1))));
+        assertThat(walkStart(translate(query)), containsString(currentSolution));
+    }
+
+
+    @Test
+    @DisplayName("a walk inside an EXISTS between two nodes of the current solution is evaluated by itself")
+    void existsWalkBetweenCurrentNodes() throws Exception
+    {
+        String query = "SELECT ?x ?y WHERE { ?x ex:label ?l . ?y ex:name ?n FILTER EXISTS { ?x ex:next+ ?y } }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(node(1), node(0)), row(node(2), node(0)), row(node(3), node(0))));
+        // the walk is evaluated once, and the test compares both its ends with the current solution
         String sql = translate(query);
         assertThat(sql, containsString("WITH RECURSIVE"));
-        assertThat(sql, containsString("LATERAL"));
+        assertThat(pattern(sql), not(containsString(currentSolution)));
+    }
+
+
+    @Test
+    @DisplayName("a walk inside an EXISTS from a node of the current solution back to it starts from that node")
+    void existsWalkFromCurrentNodeToItself() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { ?x ex:next* ?x . ?x ex:link ?z } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(3))));
+        assertThat(walkStart(translate(query)), containsString(currentSolution));
+    }
+
+
+    @Test
+    @DisplayName("a walk of zero steps inside an EXISTS starts only from a node of the graph")
+    void existsWalkFromNoNode() throws Exception
+    {
+        String query = "SELECT ?x WHERE { VALUES ?x { <http://example.org/n/0> <http://example.org/n/9> } "
+                + "FILTER EXISTS { ?x ex:next* ?o . ?o ex:label ?q } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(0))));
     }
 
 
@@ -687,9 +783,21 @@ public class RecursivePruningTest
 
         assertThat(execute(query), containsInAnyOrder(row(node(0)), row(node(1)), row(node(2)), row(node(3))));
         // the walk from the constant is evaluated once, and the database joins it with the labels
+        assertThat(pattern(translate(query)), not(containsString(currentSolution)));
+    }
+
+
+    @Test
+    @DisplayName("an EXISTS whose walk reduces to its initial solutions compares them with the solution")
+    void existsReducedWalkCompared() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { ?x ex:next+ ?y } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(1)), row(node(2)), row(node(3))));
+        // only the first step matters, which the database joins with the labels
         String sql = translate(query);
-        assertThat(sql, not(containsString("LATERAL")));
-        assertThat(sql, containsString("\"exists\""));
+        assertThat(sql, not(containsString("WITH RECURSIVE")));
+        assertThat(pattern(sql), not(containsString(currentSolution)));
     }
 
 
@@ -700,7 +808,7 @@ public class RecursivePruningTest
         String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER NOT EXISTS { ?x ex:link ?z } }";
 
         assertThat(execute(query), containsInAnyOrder(row(node(0)), row(node(1)), row(node(2))));
-        assertThat(translate(query), not(containsString("LATERAL")));
+        assertThat(pattern(translate(query)), not(containsString(currentSolution)));
     }
 
 
@@ -711,7 +819,7 @@ public class RecursivePruningTest
         String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { { ?x ex:next ?y } UNION { ?x ex:link ?z } } }";
 
         assertThat(execute(query), containsInAnyOrder(row(node(1)), row(node(2)), row(node(3))));
-        assertThat(translate(query), not(containsString("LATERAL")));
+        assertThat(pattern(translate(query)), not(containsString(currentSolution)));
     }
 
 
@@ -722,29 +830,29 @@ public class RecursivePruningTest
         String query = "SELECT ?x WHERE { ?x ex:label ?l OPTIONAL { ?x ex:next ?p } FILTER EXISTS { ?p ex:label ?q } }";
 
         assertThat(execute(query), containsInAnyOrder(row(node(0)), row(node(1)), row(node(2)), row(node(3))));
-        assertThat(translate(query), not(containsString("LATERAL")));
+        assertThat(pattern(translate(query)), not(containsString(currentSolution)));
     }
 
 
     @Test
-    @DisplayName("a pattern using a variable of the solution outside its join is evaluated laterally")
-    void existsFilterOnSolutionStaysLateral() throws Exception
+    @DisplayName("a filter of the pattern reads a variable of the solution from the input of the filter of the EXISTS")
+    void existsFilterReadsCurrentSolution() throws Exception
     {
         String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { ?x ex:next ?y FILTER(?l != 'one') } }";
 
         assertThat(execute(query), containsInAnyOrder(row(node(2)), row(node(3))));
-        assertThat(translate(query), containsString("LATERAL"));
+        assertThat(pattern(translate(query)), containsString(currentSolution + ".\"label\""));
     }
 
 
     @Test
-    @DisplayName("a pattern whose nested group holds the current solution too is evaluated laterally")
-    void existsNestedGroupStaysLateral() throws Exception
+    @DisplayName("a pattern whose MINUS shares only the variables of the solution is still compared with the solution")
+    void existsMinusCompared() throws Exception
     {
         String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { ?x ex:next ?y MINUS { ?y ex:link ?z } } }";
 
         assertThat(execute(query), containsInAnyOrder(row(node(1)), row(node(2)), row(node(3))));
-        assertThat(translate(query), containsString("LATERAL"));
+        assertThat(pattern(translate(query)), not(containsString(currentSolution)));
     }
 
 

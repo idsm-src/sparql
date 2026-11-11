@@ -35,11 +35,11 @@ import cz.iocb.sparql.testing.Database;
 
 
 /**
- * EXISTS patterns whose nested groups (the pattern of a GRAPH clause, a UNION branch, the right side of an OPTIONAL or
- * a MINUS) start from the context solution again, so that the join of the pattern holds the context solution more than
- * once, tested for a variable of several classes (IRIs of two user classes and string literals) of which the pattern
- * can join only one. The context solution leaves the classes the pattern cannot join without columns, so its copies
- * must not be joined with each other in those classes.
+ * EXISTS patterns with nested groups (the pattern of a GRAPH clause, a UNION branch, the right side of an OPTIONAL or a
+ * MINUS), each of which is evaluated for the current solution too, tested for a variable of several classes (IRIs of
+ * two user classes and string literals) of which the pattern can join only one. The pattern is optimised for the
+ * classes it can join, so a class it cannot join may be left without columns, which neither the comparison with the
+ * current solution nor the nested groups may read.
  */
 public class ExistsNestedGroupTest
 {

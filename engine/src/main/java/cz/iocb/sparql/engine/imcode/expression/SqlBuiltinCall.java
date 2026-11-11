@@ -713,9 +713,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 Set<List<ResourceClass>> set = new HashSet<>();
                 Map<ResourceClass, Set<List<ResourceClass>>> map = Map.of(xsdBoolean, set);
 
-                // a class without columns is needed by no parent: a detached EXISTS pattern leaves a variable shared
-                // with the current solution so in the classes the current solution never binds it in, whose solutions
-                // the comparison with the current solution rejects anyway
+                // a class without columns is needed by no parent: an EXISTS pattern leaves a variable shared with the
+                // current solution so in the classes the current solution never binds it in, whose solutions the
+                // comparison with the current solution rejects anyway
                 for(ResourceClass leftClass : left.getMappings().keySet())
                     for(ResourceClass rightClass : right.getMappings().keySet())
                         if(left.getMappings().get(leftClass) != null && right.getMappings().get(rightClass) != null

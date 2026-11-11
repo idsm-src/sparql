@@ -1169,6 +1169,46 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
     /**
+     * Bindings of the solution extending two compatible solutions whose columns are addressed already (through the
+     * aliases of the inputs providing them): the bindings of the join of the two (see
+     * {@link #getJoinVariableBindings(Request, List, List, Restrictions, Map)}) referring to the addressed columns
+     * themselves instead of output columns of a join, in the classes that have columns. When the two solutions can
+     * never be compatible, the first one is returned alone.
+     *
+     * @param request the current request
+     * @param solution bindings of a solution
+     * @param other bindings of the solution the first one is extended with
+     * @return bindings of the solution extending both solutions
+     */
+    public static VariableBindings getExtendedSolution(Request request, VariableBindings solution,
+            VariableBindings other)
+    {
+        Map<Column, Column> map = new HashMap<>();
+        VariableBindings joined = getJoinVariableBindings(request, solution, other, null, null, null, map);
+
+        if(joined.getVariables().isEmpty())
+            return solution;
+
+        VariableBindings result = new VariableBindings();
+
+        for(VariableBinding binding : joined.getValues())
+        {
+            VariableBinding addressed = new VariableBinding(binding.getVariable(), binding.canBeNull());
+
+            for(Entry<ResourceClass, List<Column>> entry : binding.getMappings().entrySet())
+                if(entry.getValue() != null)
+                    addressed.addMapping(entry.getKey(),
+                            entry.getValue().stream().map(c -> map.getOrDefault(c, c)).toList());
+
+            if(addressed.hasMapping())
+                result.add(addressed);
+        }
+
+        return result;
+    }
+
+
+    /**
      * True if the shared variables need no join condition: all are always bound to identical constant columns.
      *
      * @param relations declarations which unrelated user IRI classes may overlap

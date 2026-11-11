@@ -39,16 +39,21 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 /**
- * Natural join of several children on their shared variables. Optimisation flattens nested joins (holding the context
- * solution of an EXISTS pattern once, see {@link #mergeContextSolutions}), merges accesses to the same table or along
- * keys ({@link SqlTableAccess}), distributes the join over unions (a leading OPTIONAL sharing a variable with another
- * child being turned into one first, see {@link SqlLeftJoin#toUnion}), seeds the walks of property paths with the
- * siblings that bind their start (see {@link SqlRecursive#seed}; a walk binding the start without being distinct over
- * it is shared, so that its distinct values seed the other walk, see {@link SqlShared}), evaluates nondeterministic
- * children last, and decides the evaluation of SERVICE stubs by row estimates when service reordering is enabled.
+ * Natural join of several children on their shared variables. Optimisation flattens nested joins, merges accesses to
+ * the same table or along keys ({@link SqlTableAccess}), distributes the join over unions (a leading OPTIONAL sharing a
+ * variable with another child being turned into one first, see {@link SqlLeftJoin#toUnion}), seeds the walks of
+ * property paths with the siblings that bind their start (see {@link SqlRecursive#seed}; a walk binding the start
+ * without being distinct over it is shared, so that its distinct values seed the other walk, see {@link SqlShared}),
+ * evaluates nondeterministic children last, and decides the evaluation of SERVICE stubs by row estimates when service
+ * reordering is enabled.
  */
 public final class SqlJoin extends SqlIntercode
 {
+    /**
+     * Rank of the seeds of a walk that are expected to have as many rows as a whole table (see {@link #seedRank}).
+     */
+    private static final int wholeTableRank = 2;
+
     /**
      * Alias of each child.
      */
@@ -126,8 +131,6 @@ public final class SqlJoin extends SqlIntercode
      */
     protected static SqlIntercode join(Request request, List<SqlIntercode> childs, Restrictions restrictions)
     {
-        childs = mergeContextSolutions(childs);
-
         List<AliasTable> tables = IntStream.range(0, childs.size()).mapToObj(i -> new AliasTable("tab" + i)).toList();
 
         Map<Column, Column> columnMap = new HashMap<>();
@@ -356,47 +359,7 @@ public final class SqlJoin extends SqlIntercode
                 output.add(child);
         }
 
-        return mergeContextSolutions(output);
-    }
-
-
-    /**
-     * Merges the context solutions of each EXISTS pattern among the children into one, at the position of the first of
-     * them (see {@link SqlContextSolution#merge}). Every group graph pattern inside an EXISTS pattern starts from the
-     * context solution, so the join of a group with a group nested in it (the pattern of a GRAPH clause, a nested
-     * group) holds it twice. The copies must not stay apart: the restrictions of a child are derived from the other
-     * children (see {@link #getRestrictions}), among which the child itself is not counted, so each copy leaves without
-     * columns the classes that only the other copy could join, and the joins of the copies with each other (the
-     * combinations of {@link #expandJoin}, the join conditions) would then read those columns.
-     *
-     * @param childs the child nodes
-     * @return the child nodes holding a single context solution of each EXISTS pattern, or the given list when they
-     *         hold no copies
-     */
-    private static List<SqlIntercode> mergeContextSolutions(List<SqlIntercode> childs)
-    {
-        List<SqlIntercode> result = new ArrayList<>(childs.size());
-        Map<AliasTable, Integer> positions = new HashMap<>();
-        boolean merged = false;
-
-        for(SqlIntercode child : childs)
-        {
-            if(child instanceof SqlContextSolution context)
-            {
-                Integer position = positions.putIfAbsent(context.getLateralTable(), result.size());
-
-                if(position != null)
-                {
-                    result.set(position, ((SqlContextSolution) result.get(position)).merge(context));
-                    merged = true;
-                    continue;
-                }
-            }
-
-            result.add(child);
-        }
-
-        return merged ? result : childs;
+        return output;
     }
 
 
@@ -1150,9 +1113,11 @@ public final class SqlJoin extends SqlIntercode
      * start variable always and distinct solutions over it, without binding the end variable, or those binding the end
      * variable so, the walk being turned then when it may be (see {@link SqlRecursive#canSeedFromEnd}); when both ends
      * have such siblings, the end whose seeds are expected to be the fewer wins (see {@link #seedRank}, and the row
-     * estimates of the database on a tie, see {@link #fewerSeeds}), the start otherwise. The seeds leave the join,
-     * carried through the recursion instead. One walk is seeded per call; the optimisation loop comes back for the
-     * others.
+     * estimates of the database on a tie, see {@link #fewerSeeds}), the start otherwise. A walk that starts from a node
+     * of the current solution of an EXISTS pattern (see {@link SqlRecursive#startsFromValues}) is seeded only from its
+     * end, by siblings expected to be fewer than a whole table; otherwise it keeps starting from that node. The seeds
+     * leave the join, carried through the recursion instead. One walk is seeded per call; the optimisation loop comes
+     * back for the others.
      *
      * @param request the current request
      * @param childs the child nodes
@@ -1182,10 +1147,26 @@ public final class SqlJoin extends SqlIntercode
                     && !walk.canSeedFromEnd(request, endSeeds.stream().map(childs::get).toList(), walkRestrictions))
                 endSeeds = List.of();
 
-            boolean fromEnd = !endSeeds.isEmpty()
-                    && (seeds.isEmpty() || seedRank(childs, endSeeds) < seedRank(childs, seeds)
-                            || seedRank(childs, endSeeds) == seedRank(childs, seeds)
-                                    && fewerSeeds(request, childs, endSeeds, endVar, seeds, beginVar));
+            boolean fromEnd;
+
+            if(walk.startsFromValues())
+            {
+                // the walk starts from a single node already, the node the current solution of an EXISTS pattern gives,
+                // so its siblings seed it only from its end, when they are expected to be fewer than a whole table and
+                // than the siblings binding its start
+                fromEnd = !endSeeds.isEmpty() && seedRank(childs, endSeeds) < wholeTableRank
+                        && (seeds.isEmpty() || seedRank(childs, endSeeds) < seedRank(childs, seeds));
+
+                if(!fromEnd)
+                    continue;
+            }
+            else
+            {
+                fromEnd = !endSeeds.isEmpty()
+                        && (seeds.isEmpty() || seedRank(childs, endSeeds) < seedRank(childs, seeds)
+                                || seedRank(childs, endSeeds) == seedRank(childs, seeds)
+                                        && fewerSeeds(request, childs, endSeeds, endVar, seeds, beginVar));
+            }
 
             if(fromEnd)
                 seeds = endSeeds;
@@ -1280,8 +1261,9 @@ public final class SqlJoin extends SqlIntercode
         SqlIntercode endJoin = join(request, endSeeds.stream().map(childs::get).toList());
         SqlIntercode beginJoin = join(request, beginSeeds.stream().map(childs::get).toList());
 
-        if(endJoin.translate(request).contains("\"lateral") || beginJoin.translate(request).contains("\"lateral"))
-            return false;
+        for(String sql : List.of(endJoin.translate(request), beginJoin.translate(request)))
+            if(sql.contains("\"lateral") || request.refersToEnclosingInput(sql))
+                return false;
 
         Estimator estimator = new Estimator(request);
 
@@ -1297,9 +1279,9 @@ public final class SqlJoin extends SqlIntercode
 
     /**
      * How many rows the seeds are expected to have, roughly, without asking the database: 0 when one of them is inline
-     * data, 1 when one of them is a table access restricted by a constant, 2 otherwise (whole tables, or anything
-     * else); the distinct values read from shared solutions (see {@link SqlShared#seed}) count as the solutions they
-     * are read from. Joined together, the seeds have no more rows than the smallest of them.
+     * data, 1 when one of them is a table access restricted by a constant, {@link #wholeTableRank} otherwise (whole
+     * tables, or anything else); the distinct values read from shared solutions (see {@link SqlShared#seed}) count as
+     * the solutions they are read from. Joined together, the seeds have no more rows than the smallest of them.
      *
      * @param childs the child nodes
      * @param seeds indexes of the seeds
@@ -1307,7 +1289,7 @@ public final class SqlJoin extends SqlIntercode
      */
     private static int seedRank(List<SqlIntercode> childs, List<Integer> seeds)
     {
-        int rank = 2;
+        int rank = wholeTableRank;
 
         for(int i : seeds)
         {
@@ -1435,7 +1417,6 @@ public final class SqlJoin extends SqlIntercode
                     List<SqlIntercode> merged = new ArrayList<>();
                     merged.addAll(e);
                     merged.addAll(r);
-                    merged = mergeContextSolutions(merged);
 
                     if(isJoinable(relations, merged))
                         subresult.add(merged);

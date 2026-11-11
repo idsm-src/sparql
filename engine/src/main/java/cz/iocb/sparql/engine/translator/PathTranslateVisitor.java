@@ -286,10 +286,35 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         Variable endVar = (object instanceof Variable var && !object.equals(subject)) ? var :
                 parent.createVariable(variablePrefix);
 
+
+        // inside an EXISTS pattern, a walk between two variables of which the current solution of the pattern binds one
+        // starts directly from the node that solution gives (see SqlRecursive); from the object, the walk goes against
+        // the path, so its step leads from the new node to the current one
+        Map<Variable, SqlExpressionIntercode> objectStart = beginVar != null && cndTerm == null ?
+                parent.getWalkStart(endVar, beginVar, graphVar) : Map.of();
+
+        if(!objectStart.isEmpty())
+        {
+            SqlIntercode init = repeatedPath.getKind() == Kind.ZeroOrMore ? translateZeroPath(endVar, beginVar) :
+                    visitElement(repeatedPath.getChild(), beginVar, endVar);
+
+            SqlIntercode next = visitElement(repeatedPath.getChild(), beginVar, joinVar);
+
+            Variable reverseJoinVar = parent.createVariable(variablePrefix);
+            SqlIntercode reverseNext = visitElement(repeatedPath.getChild(), reverseJoinVar, endVar);
+
+            return SqlRecursive.create(request, init, next, endVar, joinVar, beginVar, graphVar, reverseNext,
+                    reverseJoinVar, objectStart);
+        }
+
+
         SqlIntercode init = repeatedPath.getKind() == Kind.ZeroOrMore ? translateZeroPath(subject, endVar) :
                 visitElement(repeatedPath.getChild(), subject, endVar);
 
         SqlIntercode next = visitElement(repeatedPath.getChild(), joinVar, endVar);
+
+        Map<Variable, SqlExpressionIntercode> start = beginVar != null ?
+                parent.getWalkStart(beginVar, endVar, graphVar) : Map.of();
 
         SqlIntercode intercode;
 
@@ -301,7 +326,12 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             SqlIntercode reverseNext = visitElement(repeatedPath.getChild(), beginVar, reverseJoinVar);
 
             intercode = SqlRecursive.create(request, init, next, beginVar, joinVar, endVar, graphVar, reverseNext,
-                    reverseJoinVar);
+                    reverseJoinVar, start);
+        }
+        else if(!start.isEmpty())
+        {
+            intercode = SqlRecursive.create(request, init, next, beginVar, joinVar, endVar, graphVar, null, null,
+                    start);
         }
         else
         {

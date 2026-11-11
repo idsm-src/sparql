@@ -533,4 +533,101 @@ public class ExistsScopeTest
                   FILTER NOT EXISTS { }
                 }"""), empty());
     }
+
+
+    @Test
+    @DisplayName("a nested EXISTS joins the solutions of both the enclosing pattern and the current solution")
+    void nestedJoin() throws Exception
+    {
+        assertThat(execute("""
+                SELECT ?x ?n WHERE {
+                  ?x :p ?n
+                  FILTER EXISTS { ?x :r ?y FILTER EXISTS { ?y :p ?k . ?x :q ?n } }
+                }"""), containsInAnyOrder(row(a, integer(1))));
+    }
+
+
+    @Test
+    @DisplayName("an OPTIONAL starting the EXISTS pattern that has no match leaves the current solution")
+    void leadingOptional() throws Exception
+    {
+        assertThat(execute("""
+                SELECT ?x ?n WHERE {
+                  ?x :p ?n
+                  FILTER EXISTS { OPTIONAL { ?x :r ?y } ?x :q ?m FILTER(!bound(?y) || ?m > 1) }
+                }"""), containsInAnyOrder(row(a, integer(1)), row(b, integer(3))));
+    }
+
+
+    @Test
+    @DisplayName("a union inside NOT EXISTS binds different variables of the current solution in its branches")
+    void unionOfDifferentVariables() throws Exception
+    {
+        assertThat(execute("""
+                SELECT ?x ?n WHERE {
+                  ?x :p ?n
+                  FILTER NOT EXISTS { { ?x :r ?y } UNION { ?z :q ?n } }
+                }"""), containsInAnyOrder(row(b, integer(3))));
+    }
+
+
+    @Test
+    @DisplayName("an aggregate of a sub-select inside EXISTS counts a variable only the current solution binds")
+    void aggregateOfCurrentVariable() throws Exception
+    {
+        assertThat(execute("""
+                SELECT ?x ?n WHERE {
+                  ?x :p ?n
+                  FILTER EXISTS { { SELECT (COUNT(?n) AS ?c) WHERE { ?x :q ?m } } FILTER(?c = 2) }
+                }"""), containsInAnyOrder(row(a, integer(1)), row(b, integer(3))));
+    }
+
+
+    @Test
+    @DisplayName("a select expression of a sub-select inside EXISTS reads a variable only the current solution binds")
+    void selectExpressionOfCurrentVariable() throws Exception
+    {
+        assertThat(execute("""
+                SELECT ?x ?n WHERE {
+                  ?x :p ?n
+                  FILTER EXISTS { { SELECT (?m + ?n AS ?k) WHERE { ?x :q ?m } } FILTER(?k = 3) }
+                }"""), containsInAnyOrder(row(a, integer(1))));
+    }
+
+
+    @Test
+    @DisplayName("a select expression of a sub-select inside EXISTS assigned to a variable of the current solution "
+            + "has to agree with its value")
+    void selectExpressionAssignedToCurrentVariable() throws Exception
+    {
+        assertThat(execute("""
+                SELECT ?x ?n WHERE {
+                  ?x :p ?n
+                  FILTER EXISTS { SELECT (?m - 1 AS ?n) WHERE { ?x :q ?m } }
+                }"""), containsInAnyOrder(row(a, integer(1)), row(b, integer(3))));
+    }
+
+
+    @Test
+    @DisplayName("a HAVING clause of a sub-select inside EXISTS aggregates a variable only the current solution binds")
+    void havingOfCurrentVariable() throws Exception
+    {
+        assertThat(execute("""
+                SELECT ?x ?n WHERE {
+                  ?x :p ?n
+                  FILTER EXISTS { SELECT ?x WHERE { ?x :q ?m } GROUP BY ?x HAVING(SUM(?m) > MAX(?n) + 5) }
+                }"""), containsInAnyOrder(row(b, integer(3))));
+    }
+
+
+    @Test
+    @DisplayName("an EXISTS in the HAVING clause of a sub-select inside EXISTS sees the group solution")
+    void existsInHavingInsideExists() throws Exception
+    {
+        assertThat(execute("""
+                SELECT ?x ?n WHERE {
+                  ?x :p ?n
+                  FILTER EXISTS { SELECT ?x WHERE { ?x :q ?m } GROUP BY ?x HAVING EXISTS { ?x :r ?y } }
+                }"""), containsInAnyOrder(row(a, integer(1))));
+    }
 }

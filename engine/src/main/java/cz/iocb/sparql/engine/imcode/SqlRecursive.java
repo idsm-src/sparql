@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,9 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
+import cz.iocb.sparql.engine.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -42,10 +46,18 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * and whose variables it delivers in place of the join. When the parent needs neither an end of the walk nor the
  * multiplicities, the walk reduces to its initial solutions, which reach the same nodes (see {@link #optimize}), and
  * since the zero-length paths match every node, an OPTIONAL walk of zero or more steps from nodes the left side binds
- * always is a join (see {@link #matchesEverySolutionOf}).
+ * always is a join (see {@link #matchesEverySolutionOf}). A walk inside an EXISTS pattern may start directly from the
+ * value of an expression, the node the current solution of the pattern gives (see {@link #start}): the recursion then
+ * takes only the initial solutions that start in the value, unless siblings expected to be fewer seed the walk from its
+ * other end.
  */
 public final class SqlRecursive extends SqlIntercode
 {
+    /**
+     * Alias of the initial solutions in the non-recursive term.
+     */
+    private static final AliasTable initTable = new AliasTable("tab");
+
     /**
      * Alias of the recursion in the recursive term.
      */
@@ -150,6 +162,20 @@ public final class SqlRecursive extends SqlIntercode
      */
     public final boolean seeded;
 
+    /**
+     * Values the walk starts from, by the variables of the initial solutions they are the values of (the start
+     * variable, and the graph variable when the walk stays in one graph): expressions over the current solution of the
+     * EXISTS pattern the walk lies in, which every solution of the walk extends. The recursion takes only the initial
+     * solutions compatible with the values, so it enumerates the paths from the node the current solution gives instead
+     * of the paths from all nodes, of which the pattern would keep the same ones. The values are read only when the
+     * recursion is evaluated: a walk reduced to its initial solutions (see {@link #optimize}) leaves the comparison
+     * with the current solution to the pattern, which the database then evaluates once for all current solutions, and
+     * so does a walk its siblings seed from its other end (see {@link #seed}), which gives the values up. Such a walk
+     * is not turned by the restrictions of its parent, because it starts from a single node already. Empty when the
+     * walk starts from all its initial solutions.
+     */
+    private final Map<Variable, SqlExpressionIntercode> start;
+
 
     /**
      * Creates the node.
@@ -169,13 +195,16 @@ public final class SqlRecursive extends SqlIntercode
      * @param segmentClasses classes of the start variable the initial solutions of a segment are restricted to, or null
      * @param carried bindings of the variables of the initial solutions carried through the recursion in its columns
      * @param seeded whether the initial solutions are seeds taken from the siblings
+     * @param start values the walk starts from, by the variables of the initial solutions
      */
     protected SqlRecursive(VariableBindings bindings, SqlIntercode init, SqlIntercode next, VariableBinding endBinding,
             Variable joinVar, Variable beginVar, List<Column> iv, List<Column> ev, Variable graphVar,
             SqlIntercode reverseNext, Variable reverseJoinVar, SqlIntercode reverseInit,
-            Set<ResourceClass> segmentClasses, VariableBindings carried, boolean seeded)
+            Set<ResourceClass> segmentClasses, VariableBindings carried, boolean seeded,
+            Map<Variable, SqlExpressionIntercode> start)
     {
-        super(bindings, init.isDeterministic() && next.isDeterministic());
+        super(bindings, init.isDeterministic() && next.isDeterministic()
+                && start.values().stream().allMatch(SqlExpressionIntercode::isDeterministic));
         this.init = init;
         this.next = next;
         this.endBinding = endBinding;
@@ -190,6 +219,7 @@ public final class SqlRecursive extends SqlIntercode
         this.segmentClasses = segmentClasses;
         this.carried = carried;
         this.seeded = seeded;
+        this.start = start;
     }
 
 
@@ -210,13 +240,17 @@ public final class SqlRecursive extends SqlIntercode
     public static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, Variable beginVar,
             Variable joinVar, Variable endVar, Variable graphVar)
     {
-        return create(request, init, next, beginVar, joinVar, endVar, graphVar, null, null, null, null, null, false);
+        return create(request, init, next, beginVar, joinVar, endVar, graphVar, null, null, null, null, null, false,
+                Map.of());
     }
 
 
     /**
      * Recursive closure of {@code next} started from {@code init} between two variables, which may also be walked the
-     * other way round by {@code reverseNext} (see {@link #reverseNext}).
+     * other way round by {@code reverseNext} (see {@link #reverseNext}), and which may start directly from the values
+     * of expressions (see {@link #start}): the initial solutions, which start in all nodes, are then restricted to
+     * those compatible with the values when the recursion is evaluated, and only the siblings of the walk make it walk
+     * the other way round (see {@link #seed}).
      *
      * @param request the current request
      * @param init the initial solutions
@@ -225,15 +259,18 @@ public final class SqlRecursive extends SqlIntercode
      * @param joinVar variable of the step bound to the current end node
      * @param endVar the end variable
      * @param graphVar the graph variable, or null
-     * @param reverseNext the step of the walk in the other direction
-     * @param reverseJoinVar variable of the reverse step bound to the node it reaches
+     * @param reverseNext the step of the walk in the other direction, or null when the walk cannot be turned
+     * @param reverseJoinVar variable of the reverse step bound to the node it reaches, or null
+     * @param start values the walk starts from, by the variables of the initial solutions (the start variable, and
+     *            possibly the graph variable); empty when the walk starts from all its initial solutions
      * @return recursive closure of {@code next} started from {@code init}
      */
     public static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, Variable beginVar,
-            Variable joinVar, Variable endVar, Variable graphVar, SqlIntercode reverseNext, Variable reverseJoinVar)
+            Variable joinVar, Variable endVar, Variable graphVar, SqlIntercode reverseNext, Variable reverseJoinVar,
+            Map<Variable, SqlExpressionIntercode> start)
     {
-        return create(request, init, next, beginVar, joinVar, endVar, graphVar, null, reverseNext, reverseJoinVar, init,
-                null, false);
+        return create(request, init, next, beginVar, joinVar, endVar, graphVar, null, reverseNext, reverseJoinVar,
+                reverseNext != null ? init : null, null, false, start);
     }
 
 
@@ -256,12 +293,14 @@ public final class SqlRecursive extends SqlIntercode
      * @param reverseInit the initial solutions of the walk turned the other way round, or null
      * @param segmentClasses classes of the start variable the initial solutions of a segment are restricted to, or null
      * @param seeded whether the initial solutions are seeds taken from the siblings
+     * @param start values the walk starts from, by the variables of the initial solutions (see {@link #start})
      * @return recursion exposing only what the parent needs; the carried variables get fresh output columns; no
      *         solution when the initial solutions do not bind the end variable
      */
     protected static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, Variable beginVar,
             Variable joinVar, Variable endVar, Variable graphVar, Restrictions restrictions, SqlIntercode reverseNext,
-            Variable reverseJoinVar, SqlIntercode reverseInit, Set<ResourceClass> segmentClasses, boolean seeded)
+            Variable reverseJoinVar, SqlIntercode reverseInit, Set<ResourceClass> segmentClasses, boolean seeded,
+            Map<Variable, SqlExpressionIntercode> start)
     {
         // initial solutions that do not bind the end variable have no solution, so no path starts
         if(init.getVariableBindings().get(endVar) == null)
@@ -323,7 +362,7 @@ public final class SqlRecursive extends SqlIntercode
 
         return new SqlRecursive(bindings.restrict(relations, restrictions), init, next, endBinding, joinVar, beginVar,
                 innerColumns, outerColumns, graphVar, reverseNext, reverseJoinVar, reverseInit, segmentClasses, carried,
-                seeded);
+                seeded, start);
     }
 
 
@@ -342,7 +381,8 @@ public final class SqlRecursive extends SqlIntercode
      * with the initial solutions as a whole, so that they are not repeated. A walk seeded from its end is turned,
      * starting from the initial solutions it was created with (see {@link #turnedInit}), which only the parent
      * restricts at the new end. The seeded walk is not turned any more, because the carried variables belong to its
-     * start.
+     * start, and it starts from the seeds alone: the values the walk would start from otherwise (see {@link #start})
+     * are given up, the pattern the walk lies in comparing its solutions with the current solution.
      *
      * @param request the current request
      * @param seeds the siblings seeding the walk, every one binding the start variable always and distinct over it (or
@@ -367,10 +407,10 @@ public final class SqlRecursive extends SqlIntercode
 
         if(fromEnd)
             return create(request, seeded, reverseNext, startVar, reverseJoinVar, stopVar, graphVar, seedRestrictions,
-                    null, null, null, null, true);
+                    null, null, null, null, true, Map.of());
 
         return create(request, seeded, next, startVar, joinVar, stopVar, graphVar, seedRestrictions, null, null, null,
-                null, true);
+                null, true, Map.of());
     }
 
 
@@ -386,6 +426,18 @@ public final class SqlRecursive extends SqlIntercode
     protected boolean canSeedFromEnd(Request request, List<SqlIntercode> seeds, Restrictions restrictions)
     {
         return canTurn(restrictions) && turnedInit(request, seeds) != null;
+    }
+
+
+    /**
+     * True if the walk starts directly from the values of expressions (see {@link #start}), so from a single node: its
+     * siblings then seed it only from its other end, and only when they are expected to be fewer than anything else.
+     *
+     * @return true if the walk starts from the values of expressions, false otherwise
+     */
+    protected boolean startsFromValues()
+    {
+        return !start.isEmpty();
     }
 
 
@@ -634,7 +686,8 @@ public final class SqlRecursive extends SqlIntercode
      */
     protected boolean matchesEverySolutionOf(SqlIntercode node)
     {
-        if(beginVar == null)
+        // a walk starting from the values of expressions has no path from the other nodes
+        if(beginVar == null || !start.isEmpty())
             return false;
 
         Variable endVar = endBinding.getVariable();
@@ -764,8 +817,9 @@ public final class SqlRecursive extends SqlIntercode
         // when the parent needs neither an end of the walk nor the multiplicities (a DISTINCT over the other end, the
         // right side of a MINUS, an EXISTS pattern), only the existence of a path from or to a node matters, and a node
         // has a path iff it has an initial solution (a zero-length path, or a first step, whose last step is one too),
-        // so the walk reduces to its initial solutions; the begin may be left out only when the initial solutions
-        // start anywhere, which those of a seeded walk do not
+        // so the walk reduces to its initial solutions; the begin may be left out only when the initial solutions start
+        // anywhere, which those of a seeded walk do not; the initial solutions of a walk starting from the values of
+        // expressions are left as they are, compared with the current solution by the pattern they lie in
         if(reduced && (!restrictions.containsVar(endBinding.getVariable())
                 || reverseNext != null && !restrictions.containsVar(beginVar)))
             return init.optimize(request, restrictions, true, evalServices);
@@ -774,11 +828,12 @@ public final class SqlRecursive extends SqlIntercode
 
         // a walk between two variables starts from the end the parent restricts more: the same step walked the other
         // way round, with the end variable for the start and the start variable for the end, from the initial solutions
-        // the walk was created with, as the restrictions of the start no longer apply to them
-        if(canTurn(restrictions) && startsBetterFromEnd(restrictions))
+        // the walk was created with, as the restrictions of the start no longer apply to them; a walk starting from the
+        // values of expressions starts from a single node already
+        if(start.isEmpty() && canTurn(restrictions) && startsBetterFromEnd(restrictions))
             return create(request, reverseInit, reverseNext, endBinding.getVariable(), reverseJoinVar, beginVar,
-                    graphVar, restrictions, next, joinVar, reverseInit, null, seeded).optimize(request, restrictions,
-                            reduced, evalServices);
+                    graphVar, restrictions, next, joinVar, reverseInit, null, seeded, Map.of()).optimize(request,
+                            restrictions, reduced, evalServices);
 
         Variable endVar = endBinding.getVariable();
 
@@ -799,12 +854,26 @@ public final class SqlRecursive extends SqlIntercode
         if(beginVar != null)
             childRestrictions.add(beginVar);
 
-        SqlIntercode initOpt = init.optimize(request, childRestrictions, reduced, evalServices);
+        // the values the walk starts from are read from the current solution as it is now, and the initial solutions
+        // are optimised as a join with them would optimise them
+        Map<Variable, SqlExpressionIntercode> optStart = optimizeStart(request, evalServices);
+        VariableBindings startBindings = getStartBindings(optStart);
+
+        Restrictions initRestrictions = optStart.isEmpty() ? childRestrictions :
+                getJoinRestrictions(relations, init.getVariableBindings(), startBindings, childRestrictions, true);
+
+        SqlIntercode initOpt = init.optimize(request, initRestrictions, reduced, evalServices);
         SqlIntercode nextOpt = next.optimize(request, childRestrictions, reduced, evalServices);
 
 
         if(initOpt.equals(SqlNoSolution.get()))
             return SqlNoSolution.get();
+
+        // no path starts when no initial solution can be compatible with the values the walk starts from
+        for(VariableBindingPair pair : VariableBindingPair.getPairs(relations, startBindings,
+                initOpt.getVariableBindings()))
+            if(!pair.isJoinable())
+                return SqlNoSolution.get();
 
         if(beginVar != null && initOpt instanceof SqlUnion union)
         {
@@ -819,7 +888,7 @@ public final class SqlRecursive extends SqlIntercode
                 for(SqlIntercode child : segs)
                     childs.add(create(request, child, nextOpt, beginVar, joinVar, endBinding.getVariable(), graphVar,
                             restrictions, reverseNext, reverseJoinVar, reverseInit,
-                            Set.copyOf(child.getVariable(beginVar).getClasses()), seeded));
+                            Set.copyOf(child.getVariable(beginVar).getClasses()), seeded, optStart));
 
                 // the segments are walks, which care about the multiplicities as much as their parent does
                 return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
@@ -879,11 +948,56 @@ public final class SqlRecursive extends SqlIntercode
             return SqlDistinct.create(request, initOpt, initOpt.getVariableBindings().getVariables());
 
 
-        if(initOpt == init && nextOpt == next && restrictions.isOptimized(relations, bindings))
+        if(initOpt == init && nextOpt == next && optStart == start && restrictions.isOptimized(relations, bindings))
             return this;
 
         return create(request, initOpt, nextOpt, beginVar, joinVar, endBinding.getVariable(), graphVar, restrictions,
-                reverseNext, reverseJoinVar, reverseInit, segmentClasses, seeded);
+                reverseNext, reverseJoinVar, reverseInit, segmentClasses, seeded, optStart);
+    }
+
+
+    /**
+     * The values the walk starts from as the current solution provides them now (see {@link #start}); a value the
+     * current solution does not bind is left out, so the walk starts from every node then.
+     *
+     * @param request the current request
+     * @param evalServices whether SERVICE stubs are evaluated
+     * @return the values the walk starts from, by the variables of the initial solutions; the map of this walk when
+     *         nothing has changed
+     */
+    private Map<Variable, SqlExpressionIntercode> optimizeStart(Request request, boolean evalServices)
+    {
+        Map<Variable, SqlExpressionIntercode> result = new LinkedHashMap<>();
+
+        for(Entry<Variable, SqlExpressionIntercode> entry : start.entrySet())
+        {
+            SqlExpressionIntercode value = entry.getValue().optimize(request, new VariableBindings(), Restriction.ALL,
+                    evalServices);
+
+            if(!value.equals(SqlNull.get()))
+                result.put(entry.getKey(), value);
+        }
+
+        return result.equals(start) ? start : result;
+    }
+
+
+    /**
+     * The values a walk starts from as bindings of the variables of the initial solutions, which the initial solutions
+     * are joined with.
+     *
+     * @param start values the walk starts from, by the variables of the initial solutions
+     * @return bindings of the variables to the values
+     */
+    private static VariableBindings getStartBindings(Map<Variable, SqlExpressionIntercode> start)
+    {
+        VariableBindings bindings = new VariableBindings();
+
+        for(Entry<Variable, SqlExpressionIntercode> entry : start.entrySet())
+            bindings.add(
+                    new VariableBinding(entry.getKey(), entry.getValue().getMappings(), entry.getValue().canBeNull()));
+
+        return bindings;
     }
 
 
@@ -1010,7 +1124,19 @@ public final class SqlRecursive extends SqlIntercode
 
         builder.append(" FROM (");
         builder.append(init.translate(request));
-        builder.append(") AS tab");
+        builder.append(") AS ");
+        builder.append(initTable);
+
+        // a walk starting from the values of expressions takes only the initial solutions compatible with them; the
+        // values are columns of the current solution of the enclosing EXISTS pattern, addressed already
+        String startCondition = generateJoinCondition(relations, getStartBindings(start), init.getVariableBindings(),
+                null, initTable);
+
+        if(startCondition != null)
+        {
+            builder.append(" WHERE ");
+            builder.append(startCondition);
+        }
 
         builder.append(" UNION SELECT ");
 
@@ -1214,14 +1340,18 @@ public final class SqlRecursive extends SqlIntercode
     @Override
     public boolean hasServiceSubpattern()
     {
-        return init.hasServiceSubpattern() || next.hasServiceSubpattern();
+        return init.hasServiceSubpattern() || next.hasServiceSubpattern()
+                || start.values().stream().anyMatch(SqlExpressionIntercode::hasServiceSubpattern);
     }
 
 
     @Override
     public Set<VirtualTable> getVirtualTables()
     {
-        return getVirtualTables(init, next);
+        Set<VirtualTable> tables = getVirtualTables(init, next);
+        tables.addAll(getVirtualTables(start.values()));
+
+        return tables;
     }
 
 
@@ -1245,6 +1375,15 @@ public final class SqlRecursive extends SqlIntercode
     public void generateExplanation(StringBuilder builder, String indent)
     {
         builder.append("recurse");
+
+        for(Entry<Variable, SqlExpressionIntercode> entry : start.entrySet())
+        {
+            indentInfo(builder, indent, true);
+            builder.append("from ");
+            builder.append(entry.getKey());
+            builder.append(" = ");
+            entry.getValue().generateExplanation(builder, getIndent(indent, false) + "  ");
+        }
 
         indentChild(builder, indent, false);
         init.generateExplanation(builder, getIndent(indent, false));
@@ -1296,6 +1435,9 @@ public final class SqlRecursive extends SqlIntercode
         if(!Objects.equals(segmentClasses, imcode.segmentClasses))
             return false;
 
+        if(!Objects.equals(start, imcode.start))
+            return false;
+
         return true;
     }
 
@@ -1304,6 +1446,6 @@ public final class SqlRecursive extends SqlIntercode
     protected int getHashCode()
     {
         return Objects.hash(graphVar, beginVar, joinVar, endBinding, init, next, reverseNext, reverseJoinVar,
-                reverseInit, segmentClasses);
+                reverseInit, segmentClasses, start);
     }
 }

@@ -6,9 +6,6 @@ import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static java.util.Collections.singletonMap;
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toSet;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -20,17 +17,12 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
-import cz.iocb.sparql.engine.imcode.SqlContextSolution;
 import cz.iocb.sparql.engine.imcode.SqlEmptySolution;
-import cz.iocb.sparql.engine.imcode.SqlFilter;
 import cz.iocb.sparql.engine.imcode.SqlIntercode;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
-import cz.iocb.sparql.engine.imcode.SqlJoin;
-import cz.iocb.sparql.engine.imcode.SqlLateralJoin;
 import cz.iocb.sparql.engine.imcode.SqlNoSolution;
-import cz.iocb.sparql.engine.imcode.SqlShared;
-import cz.iocb.sparql.engine.imcode.SqlUnion;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
+import cz.iocb.sparql.engine.mapping.classes.DerivedClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
@@ -42,13 +34,16 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 /**
  * EXISTS and NOT EXISTS: true if the pattern, evaluated for the current solution of the surrounding bindings, has a
- * solution. The pattern refers to the current solution through its context solution (see {@link SqlContextSolution}).
- * When the context solution is a plain child of the join the pattern is, the test compares the solutions of the pattern
- * without it with the current solution (see {@link #detach}), a form the database turns into a semi-join; otherwise the
- * expression supplies the exposed columns of the current solution under an alias, and the pattern is evaluated
- * laterally for them. Without a context solution, the pattern is independent of the current solution. A pattern holding
- * a SERVICE call not evaluated yet has no SQL; the expression then carries a placeholder column until the second
- * optimisation pass evaluates the call and rebuilds the expression.
+ * solution. Following SPARQL 1.2, every solution of the pattern extends the current solution, but no node of the
+ * pattern stands for it: the test compares the solutions of the pattern with the current solution in its own condition,
+ * a form the database turns into a semi-join when the pattern refers to the current solution nowhere else, and the
+ * expressions and the nested patterns that need a value of the current solution refer to the columns of the input of
+ * the node holding the test directly (see {@link SqlOuterVariable}). The current solution is read from the surrounding
+ * bindings on every optimisation (see {@link #getCurrentSolution}), so the pattern is optimised for the classes the
+ * node holding the test provides at the moment, as a join with them would optimise it. A test of a pattern independent
+ * of the surrounding bindings has no current solution of its own. A pattern holding a SERVICE call not evaluated yet
+ * has no SQL; the expression then carries a placeholder column until the second optimisation pass evaluates the call
+ * and rebuilds the expression.
  */
 public final class SqlExists extends SqlExpressionIntercode
 {
@@ -58,11 +53,6 @@ public final class SqlExists extends SqlExpressionIntercode
     private static final AliasTable patternTable = new AliasTable("tab");
 
     /**
-     * Alias of the detached pattern, exposing the compared columns under names of their own (see {@link #translate}).
-     */
-    private static final AliasTable existsTable = new AliasTable("exists");
-
-    /**
      * Column standing for the test while its pattern holds a SERVICE call not evaluated yet. It never reaches the
      * database, as the second optimisation pass rebuilds the expression once the call is evaluated, and would fail
      * there otherwise.
@@ -70,14 +60,25 @@ public final class SqlExists extends SqlExpressionIntercode
     private static final Column unevaluated = new ExpressionColumn("sparql.unevaluated_service()", BOOL, false);
 
     /**
+     * Upper bound of the rounds in which the pattern is optimised for a current solution (see {@link #optimize}).
+     */
+    private static final int maxRounds = 8;
+
+    /**
      * True for NOT EXISTS.
      */
     private final boolean negated;
 
     /**
-     * Tested pattern.
+     * Tested pattern, optimised for the current solution {@link #solution}.
      */
     private final SqlIntercode pattern;
+
+    /**
+     * The pattern as translated, from which the optimisation starts again when the surrounding bindings provide a
+     * current solution the optimised pattern does not serve (see {@link #isNarrower}).
+     */
+    private final SqlIntercode origin;
 
     /**
      * Bindings of the surrounding solution.
@@ -85,19 +86,26 @@ public final class SqlExists extends SqlExpressionIntercode
     private final VariableBindings bindings;
 
     /**
-     * Context solution the pattern refers to, as created for the pattern (with all exposed columns), or null.
+     * The variables of the current solution the pattern may refer to.
      */
-    private final SqlContextSolution context;
+    private final Set<Variable> variables;
 
     /**
-     * The pattern without its context solution, whose solutions compatible with the current solution are those of the
-     * pattern (see {@link #detach}), or null when the pattern is evaluated laterally.
+     * True when the solutions of the node holding the expression extend the current solution of the pattern the node
+     * lies in (a node of a group of an EXISTS pattern), which the current solution of this pattern then extends too;
+     * false for a node above the WHERE clause of a sub-select, whose solutions hold only what the WHERE clause, the
+     * grouping and the projection leave in them.
      */
-    private final SqlIntercode detached;
+    private final boolean chained;
 
     /**
-     * True when the expression was built by the optimisation, which detaches the context solution when it can; the
-     * translator builds the expression without trying.
+     * Bindings of the current solution the pattern was built for (see {@link #getCurrentSolution}); null for a pattern
+     * independent of the surrounding bindings, which has no current solution of its own.
+     */
+    private final VariableBindings solution;
+
+    /**
+     * True when the expression was built by the optimisation.
      */
     private final boolean optimized;
 
@@ -107,31 +115,39 @@ public final class SqlExists extends SqlExpressionIntercode
      *
      * @param negated whether the test is negated
      * @param pattern the tested pattern
+     * @param origin the pattern as translated
      * @param mappings columns per resource class
      * @param bindings the variable bindings
-     * @param context context solution the pattern refers to, or null
-     * @param detached the pattern without its context solution, or null when the pattern is evaluated laterally
+     * @param variables the variables of the current solution the pattern may refer to
+     * @param chained whether the current solution extends the current solution of the pattern the node holding the
+     *            expression lies in
+     * @param solution bindings of the current solution the pattern was built for, or null
      * @param optimized whether the expression was built by the optimisation
      */
-    protected SqlExists(boolean negated, SqlIntercode pattern, Map<ResourceClass, List<Column>> mappings,
-            VariableBindings bindings, SqlContextSolution context, SqlIntercode detached, boolean optimized)
+    private SqlExists(boolean negated, SqlIntercode pattern, SqlIntercode origin,
+            Map<ResourceClass, List<Column>> mappings, VariableBindings bindings, Set<Variable> variables,
+            boolean chained, VariableBindings solution, boolean optimized)
     {
         super(mappings, false, pattern.isDeterministic());
 
         this.negated = negated;
         this.pattern = pattern;
+        this.origin = origin;
         this.bindings = bindings;
-        this.context = context;
-        this.detached = detached;
+        this.variables = variables;
+        this.chained = chained;
+        this.solution = solution;
         this.optimized = optimized;
 
-        if(context != null)
-            this.referencedVariables.addAll(context.getVariableBindings().getVariables());
+        if(solution != null)
+            this.referencedVariables.addAll(solution.getVariables());
     }
 
 
     /**
-     * Existence test of a pattern independent of the surrounding bindings.
+     * Existence test of a pattern independent of the surrounding bindings. The pattern has no current solution of its
+     * own; when the test lies in the pattern of another test, the nodes of its pattern may still read the current
+     * solution of that pattern (see {@link Request#beginPattern}).
      *
      * @param request the current request
      * @param negated whether the test is negated
@@ -142,313 +158,196 @@ public final class SqlExists extends SqlExpressionIntercode
     public static SqlExpressionIntercode create(Request request, boolean negated, SqlIntercode pattern,
             VariableBindings bindings)
     {
-        return create(request, negated, pattern, bindings, null, Restriction.ALL);
+        return create(request, negated, pattern, pattern, bindings, Set.of(), false, null, Restriction.ALL, false);
     }
 
 
     /**
-     * Existence test of a pattern evaluated for the current solution of the surrounding bindings, which the pattern
-     * refers to through the context solution.
+     * Existence test of a pattern evaluated for the current solution of the surrounding bindings: the pattern was
+     * translated for the current solution with the given bindings, and its SQL is rendered here, so the pattern is
+     * still being translated (see {@link Request#beginPattern}).
      *
      * @param request the current request
      * @param negated whether the test is negated
      * @param pattern the tested pattern
      * @param bindings the variable bindings
-     * @param context context solution the pattern refers to
+     * @param variables the variables of the current solution the pattern may refer to
+     * @param chained whether the current solution extends the current solution of the pattern the node holding the
+     *            expression lies in
+     * @param solution bindings of the current solution the pattern was translated for (see {@link #getCurrentSolution})
      * @return existence test of a pattern evaluated for the current solution of the surrounding bindings
      */
     public static SqlExpressionIntercode create(Request request, boolean negated, SqlIntercode pattern,
-            VariableBindings bindings, SqlContextSolution context)
+            VariableBindings bindings, Set<Variable> variables, boolean chained, VariableBindings solution)
     {
-        return create(request, negated, pattern, bindings, context, Restriction.ALL);
+        return create(request, negated, pattern, pattern, bindings, variables, chained, solution, Restriction.ALL,
+                false);
     }
 
 
     /**
-     * Existence test materialising only when needed; a pattern without solutions or with the single solution makes it
-     * constant.
+     * Existence test materialising only when needed; a pattern without solutions or with the single empty solution
+     * makes it constant, and so does a pattern none of whose solutions can agree with the current solution.
      *
      * @param request the current request
      * @param negated whether the test is negated
      * @param pattern the tested pattern
+     * @param origin the pattern as translated
      * @param bindings the variable bindings
-     * @param context context solution the pattern refers to, or null
+     * @param variables the variables of the current solution the pattern may refer to
+     * @param chained whether the current solution extends the current solution of the pattern the node holding the
+     *            expression lies in
+     * @param solution bindings of the current solution the pattern was built for, or null
      * @param restriction the result classes the parent needs
-     * @return existence test materialising only when needed; a pattern without solutions or with the single solution
-     *         makes it constant
-     */
-    public static SqlExpressionIntercode create(Request request, boolean negated, SqlIntercode pattern,
-            VariableBindings bindings, SqlContextSolution context, Restriction restriction)
-    {
-        return create(request, negated, pattern, bindings, context, restriction, false, false);
-    }
-
-
-    /**
-     * Existence test materialising only when needed (see
-     * {@link #create(Request, boolean, SqlIntercode, VariableBindings, SqlContextSolution, Restriction)}), built by the
-     * optimisation when asked to detach the context solution from the pattern, optimised already (see {@link #detach}).
-     *
-     * @param request the current request
-     * @param negated whether the test is negated
-     * @param pattern the tested pattern
-     * @param bindings the variable bindings
-     * @param context context solution the pattern refers to, or null
-     * @param restriction the result classes the parent needs
-     * @param optimized whether the pattern is optimised and the context solution is to be detached from it
-     * @param evalServices whether SERVICE stubs are evaluated
+     * @param optimized whether the expression is built by the optimisation
      * @return existence test materialising only when needed
      */
     private static SqlExpressionIntercode create(Request request, boolean negated, SqlIntercode pattern,
-            VariableBindings bindings, SqlContextSolution context, Restriction restriction, boolean optimized,
-            boolean evalServices)
+            SqlIntercode origin, VariableBindings bindings, Set<Variable> variables, boolean chained,
+            VariableBindings solution, Restriction restriction, boolean optimized)
     {
         ClassRelations relations = request.getConfiguration();
 
         if(pattern.equals(SqlNoSolution.get()))
             return negated ? trueValue : falseValue;
 
-        //NOTE: the context solution is a single solution like the empty one
-        if(pattern.equals(SqlEmptySolution.get()) || pattern instanceof SqlContextSolution)
+        if(pattern.equals(SqlEmptySolution.get()))
             return negated ? falseValue : trueValue;
 
         //NOTE: a solution of the pattern agrees with the current solution on the shared variables
-        List<VariableBindingPair> pairs = VariableBindingPair.getPairs(relations, pattern.getVariableBindings(),
-                bindings);
-
-        if(pairs.stream().anyMatch(p -> !p.isJoinable()))
+        if(solution != null && VariableBindingPair.getPairs(relations, pattern.getVariableBindings(), solution).stream()
+                .anyMatch(p -> !p.isJoinable()))
             return negated ? trueValue : falseValue;
 
 
         if(!restriction.contains(relations, xsdBoolean))
-            return new SqlExists(negated, pattern, singletonMap(xsdBoolean, null), bindings, context, null, optimized);
+            return new SqlExists(negated, pattern, origin, singletonMap(xsdBoolean, null), bindings, variables, chained,
+                    solution, optimized);
 
         // the call is evaluated by the second optimisation pass, which rebuilds the expression and everything built
         // on it; until then a placeholder stands for the test
         if(pattern.hasServiceSubpattern())
-            return new SqlExists(negated, pattern, singletonMap(xsdBoolean, List.of(unevaluated)), bindings, context,
-                    null, optimized);
+            return new SqlExists(negated, pattern, origin, singletonMap(xsdBoolean, List.of(unevaluated)), bindings,
+                    variables, chained, solution, optimized);
 
 
-        SqlIntercode detached = optimized && context != null ? detach(request, pattern, context, evalServices) : null;
+        List<Column> result = translate(request, negated, pattern, solution);
 
-        List<Column> result = translate(request, negated, pattern, detached, bindings, context);
-
-        return new SqlExists(negated, pattern, singletonMap(xsdBoolean, result), bindings, context, detached,
-                optimized);
+        return new SqlExists(negated, pattern, origin, singletonMap(xsdBoolean, result), bindings, variables, chained,
+                solution, optimized);
     }
 
 
     /**
-     * The pattern without its context solution, optimised for the comparison with the current solution (see
-     * {@link #translate}): the context solution is a child of the join the pattern is (of every join under a union,
-     * also under a filter), every variable it binds there is bound by another child of the join, and the rest of the
-     * pattern refers to it nowhere else. The rest is optimised under the classes the context solution binds the shared
-     * variables in, as the join would optimise it, but without taking the context solution in. Null when the pattern
-     * cannot be detached, notably when a child of the join has taken the context solution in (a walk seeded with it),
-     * whose evaluation for every current solution the join then asks for, and when the comparison with the current
-     * solution would not be exact (see {@link #isComparable}).
+     * Bindings of the current solution a pattern of an expression is evaluated for, given the bindings of the solutions
+     * the expression is evaluated for: the variables the pattern may refer to, in the classes that have columns, the
+     * columns addressed through the alias of the input of the node holding the expression (see
+     * {@link Request#getInputTable}; the bindings of the sides of a left join are addressed already). When the node
+     * lies in a pattern of another expression and its solutions extend the current solution of that pattern, the
+     * solution is joined with it, so that a variable only that one binds is known to the nested pattern too. Called for
+     * the node holding the expression, before its pattern is entered (see {@link Request#beginPattern}).
      *
      * @param request the current request
-     * @param pattern the optimised pattern
-     * @param context the context solution of the pattern
-     * @param evalServices whether SERVICE stubs are evaluated
-     * @return the pattern without its context solution, or null when the pattern cannot be detached
+     * @param bindings bindings of the solutions the expression is evaluated for
+     * @param variables the variables of the current solution the pattern may refer to
+     * @param chained whether the solutions the expression is evaluated for extend the current solution of the pattern
+     *            the node holding the expression lies in
+     * @return bindings of the current solution
      */
-    private static SqlIntercode detach(Request request, SqlIntercode pattern, SqlContextSolution context,
-            boolean evalServices)
+    public static VariableBindings getCurrentSolution(Request request, VariableBindings bindings,
+            Set<Variable> variables, boolean chained)
     {
-        SqlIntercode rest = detachContext(request, pattern, context);
+        AliasTable table = request.getInputTable();
 
-        if(rest == null)
-            return null;
+        VariableBindings own = new VariableBindings();
 
-        Restrictions restrictions = SqlIntercode.getJoinRestrictions(request.getConfiguration(),
-                rest.getVariableBindings(), context.getVariableBindings(), new Restrictions(), true);
-
-        SqlIntercode optimized = rest.optimize(request, restrictions, true, evalServices);
-
-        if(optimized.equals(SqlNoSolution.get()) || optimized.equals(SqlEmptySolution.get()))
-            return null;
-
-        if(!isComparable(request.getConfiguration(), optimized.getVariableBindings(), context.getVariableBindings()))
-            return null;
-
-        // a nested group of the pattern may refer to the context solution too, which its SQL shows
-        if(optimized.translate(request).contains(context.getLateralTable().toString()))
-            return null;
-
-        return optimized;
-    }
-
-
-    /**
-     * True if the comparison with the current solution (see {@link #translate}) tells the solutions of the detached
-     * pattern apart exactly. The detached pattern may bind a shared variable in a class without columns (known but not
-     * materialised): a branch joined with the context solution needs the variable only in the classes overlapping those
-     * of the current solution, and the union of the detached branches merges such a class with the overlapping classes
-     * of the other branches. A solution binding the variable in a class without columns has null columns, so the
-     * comparison can neither compare it with an overlapping class of the current solution nor, when the pattern may
-     * leave the variable unbound, tell it from a solution leaving the variable unbound, compatible with every current
-     * solution. Otherwise, a class without columns disjoint with all the classes of the current solution is compared
-     * with none of them, so its solutions are compatible only with a current solution leaving the variable unbound, as
-     * they have to be.
-     *
-     * @param relations declarations which unrelated user IRI classes may overlap
-     * @param detached bindings of the detached pattern
-     * @param context bindings of the context solution as created for the pattern, whose classes with columns are the
-     *            classes of the current solution
-     * @return true if every shared variable the detached pattern binds in a class without columns is always bound by
-     *         the pattern, and every such class is disjoint with all the classes of the current solution, false
-     *         otherwise
-     */
-    private static boolean isComparable(ClassRelations relations, VariableBindings detached, VariableBindings context)
-    {
-        for(VariableBinding binding : context.getValues())
+        for(VariableBinding binding : bindings.getValues())
         {
-            VariableBinding compared = detached.get(binding.getVariable());
-
-            if(compared == null)
+            if(!variables.contains(binding.getVariable()))
                 continue;
 
-            Set<ResourceClass> unmaterialised = compared.getMappings().entrySet().stream()
-                    .filter(e -> e.getValue() == null).map(Entry::getKey).collect(toSet());
-
-            if(unmaterialised.isEmpty())
-                continue;
-
-            // a solution binding the variable in such a class has the null columns of one leaving it unbound
-            if(compared.canBeNull())
-                return false;
+            VariableBinding addressed = new VariableBinding(binding.getVariable(), binding.canBeNull());
 
             for(Entry<ResourceClass, List<Column>> entry : binding.getMappings().entrySet())
-                if(entry.getValue() != null && !ResourceClass.areDisjunct(relations, entry.getKey(), unmaterialised))
-                    return false;
+                if(entry.getValue() != null)
+                    addressed.addMapping(entry.getKey(), entry.getValue().stream()
+                            .map(c -> c instanceof TableColumn ? c.fromTable(table) : c).toList());
+
+            if(addressed.hasMapping())
+                own.add(addressed);
         }
 
-        return true;
-    }
+        VariableBindings enclosing = chained ? request.getCurrentSolution() : null;
 
+        if(enclosing == null)
+            return own;
 
-    /**
-     * The pattern without its context solution, as built (see {@link #detach}), or null when the context solution
-     * cannot be detached from it, notably when the other children of a join cannot be joined without it (see
-     * {@link #canJoinWithout}).
-     *
-     * @param request the current request
-     * @param pattern the pattern
-     * @param context the context solution of the pattern
-     * @return the pattern without its context solution, or null when the context solution cannot be detached from it
-     */
-    private static SqlIntercode detachContext(Request request, SqlIntercode pattern, SqlContextSolution context)
-    {
-        if(pattern instanceof SqlJoin join)
-        {
-            List<SqlIntercode> contexts = join.getChilds().stream().filter(c -> isContext(c, context)).toList();
-            List<SqlIntercode> others = join.getChilds().stream().filter(c -> !isContext(c, context)).toList();
+        VariableBindings outer = new VariableBindings();
 
-            if(contexts.isEmpty() || others.isEmpty())
-                return null;
+        for(VariableBinding binding : enclosing.getValues())
+            if(variables.contains(binding.getVariable()))
+                outer.add(binding);
 
-            if(!canJoinWithout(request.getConfiguration(), others, contexts))
-                return null;
+        if(outer.getVariables().isEmpty())
+            return own;
 
-            SqlIntercode rest = others.get(0);
-
-            for(int i = 1; i < others.size(); i++)
-                rest = SqlJoin.join(request, rest, others.get(i));
-
-            // the comparison stands for the join on the variables the rest binds only
-            for(SqlIntercode child : contexts)
-                for(Variable variable : child.getVariableBindings().getVariables())
-                    if(rest.getVariableBindings().get(variable) == null)
-                        return null;
-
-            return rest;
-        }
-
-        if(pattern instanceof SqlUnion union)
-        {
-            List<SqlIntercode> branches = new ArrayList<>();
-
-            // a branch without the context solution stays as it is
-            for(SqlIntercode branch : union.getChilds())
-            {
-                SqlIntercode detached = detachContext(request, branch, context);
-                branches.add(detached != null ? detached : branch);
-            }
-
-            return SqlUnion.union(request, branches);
-        }
-
-        if(pattern instanceof SqlFilter filter)
-        {
-            SqlIntercode child = detachContext(request, filter.getChild(), context);
-            return child == null ? null : SqlFilter.filter(request, filter.getConditions(), child);
-        }
-
-        return null;
-    }
-
-
-    /**
-     * True if the children of a join can be joined without its context solutions. They were optimised as partners of
-     * the context solution, which excludes the classes it does not bind the shared variables in: a child may then keep
-     * such a class without columns (a shared node keeps all its solutions, see {@link SqlShared}), and another child
-     * binding the variable in an overlapping class, with or without columns, would have to be compared with it, which
-     * the columns do not allow.
-     *
-     * @param relations declarations which unrelated user IRI classes may overlap
-     * @param others the children of the join other than the context solutions
-     * @param contexts the context solutions among the children
-     * @return true if no two of the children would compare a variable shared with the context solution in a class one
-     *         of them binds without columns
-     */
-    private static boolean canJoinWithout(ClassRelations relations, List<SqlIntercode> others,
-            List<SqlIntercode> contexts)
-    {
-        Set<Variable> shared = contexts.stream().flatMap(c -> c.getVariableBindings().getVariables().stream())
-                .collect(toSet());
-
-        for(Variable variable : shared)
-        {
-            List<VariableBinding> bindings = others.stream().map(c -> c.getVariableBindings().get(variable))
-                    .filter(b -> b != null).toList();
-
-            for(int i = 0; i < bindings.size(); i++)
-                for(Entry<ResourceClass, List<Column>> entry : bindings.get(i).getMappings().entrySet())
-                    if(entry.getValue() == null)
-                        for(int j = 0; j < bindings.size(); j++)
-                            if(j != i && bindings.get(j).getMappings().keySet().stream()
-                                    .anyMatch(c -> !ResourceClass.areDisjunct(relations, c, entry.getKey())))
-                                return false;
-        }
-
-        return true;
-    }
-
-
-    /**
-     * True if the node is the context solution of the pattern, as created or restricted.
-     *
-     * @param node the node
-     * @param context the context solution of the pattern
-     * @return true if the node is the context solution of the pattern, false otherwise
-     */
-    private static boolean isContext(SqlIntercode node, SqlContextSolution context)
-    {
-        return node instanceof SqlContextSolution solution
-                && solution.getLateralTable().equals(context.getLateralTable());
+        return SqlIntercode.getExtendedSolution(request, own, outer);
     }
 
 
     @Override
     public Restrictions getRequirements(ClassRelations relations)
     {
-        if(context == null)
-            return new Restrictions();
+        // the current solution is read from the surrounding bindings on every optimisation, so they have to keep every
+        // variable the pattern may refer to in all its classes, also one bound to constants only
+        return new Restrictions(variables);
+    }
 
-        return SqlLateralJoin.getLateralRequirements(context.getVariableBindings());
+
+    /**
+     * True if a pattern optimised for one current solution serves another one too: the other one binds no variable the
+     * first one leaves unbound, leaves unbound no variable the first one binds always, and binds no variable in a class
+     * or to a constant the first one does not. The optimisation only narrows a pattern (its filters fold for the
+     * classes of the current solution, its branches that cannot agree with the solution are left out), so a narrower
+     * solution is served by narrowing the pattern further, whereas a wider one needs the pattern as translated.
+     *
+     * @param before bindings of the current solution the pattern was optimised for
+     * @param now bindings of the other current solution
+     * @return true if the other current solution is not wider than the one the pattern was optimised for, false
+     *         otherwise
+     */
+    private static boolean isNarrower(VariableBindings before, VariableBindings now)
+    {
+        for(VariableBinding binding : before.getValues())
+            if(now.get(binding.getVariable()) == null && !binding.canBeNull())
+                return false;
+
+        for(VariableBinding binding : now.getValues())
+        {
+            VariableBinding former = before.get(binding.getVariable());
+
+            if(former == null || binding.canBeNull() && !former.canBeNull())
+                return false;
+
+            ResourceClass union = DerivedClass.unionize(former.getClasses());
+
+            for(Entry<ResourceClass, List<Column>> entry : binding.getMappings().entrySet())
+            {
+                if(!entry.getKey().isSubclassOf(union))
+                    return false;
+
+                List<Column> columns = former.getMapping(entry.getKey());
+
+                if(columns == null || entry.getValue() == null)
+                    continue;
+
+                for(int i = 0; i < columns.size(); i++)
+                    if(columns.get(i) instanceof ConstantColumn && !columns.get(i).equals(entry.getValue().get(i)))
+                        return false;
+            }
+        }
+
+        return true;
     }
 
 
@@ -456,21 +355,46 @@ public final class SqlExists extends SqlExpressionIntercode
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
+        ClassRelations relations = request.getConfiguration();
+
+        // the current solution as the surrounding bindings provide it now
+        VariableBindings solution = this.solution == null ? null :
+                getCurrentSolution(request, bindings, variables, chained);
+
+        // a pattern optimised for another current solution serves this one only if this one is not wider
+        SqlIntercode base = solution == null || isNarrower(this.solution, solution) ? pattern : origin;
+
         // a walk in the pattern is not seeded from shared solutions (see Request.isWithinExpression)
         request.beginExpression();
 
         // the nodes of the pattern lie one level deeper than the node holding the expression
-        request.beginPattern();
+        request.beginPattern(solution);
 
         try
         {
-            //NOTE: only the existence of a solution matters, no column of the pattern is needed
-            SqlIntercode optPattern = pattern.optimize(request, new Restrictions(), true, evalServices);
+            // only the existence of a solution compatible with the current one matters, so the pattern is optimised as
+            // a join with the current solution would optimise it, until it settles
+            SqlIntercode optPattern = base;
 
-            if(optPattern == pattern && bindings.equals(this.bindings) && optimized)
+            for(int round = 0; round < maxRounds; round++)
+            {
+                Restrictions restrictions = solution == null ? new Restrictions() : SqlIntercode.getJoinRestrictions(
+                        relations, optPattern.getVariableBindings(), solution, new Restrictions(), true);
+
+                SqlIntercode next = optPattern.optimize(request, restrictions, true, evalServices);
+
+                if(next.equals(optPattern))
+                    break;
+
+                optPattern = next;
+            }
+
+            if(optimized && optPattern == pattern && bindings.equals(this.bindings)
+                    && Objects.equals(solution, this.solution) && restriction.isOptimized(relations, variableBinding))
                 return this;
 
-            return create(request, negated, optPattern, bindings, context, restriction, true, evalServices);
+            return create(request, negated, optPattern, origin, bindings, variables, chained, solution, restriction,
+                    true);
         }
         finally
         {
@@ -481,24 +405,19 @@ public final class SqlExists extends SqlExpressionIntercode
 
 
     /**
-     * SQL boolean expression testing the existence of a solution of the pattern. With the context solution detached,
-     * the pattern without it is evaluated by itself, its columns of the variables of the current solution are exposed
-     * under names of their own, and the test compares them with the exposed columns of the current solution, supplied
-     * as the surrounding bindings provide them now; the names of their own keep the columns of the current solution,
-     * referred to from the outside, from being taken for columns of the pattern, and the database turns the test into a
-     * semi-join. Otherwise the pattern is joined laterally to the exposed columns of the current solution, supplied
-     * under their names.
+     * SQL boolean expression testing the existence of a solution of the pattern compatible with the current solution.
+     * The columns of the current solution are addressed through the aliases of the inputs providing them, which no node
+     * of the pattern declares, so the condition compares them with the columns of the pattern as they are; a test whose
+     * pattern refers to those inputs nowhere else is a semi-join for the database.
      *
      * @param request the current request
      * @param negated whether the test is negated
      * @param pattern the tested pattern
-     * @param detached the pattern without its context solution, or null when the pattern is evaluated laterally
-     * @param bindings the variable bindings
-     * @param context context solution the pattern refers to, or null
+     * @param solution bindings of the current solution, or null
      * @return SQL boolean expression testing the existence of a solution of the pattern
      */
-    public static List<Column> translate(Request request, boolean negated, SqlIntercode pattern, SqlIntercode detached,
-            VariableBindings bindings, SqlContextSolution context)
+    private static List<Column> translate(Request request, boolean negated, SqlIntercode pattern,
+            VariableBindings solution)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -507,91 +426,20 @@ public final class SqlExists extends SqlExpressionIntercode
         if(negated)
             builder.append("NOT ");
 
-        builder.append("EXISTS (SELECT 1 FROM ");
-
-        Map<Column, Column> values = context == null ? Map.of() :
-                SqlLateralJoin.getLateralValues(relations, context.getVariableBindings(), bindings);
-
-        if(detached != null)
-        {
-            // the current solution as the surrounding bindings provide it now
-            VariableBindings current = new VariableBindings();
-
-            for(VariableBinding binding : context.getVariableBindings().getValues())
-            {
-                VariableBinding provided = new VariableBinding(binding.getVariable(), binding.canBeNull());
-
-                for(Entry<ResourceClass, List<Column>> entry : binding.getMappings().entrySet())
-                    if(entry.getValue() != null)
-                        provided.addMapping(entry.getKey(),
-                                entry.getValue().stream().map(c -> values.getOrDefault(c, c)).toList());
-
-                current.add(provided);
-            }
-
-            // the columns of the shared variables of the detached pattern under names of their own
-            Map<Column, Column> renamed = new LinkedHashMap<>();
-            VariableBindings compared = new VariableBindings();
-
-            for(VariableBinding binding : detached.getVariableBindings().getValues())
-            {
-                if(current.get(binding.getVariable()) == null)
-                    continue;
-
-                VariableBinding copy = new VariableBinding(binding.getVariable(), binding.canBeNull());
-
-                for(Entry<ResourceClass, List<Column>> entry : binding.getMappings().entrySet())
-                {
-                    List<Column> columns = entry.getValue() == null ? null : new ArrayList<>();
-
-                    if(columns != null)
-                        for(Column column : entry.getValue())
-                            columns.add(column instanceof ConstantColumn ? column : renamed.computeIfAbsent(column,
-                                    c -> new TableColumn("@exists" + renamed.size(), c.getType(), c.canBeNull())));
-
-                    copy.addMapping(entry.getKey(), columns);
-                }
-
-                compared.add(copy);
-            }
-
-            builder.append("(SELECT ");
-            builder.append(renamed.isEmpty() ? "1" : renamed.entrySet().stream()
-                    .map(e -> e.getKey().fromTable(patternTable) + " AS " + e.getValue()).collect(joining(", ")));
-            builder.append(" FROM (");
-            builder.append(detached.translate(request));
-            builder.append(") AS ");
-            builder.append(patternTable);
-            builder.append(") AS ");
-            builder.append(existsTable);
-
-            String condition = SqlIntercode.generateJoinCondition(relations, current, compared, null, existsTable);
-
-            if(condition != null)
-            {
-                builder.append(" WHERE ");
-                builder.append(condition);
-            }
-
-            builder.append(")");
-
-            return List.of(new ExpressionColumn(builder.toString(), BOOL, false));
-        }
-
-        if(!values.isEmpty())
-        {
-            builder.append("(SELECT ");
-            builder.append(values.entrySet().stream().map(e -> e.getValue() + " AS " + e.getKey()).sorted()
-                    .collect(joining(", ")));
-            builder.append(") AS ");
-            builder.append(context.getLateralTable());
-            builder.append(" CROSS JOIN LATERAL ");
-        }
-
-        builder.append("(");
+        builder.append("EXISTS (SELECT 1 FROM (");
         builder.append(pattern.translate(request));
         builder.append(") AS ");
         builder.append(patternTable);
+
+        String condition = solution == null ? null : SqlIntercode.generateJoinCondition(relations, solution,
+                pattern.getVariableBindings(), null, patternTable);
+
+        if(condition != null)
+        {
+            builder.append(" WHERE ");
+            builder.append(condition);
+        }
+
         builder.append(")");
 
         return List.of(new ExpressionColumn(builder.toString(), BOOL, false));
@@ -610,13 +458,11 @@ public final class SqlExists extends SqlExpressionIntercode
 
         builder.append("exists");
 
-        if(context != null)
+        if(solution != null && !solution.getVariables().isEmpty())
         {
             indentInfo(builder, existsIndent, true);
-            builder.append(context.getLateralTable());
-            builder.append(detached != null ? " compared on " : " using ");
-            builder.append(context.getVariableBindings().getVariables().stream().map(Object::toString).sorted()
-                    .collect(joining(", ")));
+            builder.append("for ");
+            builder.append(solution.getVariables().stream().map(Object::toString).sorted().collect(joining(", ")));
         }
 
         indentChild(builder, existsIndent, true);
@@ -638,19 +484,22 @@ public final class SqlExists extends SqlExpressionIntercode
         if(!super.equals(imcode))
             return false;
 
-        if(!Objects.equals(negated, imcode.negated))
+        if(negated != imcode.negated || chained != imcode.chained)
             return false;
 
-        if(!Objects.equals(pattern, imcode.pattern))
+        if(!Objects.equals(variables, imcode.variables))
+            return false;
+
+        if(!Objects.equals(solution, imcode.solution))
             return false;
 
         if(!Objects.equals(bindings, imcode.bindings))
             return false;
 
-        if(!Objects.equals(context, imcode.context))
+        if(!Objects.equals(pattern, imcode.pattern))
             return false;
 
-        if(!Objects.equals(detached, imcode.detached))
+        if(!Objects.equals(origin, imcode.origin))
             return false;
 
         return true;
@@ -674,6 +523,6 @@ public final class SqlExists extends SqlExpressionIntercode
     @Override
     protected int getHashCode()
     {
-        return Objects.hash(negated, pattern, context, detached);
+        return Objects.hash(negated, pattern, variables, solution);
     }
 }

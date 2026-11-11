@@ -8,6 +8,8 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.everyItem;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -41,12 +43,12 @@ import cz.iocb.sparql.testing.Database;
 
 /**
  * EXISTS and NOT EXISTS of a union whose branches bind a variable of the current solution in different classes. The
- * pattern without its context solution is compared with the current solution, but the branches were restricted against
- * the context solution, so a branch may bind the variable in a class without columns, which the union merges with the
- * overlapping classes of the other branches: the comparison is exact only when no class without columns meets a class
- * of the current solution and the pattern always binds the variable in such a class; otherwise the pattern is evaluated
- * for every current solution (it failed on the null columns or took a solution bound in such a class for one leaving
- * the variable unbound).
+ * test compares the solutions of the pattern with the current solution, and the pattern is optimised for the classes
+ * the current solution binds the variable in, so a branch may bind the variable in a class without columns, which the
+ * union merges with the overlapping classes of the other branches: the comparison has to stay exact for every class of
+ * the current solution (it once failed on the null columns), and a solution binding the variable in a class without
+ * columns must not be taken for one leaving the variable unbound, so a variable a branch leaves unbound is merged with
+ * its current value inside the pattern, branch by branch.
  */
 public class ExistsUnionComparisonTest
 {
@@ -251,6 +253,46 @@ public class ExistsUnionComparisonTest
 
 
     /**
+     * The EXISTS tests of the SQL, each as its pattern and the condition comparing the solutions of the pattern with
+     * the current solution (empty when there is none).
+     *
+     * @param sql the SQL
+     * @return the patterns and the conditions of the EXISTS tests of the SQL
+     */
+    private static List<String[]> tests(String sql)
+    {
+        List<String[]> tests = new ArrayList<>();
+        String head = "EXISTS (SELECT 1 FROM (";
+
+        for(int begin = sql.indexOf(head); begin >= 0; begin = sql.indexOf(head, begin + 1))
+        {
+            int pattern = closing(sql, begin + head.length());
+            int test = closing(sql, pattern + 1);
+
+            tests.add(new String[] { sql.substring(begin + head.length(), pattern), sql.substring(pattern, test) });
+        }
+
+        return tests;
+    }
+
+
+    /**
+     * Position of the parenthesis closing the one that the text at the position lies in.
+     *
+     * @param sql the SQL
+     * @param position position inside the parentheses
+     * @return position of the closing parenthesis
+     */
+    private static int closing(String sql, int position)
+    {
+        for(int depth = 1; depth > 0; position++)
+            depth += sql.charAt(position) == '(' ? 1 : sql.charAt(position) == ')' ? -1 : 0;
+
+        return position - 1;
+    }
+
+
+    /**
      * Row of the terms.
      *
      * @param terms the terms
@@ -339,8 +381,26 @@ public class ExistsUnionComparisonTest
         assertThat(execute(query), containsInAnyOrder(row(resource("a/1")), row(resource("a/2")), row(resource("a/3")),
                 row(resource("b/10")), row(resource("b/20")), row(resource("b/30"))));
 
-        String sql = translate(query);
-        assertThat(sql, containsString("AS \"exists\""));
-        assertThat(sql, not(containsString("LATERAL")));
+        // the patterns do not refer to the current solution, only the tests compare them with it
+        List<String> patterns = tests(translate(query)).stream().map(t -> t[0]).toList();
+        assertThat(patterns, not(empty()));
+        assertThat(patterns, everyItem(not(containsString("\"outer0\""))));
+    }
+
+
+    @Test
+    @DisplayName("a variable a branch of the union leaves unbound is compared inside the branch, not by a disjunction")
+    void unboundMergedInBranch() throws Exception
+    {
+        String query = "SELECT ?s ?o WHERE { ?s ex:p3 ?o "
+                + "FILTER NOT EXISTS { { ?v ex:p11 ?o } UNION { ?s ex:p9 ?z } } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(resource("b/20"), resource("c/200"))));
+
+        // each branch agrees with the current solution by itself, so the test has nothing left to compare
+        List<String[]> tests = tests(translate(query));
+        assertThat(tests, hasSize(1));
+        assertThat(tests.get(0)[0], containsString("\"outer0\""));
+        assertThat(tests.get(0)[1], not(containsString(" OR ")));
     }
 }

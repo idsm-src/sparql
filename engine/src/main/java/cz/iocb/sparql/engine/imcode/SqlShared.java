@@ -66,12 +66,12 @@ public final class SqlShared extends SqlIntercode
 
     /**
      * True if the node can be shared: it is deterministic, holds no SERVICE call not evaluated yet, refers neither to
-     * the current solution of an EXISTS nor to a lateral join (its SQL would read an alias a common table expression
-     * cannot see), and no pattern of an expression is being optimised (see {@link Request#isWithinExpression}): seeding
-     * a walk inside an EXISTS from shared solutions would evaluate them in full before the first solution of the
-     * pattern, which the database would otherwise stop at. The named graphs the translation pairs zero-length paths
-     * from constants with are shared before any expression is optimised, so EXISTS patterns read them from the common
-     * table expression too.
+     * the current solution of an EXISTS (see {@link Request#refersToEnclosingInput}) nor to a lateral join (its SQL
+     * would read an alias a common table expression cannot see), and no pattern of an expression is being optimised
+     * (see {@link Request#isWithinExpression}): seeding a walk inside an EXISTS from shared solutions would evaluate
+     * them in full before the first solution of the pattern, which the database would otherwise stop at. The named
+     * graphs the translation pairs zero-length paths from constants with are shared before any expression is optimised,
+     * so EXISTS patterns read them from the common table expression too.
      *
      * @param request the current request
      * @param node the node
@@ -82,11 +82,13 @@ public final class SqlShared extends SqlIntercode
         if(request.isWithinExpression() || !node.isDeterministic() || node.hasServiceSubpattern())
             return false;
 
-        if(node instanceof SqlShared || node instanceof SqlValues || node instanceof SqlContextSolution
-                || node.equals(SqlEmptySolution.get()) || node.equals(SqlNoSolution.get()))
+        if(node instanceof SqlShared || node instanceof SqlValues || node.equals(SqlEmptySolution.get())
+                || node.equals(SqlNoSolution.get()))
             return false;
 
-        return !node.translate(request).contains("\"lateral");
+        String sql = node.translate(request);
+
+        return !sql.contains("\"lateral") && !request.refersToEnclosingInput(sql);
     }
 
 

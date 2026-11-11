@@ -56,6 +56,7 @@ import cz.iocb.sparql.engine.model.expression.UnaryExpression;
 import cz.iocb.sparql.engine.model.triple.TripleTermNode;
 import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 
 
@@ -274,6 +275,19 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     @Override
     public SqlExpressionIntercode visit(VariableNode variable)
     {
-        return SqlVariable.create(request.getConfiguration(), bindings.get(getVariable(variable)));
+        Variable var = getVariable(variable);
+        SqlExpressionIntercode own = SqlVariable.create(request.getConfiguration(), bindings.get(var));
+
+        // inside an EXISTS pattern, every solution extends the current solution the pattern is evaluated for, so a
+        // variable the solutions leave unbound has its value there
+        SqlExpressionIntercode outer = parent.getOuterVariable(var);
+
+        if(outer.equals(SqlNull.get()) || !own.equals(SqlNull.get()) && !own.canBeNull())
+            return own;
+
+        if(own.equals(SqlNull.get()))
+            return outer;
+
+        return SqlBuiltinCall.create(request, "coalesce", false, List.of(own, outer));
     }
 }
