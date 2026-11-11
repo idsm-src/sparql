@@ -189,8 +189,6 @@ public final class SqlFilter extends SqlIntercode
     @Override
     public String translate(Request request)
     {
-        ClassRelations relations = request.getConfiguration();
-
         StringBuilder builder = new StringBuilder();
 
         builder.append("SELECT ");
@@ -208,11 +206,26 @@ public final class SqlFilter extends SqlIntercode
         builder.append(request.getInputTable());
 
         builder.append(" WHERE ");
-
-        builder.append(conditions.stream().map(cnd -> cnd.get(relations, xsdBoolean).get(0).toString())
-                .collect(joining(" AND ")));
+        builder.append(translateConditions(request));
 
         return builder.toString();
+    }
+
+
+    /**
+     * SQL of the conjunction of the conditions. It reads the columns of the child by their names, so it belongs to a
+     * query whose only source is the child, under the alias of the input of a node holding expressions (see
+     * {@link Request#getInputTable}), which the patterns of the conditions refer to.
+     *
+     * @param request the current request
+     * @return SQL of the conjunction of the conditions
+     */
+    public String translateConditions(Request request)
+    {
+        ClassRelations relations = request.getConfiguration();
+
+        return conditions.stream().map(cnd -> cnd.get(relations, xsdBoolean).get(0).toString())
+                .collect(joining(" AND "));
     }
 
 

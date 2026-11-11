@@ -841,7 +841,10 @@ public class RecursivePruningTest
         String query = "SELECT ?x WHERE { ?x ex:label ?l FILTER EXISTS { ?x ex:next ?y FILTER(?l != 'one') } }";
 
         assertThat(execute(query), containsInAnyOrder(row(node(2)), row(node(3))));
-        assertThat(pattern(translate(query)), containsString(currentSolution + ".\"label\""));
+        // the test evaluates the filter itself, so the pattern does not refer to the current solution
+        String sql = translate(query);
+        assertThat(sql, containsString(currentSolution + ".\"label\""));
+        assertThat(pattern(sql), not(containsString(currentSolution)));
     }
 
 

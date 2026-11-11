@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
@@ -18,6 +19,7 @@ import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.SqlEmptySolution;
+import cz.iocb.sparql.engine.imcode.SqlFilter;
 import cz.iocb.sparql.engine.imcode.SqlIntercode;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.imcode.SqlNoSolution;
@@ -38,12 +40,13 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * pattern stands for it: the test compares the solutions of the pattern with the current solution in its own condition,
  * a form the database turns into a semi-join when the pattern refers to the current solution nowhere else, and the
  * expressions and the nested patterns that need a value of the current solution refer to the columns of the input of
- * the node holding the test directly (see {@link SqlOuterVariable}). The current solution is read from the surrounding
- * bindings on every optimisation (see {@link #getCurrentSolution}), so the pattern is optimised for the classes the
- * node holding the test provides at the moment, as a join with them would optimise it. A test of a pattern independent
- * of the surrounding bindings has no current solution of its own. A pattern holding a SERVICE call not evaluated yet
- * has no SQL; the expression then carries a placeholder column until the second optimisation pass evaluates the call
- * and rebuilds the expression.
+ * the node holding the test directly (see {@link SqlOuterVariable}). A filter at the top of the pattern that refers to
+ * the current solution is evaluated in the condition of the test as well (see {@link #translate}), so that it does not
+ * make the pattern refer to it. The current solution is read from the surrounding bindings on every optimisation (see
+ * {@link #getCurrentSolution}), so the pattern is optimised for the classes the node holding the test provides at the
+ * moment, as a join with them would optimise it. A test of a pattern independent of the surrounding bindings has no
+ * current solution of its own. A pattern holding a SERVICE call not evaluated yet has no SQL; the expression then
+ * carries a placeholder column until the second optimisation pass evaluates the call and rebuilds the expression.
  */
 public final class SqlExists extends SqlExpressionIntercode
 {
@@ -408,7 +411,10 @@ public final class SqlExists extends SqlExpressionIntercode
      * SQL boolean expression testing the existence of a solution of the pattern compatible with the current solution.
      * The columns of the current solution are addressed through the aliases of the inputs providing them, which no node
      * of the pattern declares, so the condition compares them with the columns of the pattern as they are; a test whose
-     * pattern refers to those inputs nowhere else is a semi-join for the database.
+     * pattern refers to those inputs nowhere else is a semi-join for the database. A filter at the top of the pattern
+     * whose conditions refer to those inputs is therefore not left to the pattern: the test reads the solutions the
+     * filter is given, under the alias the filter would give them, which the patterns nested in its conditions refer to
+     * (see {@link Request#getInputTable}), and its condition holds the conditions of the filter too.
      *
      * @param request the current request
      * @param negated whether the test is negated
@@ -426,18 +432,37 @@ public final class SqlExists extends SqlExpressionIntercode
         if(negated)
             builder.append("NOT ");
 
+        SqlIntercode source = pattern;
+        AliasTable table = patternTable;
+        String filterConditions = null;
+
+        // a filter at the top of the pattern whose conditions refer to the current solution is evaluated by the test
+        // itself, over the input of the filter under the alias the filter gives it, so that the pattern below does not
+        // refer to the current solution because of the filter
+        if(pattern instanceof SqlFilter filter)
+        {
+            String conditions = filter.translateConditions(request);
+
+            if(request.refersToEnclosingInput(conditions))
+            {
+                source = filter.getChild();
+                table = request.getInputTable();
+                filterConditions = conditions;
+            }
+        }
+
         builder.append("EXISTS (SELECT 1 FROM (");
-        builder.append(pattern.translate(request));
+        builder.append(source.translate(request));
         builder.append(") AS ");
-        builder.append(patternTable);
+        builder.append(table);
 
-        String condition = solution == null ? null : SqlIntercode.generateJoinCondition(relations, solution,
-                pattern.getVariableBindings(), null, patternTable);
+        String condition = solution == null ? null :
+                SqlIntercode.generateJoinCondition(relations, solution, pattern.getVariableBindings(), null, table);
 
-        if(condition != null)
+        if(condition != null || filterConditions != null)
         {
             builder.append(" WHERE ");
-            builder.append(condition);
+            builder.append(Stream.of(condition, filterConditions).filter(Objects::nonNull).collect(joining(" AND ")));
         }
 
         builder.append(")");
