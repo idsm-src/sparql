@@ -1335,8 +1335,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
             else if(pattern instanceof Service service)
             {
-                translatedGroupPattern = translateFilters(filters, translatedGroupPattern);
-                filters.clear();
+                //FIXME: This optimization is valid only if it preserves the correct result.
+                //translatedGroupPattern = translateFilters(filters, translatedGroupPattern);
+                //filters.clear();
 
                 translatedGroupPattern = translateService(service, translatedGroupPattern);
             }
