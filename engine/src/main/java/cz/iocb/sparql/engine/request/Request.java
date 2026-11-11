@@ -1018,9 +1018,47 @@ public class Request implements AutoCloseable
     public boolean refersToEnclosingInput(String sql)
     {
         for(int depth = 0; depth < currentSolutions.size(); depth++)
-            for(String name : List.of(inputTableName, leftInputTableName, rightInputTableName))
-                if(sql.contains("\"" + name + depth + "\"."))
-                    return true;
+            if(refersToInput(sql, depth))
+                return true;
+
+        return false;
+    }
+
+
+    /**
+     * The inputs the SQL refers to among the inputs of the nodes holding the expressions whose patterns are being
+     * translated or optimised (see {@link #refersToEnclosingInput}), each given by the number of the patterns its node
+     * lies in. SQL referring to such an input is evaluated for every row of the input anew, wherever in the patterns
+     * below the node it stands.
+     *
+     * @param sql the SQL
+     * @return depths of the inputs the SQL refers to
+     */
+    public Set<Integer> getEnclosingInputs(String sql)
+    {
+        Set<Integer> depths = new HashSet<>();
+
+        for(int depth = 0; depth < currentSolutions.size(); depth++)
+            if(refersToInput(sql, depth))
+                depths.add(depth);
+
+        return depths;
+    }
+
+
+    /**
+     * True if the SQL refers to the input of a node holding expressions that lies in the given number of patterns of
+     * expressions (see {@link #getInputTable}).
+     *
+     * @param sql the SQL
+     * @param depth the number of the patterns the node lies in
+     * @return true if the SQL refers to the input of such a node, false otherwise
+     */
+    private static boolean refersToInput(String sql, int depth)
+    {
+        for(String name : List.of(inputTableName, leftInputTableName, rightInputTableName))
+            if(sql.contains("\"" + name + depth + "\"."))
+                return true;
 
         return false;
     }

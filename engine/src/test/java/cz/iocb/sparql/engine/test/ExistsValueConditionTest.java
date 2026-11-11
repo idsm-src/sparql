@@ -47,7 +47,10 @@ import cz.iocb.sparql.testing.Database;
  * sub-select, the initial solutions of a walk starting from a node of the current solution), the table accesses binding
  * a variable of the current solution take its value into their conditions, converted to the class of their columns, so
  * that the database can look the rows up by an index of the table; a value the current solution may leave unbound and a
- * variable the test itself compares stay out of the accesses.
+ * variable the test itself compares stay out of the accesses. A pattern that reads the current solution anyway (in a
+ * filter the test cannot evaluate itself, in a BIND) takes the values of all the variables it binds so, because the
+ * database evaluates it for every current solution anew whatever the accesses do; a constant of the current solution is
+ * taken by any pattern.
  */
 public class ExistsValueConditionTest
 {
@@ -81,9 +84,10 @@ public class ExistsValueConditionTest
      * Creates the {@code exists_value_condition_test} schema, whose tables are mapped with the IRI classes {@code a},
      * {@code b}, {@code c} and {@code g} ({@code http://example.org/a/<id>} and so on): in the default graph
      * {@code a ex:p1 b}, {@code a ex:p2 a}, {@code b ex:p3 c}, {@code b ex:p6} with IRIs of any class, {@code a ex:p7}
-     * with terms of any kind, {@code a ex:sub a}, and {@code a ex:name} with a string and {@code a ex:rank} with an
-     * integer from one table keyed by the subject; in the graphs {@code g} named by a column {@code a ex:link a} and
-     * {@code a ex:mark} with an integer. The default graph includes the named graphs.
+     * with terms of any kind, {@code a ex:sub a}, {@code ex:p4} from both {@code a} and {@code c} to {@code b}, each
+     * from a table of its own, and {@code a ex:name} with a string and {@code a ex:rank} with an integer from one table
+     * keyed by the subject; in the graphs {@code g} named by a column {@code a ex:link a} and {@code a ex:mark} with an
+     * integer. The default graph includes the named graphs.
      *
      * @throws SQLException on database errors
      */
@@ -120,6 +124,10 @@ public class ExistsValueConditionTest
                     "insert into " + tables + "link values (1, 1, 2), (1, 2, 3), (2, 3, 4), (2, 4, 5), " + "(2, 2, 5)");
             statement.execute("create table " + tables + "mark (g int not null, s int not null, o int not null)");
             statement.execute("insert into " + tables + "mark values (1, 1, 10), (2, 1, 0), (2, 3, 0), (1, 3, 0)");
+            statement.execute("create table " + tables + "ad (s int not null, o int not null)");
+            statement.execute("insert into " + tables + "ad values (1, 10), (1, 20), (9, 20)");
+            statement.execute("create table " + tables + "cd (s int not null, o int not null)");
+            statement.execute("insert into " + tables + "cd values (100, 10)");
         }
 
         DatabaseSchema schema = new DatabaseSchema(connectionPool);
@@ -179,6 +187,12 @@ public class ExistsValueConditionTest
         configuration.addQuadMapping(table("mark"), configuration.createIriMapping("g", "g"),
                 configuration.createIriMapping("a", "s"), configuration.createIriMapping("ex:mark"),
                 configuration.createLiteralMapping(xsdInt, "o"));
+
+        configuration.addQuadMapping(table("ad"), null, configuration.createIriMapping("a", "s"),
+                configuration.createIriMapping("ex:p4"), configuration.createIriMapping("b", "o"));
+
+        configuration.addQuadMapping(table("cd"), null, configuration.createIriMapping("c", "s"),
+                configuration.createIriMapping("ex:p4"), configuration.createIriMapping("b", "o"));
 
         return configuration;
     }
@@ -571,6 +585,95 @@ public class ExistsValueConditionTest
                 containsInAnyOrder(row(resource("a/1")), row(resource("a/2")), row(resource("a/3"))));
         // the pattern does not refer to the current solution, so the database may evaluate the test as a semi-join
         assertThat(references(pattern(query)), equalTo(0));
+    }
+
+
+    @Test
+    @DisplayName("a filter in the branches of a union makes the branches look up the rows of the current solution")
+    void filterInUnionBranches() throws Exception
+    {
+        String query = "SELECT ?q WHERE { ?b ex:p6 ?q FILTER NOT EXISTS { ?q ex:p4 ?z FILTER(?z != ?b) } }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(row(resource("a/9")), row(resource("b/10")), row(resource("other/1"))));
+
+        // the test cannot evaluate a filter distributed over a union, so the pattern reads the current solution anyway
+        String pattern = pattern(query);
+        String condition = " WHERE ((\"s\" = CASE WHEN sparql.regex_string(\"outer0\".\"o\", ";
+        assertThat(pattern, containsString("FROM \"" + schemaName + "\".\"ad\"" + condition));
+        assertThat(pattern, containsString("FROM \"" + schemaName + "\".\"cd\"" + condition));
+    }
+
+
+    @Test
+    @DisplayName("a filter below a join makes the join look up the rows of the current solution")
+    void filterBelowJoin() throws Exception
+    {
+        String query = "SELECT ?s ?y WHERE { ?s ex:p2 ?y "
+                + "FILTER EXISTS { { ?y ex:p2 ?z FILTER(?z != ?s) } ?z ex:p1 ?w } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(resource("a/1"), resource("a/2")),
+                row(resource("a/2"), resource("a/3")), row(resource("a/3"), resource("a/1"))));
+        assertThat(pattern(query), containsString(access("aa", "\"s\" = \"outer0\".\"o\"")));
+    }
+
+
+    @Test
+    @DisplayName("a BIND reading the current solution makes the pattern look up the rows of the current solution")
+    void bindOfCurrentSolution() throws Exception
+    {
+        String query = "SELECT ?s ?b WHERE { ?s ex:p1 ?b "
+                + "FILTER EXISTS { ?s ex:p2 ?z . ?z ex:p2 ?u BIND(str(?b) AS ?l) FILTER(strlen(?l) > 3) } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(resource("a/1"), resource("b/10")),
+                row(resource("a/2"), resource("b/20")), row(resource("a/3"), resource("b/30"))));
+        assertThat(pattern(query), containsString(access("aa", "\"s\" = \"outer0\".\"s\"")));
+    }
+
+
+    @Test
+    @DisplayName("a constant of the current solution is taken by a pattern that does not read the current solution")
+    void constantOfCurrentSolution() throws Exception
+    {
+        String query = "SELECT ?s WHERE { BIND(<http://example.org/a/1> AS ?s) FILTER EXISTS { ?s ex:p2 ?z } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(resource("a/1"))));
+
+        String pattern = pattern(query);
+        assertThat(pattern, containsString(access("aa", "\"s\" = '1'::int4")));
+        assertThat(references(pattern), equalTo(0));
+    }
+
+
+    @Test
+    @DisplayName("a nested pattern takes the values of the test whose input it reads, not of the test around it")
+    void nestedPatternReadingItsTest() throws Exception
+    {
+        String query = "SELECT ?s WHERE { ?s ex:p1 ?b FILTER EXISTS { ?s ex:p2 ?t "
+                + "FILTER NOT EXISTS { { ?t ex:p2 ?u FILTER(?u != ?s) } ?u ex:p2 ?v } } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(resource("a/1")), row(resource("a/2"))));
+
+        // the pattern around the nested one reads nothing of its own test, which the database evaluates as a semi-join
+        String pattern = pattern(query);
+        assertThat(references(pattern), equalTo(0));
+        assertThat(pattern, containsString(access("aa", "\"s\" = \"outer1\".\"o\"")));
+    }
+
+
+    @Test
+    @DisplayName("a pattern of a test in the filter of an OPTIONAL takes the values of both sides")
+    void testInOptional() throws Exception
+    {
+        String query = "SELECT ?s ?y WHERE { ?s ex:p1 ?b OPTIONAL { ?s ex:p2 ?y "
+                + "FILTER EXISTS { { ?y ex:p2 ?z FILTER(?z != ?s) } ?b ex:p3 ?c } } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(resource("a/1"), resource("a/2")),
+                row(resource("a/2"), resource("a/3")), row(resource("a/3"), null), row(resource("a/4"), null)));
+
+        String pattern = pattern(query);
+        assertThat(pattern, containsString(access("aa", "\"s\" = \"right0\".\"o\"")));
+        assertThat(pattern, containsString(access("bc", "\"s\" = \"left0\".\"o\"")));
     }
 
 
