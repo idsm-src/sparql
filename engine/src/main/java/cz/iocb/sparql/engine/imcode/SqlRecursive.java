@@ -20,8 +20,9 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.TableColumn;
-import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
@@ -1074,13 +1075,13 @@ public final class SqlRecursive extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
         ClassRelations relations = request.getConfiguration();
 
         List<ResourceClass> endVarClasses = new LinkedList<>(endBinding.getClasses()); // to stable order
 
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         builder.append("WITH RECURSIVE recursion(");
 
@@ -1170,6 +1171,9 @@ public final class SqlRecursive extends SqlIntercode
         {
             builder.append(" WHERE ");
             builder.append(startCondition);
+
+            // the condition holds the columns of the start values, so the code reads what their SQL reads
+            compared.values().forEach(v -> builder.addDeclaredTables(v.getDeclaredTables()));
         }
 
         builder.append(" UNION SELECT ");
@@ -1276,7 +1280,7 @@ public final class SqlRecursive extends SqlIntercode
 
         builder.append(" FROM recursion");
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -1376,16 +1380,6 @@ public final class SqlRecursive extends SqlIntercode
     {
         return init.hasServiceSubpattern() || next.hasServiceSubpattern()
                 || start.values().stream().anyMatch(SqlExpressionIntercode::hasServiceSubpattern);
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        Set<VirtualTable> tables = getVirtualTables(init, next);
-        tables.addAll(getVirtualTables(start.values()));
-
-        return tables;
     }
 
 

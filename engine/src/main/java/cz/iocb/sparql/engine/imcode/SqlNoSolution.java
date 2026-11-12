@@ -1,8 +1,7 @@
 package cz.iocb.sparql.engine.imcode;
 
 import java.util.Collection;
-import java.util.Set;
-import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBindings;
@@ -18,6 +17,11 @@ public final class SqlNoSolution extends SqlIntercode
      * The only instance.
      */
     static private final SqlNoSolution singleton = new SqlNoSolution();
+
+    /**
+     * SQL code of the node.
+     */
+    static private final SqlCode code = new SqlCode("SELECT 1 WHERE false");
 
 
     /**
@@ -49,9 +53,9 @@ public final class SqlNoSolution extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
-        return "SELECT 1 WHERE false";
+        return code;
     }
 
 
@@ -66,13 +70,6 @@ public final class SqlNoSolution extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return false;
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        return Set.of();
     }
 
 

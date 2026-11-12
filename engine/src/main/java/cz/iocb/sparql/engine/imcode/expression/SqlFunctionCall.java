@@ -8,8 +8,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.DeclaredTable;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
-import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
@@ -227,9 +227,9 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
 
 
     @Override
-    public Set<VirtualTable> getVirtualTables()
+    public Set<DeclaredTable> getDeclaredTables()
     {
-        return getVirtualTables(arguments);
+        return getDeclaredTables(arguments);
     }
 
 

@@ -41,7 +41,7 @@ import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
-import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
 import cz.iocb.sparql.engine.imcode.expression.SqlEffectiveBooleanValue;
@@ -827,7 +827,7 @@ public final class SqlServiceStub extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
         throw new RuntimeException();
     }
@@ -943,7 +943,7 @@ public final class SqlServiceStub extends SqlIntercode
 
             SqlIntercode evaluated = local;
             SqlSelect query = SqlSelect.createTopLevel(request, vars, evaluated, null, limit);
-            String code = query.translate(request, scope);
+            String code = query.translateStatement(request, scope);
 
             for(Enclosure enclosure : enclosures)
             {
@@ -958,7 +958,7 @@ public final class SqlServiceStub extends SqlIntercode
             if(!referred.isEmpty())
             {
                 query = SqlSelect.createTopLevel(request, vars, evaluated, null, limit).optimize(request, scope, true);
-                code = query.translate(request, scope);
+                code = query.translateStatement(request, scope);
             }
 
             try(Result result = new Result(ResultType.SELECT, query.getResultDescription(),
@@ -1278,13 +1278,6 @@ public final class SqlServiceStub extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return true;
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        return context.getVirtualTables();
     }
 
 

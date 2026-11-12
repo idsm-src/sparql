@@ -25,6 +25,8 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
@@ -718,15 +720,17 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
     /**
-     * SQL of the subtree: a SELECT statement whose result columns are those of the variable bindings. The scope has to
-     * be the one the subtree was optimised in, because the SQL of the patterns of its expressions has been rendered for
-     * it (see {@link Scope#getInputTable}).
+     * SQL code of the subtree: a query whose result columns are those of the variable bindings, together with the
+     * declared tables it reads (see {@link SqlCode}), which the statement the code becomes a part of declares in its
+     * {@code WITH} clause (see {@link SqlSelect#translateWithClause}). The scope has to be the one the subtree was
+     * optimised in, because the SQL of the patterns of its expressions has been rendered for it (see
+     * {@link Scope#getInputTable}).
      *
      * @param request the current request
      * @param scope the scope of the node
-     * @return SQL of the subtree: a SELECT statement whose result columns are those of the variable bindings
+     * @return SQL code of the subtree: a query whose result columns are those of the variable bindings
      */
-    public abstract String translate(Request request, Scope scope);
+    public abstract SqlCode translate(Request request, Scope scope);
 
 
     /**
@@ -1571,6 +1575,30 @@ public abstract class SqlIntercode extends SqlBaseClass
             return null;
 
         return condition.stream().sorted().collect(joining(" OR ", "(", ")"));
+    }
+
+
+    /**
+     * SQL code of the conjunction of the conditions: their boolean columns, which read the declared tables the SQL of
+     * the conditions reads (see {@link SqlExpressionIntercode#getDeclaredTables()}).
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param conditions the conditions
+     * @return SQL code of the conjunction of the conditions
+     */
+    protected static SqlCode translateConditions(ClassRelations relations, List<SqlExpressionIntercode> conditions)
+    {
+        SqlBuilder builder = new SqlBuilder();
+
+        for(SqlExpressionIntercode condition : conditions)
+        {
+            appendAnd(builder, !builder.isEmpty());
+
+            builder.append(condition.get(relations, xsdBoolean).get(0));
+            builder.addDeclaredTables(condition.getDeclaredTables());
+        }
+
+        return builder.toCode();
     }
 
 

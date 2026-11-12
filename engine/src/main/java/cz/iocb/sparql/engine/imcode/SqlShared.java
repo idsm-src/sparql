@@ -5,9 +5,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.database.CommonTable;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
@@ -87,7 +88,7 @@ public final class SqlShared extends SqlIntercode
                 || node.equals(SqlNoSolution.get()))
             return false;
 
-        String sql = node.translate(request, scope);
+        String sql = node.translate(request, scope).getText();
 
         return !sql.contains("\"lateral") && !scope.refersToEnclosingInput(sql);
     }
@@ -152,14 +153,20 @@ public final class SqlShared extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
-        AliasTable table = request.getCommonTableExpression(child.translate(request, scope), child.getVirtualTables());
+        CommonTable table = request.getCommonTableExpression(child.translate(request, scope));
 
         Set<Column> columns = getVariableBindings().getNonConstantColumns();
 
-        return "SELECT " + (columns.isEmpty() ? "1" : columns.stream().map(Object::toString).collect(joining(", ")))
-                + " FROM " + table;
+        SqlBuilder builder = new SqlBuilder();
+
+        builder.append("SELECT ");
+        builder.append(columns.isEmpty() ? "1" : columns.stream().map(Object::toString).collect(joining(", ")));
+        builder.append(" FROM ");
+        builder.append(table);
+
+        return builder.toCode();
     }
 
 
@@ -174,13 +181,6 @@ public final class SqlShared extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return child.hasServiceSubpattern();
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        return child.getVirtualTables();
     }
 
 

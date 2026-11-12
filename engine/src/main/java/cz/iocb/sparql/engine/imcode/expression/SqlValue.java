@@ -18,7 +18,6 @@ import java.util.Set;
 import cz.iocb.sparql.engine.common.UnionFind;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
-import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
@@ -170,13 +169,6 @@ public final class SqlValue extends SqlExpressionIntercode
 
     @Override
     protected void generateExplanation(StringBuilder builder, String indent, int priority)
-    {
-        throw new UnsupportedOperationException();
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
     {
         throw new UnsupportedOperationException();
     }

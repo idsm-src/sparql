@@ -6,6 +6,7 @@ import java.sql.Statement;
 import java.util.Set;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlDistinct;
 import cz.iocb.sparql.engine.imcode.SqlIntercode;
@@ -95,8 +96,8 @@ public class Estimator
 
     /**
      * SQL of a statement evaluating the intermediate code: its SQL preceded by the {@code WITH} clause declaring the
-     * virtual tables and the common table expressions it refers to (see {@link SqlSelect#translateWithClause}). The SQL
-     * of the code is then wrapped in a query, since it need not be a plain {@code SELECT}: a walk begins with a
+     * virtual tables and the common table expressions it reads (see {@link SqlSelect#translateWithClause}). The SQL of
+     * the code is then wrapped in a query, since it need not be a plain {@code SELECT}: a walk begins with a
      * {@code WITH RECURSIVE} clause of its own, which cannot follow another {@code WITH} clause.
      *
      * @param scope the scope of the intermediate code
@@ -105,10 +106,10 @@ public class Estimator
      */
     private String translateStatement(Scope scope, SqlIntercode imcode)
     {
-        String sql = imcode.translate(request, scope);
-        String with = SqlSelect.translateWithClause(request, imcode.getVirtualTables(), sql);
+        SqlCode code = imcode.translate(request, scope);
+        String with = SqlSelect.translateWithClause(request, code);
 
-        return with.isEmpty() ? sql : with + "SELECT * FROM (" + sql + ") AS tab";
+        return with.isEmpty() ? code.getText() : with + "SELECT * FROM (" + code.getText() + ") AS tab";
     }
 
 

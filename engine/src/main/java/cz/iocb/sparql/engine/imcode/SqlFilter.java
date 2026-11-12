@@ -11,7 +11,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
@@ -188,9 +189,9 @@ public final class SqlFilter extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT ");
 
@@ -209,24 +210,22 @@ public final class SqlFilter extends SqlIntercode
         builder.append(" WHERE ");
         builder.append(translateConditions(request));
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
     /**
-     * SQL of the conjunction of the conditions. It reads the columns of the child by their names, so it belongs to a
-     * query whose only source is the child, under the alias of the input of a node holding expressions (see
-     * {@link Scope#getInputTable}), which the patterns of the conditions refer to.
+     * SQL code of the conjunction of the conditions. It reads the columns of the child by their names, so it belongs to
+     * a query whose only source is the child, under the alias of the input of a node holding expressions (see
+     * {@link Scope#getInputTable}), which the patterns of the conditions refer to; it reads the declared tables the
+     * conditions read.
      *
      * @param request the current request
-     * @return SQL of the conjunction of the conditions
+     * @return SQL code of the conjunction of the conditions
      */
-    public String translateConditions(Request request)
+    public SqlCode translateConditions(Request request)
     {
-        ClassRelations relations = request.getConfiguration();
-
-        return conditions.stream().map(cnd -> cnd.get(relations, xsdBoolean).get(0).toString())
-                .collect(joining(" AND "));
+        return translateConditions(request.getConfiguration(), conditions);
     }
 
 
@@ -270,15 +269,6 @@ public final class SqlFilter extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return child.hasServiceSubpattern() || conditions.stream().anyMatch(c -> c.hasServiceSubpattern());
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        Set<VirtualTable> tables = getVirtualTables(child);
-        tables.addAll(getVirtualTables(conditions));
-        return tables;
     }
 
 

@@ -15,9 +15,10 @@ import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
-import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -309,27 +310,27 @@ public final class SqlUnion extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
         return translate(request, scope, null);
     }
 
 
     /**
-     * SQL of the union, each branch selecting the columns of the union from its own SQL, with a condition of its own
-     * when the conditions are given. The branches of one table whose conditions are complementary are written together
-     * as a single scan (see {@link SqlTableAccess#translateUnion}) only without the conditions, because a condition
-     * belongs to one branch.
+     * SQL code of the union, each branch selecting the columns of the union from its own SQL, with a condition of its
+     * own when the conditions are given. The branches of one table whose conditions are complementary are written
+     * together as a single scan (see {@link SqlTableAccess#translateUnion}) only without the conditions, because a
+     * condition belongs to one branch.
      *
      * @param request the current request
      * @param scope the scope of the union
      * @param conditions the condition of a branch given the branch and its alias (null for none), or null when the
      *            branches get no conditions
-     * @return SQL of the union
+     * @return SQL code of the union
      */
-    public String translate(Request request, Scope scope, BiFunction<SqlIntercode, Table, String> conditions)
+    public SqlCode translate(Request request, Scope scope, BiFunction<SqlIntercode, Table, String> conditions)
     {
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         Set<Column> columns = bindings.getNonConstantColumns();
 
@@ -401,7 +402,7 @@ public final class SqlUnion extends SqlIntercode
             }
         }
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -436,13 +437,6 @@ public final class SqlUnion extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return childs.stream().anyMatch(c -> c.hasServiceSubpattern());
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        return getVirtualTables(childs);
     }
 
 

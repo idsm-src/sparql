@@ -7,7 +7,8 @@ import java.util.List;
 /**
  * Name of a table-like relation appearing in the generated SQL, rendered double-quoted. A {@link SourceTable} is a
  * relation the mappings read from (a {@link DatabaseTable} of the database or a {@link VirtualTable} defined by the
- * configuration), whereas a {@link AliasTable} only names a subquery inside the generated statement.
+ * configuration), whereas an {@link AliasTable} only names a subquery inside the generated statement and a
+ * {@link CommonTable} a common table expression the engine defines for it.
  */
 public abstract class Table
 {

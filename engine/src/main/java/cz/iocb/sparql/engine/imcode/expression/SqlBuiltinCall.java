@@ -146,10 +146,10 @@ import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.DeclaredTable;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.ValueColumn;
-import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
@@ -3288,9 +3288,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
 
     @Override
-    public Set<VirtualTable> getVirtualTables()
+    public Set<DeclaredTable> getDeclaredTables()
     {
-        return getVirtualTables(arguments);
+        return getDeclaredTables(arguments);
     }
 
 

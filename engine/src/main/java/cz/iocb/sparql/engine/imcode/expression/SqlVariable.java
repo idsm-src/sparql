@@ -4,9 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
-import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
@@ -143,13 +141,6 @@ public final class SqlVariable extends SqlExpressionIntercode
             return false;
 
         return true;
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        return Set.of();
     }
 
 

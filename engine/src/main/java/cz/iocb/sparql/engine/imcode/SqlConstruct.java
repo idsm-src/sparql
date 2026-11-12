@@ -28,7 +28,8 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SourceTable;
-import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
@@ -541,9 +542,9 @@ public final class SqlConstruct extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         boolean canBeNull = bindings.getValues().stream().anyMatch(v -> v.canBeNull());
         Set<Column> columns = bindings.getNonConstantColumns();
@@ -606,7 +607,7 @@ public final class SqlConstruct extends SqlIntercode
             }
         }
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -967,13 +968,6 @@ public final class SqlConstruct extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return child.hasServiceSubpattern();
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        return child.getVirtualTables();
     }
 
 

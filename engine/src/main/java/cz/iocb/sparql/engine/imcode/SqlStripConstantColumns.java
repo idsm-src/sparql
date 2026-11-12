@@ -10,8 +10,9 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.TableColumn;
-import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -142,9 +143,9 @@ public final class SqlStripConstantColumns extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT ");
 
@@ -169,7 +170,7 @@ public final class SqlStripConstantColumns extends SqlIntercode
         builder.append(child.translate(request, scope));
         builder.append(" ) AS tab");
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -191,13 +192,6 @@ public final class SqlStripConstantColumns extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return child.hasServiceSubpattern();
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        return child.getVirtualTables();
     }
 
 

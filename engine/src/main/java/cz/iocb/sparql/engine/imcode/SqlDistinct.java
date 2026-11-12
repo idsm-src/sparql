@@ -13,7 +13,8 @@ import cz.iocb.sparql.engine.common.Pair;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
-import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -187,13 +188,13 @@ public final class SqlDistinct extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
         ClassRelations relations = request.getConfiguration();
 
         Restrictions restrictions = new Restrictions(distinctVariables);
 
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT ");
 
@@ -218,7 +219,7 @@ public final class SqlDistinct extends SqlIntercode
         else
             builder.append("1");
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -450,13 +451,6 @@ public final class SqlDistinct extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return child.hasServiceSubpattern();
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        return child.getVirtualTables();
     }
 
 

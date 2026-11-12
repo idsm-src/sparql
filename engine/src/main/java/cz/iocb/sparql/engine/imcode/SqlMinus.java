@@ -11,7 +11,8 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
@@ -299,11 +300,11 @@ public final class SqlMinus extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
         ClassRelations relations = request.getConfiguration();
 
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT ");
 
@@ -333,9 +334,13 @@ public final class SqlMinus extends SqlIntercode
             builder.append(condition);
         }
 
+        // the condition may hold the test of the current solution, so the code reads what the SQL of the test reads
+        if(solutionBound != null)
+            builder.addDeclaredTables(solutionBound.getDeclaredTables());
+
         builder.append(")");
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -445,14 +450,6 @@ public final class SqlMinus extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return left.hasServiceSubpattern() || right.hasServiceSubpattern();
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        //NOTE: the condition on the current solution reads no table
-        return getVirtualTables(left, right);
     }
 
 

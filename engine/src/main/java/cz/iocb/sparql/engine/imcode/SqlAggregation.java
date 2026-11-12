@@ -14,7 +14,8 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
-import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryArithmetic;
 import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
@@ -379,7 +380,7 @@ public final class SqlAggregation extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
         Set<Column> groupByColumns = new HashSet<>();
 
@@ -388,7 +389,7 @@ public final class SqlAggregation extends SqlIntercode
                 groupByColumns.addAll(child.getVariableBindings().get(var).getNonConstantColumns());
 
 
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT ");
         boolean hasSelect = false;
@@ -413,6 +414,9 @@ public final class SqlAggregation extends SqlIntercode
 
                 List<Column> cols = expression.get(request.getConfiguration(), resClass);
                 aggregated |= expression instanceof SqlBuiltinCall c && c.isAggregateFunction();
+
+                // the columns of the expression are written here, so the code reads what their SQL reads
+                builder.addDeclaredTables(expression.getDeclaredTables());
 
                 for(int i = 0; i < resClass.getColumnCount(); i++)
                 {
@@ -450,7 +454,7 @@ public final class SqlAggregation extends SqlIntercode
             builder.append(" GROUP BY ()");
 
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -458,15 +462,6 @@ public final class SqlAggregation extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return child.hasServiceSubpattern() || aggregations.values().stream().anyMatch(a -> a.hasServiceSubpattern());
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        Set<VirtualTable> tables = getVirtualTables(child);
-        tables.addAll(getVirtualTables(aggregations.values()));
-        return tables;
     }
 
 

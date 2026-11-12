@@ -13,8 +13,9 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.TableColumn;
-import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
@@ -222,15 +223,18 @@ public final class SqlBind extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
         if(!expression.getBinding().hasExpressionColumn())
             return child.translate(request, scope);
 
 
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT ");
+
+        // the columns of the expression are written here, so the code reads what their SQL reads
+        builder.addDeclaredTables(expression.getDeclaredTables());
 
         VariableBinding binding = getVariableBindings().get(variable);
         boolean hasSelect = false;
@@ -288,7 +292,7 @@ public final class SqlBind extends SqlIntercode
         }
 
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -347,13 +351,6 @@ public final class SqlBind extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return child.hasServiceSubpattern() || expression.hasServiceSubpattern();
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        return getVirtualTables(child, expression);
     }
 
 

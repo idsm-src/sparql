@@ -1,10 +1,6 @@
 package cz.iocb.sparql.engine.imcode;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
-import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.database.SqlBuilder;
 
 
 
@@ -34,44 +30,6 @@ public abstract class SqlBaseClass
 
 
     /**
-     * Virtual tables the SQL of the node reads, including those read by its children. The top-level select declares
-     * them (and the virtual tables their definitions read) in the {@code WITH} clause of the generated statement.
-     *
-     * @return virtual tables the SQL of the node reads, including those read by its children
-     */
-    public abstract Set<VirtualTable> getVirtualTables();
-
-
-    /**
-     * Union of the virtual tables read by the given nodes.
-     *
-     * @param nodes the nodes
-     * @return union of the virtual tables read by the given nodes
-     */
-    protected static Set<VirtualTable> getVirtualTables(Collection<? extends SqlBaseClass> nodes)
-    {
-        Set<VirtualTable> tables = new HashSet<>();
-
-        for(SqlBaseClass node : nodes)
-            tables.addAll(node.getVirtualTables());
-
-        return tables;
-    }
-
-
-    /**
-     * Union of the virtual tables read by the given nodes.
-     *
-     * @param nodes the nodes
-     * @return union of the virtual tables read by the given nodes
-     */
-    protected static Set<VirtualTable> getVirtualTables(SqlBaseClass... nodes)
-    {
-        return getVirtualTables(Arrays.asList(nodes));
-    }
-
-
-    /**
      * Creates the node.
      */
     protected SqlBaseClass()
@@ -93,6 +51,19 @@ public abstract class SqlBaseClass
 
 
     /**
+     * Appends a comma separator when {@code condition} holds.
+     *
+     * @param builder the builder to append to
+     * @param condition whether to append the separator
+     */
+    protected static void appendComma(SqlBuilder builder, boolean condition)
+    {
+        if(condition)
+            builder.append(", ");
+    }
+
+
+    /**
      * Appends an {@code AND} separator when {@code condition} holds.
      *
      * @param builder the builder to append to
@@ -106,12 +77,38 @@ public abstract class SqlBaseClass
 
 
     /**
+     * Appends an {@code AND} separator when {@code condition} holds.
+     *
+     * @param builder the builder to append to
+     * @param condition whether to append the separator
+     */
+    protected static void appendAnd(SqlBuilder builder, boolean condition)
+    {
+        if(condition)
+            builder.append(" AND ");
+    }
+
+
+    /**
      * Appends an {@code OR} separator when {@code condition} holds.
      *
      * @param builder the builder to append to
      * @param condition whether to append the separator
      */
     protected static void appendOr(StringBuilder builder, boolean condition)
+    {
+        if(condition)
+            builder.append(" OR ");
+    }
+
+
+    /**
+     * Appends an {@code OR} separator when {@code condition} holds.
+     *
+     * @param builder the builder to append to
+     * @param condition whether to append the separator
+     */
+    protected static void appendOr(SqlBuilder builder, boolean condition)
     {
         if(condition)
             builder.append(" OR ");

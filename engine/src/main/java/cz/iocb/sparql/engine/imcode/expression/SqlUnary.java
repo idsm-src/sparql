@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.database.DeclaredTable;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -57,9 +57,9 @@ public abstract class SqlUnary extends SqlExpressionIntercode
 
 
     @Override
-    public Set<VirtualTable> getVirtualTables()
+    public Set<DeclaredTable> getDeclaredTables()
     {
-        return operand.getVirtualTables();
+        return operand.getDeclaredTables();
     }
 
 

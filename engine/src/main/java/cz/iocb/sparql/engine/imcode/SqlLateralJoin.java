@@ -14,7 +14,8 @@ import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
-import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.UnsupportedIriClass;
@@ -498,11 +499,11 @@ public final class SqlLateralJoin extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
         ClassRelations relations = request.getConfiguration();
 
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         Set<Column> columns = bindings.getNonConstantColumns();
 
@@ -533,7 +534,7 @@ public final class SqlLateralJoin extends SqlIntercode
             builder.append(condition);
         }
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -545,7 +546,7 @@ public final class SqlLateralJoin extends SqlIntercode
      * @param scope the scope of the join
      * @param builder the builder to append to
      */
-    private void translateLeft(Request request, Scope scope, StringBuilder builder)
+    private void translateLeft(Request request, Scope scope, SqlBuilder builder)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -637,13 +638,6 @@ public final class SqlLateralJoin extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return left.hasServiceSubpattern() || right.hasServiceSubpattern();
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        return getVirtualTables(left, right);
     }
 
 

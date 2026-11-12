@@ -12,13 +12,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.database.DeclaredTable;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.TableColumn;
-import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlEmptySolution;
 import cz.iocb.sparql.engine.imcode.SqlFilter;
@@ -125,6 +126,12 @@ public final class SqlExists extends SqlExpressionIntercode
      */
     private final boolean optimized;
 
+    /**
+     * The declared tables the SQL of the test reads: those the code of the test was rendered with (see
+     * {@link #translate}), none while the test has no SQL.
+     */
+    private final Set<DeclaredTable> tables;
+
 
     /**
      * Creates the expression; it is deterministic if the pattern is.
@@ -134,6 +141,7 @@ public final class SqlExists extends SqlExpressionIntercode
      * @param evaluated the pattern as the test evaluates it
      * @param origin the pattern as translated
      * @param mappings columns per resource class
+     * @param tables the declared tables the SQL of the test reads
      * @param bindings the variable bindings
      * @param variables the variables of the current solution the pattern may refer to
      * @param chained whether the current solution extends the current solution of the pattern the node holding the
@@ -142,8 +150,8 @@ public final class SqlExists extends SqlExpressionIntercode
      * @param optimized whether the expression was built by the optimisation
      */
     private SqlExists(boolean negated, SqlIntercode pattern, SqlIntercode evaluated, SqlIntercode origin,
-            Map<ResourceClass, List<Column>> mappings, VariableBindings bindings, Set<Variable> variables,
-            boolean chained, VariableBindings solution, boolean optimized)
+            Map<ResourceClass, List<Column>> mappings, Set<DeclaredTable> tables, VariableBindings bindings,
+            Set<Variable> variables, boolean chained, VariableBindings solution, boolean optimized)
     {
         super(mappings, false, pattern.isDeterministic());
 
@@ -151,6 +159,7 @@ public final class SqlExists extends SqlExpressionIntercode
         this.pattern = pattern;
         this.evaluated = evaluated;
         this.origin = origin;
+        this.tables = tables;
         this.bindings = bindings;
         this.variables = variables;
         this.chained = chained;
@@ -215,8 +224,8 @@ public final class SqlExists extends SqlExpressionIntercode
      * @param negated whether the test is negated
      * @param pattern the tested pattern
      * @param evaluated the pattern as the test evaluates it
-     * @param sql SQL of the solutions the test reads from the evaluated pattern (see {@link #translate}) when it has
-     *            been rendered already, or null
+     * @param sql SQL code of the solutions the test reads from the evaluated pattern (see {@link #translate}) when it
+     *            has been rendered already, or null
      * @param origin the pattern as translated
      * @param bindings the variable bindings
      * @param variables the variables of the current solution the pattern may refer to
@@ -228,8 +237,9 @@ public final class SqlExists extends SqlExpressionIntercode
      * @return existence test materialising only when needed
      */
     private static SqlExpressionIntercode create(Request request, Scope scope, boolean negated, SqlIntercode pattern,
-            SqlIntercode evaluated, String sql, SqlIntercode origin, VariableBindings bindings, Set<Variable> variables,
-            boolean chained, VariableBindings solution, Restriction restriction, boolean optimized)
+            SqlIntercode evaluated, SqlCode sql, SqlIntercode origin, VariableBindings bindings,
+            Set<Variable> variables, boolean chained, VariableBindings solution, Restriction restriction,
+            boolean optimized)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -246,20 +256,23 @@ public final class SqlExists extends SqlExpressionIntercode
 
 
         if(!restriction.contains(relations, xsdBoolean))
-            return new SqlExists(negated, pattern, evaluated, origin, singletonMap(xsdBoolean, null), bindings,
-                    variables, chained, solution, optimized);
+            return new SqlExists(negated, pattern, evaluated, origin, singletonMap(xsdBoolean, null), Set.of(),
+                    bindings, variables, chained, solution, optimized);
 
         // the call is evaluated by the second optimisation pass, which rebuilds the expression and everything built
         // on it; until then a placeholder stands for the test
         if(pattern.hasServiceSubpattern())
             return new SqlExists(negated, pattern, evaluated, origin, singletonMap(xsdBoolean, List.of(unevaluated)),
-                    bindings, variables, chained, solution, optimized);
+                    Set.of(), bindings, variables, chained, solution, optimized);
 
 
-        List<Column> result = translate(request, scope, negated, evaluated, solution, sql);
+        // the SQL of the test is rendered at once, as the column of the expression; the declared tables it reads are
+        // kept with the expression for the node that writes the column into its SQL
+        SqlCode test = translate(request, scope, negated, evaluated, solution, sql);
+        List<Column> result = List.of(new ExpressionColumn(test.getText(), BOOL, false));
 
-        return new SqlExists(negated, pattern, evaluated, origin, singletonMap(xsdBoolean, result), bindings, variables,
-                chained, solution, optimized);
+        return new SqlExists(negated, pattern, evaluated, origin, singletonMap(xsdBoolean, result),
+                test.getDeclaredTables(), bindings, variables, chained, solution, optimized);
     }
 
 
@@ -403,7 +416,7 @@ public final class SqlExists extends SqlExpressionIntercode
         // pattern is not the first to read them; the SQL rendered to find that out is the SQL of the test when no value
         // is taken
         SqlIntercode evaluated = optPattern;
-        String sql = null;
+        SqlCode sql = null;
 
         if(restriction.contains(relations, xsdBoolean) && !optPattern.hasServiceSubpattern()
                 && hasValues(optPattern, solution))
@@ -502,13 +515,13 @@ public final class SqlExists extends SqlExpressionIntercode
      * @param scope the scope of the pattern
      * @param pattern the pattern
      * @param solution bindings of the current solution
-     * @param sql SQL of the solutions the test reads from the pattern
+     * @param sql SQL code of the solutions the test reads from the pattern
      * @return the values the table accesses of the pattern take, by their variables
      */
     private static Map<Variable, SqlExpressionIntercode> getValues(Scope scope, SqlIntercode pattern,
-            VariableBindings solution, String sql)
+            VariableBindings solution, SqlCode sql)
     {
-        Set<Integer> read = scope.getEnclosingInputs(sql);
+        Set<Integer> read = scope.getEnclosingInputs(sql.getText());
 
         Map<Variable, SqlExpressionIntercode> values = new LinkedHashMap<>();
 
@@ -539,7 +552,8 @@ public final class SqlExists extends SqlExpressionIntercode
      */
     private static SqlFilter getTopFilter(Request request, Scope scope, SqlIntercode pattern)
     {
-        if(pattern instanceof SqlFilter filter && scope.refersToEnclosingInput(filter.translateConditions(request)))
+        if(pattern instanceof SqlFilter filter
+                && scope.refersToEnclosingInput(filter.translateConditions(request).getText()))
             return filter;
 
         return null;
@@ -547,29 +561,30 @@ public final class SqlExists extends SqlExpressionIntercode
 
 
     /**
-     * SQL boolean expression testing the existence of a solution of the pattern compatible with the current solution.
-     * The columns of the current solution are addressed through the aliases of the inputs providing them, which no node
-     * of the pattern declares, so the condition compares them with the columns of the pattern as they are; a test whose
-     * pattern refers to those inputs nowhere else is a semi-join for the database. A filter at the top of the pattern
-     * whose conditions refer to those inputs is therefore not left to the pattern: the test reads the solutions the
-     * filter is given, under the alias the filter would give them, which the patterns nested in its conditions refer to
-     * (see {@link Scope#getInputTable}), and its condition holds the conditions of the filter too.
+     * SQL code of the boolean expression testing the existence of a solution of the pattern compatible with the current
+     * solution; it reads the declared tables the code of the pattern and the conditions of a filter the test evaluates
+     * read. The columns of the current solution are addressed through the aliases of the inputs providing them, which
+     * no node of the pattern declares, so the condition compares them with the columns of the pattern as they are; a
+     * test whose pattern refers to those inputs nowhere else is a semi-join for the database. A filter at the top of
+     * the pattern whose conditions refer to those inputs is therefore not left to the pattern: the test reads the
+     * solutions the filter is given, under the alias the filter would give them, which the patterns nested in its
+     * conditions refer to (see {@link Scope#getInputTable}), and its condition holds the conditions of the filter too.
      *
      * @param request the current request
      * @param scope the scope of the pattern
      * @param negated whether the test is negated
      * @param pattern the pattern as the test evaluates it
      * @param solution bindings of the current solution, or null
-     * @param sql SQL of the solutions the test reads (the pattern, or the child of the filter at its top that the test
-     *            evaluates) when it has been rendered already, or null
-     * @return SQL boolean expression testing the existence of a solution of the pattern
+     * @param sql SQL code of the solutions the test reads (the pattern, or the child of the filter at its top that the
+     *            test evaluates) when it has been rendered already, or null
+     * @return SQL code of the boolean expression testing the existence of a solution of the pattern
      */
-    private static List<Column> translate(Request request, Scope scope, boolean negated, SqlIntercode pattern,
-            VariableBindings solution, String sql)
+    private static SqlCode translate(Request request, Scope scope, boolean negated, SqlIntercode pattern,
+            VariableBindings solution, SqlCode sql)
     {
         ClassRelations relations = request.getConfiguration();
 
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         if(negated)
             builder.append("NOT ");
@@ -588,17 +603,22 @@ public final class SqlExists extends SqlExpressionIntercode
 
         String condition = solution == null ? null :
                 SqlIntercode.generateJoinCondition(relations, solution, pattern.getVariableBindings(), null, table);
-        String filterConditions = filter != null ? filter.translateConditions(request) : null;
 
-        if(condition != null || filterConditions != null)
-        {
+        if(condition != null || filter != null)
             builder.append(" WHERE ");
-            builder.append(Stream.of(condition, filterConditions).filter(Objects::nonNull).collect(joining(" AND ")));
-        }
+
+        if(condition != null)
+            builder.append(condition);
+
+        if(condition != null && filter != null)
+            builder.append(" AND ");
+
+        if(filter != null)
+            builder.append(filter.translateConditions(request));
 
         builder.append(")");
 
-        return List.of(new ExpressionColumn(builder.toString(), BOOL, false));
+        return builder.toCode();
     }
 
 
@@ -666,9 +686,9 @@ public final class SqlExists extends SqlExpressionIntercode
 
 
     @Override
-    public Set<VirtualTable> getVirtualTables()
+    public Set<DeclaredTable> getDeclaredTables()
     {
-        return evaluated.getVirtualTables();
+        return tables;
     }
 
 

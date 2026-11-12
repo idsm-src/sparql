@@ -43,6 +43,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import static java.util.Comparator.comparing;
+import static java.util.Comparator.comparingInt;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 import java.math.BigInteger;
@@ -55,11 +56,16 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.CommonTable;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.DeclaredTable;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.database.VirtualTableDefinition;
@@ -555,38 +561,64 @@ public final class SqlSelect extends SqlIntercode
 
 
     /**
-     * {@code WITH} clause of a statement: it declares the virtual tables the statement reads and, transitively, the
-     * virtual tables their definitions read, each one after the tables it depends on, followed by the common table
-     * expressions the SQL of the statement refers to (see {@link Request#getCommonTableExpressions}); empty when there
-     * is nothing to declare.
+     * {@code WITH} clause of a statement made of the code: it declares the declared tables the code reads (see
+     * {@link SqlCode}) and, transitively, those their own queries read. The virtual tables come first, each one after
+     * the virtual tables its definition reads; the common table expressions follow in the order they were asked for, so
+     * that each one follows the ones its query reads (see {@link CommonTable}). Empty when there is nothing to declare.
      *
      * @param request the current request
-     * @param tables the virtual tables the statement reads
-     * @param sql the SQL of the statement without the clause
+     * @param code the SQL code of the statement without the clause
      * @return the {@code WITH} clause followed by a space, or the empty string
      * @throws IllegalStateException if a virtual table has no definition in the configuration or the dependencies of
      *             the virtual tables are cyclic
      */
-    public static String translateWithClause(Request request, Set<VirtualTable> tables, String sql)
+    public static String translateWithClause(Request request, SqlCode code)
     {
-        List<String> expressions = request.getCommonTableExpressions(sql);
+        Set<VirtualTable> virtual = new HashSet<>();
+        Set<CommonTable> common = new TreeSet<>(comparingInt(CommonTable::getIndex));
 
-        // the queries of the common table expressions may read virtual tables the statement itself does not read
-        Set<VirtualTable> declared = new HashSet<>(tables);
-        declared.addAll(request.getCommonTableExpressionTables(sql));
+        collectDeclaredTables(code, virtual, common);
 
-        if(declared.isEmpty() && expressions.isEmpty())
+        if(virtual.isEmpty() && common.isEmpty())
             return "";
 
         LinkedHashMap<VirtualTable, VirtualTableDefinition> ordered = new LinkedHashMap<>();
 
-        for(VirtualTable table : declared.stream().sorted(comparing(VirtualTable::getName)).toList())
+        for(VirtualTable table : virtual.stream().sorted(comparing(VirtualTable::getName)).toList())
             orderVirtualTable(request.getConfiguration(), table, ordered, new HashSet<>());
 
         Stream<String> definitions = ordered.entrySet().stream()
                 .map(e -> e.getKey() + " AS (" + e.getValue().getQuery() + ")");
 
-        return Stream.concat(definitions, expressions.stream()).collect(joining(", ", "WITH ", " "));
+        Stream<String> expressions = common.stream().map(t -> t + " AS (" + t.getQuery().getText() + ")");
+
+        return Stream.concat(definitions, expressions).collect(joining(", ", "WITH ", " "));
+    }
+
+
+    /**
+     * Collects the declared tables the code reads, together with those the queries of the common table expressions
+     * among them read.
+     *
+     * @param code the SQL code
+     * @param virtual the virtual tables collected so far
+     * @param common the common table expressions collected so far
+     */
+    private static void collectDeclaredTables(SqlCode code, Set<VirtualTable> virtual, Set<CommonTable> common)
+    {
+        for(DeclaredTable table : code.getDeclaredTables())
+        {
+            switch(table)
+            {
+                case VirtualTable virtualTable -> virtual.add(virtualTable);
+
+                case CommonTable commonTable ->
+                {
+                    if(common.add(commonTable))
+                        collectDeclaredTables(commonTable.getQuery(), virtual, common);
+                }
+            }
+        }
     }
 
 
@@ -622,42 +654,40 @@ public final class SqlSelect extends SqlIntercode
 
 
     /**
-     * SQL of the top-level select of a statement of a query, which lies in no pattern of an expression (see
-     * {@link Scope#TOP}).
+     * SQL of the statement of the top-level select of a query, which lies in no pattern of an expression (see
+     * {@link Scope#TOP} and {@link #translateStatement}).
      *
      * @param request the current request
      * @return SQL of the statement
      */
     public String translate(Request request)
     {
-        return translate(request, Scope.TOP);
-    }
-
-
-    @Override
-    public String translate(Request request, Scope scope)
-    {
-        if(!isTopLevel())
-            return translateSelect(request, scope);
-
-        String select = translateSelect(request, scope);
-
-        return translateWithClause(request, getVirtualTables(), select) + select;
+        return translateStatement(request, Scope.TOP);
     }
 
 
     /**
-     * The select without the {@code WITH} clause of the statement.
+     * SQL of the statement of the select: the code of the select preceded by the {@code WITH} clause that declares the
+     * tables the code reads (see {@link #translateWithClause}).
      *
      * @param request the current request
      * @param scope the scope of the select
-     * @return the select without the {@code WITH} clause of the statement
+     * @return SQL of the statement
      */
-    private String translateSelect(Request request, Scope scope)
+    public String translateStatement(Request request, Scope scope)
+    {
+        SqlCode select = translate(request, scope);
+
+        return translateWithClause(request, select) + select.getText();
+    }
+
+
+    @Override
+    public SqlCode translate(Request request, Scope scope)
     {
         ClassRelations relations = request.getConfiguration();
 
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         if(!isTopLevel())
         {
@@ -733,7 +763,7 @@ public final class SqlSelect extends SqlIntercode
         if(offset != null)
             builder.append(" OFFSET ").append(offset.toString());
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -1142,13 +1172,6 @@ public final class SqlSelect extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return child.hasServiceSubpattern();
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        return child.getVirtualTables();
     }
 
 

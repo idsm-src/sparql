@@ -17,7 +17,8 @@ import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
-import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression;
 import cz.iocb.sparql.engine.imcode.expression.SqlExists;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
@@ -514,11 +515,11 @@ public final class SqlLeftJoin extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
         ClassRelations relations = request.getConfiguration();
 
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         Set<Column> columns = bindings.getNonConstantColumns();
 
@@ -551,13 +552,12 @@ public final class SqlLeftJoin extends SqlIntercode
         if(condition != null && !conditions.isEmpty())
             builder.append(" AND ");
 
-        builder.append(
-                conditions.stream().map(c -> c.get(relations, xsdBoolean).get(0).toString()).collect(joining(" AND ")));
+        builder.append(translateConditions(relations, conditions));
 
         if(condition == null && conditions.isEmpty())
             builder.append("true");
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -607,15 +607,6 @@ public final class SqlLeftJoin extends SqlIntercode
     {
         return left.hasServiceSubpattern() || right.hasServiceSubpattern()
                 || conditions.stream().anyMatch(c -> c.hasServiceSubpattern());
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        Set<VirtualTable> tables = getVirtualTables(left, right);
-        tables.addAll(getVirtualTables(conditions));
-        return tables;
     }
 
 

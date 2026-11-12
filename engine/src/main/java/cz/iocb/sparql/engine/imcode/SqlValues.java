@@ -13,12 +13,14 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.CommonTable;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.SourceTable;
-import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
@@ -253,11 +255,18 @@ public final class SqlValues extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
-        String values = translateValues();
+        CommonTable table = request.getCommonTableExpression(new SqlCode(translateValues()));
 
-        return "SELECT " + translateColumns() + " FROM " + request.getCommonTableExpression(values);
+        SqlBuilder builder = new SqlBuilder();
+
+        builder.append("SELECT ");
+        builder.append(translateColumns());
+        builder.append(" FROM ");
+        builder.append(table);
+
+        return builder.toCode();
     }
 
 
@@ -330,13 +339,6 @@ public final class SqlValues extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return false;
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        return Set.of();
     }
 
 

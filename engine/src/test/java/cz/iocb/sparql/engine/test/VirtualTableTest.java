@@ -3,13 +3,18 @@ package cz.iocb.sparql.engine.test;
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdBooleanIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.sql.Connection;
@@ -25,12 +30,16 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.CommonTable;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.database.VirtualTableDefinition;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
+import cz.iocb.sparql.engine.imcode.SqlSelect;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.ParametrisedMapping;
 import cz.iocb.sparql.engine.mapping.QuadMapping;
@@ -42,8 +51,10 @@ import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.Engine;
 import cz.iocb.sparql.engine.request.LimitExceedException;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.request.Request.PreparedQuery;
 import cz.iocb.sparql.engine.request.Result;
 import cz.iocb.sparql.engine.translator.ServiceException;
+import cz.iocb.sparql.engine.translator.TranslateVisitor;
 import cz.iocb.sparql.testing.Database;
 
 
@@ -207,6 +218,27 @@ public class VirtualTableTest
 
 
     /**
+     * The SQL statement the query is translated to.
+     *
+     * @param query the query without the prefix declaration
+     * @return the SQL statement
+     * @throws Exception if the query cannot be translated
+     */
+    private static String translate(String query) throws Exception
+    {
+        Engine engine = new Engine(createConfiguration());
+
+        try(Request request = engine.getRequest())
+        {
+            PreparedQuery prepared = request.prepareQuery(prefix + query, null);
+            SqlSelect imcode = new TranslateVisitor(request).translate(prepared.getSyntaxTree(), null, null, List.of());
+
+            return imcode.optimize(request, false).optimize(request, true).translate(request);
+        }
+    }
+
+
+    /**
      * Expected row.
      *
      * @param terms the terms
@@ -251,6 +283,18 @@ public class VirtualTableTest
     private static TypedLiteral integer(int value)
     {
         return new TypedLiteral(Integer.toString(value), xsdIntegerIri);
+    }
+
+
+    /**
+     * Boolean literal.
+     *
+     * @param value the value
+     * @return boolean literal
+     */
+    private static TypedLiteral bool(boolean value)
+    {
+        return new TypedLiteral(Boolean.toString(value), xsdBooleanIri);
     }
 
 
@@ -323,6 +367,92 @@ public class VirtualTableTest
                 FILTER EXISTS { GRAPH ?g { <http://example.org/compound/1> ex:synonym* ?w } } \
                 FILTER(?q = <http://example.org/other/1>) } }""");
         assertThat(result, containsInAnyOrder(row(string("first")), row(string("second")), row(string("third"))));
+    }
+
+
+    @Test
+    @DisplayName("a virtual table in the EXISTS pattern of a BIND")
+    void existsInBind() throws Exception
+    {
+        String query = "SELECT ?l ?b WHERE { ?s ex:label ?l BIND(EXISTS { ?s ex:synonym ?o } AS ?b) }";
+
+        assertThat(execute(query), containsInAnyOrder(row(string("first"), bool(true)),
+                row(string("second"), bool(true)), row(string("third"), bool(false))));
+        assertThat(translate(query), startsWith("WITH \"compound_synonyms\" AS ("));
+    }
+
+
+    @Test
+    @DisplayName("a virtual table in the EXISTS pattern of a filter of an OPTIONAL")
+    void existsInOptionalFilter() throws Exception
+    {
+        String query = "SELECT ?l ?t WHERE { ?s ex:label ?l OPTIONAL { ?s ex:label ?t "
+                + "FILTER EXISTS { ?s ex:synonym 'b' } } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(string("first"), string("first")),
+                row(string("second"), null), row(string("third"), null)));
+        assertThat(translate(query), startsWith("WITH \"compound_synonyms\" AS ("));
+    }
+
+
+    @Test
+    @DisplayName("a virtual table in the EXISTS pattern of an aggregated expression")
+    void existsInAggregate() throws Exception
+    {
+        String query = "SELECT (SUM(IF(EXISTS { ?s ex:synonym ?o }, 1, 0)) AS ?c) WHERE { ?s ex:label ?l }";
+
+        assertThat(execute(query), containsInAnyOrder(row(integer(2))));
+        assertThat(translate(query), startsWith("WITH \"compound_synonyms\" AS ("));
+    }
+
+
+    @Test
+    @DisplayName("an inline table and a virtual table in nested EXISTS patterns")
+    void nestedExists() throws Exception
+    {
+        String query = "SELECT ?l WHERE { ?s ex:label ?l FILTER EXISTS { VALUES ?o { 'b' 'c' } "
+                + "FILTER EXISTS { ?s ex:synonym ?o } } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(string("first"))));
+
+        // the statement declares the virtual table and the inline table, each once, which the patterns only read
+        String sql = translate(query);
+        assertThat(sql, startsWith("WITH \"compound_synonyms\" AS ("));
+        assertThat(sql, containsString(", \"cte0\" AS (SELECT * FROM (VALUES"));
+        assertThat(sql.indexOf(" AS (SELECT * FROM (VALUES"), is(sql.lastIndexOf(" AS (SELECT * FROM (VALUES")));
+        assertThat(sql.indexOf("WITH "), is(sql.lastIndexOf("WITH ")));
+    }
+
+
+    @Test
+    @DisplayName("a statement declares the tables its code reads, also through its common table expressions")
+    void withClause() throws Exception
+    {
+        Engine engine = new Engine(createConfiguration());
+
+        try(Request request = engine.getRequest())
+        {
+            CommonTable first = request.getCommonTableExpression(new SqlCode("SELECT 1 AS x"));
+            CommonTable second = request.getCommonTableExpression(
+                    new SqlBuilder().append("SELECT x FROM ").append(first).append(", ").append(labeled).toCode());
+            CommonTable unused = request.getCommonTableExpression(new SqlCode("SELECT 2 AS y"));
+
+            // a query asked for again has the common table expression it had
+            assertSame(first, request.getCommonTableExpression(new SqlCode("SELECT 1 AS x")));
+            assertEquals(List.of("cte0", "cte1", "cte2"), List.of(first.getName(), second.getName(), unused.getName()));
+
+            // the code reads only the second one, whose query reads the first one and a virtual table, which reads
+            // another virtual table; each table follows the tables its query reads
+            SqlCode code = new SqlBuilder().append("SELECT x FROM ").append(second).toCode();
+
+            assertEquals("WITH \"compound_synonyms\" AS (" + synonymsDefinition().getQuery()
+                    + "), \"labeled_synonyms\" AS (" + labeledDefinition().getQuery()
+                    + "), \"cte0\" AS (SELECT 1 AS x), \"cte1\" AS (SELECT x FROM \"cte0\", \"labeled_synonyms\") ",
+                    SqlSelect.translateWithClause(request, code));
+
+            // a table the code does not read is not declared, even when the text spells its name
+            assertEquals("", SqlSelect.translateWithClause(request, new SqlCode("SELECT '\"cte2\"'")));
+        }
     }
 
 

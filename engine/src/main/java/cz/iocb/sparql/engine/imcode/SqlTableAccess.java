@@ -23,8 +23,9 @@ import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SourceTable;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.TableColumn;
-import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
@@ -1935,37 +1936,38 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
         return translateAccess(request, null);
     }
 
 
     /**
-     * SQL of the access evaluated for a row of the outer tables it is joined with laterally: the correlated condition,
-     * which refers to the columns of the outer tables, restricts the rows along with the conditions of the access, and
-     * the subquery is fenced by {@code OFFSET 0}, so that the planner does not flatten it into the outer join but looks
-     * the rows up through an index of the table for every outer row (see {@link JoinOptimizer}).
+     * SQL code of the access evaluated for a row of the outer tables it is joined with laterally: the correlated
+     * condition, which refers to the columns of the outer tables, restricts the rows along with the conditions of the
+     * access, and the subquery is fenced by {@code OFFSET 0}, so that the planner does not flatten it into the outer
+     * join but looks the rows up through an index of the table for every outer row (see {@link JoinOptimizer}).
      *
      * @param request the current request
      * @param correlatedCondition SQL condition over the columns of the table and of the outer tables
-     * @return SQL of the access evaluated for a row of the outer tables
+     * @return SQL code of the access evaluated for a row of the outer tables
      */
-    public String translateLateral(Request request, String correlatedCondition)
+    public SqlCode translateLateral(Request request, String correlatedCondition)
     {
         return translateAccess(request, correlatedCondition);
     }
 
 
     /**
-     * SQL of the access, restricted and fenced for a lateral join when the correlated condition is given (see
-     * {@link #translateLateral}).
+     * SQL code of the access, restricted and fenced for a lateral join when the correlated condition is given (see
+     * {@link #translateLateral}). It reads the table of the access, which the statement has to declare when it is a
+     * virtual one.
      *
      * @param request the current request
      * @param correlatedCondition SQL condition over the columns of the table and of the outer tables, or null
-     * @return SQL of the access
+     * @return SQL code of the access
      */
-    private String translateAccess(Request request, String correlatedCondition)
+    private SqlCode translateAccess(Request request, String correlatedCondition)
     {
         // the values of the current solution restrict the rows along with the conditions
         String valueCondition = translateValues(request.getConfiguration());
@@ -2008,7 +2010,7 @@ public final class SqlTableAccess extends SqlIntercode
         // one such member makes the whole UNION ALL or join around it sequential
         boolean existence = canBeLimited && table != null;
 
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT ");
 
@@ -2032,6 +2034,9 @@ public final class SqlTableAccess extends SqlIntercode
 
         appendConditions(builder, conditions, extraCondition);
 
+        // the conditions hold the columns of the values of the current solution, so the code reads what their SQL reads
+        values.forEach(v -> builder.addDeclaredTables(v.value().getDeclaredTables()));
+
         if(groupColumns != null)
         {
             builder.append(" GROUP BY ");
@@ -2044,7 +2049,7 @@ public final class SqlTableAccess extends SqlIntercode
         if(correlatedCondition != null)
             builder.append(" OFFSET 0");
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -2086,7 +2091,7 @@ public final class SqlTableAccess extends SqlIntercode
      * @param builder the SQL code being built
      * @param conditions the conditions
      */
-    private static void appendConditions(StringBuilder builder, Conditions conditions)
+    private static void appendConditions(SqlBuilder builder, Conditions conditions)
     {
         appendConditions(builder, conditions, null);
     }
@@ -2100,7 +2105,7 @@ public final class SqlTableAccess extends SqlIntercode
      * @param conditions the conditions
      * @param extra SQL of an extra condition in conjunction with the conditions, or null
      */
-    private static void appendConditions(StringBuilder builder, Conditions conditions, String extra)
+    private static void appendConditions(SqlBuilder builder, Conditions conditions, String extra)
     {
         if(conditions.isTrue() && extra == null)
             return;
@@ -2257,7 +2262,7 @@ public final class SqlTableAccess extends SqlIntercode
      * @param columns the columns of the union in the order of the projection
      * @return SQL code of the union of the two accesses as a single scan of their table
      */
-    static String translateUnion(SqlTableAccess left, SqlTableAccess right, Map<Column, Column> leftColumns,
+    static SqlCode translateUnion(SqlTableAccess left, SqlTableAccess right, Map<Column, Column> leftColumns,
             Map<Column, Column> rightColumns, Collection<Column> columns)
     {
         Condition l = left.conditions.getConditions().iterator().next();
@@ -2270,7 +2275,7 @@ public final class SqlTableAccess extends SqlIntercode
         Map<Column, Column> leftExpressions = left.getExpressions();
         Map<Column, Column> rightExpressions = right.getExpressions();
 
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT ");
         boolean hasSelect = false;
@@ -2316,7 +2321,7 @@ public final class SqlTableAccess extends SqlIntercode
 
         appendConditions(builder, new Conditions(l.resolve(r)));
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -2408,13 +2413,6 @@ public final class SqlTableAccess extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return false;
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        return table instanceof VirtualTable virtual ? Set.of(virtual) : Set.of();
     }
 
 

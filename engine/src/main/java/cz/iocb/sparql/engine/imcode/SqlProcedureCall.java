@@ -14,14 +14,15 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
-import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.CommonTable;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.database.NullColumn;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.TableColumn;
-import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
@@ -389,11 +390,11 @@ public final class SqlProcedureCall extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
         Set<Column> columns = bindings.getNonConstantColumns();
 
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT ");
 
@@ -405,8 +406,8 @@ public final class SqlProcedureCall extends SqlIntercode
 
         builder.append(" FROM ");
 
-        String call = translateCall(request, scope);
-        AliasTable table = child.equals(SqlEmptySolution.get()) && !scope.refersToEnclosingInput(call) ?
+        SqlCode call = translateCall(request, scope);
+        CommonTable table = child.equals(SqlEmptySolution.get()) && !scope.refersToEnclosingInput(call.getText()) ?
                 request.getCommonTableExpression(call) : null;
 
         if(table != null)
@@ -420,20 +421,20 @@ public final class SqlProcedureCall extends SqlIntercode
             builder.append(" ) AS tab ");
         }
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
     /**
-     * SQL calling the function with the values of the parameters in the columns of their declared classes for every
-     * solution of the child.
+     * SQL code calling the function with the values of the parameters in the columns of their declared classes for
+     * every solution of the child.
      *
      * @param request the current request
      * @param scope the scope of the call
-     * @return SQL calling the function with the values of the parameters in the columns of their declared classes for
-     *         every solution of the child
+     * @return SQL code calling the function with the values of the parameters in the columns of their declared classes
+     *         for every solution of the child
      */
-    private String translateCall(Request request, Scope scope)
+    private SqlCode translateCall(Request request, Scope scope)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -452,7 +453,7 @@ public final class SqlProcedureCall extends SqlIntercode
                 procedure.getSqlProcedure() : specialization.getSqlProcedure();
         List<String> arguments = specialization == null ? declared : specialization.getArguments(declared);
 
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT ");
         builder.append(function);
@@ -461,6 +462,9 @@ public final class SqlProcedureCall extends SqlIntercode
         builder.append(" AS \"");
         builder.append(resultVar);
         builder.append('"');
+
+        // the columns of the parameters are written here, so the code reads what their SQL reads
+        parameters.values().forEach(p -> builder.addDeclaredTables(p.getDeclaredTables()));
 
         for(Column column : child.getVariableBindings()
                 .restrict(relations, new Restrictions(this.getVariableBindings().getVariables()))
@@ -478,7 +482,7 @@ public final class SqlProcedureCall extends SqlIntercode
             builder.append(scope.getInputTable());
         }
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -575,15 +579,6 @@ public final class SqlProcedureCall extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return child.hasServiceSubpattern() || parameters.values().stream().anyMatch(p -> p.hasServiceSubpattern());
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        Set<VirtualTable> tables = getVirtualTables(child);
-        tables.addAll(getVirtualTables(parameters.values()));
-        return tables;
     }
 
 

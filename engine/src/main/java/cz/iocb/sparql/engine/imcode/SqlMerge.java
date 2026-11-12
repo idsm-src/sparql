@@ -10,7 +10,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -189,14 +190,14 @@ public final class SqlMerge extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
         VariableBinding binding1 = child.getVariableBindings().get(variable1);
         VariableBinding binding2 = child.getVariableBindings().get(variable2);
 
         Set<Column> columns = bindings.getNonConstantColumns();
 
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT ");
 
@@ -219,7 +220,7 @@ public final class SqlMerge extends SqlIntercode
             builder.append(condition);
         }
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -323,13 +324,6 @@ public final class SqlMerge extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return child.hasServiceSubpattern();
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        return child.getVirtualTables();
     }
 
 

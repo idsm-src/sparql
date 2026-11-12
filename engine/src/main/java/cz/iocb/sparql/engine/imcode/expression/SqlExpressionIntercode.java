@@ -27,8 +27,10 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.common.UnionFind;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.DeclaredTable;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlBaseClass;
@@ -273,6 +275,39 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     public boolean hasServiceSubpattern()
     {
         return false;
+    }
+
+
+    /**
+     * The declared tables the SQL of the expression reads (see {@link SqlCode}): those read by the patterns of the
+     * EXISTS tests the expression holds, whose SQL is rendered into the columns of the expression when the expression
+     * is built. A node that writes columns of the expression into its SQL reads the tables too, so it adds them to its
+     * code (see {@link cz.iocb.sparql.engine.database.SqlBuilder#addDeclaredTables}). An expression without operands
+     * reads none.
+     *
+     * @return the declared tables the SQL of the expression reads
+     */
+    public Set<DeclaredTable> getDeclaredTables()
+    {
+        return Set.of();
+    }
+
+
+    /**
+     * The declared tables the SQL of the given expressions reads (see {@link #getDeclaredTables()}), in a set of its
+     * own that the caller may extend.
+     *
+     * @param expressions the expressions
+     * @return the declared tables the SQL of the given expressions reads
+     */
+    protected static Set<DeclaredTable> getDeclaredTables(Collection<? extends SqlExpressionIntercode> expressions)
+    {
+        Set<DeclaredTable> tables = new HashSet<>();
+
+        for(SqlExpressionIntercode expression : expressions)
+            tables.addAll(expression.getDeclaredTables());
+
+        return tables;
     }
 
 

@@ -20,9 +20,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.DeclaredTable;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.TableColumn;
-import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator;
@@ -123,13 +123,6 @@ public final class SqlInExpression extends SqlExpressionIntercode
         {
             return columnMap;
         }
-
-        @Override
-        public Set<VirtualTable> getVirtualTables()
-        {
-            throw new UnsupportedOperationException();
-        }
-
 
         @Override
         protected int getHashCode()
@@ -372,10 +365,10 @@ public final class SqlInExpression extends SqlExpressionIntercode
 
 
     @Override
-    public Set<VirtualTable> getVirtualTables()
+    public Set<DeclaredTable> getDeclaredTables()
     {
-        Set<VirtualTable> tables = getVirtualTables(left);
-        tables.addAll(getVirtualTables(rights));
+        Set<DeclaredTable> tables = getDeclaredTables(rights);
+        tables.addAll(left.getDeclaredTables());
         return tables;
     }
 

@@ -24,7 +24,8 @@ import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
-import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -893,13 +894,13 @@ public final class SqlJoin extends SqlIntercode
 
 
     @Override
-    public String translate(Request request, Scope scope)
+    public SqlCode translate(Request request, Scope scope)
     {
         ClassRelations relations = request.getConfiguration();
 
         Set<Column> columns = bindings.getNonConstantColumns();
 
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT ");
 
@@ -917,7 +918,7 @@ public final class SqlJoin extends SqlIntercode
                     childs.stream().map(c -> c.getVariableBindings()).toList());
 
             translateTree(request, scope, getPlan(request).root(), joined, builder);
-            return builder.toString();
+            return builder.toCode();
         }
 
         for(int i = 0; i < childs.size(); i++)
@@ -940,7 +941,7 @@ public final class SqlJoin extends SqlIntercode
             builder.append(condition);
         }
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -960,7 +961,7 @@ public final class SqlJoin extends SqlIntercode
      * @return the children of the tree, as a bit per child
      */
     private int translateTree(Request request, Scope scope, JoinOptimizer.Node node,
-            Map<Variable, Set<ResourceClass>> joined, StringBuilder builder)
+            Map<Variable, Set<ResourceClass>> joined, SqlBuilder builder)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -1006,7 +1007,7 @@ public final class SqlJoin extends SqlIntercode
 
         int left = translateTree(request, scope, join.left(), joined, builder);
 
-        StringBuilder rightBuilder = new StringBuilder();
+        SqlBuilder rightBuilder = new SqlBuilder();
         int right = translateTree(request, scope, join.right(), joined, rightBuilder);
 
         List<String> conditions = new ArrayList<>();
@@ -1036,7 +1037,7 @@ public final class SqlJoin extends SqlIntercode
         if(nested)
             builder.append("(");
 
-        builder.append(rightBuilder);
+        builder.append(rightBuilder.toCode());
 
         if(nested)
             builder.append(")");
@@ -1286,9 +1287,13 @@ public final class SqlJoin extends SqlIntercode
         SqlIntercode endJoin = join(request, endSeeds.stream().map(childs::get).toList());
         SqlIntercode beginJoin = join(request, beginSeeds.stream().map(childs::get).toList());
 
-        for(String sql : List.of(endJoin.translate(request, scope), beginJoin.translate(request, scope)))
+        for(SqlIntercode join : List.of(endJoin, beginJoin))
+        {
+            String sql = join.translate(request, scope).getText();
+
             if(sql.contains("\"lateral") || scope.refersToEnclosingInput(sql))
                 return false;
+        }
 
         Estimator estimator = new Estimator(request);
 
@@ -1497,13 +1502,6 @@ public final class SqlJoin extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return childs.stream().anyMatch(c -> c.hasServiceSubpattern());
-    }
-
-
-    @Override
-    public Set<VirtualTable> getVirtualTables()
-    {
-        return getVirtualTables(childs);
     }
 
 
