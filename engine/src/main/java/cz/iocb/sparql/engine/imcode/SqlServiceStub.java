@@ -167,7 +167,9 @@ public final class SqlServiceStub extends SqlIntercode
      * evaluating the context by itself does not define the alias. Such a context is evaluated joined laterally with the
      * left side once more, so that every context solution binds the variable of the left side to the solution it was
      * computed for, and the received solutions are restricted to the current solution of the enclosing join (see
-     * {@link SqlServiceStub#eval}).
+     * {@link SqlServiceStub#eval}). The enclosing join keeps the bindings it exposed to its right side when it was
+     * created (see {@link SqlLateralJoin}), so the copies of the call in the branches the join is made for have the
+     * same context and share its evaluation for all solutions of the left side.
      *
      * @param solutions solutions of the left side binding nothing but the variable, which no pattern mentions
      * @param table alias through which the right side refers to the left side
@@ -202,7 +204,7 @@ public final class SqlServiceStub extends SqlIntercode
             VariableBindings lateral = new VariableBindings();
             lateral.add(binding);
 
-            return SqlLateralJoin.lateralJoin(request, solutions, context, table, lateral, null);
+            return SqlLateralJoin.lateralJoin(request, solutions, context, table, lateral, false, null);
         }
 
 
@@ -219,7 +221,7 @@ public final class SqlServiceStub extends SqlIntercode
             for(Entry<ResourceClass, List<Column>> entry : binding.getMappings().entrySet())
                 current.addMapping(entry.getKey(), toTableColumns(table, entry.getValue()));
 
-            return SqlLateralVariable.create(current);
+            return SqlLateralVariable.create(table, current);
         }
     }
 

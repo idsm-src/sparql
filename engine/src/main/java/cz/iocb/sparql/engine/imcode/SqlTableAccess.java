@@ -57,10 +57,11 @@ public final class SqlTableAccess extends SqlIntercode
      * lies in is evaluated for (see {@link SqlExpressionIntercode#isCurrentValue}): the term held by the columns is the
      * value of the expression. The value is converted to the class of the columns, so that the database can look the
      * rows up by an index of the table, whereas the node merging the variable with the value compares them in their
-     * common class. The condition is kept apart from the conditions on the rows, because the columns of the current
-     * solution of an EXISTS pattern change whenever the node holding the EXISTS expression is optimised: the expression
-     * is read again on every optimisation of the access (see
-     * {@link cz.iocb.sparql.engine.imcode.expression.SqlOuterVariable}).
+     * common class. The condition is kept apart from the conditions on the rows, because the columns of a current
+     * solution change whenever the node providing it is optimised (the node holding the EXISTS expression, the
+     * enumeration of the graphs a pattern is evaluated in): the expression is read again on every optimisation of the
+     * access (see {@link cz.iocb.sparql.engine.imcode.expression.SqlOuterVariable} and
+     * {@link cz.iocb.sparql.engine.imcode.expression.SqlLateralVariable}).
      *
      * @param resourceClass class of the term held by the columns
      * @param columns the columns of the table holding the term, as the internal bindings give them
@@ -1787,7 +1788,7 @@ public final class SqlTableAccess extends SqlIntercode
 
         for(ValueCondition condition : values)
         {
-            // the value is read from the current solution as the node holding the EXISTS expression provides it now
+            // the value is read from the current solution as the node providing that solution provides it now
             SqlExpressionIntercode value = condition.value().optimize(request, new VariableBindings(), Restriction.ALL,
                     evalServices);
 

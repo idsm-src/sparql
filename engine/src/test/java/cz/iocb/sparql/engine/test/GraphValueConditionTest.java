@@ -63,12 +63,6 @@ public class GraphValueConditionTest
     private static final String graphColumn = "\"g\" = \"lateral0\".\"g#g_par0\"";
 
     /**
-     * SQL of the condition restricting the table of the constant graph to the graph of the current solution.
-     */
-    private static final String graphConstant = "'http://example.org/fixed'::varchar = "
-            + "\"lateral0\".\"g#unsupported_par0\"";
-
-    /**
      * Configuration mapping the test tables.
      */
     private static SparqlDatabaseConfiguration config = null;
@@ -289,10 +283,8 @@ public class GraphValueConditionTest
                 containsInAnyOrder(row(resource("g/1"), integer(2)), row(resource("g/2"), integer(3)),
                         row(resource("g/3"), integer(0)), row(resource("fixed"), integer(2))));
 
-        // the graph is compared in the class of the graph column, and with the constant of a constant graph
-        String sql = translate(query);
-        assertThat(sql, containsString(access("link", graphColumn)));
-        assertThat(sql, containsString(access("fixed", graphConstant)));
+        // the graph is compared in the class of the graph column
+        assertThat(translate(query), containsString(access("link", graphColumn)));
     }
 
 

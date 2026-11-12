@@ -2,9 +2,9 @@ package cz.iocb.sparql.engine.imcode.expression;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
@@ -22,10 +22,19 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * Reference from an expression inside the right side of a lateral join to a variable of its left side: the columns of
  * the current left solution addressed through the alias of the join (see {@link SqlLateralJoin}). Unlike
  * {@link SqlVariable}, it is no variable of the bindings it occurs in, so it needs nothing of them and is never
- * resolved against them; the join keeps its columns available.
+ * resolved against them; the join keeps its columns available. When the join lets its right side read the solution as
+ * the left side provides it at the moment, the expression takes its classes and columns from that solution on every
+ * optimisation (see {@link Request#getLateralSolution}), like a value of the current solution of an EXISTS pattern (see
+ * {@link SqlOuterVariable}), so it follows the classes and the constants the left side is optimised to; otherwise it
+ * keeps what the join exposed when it was created.
  */
 public final class SqlLateralVariable extends SqlExpressionIntercode
 {
+    /**
+     * Alias through which the right side of the join refers to its left side.
+     */
+    private final AliasTable table;
+
     /**
      * The variable of the left side.
      */
@@ -35,28 +44,32 @@ public final class SqlLateralVariable extends SqlExpressionIntercode
     /**
      * Creates the expression.
      *
+     * @param table alias through which the right side of the join refers to its left side
      * @param variable the variable of the left side
      * @param mappings columns per resource class
      * @param canBeNull whether the value may be null
      */
-    private SqlLateralVariable(Variable variable, Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
+    private SqlLateralVariable(AliasTable table, Variable variable, Map<ResourceClass, List<Column>> mappings,
+            boolean canBeNull)
     {
         super(mappings, canBeNull, true);
 
+        this.table = table;
         this.variable = variable;
     }
 
 
     /**
      * Reference to the variable of the binding, one of the bindings returned by
-     * {@link SqlLateralJoin#getLateralVariableBindings}.
+     * {@link SqlLateralJoin#getLateralVariableBindings} for the alias.
      *
+     * @param table alias through which the right side of the join refers to its left side
      * @param binding the binding of the variable as seen by the right side
      * @return reference to the variable of the binding
      */
-    public static SqlExpressionIntercode create(VariableBinding binding)
+    public static SqlExpressionIntercode create(AliasTable table, VariableBinding binding)
     {
-        return new SqlLateralVariable(binding.getVariable(), binding.getMappings(), binding.canBeNull());
+        return new SqlLateralVariable(table, binding.getVariable(), binding.getMappings(), binding.canBeNull());
     }
 
 
@@ -73,11 +86,19 @@ public final class SqlLateralVariable extends SqlExpressionIntercode
     {
         ClassRelations relations = request.getConfiguration();
 
-        if(restriction.isOptimized(relations, variableBinding))
+        // the current solution as the left side of the join provides it now, when the join lets the right side read it
+        VariableBindings solution = request.getLateralSolution(table);
+        VariableBinding binding = solution == null ? variableBinding : solution.get(variable);
+
+        if(binding == null)
+            return SqlNull.get();
+
+        Map<ResourceClass, List<Column>> mappings = restriction.restrict(relations, binding.getMappings());
+
+        if(mappings.equals(variableBinding.getMappings()) && binding.canBeNull() == variableBinding.canBeNull())
             return this;
 
-        return new SqlLateralVariable(variable, restriction.restrict(relations, variableBinding.getMappings()),
-                variableBinding.canBeNull());
+        return new SqlLateralVariable(table, variable, mappings, binding.canBeNull());
     }
 
 
@@ -103,16 +124,10 @@ public final class SqlLateralVariable extends SqlExpressionIntercode
     @Override
     public boolean hasSameValue(SqlExpressionIntercode other)
     {
-        if(!(other instanceof SqlLateralVariable lateral) || !variable.equals(lateral.variable))
-            return false;
-
-        //NOTE: every join exposes its columns through an alias of its own, so the columns of a class tell the joins
-        // apart, whatever classes each of the two references is restricted to
-        for(Entry<ResourceClass, List<Column>> entry : getMappings().entrySet())
-            if(entry.getValue() != null && entry.getValue().equals(lateral.getMappings().get(entry.getKey())))
-                return true;
-
-        return false;
+        //NOTE: the value is read from the current solution of the left side of the join, whatever classes and columns
+        // each of the two references holds at the moment
+        return other instanceof SqlLateralVariable lateral && table.equals(lateral.table)
+                && variable.equals(lateral.variable);
     }
 
 
@@ -142,6 +157,9 @@ public final class SqlLateralVariable extends SqlExpressionIntercode
         if(!super.equals(imcode))
             return false;
 
+        if(!table.equals(imcode.table))
+            return false;
+
         if(!variable.equals(imcode.variable))
             return false;
 
@@ -152,6 +170,6 @@ public final class SqlLateralVariable extends SqlExpressionIntercode
     @Override
     protected int getHashCode()
     {
-        return Objects.hash(variable);
+        return Objects.hash(table, variable);
     }
 }

@@ -32,9 +32,11 @@ import cz.iocb.sparql.engine.error.MessageCategory;
 import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.error.TranslateMessage;
+import cz.iocb.sparql.engine.imcode.SqlLateralJoin;
 import cz.iocb.sparql.engine.imcode.SqlSelect;
 import cz.iocb.sparql.engine.imcode.SqlShared;
 import cz.iocb.sparql.engine.imcode.expression.SqlExists;
+import cz.iocb.sparql.engine.imcode.expression.SqlLateralVariable;
 import cz.iocb.sparql.engine.imcode.expression.SqlOuterVariable;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
 import cz.iocb.sparql.engine.mapping.classes.DerivedClass;
@@ -298,6 +300,12 @@ public class Request implements AutoCloseable
      * patterns (see {@link #getInputTable}).
      */
     private final List<VariableBindings> currentSolutions = new ArrayList<>();
+
+    /**
+     * Bindings of the current solutions of the left sides of the lateral joins whose right sides are being optimised,
+     * by the aliases of the joins (see {@link #beginLateral}).
+     */
+    private final Map<AliasTable, VariableBindings> lateralSolutions = new HashMap<>();
 
     /**
      * Start of the execution in {@link System#nanoTime} units.
@@ -1001,6 +1009,53 @@ public class Request implements AutoCloseable
                 return currentSolutions.get(i);
 
         return null;
+    }
+
+
+    /**
+     * Begins the optimisation of the right side of a lateral join that reads the current solution of the left side as
+     * the left side provides it at the moment (see {@link SqlLateralJoin}): the expressions of the right side referring
+     * to that solution take its classes and columns from the given bindings (see {@link SqlLateralVariable}). Unlike
+     * the current solution of a pattern of an expression (see {@link #beginPattern}), the solution is no solution the
+     * solutions of the right side extend, so it is kept apart, by the alias of the join, which is unique within the
+     * request (see {@link #createLateralTable}).
+     *
+     * @param table alias through which the right side of the join refers to its left side
+     * @param solution bindings of the current solution of the left side, its columns addressed through the alias
+     * @return the bindings in effect for the alias so far, to be given to {@link #endLateral}; null when there are none
+     */
+    public VariableBindings beginLateral(AliasTable table, VariableBindings solution)
+    {
+        return lateralSolutions.put(table, solution);
+    }
+
+
+    /**
+     * Ends the optimisation of the right side of a lateral join (see {@link #beginLateral}).
+     *
+     * @param table alias through which the right side of the join refers to its left side
+     * @param enclosing the bindings that were in effect for the alias before, or null
+     */
+    public void endLateral(AliasTable table, VariableBindings enclosing)
+    {
+        if(enclosing != null)
+            lateralSolutions.put(table, enclosing);
+        else
+            lateralSolutions.remove(table);
+    }
+
+
+    /**
+     * Bindings of the current solution of the left side of the lateral join with the given alias, as the left side
+     * provides it at the moment, while the right side of the join is being optimised (see {@link #beginLateral}); null
+     * otherwise, and for a join whose right side keeps what the join exposed to it when it was created.
+     *
+     * @param table alias through which the right side of the join refers to its left side
+     * @return bindings of the current solution of the left side of the join, or null
+     */
+    public VariableBindings getLateralSolution(AliasTable table)
+    {
+        return lateralSolutions.get(table);
     }
 
 

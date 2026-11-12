@@ -33,10 +33,26 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * to be unique, because the reference crosses the boundaries of nested subqueries and a nested lateral join would
  * otherwise shadow the alias of the outer one. The columns are given to the right side by getLateralVariableBindings()
  * (an expression of the right side refers to them through SqlLateralVariable) and the same alias and requirements have
- * to be passed to lateralJoin(). The alias and the bindings exposed this way are fixed when the join is created and are
- * kept by all reconstructions of the join during its optimization; if the optimization of the left side removes an
- * exposed column (the variable is proven to be unbound in that class) or turns it into a constant, the translation adds
- * a projection that supplies the column again, so the right side never refers to a missing column.
+ * to be passed to lateralJoin(). The alias is fixed when the join is created and is kept by all reconstructions of the
+ * join during its optimisation. The bindings exposed this way are read by the right side in one of two ways.
+ *
+ * A live join lets its right side read them as the left side provides them at the moment: while the right side is
+ * optimised, the request holds the current bindings of the left side (see Request.beginLateral()), from which the
+ * references of the right side take their classes and columns again, so the right side is optimised for the classes and
+ * the constants the left side has been optimised to. When the left side is a union, the join is made for every branch,
+ * and each of them then optimises the right side for its own branch: an evaluation of a pattern per named graph keeps
+ * in the branch of a graph (or of the graphs of a class) only the table accesses that can hold triples of that graph,
+ * instead of all accesses of the pattern with the graphs compared when the statement runs. The join keeps the bindings
+ * its right side has been optimised for.
+ *
+ * The other joins keep the bindings exposed when the join was created, which the copies of a SERVICE call in the
+ * branches rely on: the context of the call is evaluated by a statement of its own for all solutions of the left side
+ * at once, and its result is shared by the copies (see SqlServiceStub.Enclosure).
+ *
+ * In both cases, if the left side does not provide an exposed column the right side may refer to (the optimisation has
+ * proven the variable unbound in that class or has turned the column into a constant, or the join has just been made
+ * for a branch of the left side), the translation adds a projection that supplies the column again, so the right side
+ * never refers to a missing column.
  *
  * Variables shared by both sides are joined in the usual way. Unlike in SqlLeftJoin, the right side never introduces
  * nulls, so the nullability of the result follows the same rules as in SqlJoin. Unlike in SqlJoin, the sides can
@@ -72,12 +88,20 @@ public final class SqlLateralJoin extends SqlIntercode
     private final AliasTable table;
 
     /**
-     * Left-side bindings the right side may refer to.
+     * Left-side bindings the right side may refer to: those the right side has been optimised for when the right side
+     * reads them live, those exposed when the join was created otherwise.
      */
     private final VariableBindings lateral;
 
     /**
-     * Variables and classes of the left side the right side actually refers to (non-constant columns only).
+     * Whether the right side reads the exposed bindings as the left side provides them at the moment.
+     */
+    private final boolean live;
+
+    /**
+     * What the right side needs of the left side: the exposed variables whole when the right side reads them live,
+     * because it follows whatever the left side binds them to; otherwise the variables and classes exposed through
+     * non-constant columns.
      */
     private final Restrictions requirements;
 
@@ -95,10 +119,11 @@ public final class SqlLateralJoin extends SqlIntercode
      * @param right the right side
      * @param table alias through which the right side refers to the left side
      * @param lateral left-side bindings exposed to the right side
+     * @param live whether the right side reads the exposed bindings as the left side provides them at the moment
      * @param columnMap the column map
      */
     protected SqlLateralJoin(VariableBindings bindings, SqlIntercode left, SqlIntercode right, AliasTable table,
-            VariableBindings lateral, Map<Column, Column> columnMap)
+            VariableBindings lateral, boolean live, Map<Column, Column> columnMap)
     {
         super(bindings, left.isDeterministic() && right.isDeterministic());
 
@@ -106,7 +131,8 @@ public final class SqlLateralJoin extends SqlIntercode
         this.right = right;
         this.table = table;
         this.lateral = lateral;
-        this.requirements = getLateralRequirements(lateral);
+        this.live = live;
+        this.requirements = live ? new Restrictions(lateral.getVariables()) : getLateralRequirements(lateral);
         this.columnMap = columnMap;
     }
 
@@ -121,7 +147,7 @@ public final class SqlLateralJoin extends SqlIntercode
      */
     public static SqlIntercode lateralJoin(Request request, SqlIntercode left, SqlIntercode right)
     {
-        return lateralJoin(request, left, right, request.createLateralTable(), null);
+        return lateralJoin(request, left, right, request.createLateralTable(), null, false);
     }
 
 
@@ -137,7 +163,7 @@ public final class SqlLateralJoin extends SqlIntercode
     public static SqlIntercode lateralJoin(Request request, SqlIntercode left, SqlIntercode right, AliasTable table)
     {
         //NOTE: the right side may refer to all variables of the left side, so the left side cannot drop any of them
-        return lateralJoin(request, left, right, table, null);
+        return lateralJoin(request, left, right, table, null, false);
     }
 
 
@@ -150,15 +176,17 @@ public final class SqlLateralJoin extends SqlIntercode
      * @param right the right side
      * @param table alias through which the right side refers to the left side
      * @param requirements variables and classes the right side refers to
+     * @param live whether the right side reads the exposed bindings as the left side provides them at the moment,
+     *            instead of as they are exposed now
      * @return lateral join through the given alias; the right side may refer to the left-side bindings returned by
      *         {@link #getLateralVariableBindings} for the same alias and requirements
      */
     public static SqlIntercode lateralJoin(Request request, SqlIntercode left, SqlIntercode right, AliasTable table,
-            Restrictions requirements)
+            Restrictions requirements, boolean live)
     {
         //NOTE: the right side may refer to the bindings returned by getLateralVariableBindings() for these arguments
         return lateralJoin(request, left, right, table,
-                left.getVariableBindings().restrict(request.getConfiguration(), requirements), null);
+                left.getVariableBindings().restrict(request.getConfiguration(), requirements), live, null);
     }
 
 
@@ -171,12 +199,13 @@ public final class SqlLateralJoin extends SqlIntercode
      * @param right the right side
      * @param table alias through which the right side refers to the left side
      * @param lateral left-side bindings exposed to the right side
+     * @param live whether the right side reads the exposed bindings as the left side provides them at the moment
      * @param restrictions what the parent needs of the variables
      * @return lateral join exposing only what the parent needs; degrades to an ordinary join when the right side is
      *         deterministic and refers to nothing
      */
     protected static SqlIntercode lateralJoin(Request request, SqlIntercode left, SqlIntercode right, AliasTable table,
-            VariableBindings lateral, Restrictions restrictions)
+            VariableBindings lateral, boolean live, Restrictions restrictions)
     {
         /* NOTE: If the right side does not refer to the left side, all optimizations of the ordinary join apply. This
          * does not hold for a nondeterministic right side, which the ordinary join evaluates only once, whereas the
@@ -190,7 +219,7 @@ public final class SqlLateralJoin extends SqlIntercode
         VariableBindings bindings = getJoinVariableBindings(request, left.getVariableBindings(),
                 right.getVariableBindings(), table, rightTable, restrictions, map);
 
-        return new SqlLateralJoin(bindings, left, right, table, lateral, map);
+        return new SqlLateralJoin(bindings, left, right, table, lateral, live, map);
     }
 
 
@@ -355,23 +384,57 @@ public final class SqlLateralJoin extends SqlIntercode
         // the sides could swap their presentations of a shared variable in every round
         Settlement settlement = new Settlement();
 
+        // the left-side bindings the right side refers to at the moment
+        VariableBindings optLateral = lateral;
+
         while(true)
         {
             optLeft = optLeft.optimize(request, leftRestrictions, leftReduced, evalServices);
-            optRight = optRight.optimize(request, rightRestrictions, reduced, evalServices);
 
-            if(optRight instanceof SqlUnion union)
+            // a right side reading the current solution of the left side would find every variable of it unbound
+            if(live && optLeft.equals(SqlNoSolution.get()))
+                return SqlNoSolution.get();
+
+            /* NOTE: A right side reading the bindings live is not optimised for the whole union first: the join of
+             * every branch optimises it for its own branch as it stands, before the optimisation rewrites it in ways
+             * that cannot be taken back (an aggregation distributed over the members of a union that a branch would
+             * have reduced to a single member).
+             */
+            if(live && optLeft instanceof SqlUnion union)
+                return distribute(request, union, optRight, optLateral, restrictions, reduced, evalServices);
+
+            VariableBindings enclosing = null;
+
+            // the right side reads the current solution of the left side as the left side provides it now
+            if(live)
+                enclosing = request.beginLateral(table,
+                        getLateralVariableBindings(relations, table, optLeft, requirements));
+
+            try
             {
-                List<SqlIntercode> unionList = new ArrayList<>();
+                optRight = optRight.optimize(request, rightRestrictions, reduced, evalServices);
 
-                for(SqlIntercode child : union.getChilds())
-                    if(isJoinable(relations, optLeft, child))
-                        unionList.add(child);
+                if(optRight instanceof SqlUnion union)
+                {
+                    List<SqlIntercode> unionList = new ArrayList<>();
 
-                if(!unionList.equals(union.getChilds()))
-                    optRight = SqlUnion.union(request, unionList).optimize(request, rightRestrictions, reduced,
-                            evalServices);
+                    for(SqlIntercode child : union.getChilds())
+                        if(isJoinable(relations, optLeft, child))
+                            unionList.add(child);
+
+                    if(!unionList.equals(union.getChilds()))
+                        optRight = SqlUnion.union(request, unionList).optimize(request, rightRestrictions, reduced,
+                                evalServices);
+                }
             }
+            finally
+            {
+                if(live)
+                    request.endLateral(table, enclosing);
+            }
+
+            if(live)
+                optLateral = optLeft.getVariableBindings().restrict(relations, requirements);
 
 
             boolean newLeftReduced = reduced && optRight.isDeterministic();
@@ -404,21 +467,40 @@ public final class SqlLateralJoin extends SqlIntercode
             return optLeft.optimize(request, restrictions, reduced, evalServices);
 
         if(optLeft instanceof SqlUnion union)
-        {
-            //NOTE: the branches share the right side and therefore also the alias; they are not nested, so no shadowing
-            List<SqlIntercode> unionList = new ArrayList<>();
-
-            for(SqlIntercode child : union.getChilds())
-                unionList.add(lateralJoin(request, child, optRight, table, lateral, restrictions));
-
-            return SqlUnion.union(request, unionList).optimize(request, restrictions, reduced, evalServices);
-        }
+            return distribute(request, union, optRight, optLateral, restrictions, reduced, evalServices);
 
 
-        if(optLeft == left && optRight == right && restrictions.isOptimized(relations, bindings))
+        if(optLeft == left && optRight == right && optLateral.equals(lateral)
+                && restrictions.isOptimized(relations, bindings))
             return this;
 
-        return lateralJoin(request, optLeft, optRight, table, lateral, restrictions);
+        return lateralJoin(request, optLeft, optRight, table, optLateral, live, restrictions);
+    }
+
+
+    /**
+     * The join made for every branch of a left side that is a union, optimised. The branches share the right side and
+     * therefore also the alias; they are not nested, so no shadowing. A right side reading the bindings live refers to
+     * the given bindings until the join of a branch optimises it for the branch.
+     *
+     * @param request the current request
+     * @param union the left side
+     * @param optRight the right side
+     * @param optLateral left-side bindings the right side refers to
+     * @param restrictions what the parent needs of the variables
+     * @param reduced whether duplicate solutions may be dropped
+     * @param evalServices whether SERVICE stubs are evaluated
+     * @return union of the joins of the branches of the left side with the right side, optimised
+     */
+    private SqlIntercode distribute(Request request, SqlUnion union, SqlIntercode optRight, VariableBindings optLateral,
+            Restrictions restrictions, boolean reduced, boolean evalServices)
+    {
+        List<SqlIntercode> unionList = new ArrayList<>();
+
+        for(SqlIntercode child : union.getChilds())
+            unionList.add(lateralJoin(request, child, optRight, table, optLateral, live, restrictions));
+
+        return SqlUnion.union(request, unionList).optimize(request, restrictions, reduced, evalServices);
     }
 
 
@@ -614,6 +696,9 @@ public final class SqlLateralJoin extends SqlIntercode
         if(!Objects.equals(table, imcode.table))
             return false;
 
+        if(live != imcode.live)
+            return false;
+
         if(!Objects.equals(lateral, imcode.lateral))
             return false;
 
@@ -630,6 +715,6 @@ public final class SqlLateralJoin extends SqlIntercode
     @Override
     protected int getHashCode()
     {
-        return Objects.hash(table, lateral, left, right);
+        return Objects.hash(table, lateral, live, left, right);
     }
 }

@@ -840,10 +840,15 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      * laterally, evaluated for the graph of the current solution. The lateral value of that graph is remembered in
      * {@link #lateralGraphs}, and {@link #restrictToCurrentGraph} merges the fresh variable with it wherever the graph
      * matters: the pattern as a whole, the WHERE clause of a sub-select, the right side of a MINUS or an OPTIONAL and
-     * the pattern of an EXISTS. The result binds the variable to the graph. When the pattern holds a SERVICE call, the
+     * the pattern of an EXISTS. The result binds the variable to the graph. The pattern reads the lateral value as the
+     * enumeration provides it at the moment (see {@link SqlLateralJoin}): the optimisation splits the enumeration into
+     * branches, those of the graphs given by constants and those of the graphs of a class, and the pattern of a branch
+     * keeps only the table accesses that can hold triples of its graphs. When the pattern holds a SERVICE call, the
      * join is remembered in {@link #enclosures} too, because the context of the call may refer to the lateral value and
      * is evaluated by a statement of its own: the call evaluates it for all graphs, joined laterally with the graphs
      * bound to a fresh variable again, and keeps the received solutions of the current graph (see {@link Enclosure}).
+     * Such a pattern keeps the lateral value as the whole enumeration provides it, so that the copies of the call in
+     * the branches stay the same and share that one evaluation.
      *
      * @param variable the graph variable
      * @param pattern the pattern, searched for SERVICE calls
@@ -865,7 +870,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         Variable innerGraph = createVariable("@graph");
 
-        lateralGraphs.put(innerGraph, SqlLateralVariable.create(lateral.get(variable)));
+        lateralGraphs.put(innerGraph, SqlLateralVariable.create(lateralTable, lateral.get(variable)));
         graphRestrictions.push(innerGraph);
 
         boolean service = holds(pattern, Service.class);
@@ -889,7 +894,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         graphRestrictions.pop();
         lateralGraphs.remove(innerGraph);
 
-        return SqlLateralJoin.lateralJoin(request, graphs, translated, lateralTable, requirements);
+        // the copies of a SERVICE call in the branches of the graphs share one evaluation of the call for all graphs
+        return SqlLateralJoin.lateralJoin(request, graphs, translated, lateralTable, requirements, !service);
     }
 
 
