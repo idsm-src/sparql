@@ -66,36 +66,38 @@ public final class SqlShared extends SqlIntercode
 
     /**
      * True if the node can be shared: it is deterministic, holds no SERVICE call not evaluated yet, refers neither to
-     * the current solution of an EXISTS (see {@link Request#refersToEnclosingInput}) nor to a lateral join (its SQL
-     * would read an alias a common table expression cannot see), and no pattern of an expression is being optimised
-     * (see {@link Request#isWithinExpression}): seeding a walk inside an EXISTS from shared solutions would evaluate
-     * them in full before the first solution of the pattern, which the database would otherwise stop at. The named
-     * graphs the translation pairs zero-length paths from constants with are shared before any expression is optimised,
-     * so EXISTS patterns read them from the common table expression too.
+     * the current solution of an EXISTS (see {@link Scope#refersToEnclosingInput}) nor to a lateral join (its SQL would
+     * read an alias a common table expression cannot see), and it does not lie in a pattern of an expression (see
+     * {@link Scope#isWithinExpression}): seeding a walk inside an EXISTS from shared solutions would evaluate them in
+     * full before the first solution of the pattern, which the database would otherwise stop at. The named graphs the
+     * translation pairs zero-length paths from constants with are shared as code of the statement (see
+     * {@link #shareOptimized}), so EXISTS patterns read them from the common table expression too.
      *
      * @param request the current request
+     * @param scope the scope of the node
      * @param node the node
      * @return true if the node can be shared, false otherwise
      */
-    protected static boolean canShare(Request request, SqlIntercode node)
+    protected static boolean canShare(Request request, Scope scope, SqlIntercode node)
     {
-        if(request.isWithinExpression() || !node.isDeterministic() || node.hasServiceSubpattern())
+        if(scope.isWithinExpression() || !node.isDeterministic() || node.hasServiceSubpattern())
             return false;
 
         if(node instanceof SqlShared || node instanceof SqlValues || node.equals(SqlEmptySolution.get())
                 || node.equals(SqlNoSolution.get()))
             return false;
 
-        String sql = node.translate(request);
+        String sql = node.translate(request, scope);
 
-        return !sql.contains("\"lateral") && !request.refersToEnclosingInput(sql);
+        return !sql.contains("\"lateral") && !scope.refersToEnclosingInput(sql);
     }
 
 
     /**
      * The node optimised for the variable alone and shared when it can be (see {@link #canShare}): solutions that
      * several parts of a pattern join, like the named graphs every zero-length path from a constant is paired with, are
-     * then evaluated once by the statement.
+     * then evaluated once by the statement. The node is optimised as code of the statement (see {@link Scope#TOP}),
+     * wherever the parts joining it lie.
      *
      * @param request the current request
      * @param node the node
@@ -104,9 +106,9 @@ public final class SqlShared extends SqlIntercode
      */
     public static SqlIntercode shareOptimized(Request request, SqlIntercode node, Variable variable)
     {
-        SqlIntercode optimized = node.optimize(request, new Restrictions(Set.of(variable)), false, false);
+        SqlIntercode optimized = node.optimize(request, Scope.TOP, new Restrictions(Set.of(variable)), false, false);
 
-        if(!canShare(request, optimized))
+        if(!canShare(request, Scope.TOP, optimized))
             return optimized;
 
         return share(optimized);
@@ -118,22 +120,25 @@ public final class SqlShared extends SqlIntercode
      * {@link SqlRecursive#seed}).
      *
      * @param request the current request
+     * @param scope the scope of the node
      * @param shared the shared solutions
      * @param variable the variable
      * @param evalServices whether SERVICE stubs are evaluated
      * @return distinct values of the variable in the shared solutions, shared
      */
-    protected static SqlIntercode seed(Request request, SqlIntercode shared, Variable variable, boolean evalServices)
+    protected static SqlIntercode seed(Request request, Scope scope, SqlIntercode shared, Variable variable,
+            boolean evalServices)
     {
         Restrictions restrictions = new Restrictions(Set.of(variable));
 
-        return share(SqlDistinct.create(request, shared, Set.of(variable)).optimize(request, restrictions, false,
+        return share(SqlDistinct.create(request, shared, Set.of(variable)).optimize(request, scope, restrictions, false,
                 evalServices));
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         // the child stays as optimised, so that every reference reads the same common table expression, and the
         // reference exposes no more than it did (the seeds read from the shared solutions expose the start alone)
@@ -147,9 +152,9 @@ public final class SqlShared extends SqlIntercode
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
-        AliasTable table = request.getCommonTableExpression(child.translate(request), child.getVirtualTables());
+        AliasTable table = request.getCommonTableExpression(child.translate(request, scope), child.getVirtualTables());
 
         Set<Column> columns = getVariableBindings().getNonConstantColumns();
 

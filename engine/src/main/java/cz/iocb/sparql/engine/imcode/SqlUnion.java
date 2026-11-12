@@ -248,12 +248,13 @@ public final class SqlUnion extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
         List<SqlIntercode> optChilds = childs.stream()
-                .map(c -> c.optimize(request, restrictions, reduced, evalServices))
+                .map(c -> c.optimize(request, scope, restrictions, reduced, evalServices))
                 .filter(i -> !i.equals(SqlNoSolution.get()) && isAccepted(relations, i, restrictions)).toList();
 
 
@@ -308,9 +309,9 @@ public final class SqlUnion extends SqlIntercode
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
-        return translate(request, null);
+        return translate(request, scope, null);
     }
 
 
@@ -321,11 +322,12 @@ public final class SqlUnion extends SqlIntercode
      * belongs to one branch.
      *
      * @param request the current request
+     * @param scope the scope of the union
      * @param conditions the condition of a branch given the branch and its alias (null for none), or null when the
      *            branches get no conditions
      * @return SQL of the union
      */
-    public String translate(Request request, BiFunction<SqlIntercode, Table, String> conditions)
+    public String translate(Request request, Scope scope, BiFunction<SqlIntercode, Table, String> conditions)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -383,7 +385,7 @@ public final class SqlUnion extends SqlIntercode
                 builder.append("1");
 
             builder.append(" FROM (");
-            builder.append(child.translate(request));
+            builder.append(child.translate(request, scope));
             builder.append(") AS tab");
             builder.append(i);
 

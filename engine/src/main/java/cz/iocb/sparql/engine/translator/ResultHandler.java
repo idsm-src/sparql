@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlIntercode;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
@@ -39,6 +40,11 @@ public abstract class ResultHandler implements AutoCloseable
     protected final Request request;
 
     /**
+     * Scope of the call whose solutions are received.
+     */
+    protected final Scope scope;
+
+    /**
      * Variables and classes the parent needs.
      */
     protected final Restrictions restrictions;
@@ -58,13 +64,15 @@ public abstract class ResultHandler implements AutoCloseable
      * Creates the handler; IRI classes to try are taken from the restrictions of each variable.
      *
      * @param request the current request
+     * @param scope the scope of the call whose solutions are received
      * @param restrictions what the parent needs of the variables
      */
-    protected ResultHandler(Request request, Restrictions restrictions)
+    protected ResultHandler(Request request, Scope scope, Restrictions restrictions)
     {
         ClassRelations relations = request.getConfiguration();
 
         this.request = request;
+        this.scope = scope;
         this.restrictions = restrictions;
 
         List<UserIriClass> iriClasses = request.getConfiguration().getIriClasses();

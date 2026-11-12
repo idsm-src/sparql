@@ -143,7 +143,8 @@ public final class SqlJoin extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -155,7 +156,7 @@ public final class SqlJoin extends SqlIntercode
             restrictions.removeAcceptedValues();
         }
 
-        List<SqlIntercode> flatChilds = flatChilds(optimize(request, flatChilds(childs), restrictions, reduced));
+        List<SqlIntercode> flatChilds = flatChilds(optimize(request, scope, flatChilds(childs), restrictions, reduced));
 
         boolean hasService = false;
 
@@ -166,7 +167,7 @@ public final class SqlJoin extends SqlIntercode
             for(SqlIntercode l : flatChilds)
             {
                 if(l.hasServiceSubpattern() && !(request.isServiceReorderEnabled() && l instanceof SqlServiceStub))
-                    tmp.add(l.optimize(request, getRestrictions(relations, l, flatChilds, restrictions), reduced,
+                    tmp.add(l.optimize(request, scope, getRestrictions(relations, l, flatChilds, restrictions), reduced,
                             true));
                 else
                     tmp.add(l);
@@ -206,14 +207,14 @@ public final class SqlJoin extends SqlIntercode
 
         while(true)
         {
-            List<SqlIntercode> optimized = optimize(request, optChilds, newRestrictions, reduced, evalServices,
+            List<SqlIntercode> optimized = optimize(request, scope, optChilds, newRestrictions, reduced, evalServices,
                     settlement.getClasses());
             List<SqlIntercode> newChilds = reduceDistinctUnion(relations,
                     reduceJoin(relations, optimized, newRestrictions, schema), schema);
 
-            newChilds = expandLeadingOptionals(request, newChilds, evalServices);
-            newChilds = seedWalks(request, newChilds, newRestrictions);
-            newChilds = shareSeeds(request, newChilds, evalServices);
+            newChilds = expandLeadingOptionals(request, scope, newChilds, evalServices);
+            newChilds = seedWalks(request, scope, newChilds, newRestrictions);
+            newChilds = shareSeeds(request, scope, newChilds, evalServices);
 
             if(!Objects.equals(new Multiset<>(newChilds), new Multiset<>(optChilds)))
                 optChilds = newChilds;
@@ -225,7 +226,7 @@ public final class SqlJoin extends SqlIntercode
                                 .union(request,
                                         expandJoin(relations, newChilds).stream()
                                                 .map(l -> join(request, l, newRestrictions)).toList())
-                                .optimize(request, newRestrictions, reduced, evalServices));
+                                .optimize(request, scope, newRestrictions, reduced, evalServices));
 
                 if(newChilds.size() == 1 && newChilds.get(0) instanceof SqlJoin join)
                     newChilds = join.getChilds();
@@ -263,7 +264,8 @@ public final class SqlJoin extends SqlIntercode
 
                 Restrictions serviceRestrictions = new Restrictions(vars);
 
-                SqlIntercode join = join(request, optChilds).optimize(request, serviceRestrictions, false, false);
+                SqlIntercode join = join(request, optChilds).optimize(request, scope, serviceRestrictions, false,
+                        false);
 
                 Map<Variable, Long> basic = new HashMap<>();
 
@@ -273,7 +275,7 @@ public final class SqlJoin extends SqlIntercode
                     {
                         try
                         {
-                            basic.put(var, estimator.estimateDistinct(request, join, var));
+                            basic.put(var, estimator.estimateDistinct(request, scope, join, var));
                         }
                         catch(SQLException e)
                         {
@@ -288,12 +290,12 @@ public final class SqlJoin extends SqlIntercode
                         .map(Map.Entry::getKey).toList());
 
                 Set<Variable> set = new HashSet<>(order);
-                long count = estimator.estimateDistinct(request, join, set);
+                long count = estimator.estimateDistinct(request, scope, join, set);
 
                 while(count > 20000l) //TODO: export limit
                 {
                     set.remove(order.pop());
-                    count = estimator.estimateDistinct(request, join, set);
+                    count = estimator.estimateDistinct(request, scope, join, set);
                 }
 
                 stats.put(service, new Stats(set, count, vars.size() - set.size()));
@@ -307,10 +309,10 @@ public final class SqlJoin extends SqlIntercode
             SqlServiceStub service = entry.getKey();
 
             Set<Variable> vars = entry.getValue().vars;
-            SqlIntercode context = SqlDistinct.create(request, join(request, optChilds), vars).optimize(request,
+            SqlIntercode context = SqlDistinct.create(request, join(request, optChilds), vars).optimize(request, scope,
                     new Restrictions(vars), false, false);
 
-            SqlIntercode evaluated = service.eval(request, context,
+            SqlIntercode evaluated = service.eval(request, scope, context,
                     getRestrictions(relations, service, flatChilds, restrictions));
 
 
@@ -319,13 +321,14 @@ public final class SqlJoin extends SqlIntercode
             optChilds = new ArrayList<>(optChilds);
             optChilds.add(evaluated);
 
-            List<SqlIntercode> fullChilds = mergeChilds(request, optChilds, nondeterministic, restrictions, reduced);
+            List<SqlIntercode> fullChilds = mergeChilds(request, scope, optChilds, nondeterministic, restrictions,
+                    reduced);
 
-            return join(request, fullChilds, restrictions).optimize(request, restrictions, reduced, true);
+            return join(request, fullChilds, restrictions).optimize(request, scope, restrictions, reduced, true);
         }
 
 
-        List<SqlIntercode> fullChilds = mergeChilds(request, optChilds, nondeterministic, restrictions, reduced);
+        List<SqlIntercode> fullChilds = mergeChilds(request, scope, optChilds, nondeterministic, restrictions, reduced);
 
         if(fullChilds.size() == 0)
             return SqlEmptySolution.get();
@@ -377,13 +380,14 @@ public final class SqlJoin extends SqlIntercode
      * union so that its branches are joined separately.
      *
      * @param request the current request
+     * @param scope the scope of the join
      * @param deterministic the deterministic children
      * @param nondeterministic the nondeterministic children
      * @param restrictions what the parent needs of the variables
      * @param reduced whether duplicate solutions may be dropped
      * @return the joined children
      */
-    private static List<SqlIntercode> mergeChilds(Request request, List<SqlIntercode> deterministic,
+    private static List<SqlIntercode> mergeChilds(Request request, Scope scope, List<SqlIntercode> deterministic,
             List<SqlIntercode> nondeterministic, Restrictions restrictions, boolean reduced)
     {
         if(nondeterministic.size() == 1 && nondeterministic.get(0) instanceof SqlUnion union)
@@ -399,7 +403,7 @@ public final class SqlJoin extends SqlIntercode
                 branches.add(join(request, l, null));
             }
 
-            return List.of(SqlUnion.union(request, branches).optimize(request, restrictions, reduced, false));
+            return List.of(SqlUnion.union(request, branches).optimize(request, scope, restrictions, reduced, false));
         }
 
 
@@ -416,16 +420,17 @@ public final class SqlJoin extends SqlIntercode
      * Optimises each child with the restrictions implied by the parent and by the other children.
      *
      * @param request the current request
+     * @param scope the scope of the join
      * @param childs the child nodes
      * @param restrictions what the parent needs of the variables
      * @param reduced whether duplicate solutions may be dropped
      * @param evalServices whether SERVICE stubs are evaluated
      * @return the optimised children
      */
-    public static List<SqlIntercode> optimize(Request request, List<SqlIntercode> childs, Restrictions restrictions,
-            boolean reduced, boolean evalServices)
+    public static List<SqlIntercode> optimize(Request request, Scope scope, List<SqlIntercode> childs,
+            Restrictions restrictions, boolean reduced, boolean evalServices)
     {
-        return optimize(request, childs, restrictions, reduced, evalServices, Map.of());
+        return optimize(request, scope, childs, restrictions, reduced, evalServices, Map.of());
     }
 
 
@@ -434,6 +439,7 @@ public final class SqlJoin extends SqlIntercode
      * classes of the optimisation loop (see {@link Settlement}).
      *
      * @param request the current request
+     * @param scope the scope of the join
      * @param childs the child nodes
      * @param restrictions what the parent needs of the variables
      * @param reduced whether duplicate solutions may be dropped
@@ -441,16 +447,16 @@ public final class SqlJoin extends SqlIntercode
      * @param settled settled classes per variable, see {@link Settlement#getClasses}
      * @return the optimised children
      */
-    private static List<SqlIntercode> optimize(Request request, List<SqlIntercode> childs, Restrictions restrictions,
-            boolean reduced, boolean evalServices, Map<Variable, Set<ResourceClass>> settled)
+    private static List<SqlIntercode> optimize(Request request, Scope scope, List<SqlIntercode> childs,
+            Restrictions restrictions, boolean reduced, boolean evalServices, Map<Variable, Set<ResourceClass>> settled)
     {
         ClassRelations relations = request.getConfiguration();
 
         List<SqlIntercode> optimized = new ArrayList<>(childs.size());
 
         for(SqlIntercode child : childs)
-            optimized.add(child.optimize(request, getRestrictions(relations, child, childs, restrictions, settled),
-                    reduced, evalServices));
+            optimized.add(child.optimize(request, scope,
+                    getRestrictions(relations, child, childs, restrictions, settled), reduced, evalServices));
 
         return optimized;
     }
@@ -461,15 +467,16 @@ public final class SqlJoin extends SqlIntercode
      * services.
      *
      * @param request the current request
+     * @param scope the scope of the join
      * @param childs the child nodes
      * @param restrictions what the parent needs of the variables
      * @param reduced whether duplicate solutions may be dropped
      * @return the optimised children
      */
-    public static List<SqlIntercode> optimize(Request request, List<SqlIntercode> childs, Restrictions restrictions,
-            boolean reduced)
+    public static List<SqlIntercode> optimize(Request request, Scope scope, List<SqlIntercode> childs,
+            Restrictions restrictions, boolean reduced)
     {
-        return optimize(request, childs, restrictions, reduced, false);
+        return optimize(request, scope, childs, restrictions, reduced, false);
     }
 
 
@@ -886,7 +893,7 @@ public final class SqlJoin extends SqlIntercode
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -909,7 +916,7 @@ public final class SqlJoin extends SqlIntercode
             Map<Variable, Set<ResourceClass>> joined = getJoinedClasses(relations,
                     childs.stream().map(c -> c.getVariableBindings()).toList());
 
-            translateTree(request, getPlan(request).root(), joined, builder);
+            translateTree(request, scope, getPlan(request).root(), joined, builder);
             return builder.toString();
         }
 
@@ -919,7 +926,7 @@ public final class SqlJoin extends SqlIntercode
                 builder.append(", ");
 
             builder.append("(");
-            builder.append(childs.get(i).translate(request));
+            builder.append(childs.get(i).translate(request, scope));
             builder.append(") AS ");
             builder.append(tables.get(i));
         }
@@ -946,20 +953,21 @@ public final class SqlJoin extends SqlIntercode
      * that meet a class it takes in the whole join (see {@link #getJoinedClasses}).
      *
      * @param request the current request
+     * @param scope the scope of the join
      * @param node the tree
      * @param joined classes per variable in the whole join (see {@link #getJoinedClasses})
      * @param builder the SQL code being built
      * @return the children of the tree, as a bit per child
      */
-    private int translateTree(Request request, JoinOptimizer.Node node, Map<Variable, Set<ResourceClass>> joined,
-            StringBuilder builder)
+    private int translateTree(Request request, Scope scope, JoinOptimizer.Node node,
+            Map<Variable, Set<ResourceClass>> joined, StringBuilder builder)
     {
         ClassRelations relations = request.getConfiguration();
 
         if(node instanceof JoinOptimizer.Leaf leaf)
         {
             builder.append("(");
-            builder.append(childs.get(leaf.child()).translate(request));
+            builder.append(childs.get(leaf.child()).translate(request, scope));
             builder.append(") AS ");
             builder.append(tables.get(leaf.child()));
 
@@ -968,7 +976,7 @@ public final class SqlJoin extends SqlIntercode
 
         if(node instanceof JoinOptimizer.Lookup lookup)
         {
-            int outer = translateTree(request, lookup.outer(), joined, builder);
+            int outer = translateTree(request, scope, lookup.outer(), joined, builder);
             SqlTableAccess access = (SqlTableAccess) childs.get(lookup.child());
 
             List<String> conditions = new ArrayList<>();
@@ -996,10 +1004,10 @@ public final class SqlJoin extends SqlIntercode
 
         JoinOptimizer.HashJoin join = (JoinOptimizer.HashJoin) node;
 
-        int left = translateTree(request, join.left(), joined, builder);
+        int left = translateTree(request, scope, join.left(), joined, builder);
 
         StringBuilder rightBuilder = new StringBuilder();
-        int right = translateTree(request, join.right(), joined, rightBuilder);
+        int right = translateTree(request, scope, join.right(), joined, rightBuilder);
 
         List<String> conditions = new ArrayList<>();
 
@@ -1095,11 +1103,12 @@ public final class SqlJoin extends SqlIntercode
      * plain equality.
      *
      * @param request the current request
+     * @param scope the scope of the join
      * @param childs the child nodes
      * @param evalServices whether SERVICE stubs are evaluated
      * @return the children, the leading OPTIONALs sharing a variable with another child replaced by unions
      */
-    private static List<SqlIntercode> expandLeadingOptionals(Request request, List<SqlIntercode> childs,
+    private static List<SqlIntercode> expandLeadingOptionals(Request request, Scope scope, List<SqlIntercode> childs,
             boolean evalServices)
     {
         List<SqlIntercode> result = new ArrayList<>(childs.size());
@@ -1109,7 +1118,7 @@ public final class SqlJoin extends SqlIntercode
             SqlIntercode child = childs.get(i);
 
             if(child instanceof SqlLeftJoin join && join.isLeadingOptional() && sharesVariable(childs, i))
-                result.add(join.toUnion(request, evalServices));
+                result.add(join.toUnion(request, scope, evalServices));
             else
                 result.add(child);
         }
@@ -1130,11 +1139,13 @@ public final class SqlJoin extends SqlIntercode
      * back for the others.
      *
      * @param request the current request
+     * @param scope the scope of the join
      * @param childs the child nodes
      * @param restrictions what the parent needs of the variables
      * @return the children, with the first walk that can be seeded replaced by its seeded form and its seeds removed
      */
-    private static List<SqlIntercode> seedWalks(Request request, List<SqlIntercode> childs, Restrictions restrictions)
+    private static List<SqlIntercode> seedWalks(Request request, Scope scope, List<SqlIntercode> childs,
+            Restrictions restrictions)
     {
         for(int i = 0; i < childs.size(); i++)
         {
@@ -1153,8 +1164,8 @@ public final class SqlJoin extends SqlIntercode
                     selectSeeds(request, childs, i, endVar, beginVar, walk.graphVar) : List.of();
 
             // the walk turned to start from its end has to agree with the seeds (see SqlRecursive.canSeedFromEnd)
-            if(!endSeeds.isEmpty()
-                    && !walk.canSeedFromEnd(request, endSeeds.stream().map(childs::get).toList(), walkRestrictions))
+            if(!endSeeds.isEmpty() && !walk.canSeedFromEnd(request, scope, endSeeds.stream().map(childs::get).toList(),
+                    walkRestrictions))
                 endSeeds = List.of();
 
             boolean fromEnd;
@@ -1175,7 +1186,7 @@ public final class SqlJoin extends SqlIntercode
                 fromEnd = !endSeeds.isEmpty()
                         && (seeds.isEmpty() || seedRank(childs, endSeeds) < seedRank(childs, seeds)
                                 || seedRank(childs, endSeeds) == seedRank(childs, seeds)
-                                        && fewerSeeds(request, childs, endSeeds, endVar, seeds, beginVar));
+                                        && fewerSeeds(request, scope, childs, endSeeds, endVar, seeds, beginVar));
             }
 
             if(fromEnd)
@@ -1190,7 +1201,8 @@ public final class SqlJoin extends SqlIntercode
                 if(j != i && !seeds.contains(j))
                     result.add(childs.get(j));
 
-            result.add(walk.seed(request, seeds.stream().map(j -> childs.get(j)).toList(), fromEnd, walkRestrictions));
+            result.add(walk.seed(request, scope, seeds.stream().map(j -> childs.get(j)).toList(), fromEnd,
+                    walkRestrictions));
 
             return result;
         }
@@ -1207,11 +1219,13 @@ public final class SqlJoin extends SqlIntercode
      * other walk has siblings that seed it directly.
      *
      * @param request the current request
+     * @param scope the scope of the join
      * @param childs the child nodes
      * @param evalServices whether SERVICE stubs are evaluated
      * @return the children, with the first such walk shared and the seeds read from it added
      */
-    private static List<SqlIntercode> shareSeeds(Request request, List<SqlIntercode> childs, boolean evalServices)
+    private static List<SqlIntercode> shareSeeds(Request request, Scope scope, List<SqlIntercode> childs,
+            boolean evalServices)
     {
         for(int i = 0; i < childs.size(); i++)
         {
@@ -1234,14 +1248,14 @@ public final class SqlJoin extends SqlIntercode
                     VariableBinding binding = child.getVariable(variable);
 
                     if(j == i || !(child instanceof SqlRecursive) || binding == null || binding.canBeNull()
-                            || child.getVariable(other) != null || !SqlShared.canShare(request, child))
+                            || child.getVariable(other) != null || !SqlShared.canShare(request, scope, child))
                         continue;
 
                     SqlIntercode shared = SqlShared.share(child);
 
                     List<SqlIntercode> result = new ArrayList<>(childs);
                     result.set(j, shared);
-                    result.add(SqlShared.seed(request, shared, variable, evalServices));
+                    result.add(SqlShared.seed(request, scope, shared, variable, evalServices));
 
                     return result;
                 }
@@ -1258,6 +1272,7 @@ public final class SqlJoin extends SqlIntercode
      * seeds refer to the current solution of an EXISTS or to a lateral join, which cannot be explained on their own.
      *
      * @param request the current request
+     * @param scope the scope of the join
      * @param childs the child nodes
      * @param endSeeds indexes of the seeds of the end
      * @param endVar the end variable
@@ -1265,20 +1280,20 @@ public final class SqlJoin extends SqlIntercode
      * @param beginVar the begin variable
      * @return true if the seeds of the end are estimated to have the fewer distinct values, false otherwise
      */
-    private static boolean fewerSeeds(Request request, List<SqlIntercode> childs, List<Integer> endSeeds,
+    private static boolean fewerSeeds(Request request, Scope scope, List<SqlIntercode> childs, List<Integer> endSeeds,
             Variable endVar, List<Integer> beginSeeds, Variable beginVar)
     {
         SqlIntercode endJoin = join(request, endSeeds.stream().map(childs::get).toList());
         SqlIntercode beginJoin = join(request, beginSeeds.stream().map(childs::get).toList());
 
-        for(String sql : List.of(endJoin.translate(request), beginJoin.translate(request)))
-            if(sql.contains("\"lateral") || request.refersToEnclosingInput(sql))
+        for(String sql : List.of(endJoin.translate(request, scope), beginJoin.translate(request, scope)))
+            if(sql.contains("\"lateral") || scope.refersToEnclosingInput(sql))
                 return false;
 
         Estimator estimator = new Estimator(request);
 
-        long end = estimator.estimateDistinct(request, endJoin, Set.of(endVar));
-        long begin = estimator.estimateDistinct(request, beginJoin, Set.of(beginVar));
+        long end = estimator.estimateDistinct(request, scope, endJoin, Set.of(endVar));
+        long begin = estimator.estimateDistinct(request, scope, beginJoin, Set.of(beginVar));
 
         if(end == Long.MAX_VALUE || begin == Long.MAX_VALUE)
             return false;

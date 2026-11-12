@@ -163,7 +163,8 @@ public final class SqlMinus extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -186,7 +187,7 @@ public final class SqlMinus extends SqlIntercode
 
         while(true)
         {
-            optLeft = optLeft.optimize(request, leftRestrictions, leftReduced, evalServices);
+            optLeft = optLeft.optimize(request, scope, leftRestrictions, leftReduced, evalServices);
 
             // a join on the right side holding a walk whose start the left side binds always is offered the distinct
             // values of the start read from the left side, shared so that the statement evaluates it once, before its
@@ -197,14 +198,15 @@ public final class SqlMinus extends SqlIntercode
 
                 Variable seedVar = SqlRecursive.seedVariable(optRight, optLeft.getVariableBindings());
 
-                if(seedVar != null && SqlShared.canShare(request, optLeft))
+                if(seedVar != null && SqlShared.canShare(request, scope, optLeft))
                 {
                     optLeft = SqlShared.share(optLeft);
-                    optRight = SqlJoin.join(request, SqlShared.seed(request, optLeft, seedVar, evalServices), optRight);
+                    optRight = SqlJoin.join(request, SqlShared.seed(request, scope, optLeft, seedVar, evalServices),
+                            optRight);
                 }
             }
 
-            optRight = optRight.optimize(request, rightRestrictions, true, evalServices);
+            optRight = optRight.optimize(request, scope, rightRestrictions, true, evalServices);
 
             if(optRight instanceof SqlUnion union)
             {
@@ -215,7 +217,7 @@ public final class SqlMinus extends SqlIntercode
                         unionList.add(child);
 
                 if(!unionList.equals(union.getChilds()))
-                    optRight = SqlUnion.union(request, unionList).optimize(request, rightRestrictions, true,
+                    optRight = SqlUnion.union(request, unionList).optimize(request, scope, rightRestrictions, true,
                             evalServices);
             }
 
@@ -242,8 +244,8 @@ public final class SqlMinus extends SqlIntercode
 
         // the condition follows the current solution as the node holding the EXISTS expression provides it now; a
         // solution binding no variable leaves the sides with the variables they bind themselves
-        SqlExpressionIntercode optSolutionBound = solutionBound == null ? null :
-                solutionBound.optimize(request, new VariableBindings(), new Restriction(xsdBoolean), evalServices);
+        SqlExpressionIntercode optSolutionBound = solutionBound == null ? null : solutionBound.optimize(request, scope,
+                new VariableBindings(), new Restriction(xsdBoolean), evalServices);
 
         if(optSolutionBound != null && (optSolutionBound.equals(SqlNull.get()) || optSolutionBound.equals(falseValue)))
             optSolutionBound = null;
@@ -257,11 +259,11 @@ public final class SqlMinus extends SqlIntercode
                 shareVariables = true;
 
             if(!pair.isJoinable())
-                return optLeft.optimize(request, restrictions, reduced, evalServices);
+                return optLeft.optimize(request, scope, restrictions, reduced, evalServices);
         }
 
         if(!shareVariables)
-            return optLeft.optimize(request, restrictions, reduced, evalServices);
+            return optLeft.optimize(request, scope, restrictions, reduced, evalServices);
 
         if(optLeft instanceof SqlUnion union)
         {
@@ -270,7 +272,7 @@ public final class SqlMinus extends SqlIntercode
             for(SqlIntercode child : union.getChilds())
                 childs.add(minus(request, child, optRight, graph, optSolutionBound, restrictions));
 
-            return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
+            return SqlUnion.union(request, childs).optimize(request, scope, restrictions, reduced, evalServices);
         }
 
 
@@ -279,13 +281,13 @@ public final class SqlMinus extends SqlIntercode
         Variable seedVar = optLeft instanceof SqlShared ? null :
                 SqlRecursive.seedVariable(optRight, optLeft.getVariableBindings());
 
-        if(seedVar != null && SqlShared.canShare(request, optLeft))
+        if(seedVar != null && SqlShared.canShare(request, scope, optLeft))
         {
             SqlIntercode shared = SqlShared.share(optLeft);
-            SqlIntercode seed = SqlShared.seed(request, shared, seedVar, evalServices);
+            SqlIntercode seed = SqlShared.seed(request, scope, shared, seedVar, evalServices);
 
             return minus(request, shared, SqlJoin.join(request, seed, optRight), graph, optSolutionBound, restrictions)
-                    .optimize(request, restrictions, reduced, evalServices);
+                    .optimize(request, scope, restrictions, reduced, evalServices);
         }
 
         if(restrictions.isOptimized(relations, bindings) && optLeft == left && optRight == right
@@ -297,7 +299,7 @@ public final class SqlMinus extends SqlIntercode
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -313,12 +315,12 @@ public final class SqlMinus extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM (");
-        builder.append(left.translate(request));
+        builder.append(left.translate(request, scope));
         builder.append(") AS ");
         builder.append(leftTable);
 
         builder.append(" WHERE NOT EXISTS (SELECT 1 FROM (");
-        builder.append(right.translate(request));
+        builder.append(right.translate(request, scope));
         builder.append(") AS ");
         builder.append(rightTable);
 

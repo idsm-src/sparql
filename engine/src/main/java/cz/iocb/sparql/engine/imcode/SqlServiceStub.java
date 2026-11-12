@@ -781,17 +781,18 @@ public final class SqlServiceStub extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
         if(evalServices)
-            return eval(request, context, restrictions);
+            return eval(request, scope, context, restrictions);
 
 
         Restrictions contextRestrictions = getContextRestrictions(restrictions);
 
-        SqlIntercode optContext = context.optimize(request, contextRestrictions, reduced, evalServices);
+        SqlIntercode optContext = context.optimize(request, scope, contextRestrictions, reduced, evalServices);
 
 
         if(optContext.equals(SqlNoSolution.get()))
@@ -813,7 +814,7 @@ public final class SqlServiceStub extends SqlIntercode
                 childs.add(create(request, name, serviceCode, serviceVariables, child, blankNodeClass, silent,
                         enclosures, restrictions, state));
 
-            return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
+            return SqlUnion.union(request, childs).optimize(request, scope, restrictions, reduced, evalServices);
         }
 
 
@@ -826,7 +827,7 @@ public final class SqlServiceStub extends SqlIntercode
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
         throw new RuntimeException();
     }
@@ -878,11 +879,12 @@ public final class SqlServiceStub extends SqlIntercode
      * of them.
      *
      * @param request the current request
+     * @param scope the scope of the call
      * @param context solutions the call is evaluated for
      * @param restrictions what the parent needs of the variables
      * @return the received solutions joined with the context
      */
-    public SqlIntercode eval(Request request, SqlIntercode context, Restrictions restrictions)
+    public SqlIntercode eval(Request request, Scope scope, SqlIntercode context, Restrictions restrictions)
     {
         restrictions = getEvaluationRestrictions(context, restrictions);
 
@@ -937,11 +939,11 @@ public final class SqlServiceStub extends SqlIntercode
              * lateral joins, and only then the evaluated context is joined with their left sides, so that no call is
              * evaluated twice.
              */
-            local = context.optimize(request, new Restrictions(vars), false, true);
+            local = context.optimize(request, scope, new Restrictions(vars), false, true);
 
             SqlIntercode evaluated = local;
             SqlSelect query = SqlSelect.createTopLevel(request, vars, evaluated, null, limit);
-            String code = query.translate(request);
+            String code = query.translate(request, scope);
 
             for(Enclosure enclosure : enclosures)
             {
@@ -955,8 +957,8 @@ public final class SqlServiceStub extends SqlIntercode
 
             if(!referred.isEmpty())
             {
-                query = SqlSelect.createTopLevel(request, vars, evaluated, null, limit).optimize(request, true);
-                code = query.translate(request);
+                query = SqlSelect.createTopLevel(request, vars, evaluated, null, limit).optimize(request, scope, true);
+                code = query.translate(request, scope);
             }
 
             try(Result result = new Result(ResultType.SELECT, query.getResultDescription(),
@@ -1028,7 +1030,7 @@ public final class SqlServiceStub extends SqlIntercode
         for(Enclosure enclosure : referred)
             resultRestrictions.add(enclosure.binding().getVariable());
 
-        try(ResultHandler results = new StoredResultHandler(request, resultRestrictions))
+        try(ResultHandler results = new StoredResultHandler(request, scope, resultRestrictions))
         {
             int call = 0;
 
@@ -1077,7 +1079,8 @@ public final class SqlServiceStub extends SqlIntercode
 
                     // the earlier calls of the context are evaluated already, and the copies of the stub share the
                     // result instead of asking the failing endpoint again
-                    SqlIntercode result = local.optimize(request, getContextRestrictions(restrictions), false, true);
+                    SqlIntercode result = local.optimize(request, scope, getContextRestrictions(restrictions), false,
+                            true);
 
                     if(context.isDeterministic())
                         evaluations.add(new Evaluation(new Restrictions(restrictions), result));
@@ -1117,7 +1120,7 @@ public final class SqlServiceStub extends SqlIntercode
                 }
             }
 
-            SqlIntercode result = restrictToEnclosures(request, results.get(), referred, restrictions);
+            SqlIntercode result = restrictToEnclosures(request, scope, results.get(), referred, restrictions);
 
             if(context.isDeterministic())
                 evaluations.add(new Evaluation(new Restrictions(restrictions), result));
@@ -1164,13 +1167,14 @@ public final class SqlServiceStub extends SqlIntercode
      * of each enclosure to the term its current solution refers to (see {@link Enclosure#getCurrentValue}).
      *
      * @param request the current request
+     * @param scope the scope of the call
      * @param result solutions computed for all solutions of the enclosures, binding their variables
      * @param enclosures the enclosures the context refers to
      * @param restrictions what the parent needs of the variables
      * @return solutions computed for the current solutions of the enclosing lateral joins
      */
-    private static SqlIntercode restrictToEnclosures(Request request, SqlIntercode result, List<Enclosure> enclosures,
-            Restrictions restrictions)
+    private static SqlIntercode restrictToEnclosures(Request request, Scope scope, SqlIntercode result,
+            List<Enclosure> enclosures, Restrictions restrictions)
     {
         if(enclosures.isEmpty() || result.equals(SqlNoSolution.get()))
             return result;
@@ -1187,7 +1191,8 @@ public final class SqlServiceStub extends SqlIntercode
             conditions.add(SqlEffectiveBooleanValue.create(relations, condition));
         }
 
-        return SqlFilter.filter(request, conditions, result, restrictions).optimize(request, restrictions, false, true);
+        return SqlFilter.filter(request, conditions, result, restrictions).optimize(request, scope, restrictions, false,
+                true);
     }
 
 

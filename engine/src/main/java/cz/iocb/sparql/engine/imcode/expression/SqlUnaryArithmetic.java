@@ -18,6 +18,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
@@ -153,8 +154,8 @@ public final class SqlUnaryArithmetic extends SqlUnary
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
-            boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, Scope scope, VariableBindings bindings,
+            Restriction restriction, boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -167,7 +168,8 @@ public final class SqlUnaryArithmetic extends SqlUnary
             if(restriction.contains(relations, results.get(i)))
                 operandRestriction.add(numericBaseClasses.subList(0, numericBaseClasses.size() - i));
 
-        SqlExpressionIntercode optOperand = operand.optimize(request, bindings, operandRestriction, evalServices);
+        SqlExpressionIntercode optOperand = operand.optimize(request, scope, bindings, operandRestriction,
+                evalServices);
 
         if(optOperand == operand && restriction.isOptimized(relations, variableBinding))
             return this;

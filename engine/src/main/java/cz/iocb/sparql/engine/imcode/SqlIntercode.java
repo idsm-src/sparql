@@ -701,9 +701,11 @@ public abstract class SqlIntercode extends SqlBaseClass
      * Returns a subtree with the same solutions (or, when {@code reduced}, the same solutions up to duplicates) that is
      * optimised for the parent's needs: variables and classes outside {@code restrictions} are dropped, constants
      * propagated and nodes simplified or merged. With {@code evalServices}, SERVICE stubs are evaluated against their
-     * endpoints and replaced by their results.
+     * endpoints and replaced by their results. The subtree is optimised for the place it lies in: the expressions that
+     * refer to a current solution read it from the scope (see {@link Scope}).
      *
      * @param request the current request
+     * @param scope the scope of the node
      * @param restrictions what the parent needs of the variables
      * @param reduced whether duplicate solutions may be dropped
      * @param evalServices whether SERVICE stubs are evaluated
@@ -711,17 +713,20 @@ public abstract class SqlIntercode extends SqlBaseClass
      *         optimised for the parent's needs: variables and classes outside {@code restrictions} are dropped,
      *         constants propagated and nodes simplified or merged
      */
-    public abstract SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced,
+    public abstract SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
             boolean evalServices);
 
 
     /**
-     * SQL of the subtree: a SELECT statement whose result columns are those of the variable bindings.
+     * SQL of the subtree: a SELECT statement whose result columns are those of the variable bindings. The scope has to
+     * be the one the subtree was optimised in, because the SQL of the patterns of its expressions has been rendered for
+     * it (see {@link Scope#getInputTable}).
      *
      * @param request the current request
+     * @param scope the scope of the node
      * @return SQL of the subtree: a SELECT statement whose result columns are those of the variable bindings
      */
-    public abstract String translate(Request request);
+    public abstract String translate(Request request, Scope scope);
 
 
     /**
@@ -1786,11 +1791,12 @@ public abstract class SqlIntercode extends SqlBaseClass
      * conditions are not evaluated by the trial.
      *
      * @param request the current request
+     * @param scope the scope of the node holding the conditions
      * @param restrictions the restrictions to extend
      * @param conditions the conditions, all of which have to hold
      * @param bindings the variable bindings the conditions are evaluated under
      */
-    protected static void addAcceptedClasses(Request request, Restrictions restrictions,
+    protected static void addAcceptedClasses(Request request, Scope scope, Restrictions restrictions,
             Collection<SqlExpressionIntercode> conditions, VariableBindings bindings)
     {
         for(SqlExpressionIntercode condition : conditions)
@@ -1815,8 +1821,8 @@ public abstract class SqlIntercode extends SqlBaseClass
                     VariableBindings trial = new VariableBindings(bindings);
                     trial.add(new VariableBinding(variable, resClass, columns, false));
 
-                    SqlExpressionIntercode expression = condition.optimize(request, trial, new Restriction(xsdBoolean),
-                            false);
+                    SqlExpressionIntercode expression = condition.optimize(request, scope, trial,
+                            new Restriction(xsdBoolean), false);
 
                     if(!expression.equals(SqlNull.get()) && !expression.equals(falseValue)
                             && !(expression instanceof SqlBooleanExpression e && e.isFalseOrError()))

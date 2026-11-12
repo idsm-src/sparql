@@ -30,6 +30,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SqlType;
+import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlBaseClass;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.BooleanBaseClass;
@@ -277,16 +278,18 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
     /**
      * Rebuilds the expression over the given (optimised) variable bindings, materialising only the classes in
-     * {@code restriction}; with {@code evalServices}, patterns nested in EXISTS evaluate their SERVICE stubs.
+     * {@code restriction}; with {@code evalServices}, patterns nested in EXISTS evaluate their SERVICE stubs. A
+     * reference to a current solution takes its classes and columns from the scope (see {@link Scope}).
      *
      * @param request the current request
+     * @param scope the scope of the node holding the expression
      * @param bindings the variable bindings
      * @param restriction the result classes the parent needs
      * @param evalServices whether SERVICE stubs are evaluated
      * @return the resulting expression
      */
-    public abstract SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
-            boolean evalServices);
+    public abstract SqlExpressionIntercode optimize(Request request, Scope scope, VariableBindings bindings,
+            Restriction restriction, boolean evalServices);
 
 
     /**

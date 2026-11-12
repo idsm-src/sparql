@@ -6,6 +6,7 @@ import java.sql.Statement;
 import java.util.Set;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlDistinct;
 import cz.iocb.sparql.engine.imcode.SqlIntercode;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
@@ -41,20 +42,21 @@ public class Estimator
      * Estimated number of distinct values of the variable in the solutions of the intermediate code.
      *
      * @param request the current request
+     * @param scope the scope of the intermediate code
      * @param imcode the intermediate code
      * @param var the variable
      * @return estimated number of distinct values of the variable in the solutions of the intermediate code
      * @throws SQLException on database errors
      */
-    public long estimateDistinct(Request request, SqlIntercode imcode, Variable var) throws SQLException
+    public long estimateDistinct(Request request, Scope scope, SqlIntercode imcode, Variable var) throws SQLException
     {
         Restrictions restrictions = new Restrictions();
         restrictions.add(var);
 
-        SqlIntercode distinct = SqlDistinct.create(request, imcode, Set.of(var)).optimize(request, restrictions, false,
-                false);
+        SqlIntercode distinct = SqlDistinct.create(request, imcode, Set.of(var)).optimize(request, scope, restrictions,
+                false, false);
 
-        return estimateRowCount(translateStatement(distinct));
+        return estimateRowCount(translateStatement(scope, distinct));
     }
 
 
@@ -63,12 +65,13 @@ public class Estimator
      * {@link Long#MAX_VALUE} when the estimate fails.
      *
      * @param request the current request
+     * @param scope the scope of the intermediate code
      * @param imcode the intermediate code
      * @param vars the variables
      * @return estimated number of distinct value combinations of the variables in the solutions of the intermediate
      *         code; {@link Long#MAX_VALUE} when the estimate fails
      */
-    public long estimateDistinct(Request request, SqlIntercode imcode, Set<Variable> vars)
+    public long estimateDistinct(Request request, Scope scope, SqlIntercode imcode, Set<Variable> vars)
     {
         if(vars.isEmpty())
             return 0;
@@ -77,10 +80,10 @@ public class Estimator
         {
             Restrictions restrictions = new Restrictions(vars);
 
-            SqlIntercode distinct = SqlDistinct.create(request, imcode, vars).optimize(request, restrictions, false,
-                    false);
+            SqlIntercode distinct = SqlDistinct.create(request, imcode, vars).optimize(request, scope, restrictions,
+                    false, false);
 
-            return estimateRowCount(translateStatement(distinct));
+            return estimateRowCount(translateStatement(scope, distinct));
         }
         catch(SQLException e)
         {
@@ -96,12 +99,13 @@ public class Estimator
      * of the code is then wrapped in a query, since it need not be a plain {@code SELECT}: a walk begins with a
      * {@code WITH RECURSIVE} clause of its own, which cannot follow another {@code WITH} clause.
      *
+     * @param scope the scope of the intermediate code
      * @param imcode the intermediate code
      * @return SQL of a statement evaluating the intermediate code
      */
-    private String translateStatement(SqlIntercode imcode)
+    private String translateStatement(Scope scope, SqlIntercode imcode)
     {
-        String sql = imcode.translate(request);
+        String sql = imcode.translate(request, scope);
         String with = SqlSelect.translateWithClause(request, imcode.getVirtualTables(), sql);
 
         return with.isEmpty() ? sql : with + "SELECT * FROM (" + sql + ") AS tab";

@@ -89,7 +89,8 @@ public final class SqlValues extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         // a row binding a variable to a value of a class the parent does not accept never reaches the result
         boolean[] mask = new boolean[size];
@@ -100,7 +101,7 @@ public final class SqlValues extends SqlIntercode
                 kept++;
 
         if(kept < size)
-            return strip(mask).optimize(request, restrictions, reduced, evalServices);
+            return strip(mask).optimize(request, scope, restrictions, reduced, evalServices);
 
 
         VariableBindings optimizedBindings = bindings.restrict(request.getConfiguration(), restrictions);
@@ -252,7 +253,7 @@ public final class SqlValues extends SqlIntercode
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
         String values = translateValues();
 

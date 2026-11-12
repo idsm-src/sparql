@@ -372,14 +372,29 @@ public final class SqlSelect extends SqlIntercode
 
 
     /**
-     * Optimises the top-level select: the child is optimised for the projected and ordering variables, orderings on
-     * unbound variables are dropped, and DISTINCT is pushed into a {@link SqlDistinct} when the ordering allows it.
+     * Optimises the top-level select of a statement of a query, which lies in no pattern of an expression (see
+     * {@link Scope#TOP}).
      *
      * @param request the current request
      * @param evalServices whether SERVICE stubs are evaluated
      * @return the resulting select
      */
     public SqlSelect optimize(Request request, boolean evalServices)
+    {
+        return optimize(request, Scope.TOP, evalServices);
+    }
+
+
+    /**
+     * Optimises the top-level select: the child is optimised for the projected and ordering variables, orderings on
+     * unbound variables are dropped, and DISTINCT is pushed into a {@link SqlDistinct} when the ordering allows it.
+     *
+     * @param request the current request
+     * @param scope the scope of the select
+     * @param evalServices whether SERVICE stubs are evaluated
+     * @return the resulting select
+     */
+    public SqlSelect optimize(Request request, Scope scope, boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -394,7 +409,7 @@ public final class SqlSelect extends SqlIntercode
         // duplicates do not matter to a DISTINCT that is going to deduplicate the child over the projections below
         boolean childReduced = distinct && projections.containsAll(orderBy.keySet());
 
-        SqlIntercode optChild = child.optimize(request, childRestrictions, childReduced, evalServices);
+        SqlIntercode optChild = child.optimize(request, scope, childRestrictions, childReduced, evalServices);
 
 
         LinkedHashMap<Variable, Direction> stripedOrderBy = new LinkedHashMap<>();
@@ -420,7 +435,7 @@ public final class SqlSelect extends SqlIntercode
 
         if(optDistinct && projections.containsAll(stripedOrderBy.keySet()))
         {
-            optChild = SqlDistinct.create(request, optChild, new HashSet<>(projections)).optimize(request,
+            optChild = SqlDistinct.create(request, optChild, new HashSet<>(projections)).optimize(request, scope,
                     childRestrictions, true, evalServices);
             optDistinct = false;
         }
@@ -436,7 +451,8 @@ public final class SqlSelect extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -466,7 +482,7 @@ public final class SqlSelect extends SqlIntercode
         if(distinct && !childReduced)
             patternRestrictions.add(bindings.getVariables());
 
-        SqlIntercode optChild = child.optimize(request, patternRestrictions, childReduced, evalServices);
+        SqlIntercode optChild = child.optimize(request, scope, patternRestrictions, childReduced, evalServices);
 
         LinkedHashMap<Variable, Direction> stripedOrderBy = new LinkedHashMap<>();
 
@@ -478,7 +494,7 @@ public final class SqlSelect extends SqlIntercode
 
         if(optDistinct && bindings.getVariables().containsAll(stripedOrderBy.keySet()))
         {
-            optChild = SqlDistinct.create(request, optChild, bindings.getVariables()).optimize(request,
+            optChild = SqlDistinct.create(request, optChild, bindings.getVariables()).optimize(request, scope,
                     childRestrictions, childReduced, evalServices);
             optDistinct = false;
         }
@@ -605,14 +621,26 @@ public final class SqlSelect extends SqlIntercode
     }
 
 
-
-    @Override
+    /**
+     * SQL of the top-level select of a statement of a query, which lies in no pattern of an expression (see
+     * {@link Scope#TOP}).
+     *
+     * @param request the current request
+     * @return SQL of the statement
+     */
     public String translate(Request request)
     {
-        if(!isTopLevel())
-            return translateSelect(request);
+        return translate(request, Scope.TOP);
+    }
 
-        String select = translateSelect(request);
+
+    @Override
+    public String translate(Request request, Scope scope)
+    {
+        if(!isTopLevel())
+            return translateSelect(request, scope);
+
+        String select = translateSelect(request, scope);
 
         return translateWithClause(request, getVirtualTables(), select) + select;
     }
@@ -622,9 +650,10 @@ public final class SqlSelect extends SqlIntercode
      * The select without the {@code WITH} clause of the statement.
      *
      * @param request the current request
+     * @param scope the scope of the select
      * @return the select without the {@code WITH} clause of the statement
      */
-    private String translateSelect(Request request)
+    private String translateSelect(Request request, Scope scope)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -645,7 +674,7 @@ public final class SqlSelect extends SqlIntercode
             }
 
             builder.append(" FROM (");
-            builder.append(child.translate(request));
+            builder.append(child.translate(request, scope));
             builder.append(") AS tab");
 
         }
@@ -663,7 +692,7 @@ public final class SqlSelect extends SqlIntercode
                 builder.append("SELECT ");
                 builder.append(translateSelectVariables(relations, description, branch.getVariableBindings()));
                 builder.append(" FROM (");
-                builder.append(branch.translate(request));
+                builder.append(branch.translate(request, scope));
                 builder.append(") AS tab");
             }
         }
@@ -682,7 +711,7 @@ public final class SqlSelect extends SqlIntercode
             }
 
             builder.append(" FROM (");
-            builder.append(child.translate(request));
+            builder.append(child.translate(request, scope));
             builder.append(") AS tab");
 
         }

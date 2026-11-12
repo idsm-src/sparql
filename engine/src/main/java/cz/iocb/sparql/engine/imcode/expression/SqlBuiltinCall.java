@@ -150,6 +150,7 @@ import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.ValueColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
@@ -3308,23 +3309,25 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
-            boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, Scope scope, VariableBindings bindings,
+            Restriction restriction, boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
         List<SqlExpressionIntercode> optimized = !restriction.contains(relations, unionize(getResourceClasses())) ?
-                arguments.stream().map(a -> a.optimize(request, bindings, NONE, evalServices)).toList() :
+                arguments.stream().map(a -> a.optimize(request, scope, bindings, NONE, evalServices)).toList() :
                 switch(function)
                 {
                     case "card", "count", "sum", "avg", "min", "max", "sample", "group_concat" ->
                     {
-                        yield arguments.stream().map(a -> a.optimize(request, bindings, ALL, evalServices)).toList();
+                        yield arguments.stream().map(a -> a.optimize(request, scope, bindings, ALL, evalServices))
+                                .toList();
                     }
 
                     case "bound", "isiri", "isuri", "isblank", "isliteral", "isnumeric", "istriple", "haslang", "haslangdir" ->
                     {
-                        yield arguments.stream().map(a -> a.optimize(request, bindings, ALL, evalServices)).toList();
+                        yield arguments.stream().map(a -> a.optimize(request, scope, bindings, ALL, evalServices))
+                                .toList();
                     }
 
                     case "uuid", "struuid", "rand", "now" ->
@@ -3336,81 +3339,88 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         //TODO: can be improved
                         yield List.of(
-                                arguments.get(0).optimize(request, bindings, new Restriction(xsdBoolean), evalServices),
-                                arguments.get(1).optimize(request, bindings, restriction, evalServices),
-                                arguments.get(2).optimize(request, bindings, restriction, evalServices));
+                                arguments.get(0).optimize(request, scope, bindings, new Restriction(xsdBoolean),
+                                        evalServices),
+                                arguments.get(1).optimize(request, scope, bindings, restriction, evalServices),
+                                arguments.get(2).optimize(request, scope, bindings, restriction, evalServices));
                     }
 
                     case "coalesce" ->
                     {
                         // a value of a class the parent does not need still stops the search for a bound argument
-                        yield arguments.stream().map(a -> a.optimize(request, bindings, ALL, evalServices)).toList();
+                        yield arguments.stream().map(a -> a.optimize(request, scope, bindings, ALL, evalServices))
+                                .toList();
                     }
 
                     case "sameterm" ->
                     {
                         //TODO: can be improved
-                        yield arguments.stream().map(a -> a.optimize(request, bindings, ALL, evalServices)).toList();
+                        yield arguments.stream().map(a -> a.optimize(request, scope, bindings, ALL, evalServices))
+                                .toList();
                     }
 
                     case "str" ->
                     {
-                        yield List.of(arguments.get(0).optimize(request, bindings, new Restriction(iri, literal),
+                        yield List.of(arguments.get(0).optimize(request, scope, bindings, new Restriction(iri, literal),
                                 evalServices));
                     }
 
                     case "lang", "langdir", "datatype" ->
                     {
-                        yield List.of(
-                                arguments.get(0).optimize(request, bindings, new Restriction(literal), evalServices));
+                        yield List.of(arguments.get(0).optimize(request, scope, bindings, new Restriction(literal),
+                                evalServices));
                     }
 
                     case "iri", "uri" ->
                     {
                         yield List.of(
-                                arguments.get(0).optimize(request, bindings, new Restriction(iri, xsdString),
+                                arguments.get(0).optimize(request, scope, bindings, new Restriction(iri, xsdString),
                                         evalServices),
-                                arguments.get(1).optimize(request, bindings, new Restriction(iri), evalServices));
+                                arguments.get(1).optimize(request, scope, bindings, new Restriction(iri),
+                                        evalServices));
                     }
 
                     case "bnode" ->
                     {
-                        yield arguments.stream()
-                                .map(a -> a.optimize(request, bindings, new Restriction(xsdString), evalServices))
+                        yield arguments.stream().map(
+                                a -> a.optimize(request, scope, bindings, new Restriction(xsdString), evalServices))
                                 .toList();
                     }
 
                     case "strdt" ->
                     {
                         yield List.of(
-                                arguments.get(0).optimize(request, bindings, new Restriction(xsdString), evalServices),
-                                arguments.get(1).optimize(request, bindings, new Restriction(iri), evalServices));
+                                arguments.get(0).optimize(request, scope, bindings, new Restriction(xsdString),
+                                        evalServices),
+                                arguments.get(1).optimize(request, scope, bindings, new Restriction(iri),
+                                        evalServices));
                     }
 
                     case "strlang", "strlangdir" ->
                     {
-                        yield arguments.stream()
-                                .map(a -> a.optimize(request, bindings, new Restriction(xsdString), evalServices))
+                        yield arguments.stream().map(
+                                a -> a.optimize(request, scope, bindings, new Restriction(xsdString), evalServices))
                                 .toList();
                     }
 
                     case "triple" ->
                     {
                         yield List.of(
-                                arguments.get(0).optimize(request, bindings, new Restriction(reference), evalServices),
-                                arguments.get(1).optimize(request, bindings, new Restriction(iri), evalServices),
-                                arguments.get(2).optimize(request, bindings, ALL, evalServices));
+                                arguments.get(0).optimize(request, scope, bindings, new Restriction(reference),
+                                        evalServices),
+                                arguments.get(1).optimize(request, scope, bindings, new Restriction(iri), evalServices),
+                                arguments.get(2).optimize(request, scope, bindings, ALL, evalServices));
                     }
 
                     case "subject", "predicate", "object" ->
                     {
-                        yield List.of(arguments.get(0).optimize(request, bindings, new Restriction(tripleTerm),
+                        yield List.of(arguments.get(0).optimize(request, scope, bindings, new Restriction(tripleTerm),
                                 evalServices));
                     }
 
                     case "strlen" ->
                     {
-                        yield List.of(arguments.get(0).optimize(request, bindings,
+                        yield List.of(arguments.get(0).optimize(request, scope, bindings,
                                 new Restriction(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString),
                                 evalServices));
                     }
@@ -3423,13 +3433,14 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                                 .filter(r -> hasStringLiteral(r)).map(r -> getStringLiteralResultClass(r))
                                 .collect(toSet());
 
-                        args.add(arguments.get(0).optimize(request, bindings, new Restriction(set), evalServices));
-                        args.add(arguments.get(1).optimize(request, bindings, new Restriction(integerNumeric),
+                        args.add(arguments.get(0).optimize(request, scope, bindings, new Restriction(set),
+                                evalServices));
+                        args.add(arguments.get(1).optimize(request, scope, bindings, new Restriction(integerNumeric),
                                 evalServices));
 
                         if(arguments.size() > 2)
-                            args.add(arguments.get(2).optimize(request, bindings, new Restriction(integerNumeric),
-                                    evalServices));
+                            args.add(arguments.get(2).optimize(request, scope, bindings,
+                                    new Restriction(integerNumeric), evalServices));
 
                         yield args;
                     }
@@ -3440,14 +3451,15 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                                 .filter(r -> hasStringLiteral(r)).map(r -> getStringLiteralResultClass(r))
                                 .collect(toSet());
 
-                        yield List.of(arguments.get(0).optimize(request, bindings, new Restriction(set), evalServices));
+                        yield List.of(arguments.get(0).optimize(request, scope, bindings, new Restriction(set),
+                                evalServices));
                     }
 
                     case "strstarts", "strends", "contains" ->
                     {
                         //TODO can be improved
                         yield arguments.stream()
-                                .map(a -> a.optimize(request, bindings,
+                                .map(a -> a.optimize(request, scope, bindings,
                                         new Restriction(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString),
                                         evalServices))
                                 .toList();
@@ -3457,7 +3469,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         //TODO can be improved
                         yield arguments.stream()
-                                .map(a -> a.optimize(request, bindings,
+                                .map(a -> a.optimize(request, scope, bindings,
                                         new Restriction(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString),
                                         evalServices))
                                 .toList();
@@ -3465,7 +3477,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     case "encode_for_uri" ->
                     {
-                        yield List.of(arguments.get(0).optimize(request, bindings,
+                        yield List.of(arguments.get(0).optimize(request, scope, bindings,
                                 new Restriction(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString),
                                 evalServices));
                     }
@@ -3474,7 +3486,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         //TODO can be improved
                         yield arguments.stream()
-                                .map(a -> a.optimize(request, bindings,
+                                .map(a -> a.optimize(request, scope, bindings,
                                         new Restriction(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString),
                                         evalServices))
                                 .toList();
@@ -3482,8 +3494,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     case "langmatches" ->
                     {
-                        yield arguments.stream()
-                                .map(a -> a.optimize(request, bindings, new Restriction(xsdString), evalServices))
+                        yield arguments.stream().map(
+                                a -> a.optimize(request, scope, bindings, new Restriction(xsdString), evalServices))
                                 .toList();
                     }
 
@@ -3491,12 +3503,12 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         List<SqlExpressionIntercode> args = new ArrayList<>(arguments.size());
 
-                        args.add(arguments.get(0).optimize(request, bindings,
+                        args.add(arguments.get(0).optimize(request, scope, bindings,
                                 new Restriction(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString),
                                 evalServices));
 
                         for(int i = 1; i < arguments.size(); i++)
-                            args.add(arguments.get(i).optimize(request, bindings, new Restriction(xsdString),
+                            args.add(arguments.get(i).optimize(request, scope, bindings, new Restriction(xsdString),
                                     evalServices));
 
                         yield args;
@@ -3510,10 +3522,11 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                                 .filter(r -> hasStringLiteral(r)).map(r -> getStringLiteralResultClass(r))
                                 .collect(toSet());
 
-                        args.add(arguments.get(0).optimize(request, bindings, new Restriction(set), evalServices));
+                        args.add(arguments.get(0).optimize(request, scope, bindings, new Restriction(set),
+                                evalServices));
 
                         for(int i = 1; i < arguments.size(); i++)
-                            args.add(arguments.get(i).optimize(request, bindings, new Restriction(xsdString),
+                            args.add(arguments.get(i).optimize(request, scope, bindings, new Restriction(xsdString),
                                     evalServices));
 
                         yield args;
@@ -3535,12 +3548,13 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         if(restriction.contains(relations, xsdInteger))
                             set.add(integerNumeric);
 
-                        yield List.of(arguments.get(0).optimize(request, bindings, new Restriction(set), evalServices));
+                        yield List.of(arguments.get(0).optimize(request, scope, bindings, new Restriction(set),
+                                evalServices));
                     }
 
                     case "year", "month", "day", "tz" ->
                     {
-                        yield List.of(arguments.get(0).optimize(request, bindings,
+                        yield List.of(arguments.get(0).optimize(request, scope, bindings,
                                 new Restriction(genScalarDateTime, genScalarDate), evalServices));
                     }
 
@@ -3552,19 +3566,20 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                                         && (!(r instanceof DateInZone z) || z.getZone() != Integer.MIN_VALUE))
                                 .collect(toSet());
 
-                        yield List.of(arguments.get(0).optimize(request, bindings, new Restriction(set), evalServices));
+                        yield List.of(arguments.get(0).optimize(request, scope, bindings, new Restriction(set),
+                                evalServices));
                     }
 
                     case "hours", "minutes", "seconds" ->
                     {
-                        yield List.of(arguments.get(0).optimize(request, bindings, new Restriction(genScalarDateTime),
-                                evalServices));
+                        yield List.of(arguments.get(0).optimize(request, scope, bindings,
+                                new Restriction(genScalarDateTime), evalServices));
                     }
 
                     case "md5", "sha1", "sha256", "sha384", "sha512" ->
                     {
-                        yield List.of(
-                                arguments.get(0).optimize(request, bindings, new Restriction(xsdString), evalServices));
+                        yield List.of(arguments.get(0).optimize(request, scope, bindings, new Restriction(xsdString),
+                                evalServices));
                     }
 
                     default -> throw new IllegalArgumentException(); // unexpected

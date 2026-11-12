@@ -1734,7 +1734,8 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -1742,7 +1743,7 @@ public final class SqlTableAccess extends SqlIntercode
             return SqlNoSolution.get();
 
         // the values of the current solution the parent accepts for the variables restrict the rows by themselves
-        List<ValueCondition> optimizedValues = optimizeValues(request, restrictions, evalServices);
+        List<ValueCondition> optimizedValues = optimizeValues(request, scope, restrictions, evalServices);
 
         if(optimizedValues == null)
             return SqlNoSolution.get();
@@ -1775,12 +1776,14 @@ public final class SqlTableAccess extends SqlIntercode
      * the constants the columns are, is held by no row.
      *
      * @param request the current request
+     * @param scope the scope of the access
      * @param restrictions what the parent needs of the variables
      * @param evalServices whether SERVICE stubs are evaluated
      * @return the values the rows are restricted to (the list of this access when nothing has changed), or null when no
      *         row can hold a value
      */
-    private List<ValueCondition> optimizeValues(Request request, Restrictions restrictions, boolean evalServices)
+    private List<ValueCondition> optimizeValues(Request request, Scope scope, Restrictions restrictions,
+            boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -1789,8 +1792,8 @@ public final class SqlTableAccess extends SqlIntercode
         for(ValueCondition condition : values)
         {
             // the value is read from the current solution as the node providing that solution provides it now
-            SqlExpressionIntercode value = condition.value().optimize(request, new VariableBindings(), Restriction.ALL,
-                    evalServices);
+            SqlExpressionIntercode value = condition.value().optimize(request, scope, new VariableBindings(),
+                    Restriction.ALL, evalServices);
 
             if(value.equals(SqlNull.get()))
                 continue;
@@ -1817,7 +1820,7 @@ public final class SqlTableAccess extends SqlIntercode
             if(containsAll(result, List.of(new ValueCondition(mapping.getKey(), mapping.getValue(), accepted))))
                 continue;
 
-            SqlExpressionIntercode value = accepted.optimize(request, new VariableBindings(), Restriction.ALL,
+            SqlExpressionIntercode value = accepted.optimize(request, scope, new VariableBindings(), Restriction.ALL,
                     evalServices);
 
             if(value.equals(SqlNull.get()) || !isComparedInClass(relations, mapping.getKey(), value))
@@ -1932,9 +1935,9 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
-        return translate(request, null);
+        return translateAccess(request, null);
     }
 
 
@@ -1950,7 +1953,7 @@ public final class SqlTableAccess extends SqlIntercode
      */
     public String translateLateral(Request request, String correlatedCondition)
     {
-        return translate(request, correlatedCondition);
+        return translateAccess(request, correlatedCondition);
     }
 
 
@@ -1962,7 +1965,7 @@ public final class SqlTableAccess extends SqlIntercode
      * @param correlatedCondition SQL condition over the columns of the table and of the outer tables, or null
      * @return SQL of the access
      */
-    private String translate(Request request, String correlatedCondition)
+    private String translateAccess(Request request, String correlatedCondition)
     {
         // the values of the current solution restrict the rows along with the conditions
         String valueCondition = translateValues(request.getConfiguration());

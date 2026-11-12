@@ -121,7 +121,8 @@ public final class SqlMerge extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -136,7 +137,7 @@ public final class SqlMerge extends SqlIntercode
 
         while(true)
         {
-            optChild = child.optimize(request, childRestrictions, reduced, evalServices);
+            optChild = child.optimize(request, scope, childRestrictions, reduced, evalServices);
 
             Restrictions newChildRestrictions = getRestrictions(relations, optChild, variable1, variable2, value,
                     restrictions);
@@ -158,16 +159,16 @@ public final class SqlMerge extends SqlIntercode
             return SqlNoSolution.get();
 
         if(binding1 == null && !restrictions.containsVar(variable1))
-            return optChild.optimize(request, restrictions, reduced, evalServices);
+            return optChild.optimize(request, scope, restrictions, reduced, evalServices);
 
         if(binding2 == null)
-            return optChild.optimize(request, restrictions, reduced, evalServices);
+            return optChild.optimize(request, scope, restrictions, reduced, evalServices);
 
         // a child whose every solution binds the kept variable to the value merged into it needs no merge: its table
         // accesses have taken the value into their conditions
         if(value != null && optChild instanceof SqlBind bind && bind.getVariable().equals(variable2)
                 && bind.getChild().isRestricted(variable1, value))
-            return bind.getChild().optimize(request, restrictions, reduced, evalServices);
+            return bind.getChild().optimize(request, scope, restrictions, reduced, evalServices);
 
         if(optChild instanceof SqlUnion union)
         {
@@ -176,7 +177,7 @@ public final class SqlMerge extends SqlIntercode
             for(SqlIntercode child : union.getChilds())
                 childs.add(create(request, variable1, variable2, child, restrictions));
 
-            return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
+            return SqlUnion.union(request, childs).optimize(request, scope, restrictions, reduced, evalServices);
         }
 
 
@@ -188,7 +189,7 @@ public final class SqlMerge extends SqlIntercode
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
         VariableBinding binding1 = child.getVariableBindings().get(variable1);
         VariableBinding binding2 = child.getVariableBindings().get(variable2);
@@ -206,7 +207,7 @@ public final class SqlMerge extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM (");
-        builder.append(child.translate(request));
+        builder.append(child.translate(request, scope));
         builder.append(" ) AS ");
         builder.append("tab");
 

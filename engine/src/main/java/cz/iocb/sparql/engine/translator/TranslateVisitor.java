@@ -33,6 +33,7 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.SourceTable;
+import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlAggregation;
 import cz.iocb.sparql.engine.imcode.SqlBind;
 import cz.iocb.sparql.engine.imcode.SqlConstruct;
@@ -200,6 +201,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private final Map<Variable, SqlIntercode> namedGraphs = new HashMap<>();
 
     /**
+     * Scope of the pattern being translated: that of the statement, and inside an EXISTS pattern the scope of that
+     * pattern, entered with the current solution the pattern is evaluated for (see {@link #translateExists}).
+     */
+    private Scope scope = Scope.TOP;
+
+    /**
      * True while the clauses above the WHERE clause of a sub-select inside an EXISTS pattern are being translated:
      * their expressions see only the solutions the WHERE clause delivers, which hold the values of the current solution
      * the clauses refer to (see {@link #restrictToCurrentSolution}), not the current solution itself.
@@ -272,16 +279,17 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         SqlExpressionIntercode expression;
 
         // the select is the pattern of an existence test, so its nodes lie one level deeper than the node holding it
-        request.beginPattern(null);
+        Scope enclosingScope = scope;
+        scope = enclosingScope.enterPattern(null);
 
         try
         {
             SqlIntercode translatedSelect = visitElement(askQuery.getSelect());
-            expression = SqlExists.create(request, false, translatedSelect, new VariableBindings());
+            expression = SqlExists.create(request, enclosingScope, false, translatedSelect, new VariableBindings());
         }
         finally
         {
-            request.endPattern();
+            scope = enclosingScope;
         }
 
         SqlIntercode bind = SqlBind.bind(request, variable, expression, SqlEmptySolution.get());
@@ -502,7 +510,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         translatedWhereClause = restrictToCurrentGraph(translatedWhereClause);
 
         boolean enclosingAboveWhereClause = aboveWhereClause;
-        aboveWhereClause = select.isSubSelect() && request.getCurrentSolution() != null;
+        aboveWhereClause = select.isSubSelect() && scope.getCurrentSolution() != null;
 
         try
         {
@@ -765,7 +773,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         else if(!isGraphWitnessed(graph.getPattern(), graphTerm))
         {
             //NOTE: the pattern has solutions even if the graph does not exist, so the existence has to be checked
-            SqlExpressionIntercode exists = SqlExists.create(request, false, quads, new VariableBindings());
+            SqlExpressionIntercode exists = SqlExists.create(request, scope, false, quads, new VariableBindings());
 
             translatedPattern = SqlFilter.filter(request, List.of(exists), translatedPattern);
         }
@@ -818,7 +826,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         // a pattern evaluated for a current solution is the pattern of an EXISTS
         if(graph instanceof Variable variable && lateralGraphs.containsKey(variable)
-                && request.getCurrentSolution() != null)
+                && scope.getCurrentSolution() != null)
             return SqlBind.bind(request, variable, lateralGraphs.get(variable), solutions);
 
         if(graph instanceof Variable variable)
@@ -827,7 +835,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         if(graph == null)
             return solutions;
 
-        SqlExpressionIntercode exists = SqlExists.create(request, false, translateGraphQuads(graph),
+        SqlExpressionIntercode exists = SqlExists.create(request, scope, false, translateGraphQuads(graph),
                 new VariableBindings());
 
         return SqlFilter.filter(request, List.of(exists), solutions);
@@ -929,9 +937,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     /**
      * Translates an EXISTS expression evaluated for the solutions of the given bindings. Following SPARQL 1.2, the
      * pattern is evaluated for the current solution: every solution of every group graph pattern inside it extends the
-     * current solution. No node of the pattern stands for the current solution; its bindings are kept by the request
-     * while the pattern is translated (see {@link Request#beginPattern}), and the pattern is made to agree with it only
-     * where the algebra needs it. The test itself compares the solutions of the pattern with the current solution (see
+     * current solution. No node of the pattern stands for the current solution; its bindings are kept by the scope the
+     * pattern is translated in (see {@link Scope#enterPattern}), and the pattern is made to agree with it only where
+     * the algebra needs it. The test itself compares the solutions of the pattern with the current solution (see
      * {@link SqlExists}), except for the variables the pattern may leave unbound, which are merged with their current
      * values inside the pattern (see {@link #restrictToCurrentSolution}). The right side of an OPTIONAL or a MINUS and
      * the WHERE clause of a sub-select are restricted to the solutions compatible with the current solution, and the
@@ -978,7 +986,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         // the clauses above the WHERE clause of a sub-select see its solutions only, which extend no current solution
         boolean enclosingAboveWhereClause = aboveWhereClause;
         boolean chained = !enclosingAboveWhereClause;
-        VariableBindings enclosing = chained ? request.getCurrentSolution() : null;
+        VariableBindings enclosing = chained ? scope.getCurrentSolution() : null;
 
         Set<Variable> variables = mentioned;
 
@@ -990,10 +998,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 variables.addAll(enclosing.getVariables());
         }
 
-        VariableBindings solution = SqlExists.getCurrentSolution(request, bindings, variables, chained);
+        VariableBindings solution = SqlExists.getCurrentSolution(request, scope, bindings, variables, chained);
 
         // the nodes of the pattern lie one level deeper than the node holding the expression
-        request.beginPattern(solution);
+        Scope enclosingScope = scope;
+        scope = enclosingScope.enterPattern(solution);
         aboveWhereClause = false;
 
         try
@@ -1004,12 +1013,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             // would be compared by a disjunction the database can neither hash nor look up by an index
             translated = restrictToCurrentSolution(translated, null, Set.of(), true);
 
-            return SqlExists.create(request, exists.isNegated(), translated, bindings, variables, chained, solution);
+            return SqlExists.create(request, enclosingScope, exists.isNegated(), translated, bindings, variables,
+                    chained, solution);
         }
         finally
         {
             aboveWhereClause = enclosingAboveWhereClause;
-            request.endPattern();
+            scope = enclosingScope;
         }
     }
 
@@ -1024,7 +1034,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      */
     SqlExpressionIntercode getOuterVariable(Variable variable)
     {
-        VariableBindings solution = request.getCurrentSolution();
+        VariableBindings solution = scope.getCurrentSolution();
 
         if(solution == null || aboveWhereClause)
             return SqlNull.get();
@@ -1054,7 +1064,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private SqlIntercode restrictToCurrentSolution(SqlIntercode pattern, VariableBindings left, Set<Variable> completed,
             boolean nullableOnly)
     {
-        VariableBindings solution = request.getCurrentSolution();
+        VariableBindings solution = scope.getCurrentSolution();
 
         if(solution == null)
             return pattern;
@@ -1106,7 +1116,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         Set<Variable> variables = new HashSet<>();
 
-        if(!select.isSubSelect() || request.getCurrentSolution() == null)
+        if(!select.isSubSelect() || scope.getCurrentSolution() == null)
             return variables;
 
         ElementVisitor<Void> visitor = new ElementVisitor<>()
@@ -1148,7 +1158,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      */
     private SqlExpressionIntercode getCurrentSolutionBound()
     {
-        VariableBindings solution = request.getCurrentSolution();
+        VariableBindings solution = scope.getCurrentSolution();
 
         if(solution == null)
             return null;
@@ -1188,7 +1198,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      */
     Map<Variable, SqlExpressionIntercode> getWalkStart(Variable begin, Variable end, Variable graph)
     {
-        VariableBindings solution = request.getCurrentSolution();
+        VariableBindings solution = scope.getCurrentSolution();
 
         if(solution == null || solution.get(begin) == null || solution.get(begin).canBeNull()
                 || solution.get(end) != null)
@@ -1223,7 +1233,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         if(!(getGraph() instanceof Variable graph) || lateralGraphs.containsKey(graph))
             return SqlEmptySolution.get();
 
-        VariableBindings solution = request.getCurrentSolution();
+        VariableBindings solution = scope.getCurrentSolution();
         VariableBinding currentGraph = solution != null ? solution.get(graph) : null;
 
         if(currentGraph != null && !currentGraph.canBeNull())
@@ -1613,7 +1623,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         if(!optionalFilters.isEmpty())
         {
-            VariableBindings bindings = SqlLeftJoin.getExpressionVariableBindings(request,
+            VariableBindings bindings = SqlLeftJoin.getExpressionVariableBindings(request, scope,
                     translatedGroupPattern.getVariableBindings(), translatedPattern.getVariableBindings());
 
             for(Filter filter : optionalFilters)
@@ -1627,7 +1637,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
         }
 
-        return SqlLeftJoin.leftJoin(request, translatedGroupPattern, translatedPattern, conditions);
+        return SqlLeftJoin.leftJoin(request, scope, translatedGroupPattern, translatedPattern, conditions);
     }
 
 
@@ -1981,8 +1991,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         Set<Variable> variables = new HashSet<>(context.getVariableBindings().getVariables());
 
-        if(request.getCurrentSolution() != null)
-            variables.addAll(request.getCurrentSolution().getVariables());
+        if(scope.getCurrentSolution() != null)
+            variables.addAll(scope.getCurrentSolution().getVariables());
 
         return procedureCall.getParameters().stream()
                 .anyMatch(p -> p.getValue() instanceof VariableOrBlankNode v && variables.contains(getVariable(v)));
@@ -2029,7 +2039,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
          * by itself and joined afterwards. With the reordering of calls, the join evaluates the call for the solutions
          * of its other members, which may refer to the graph of an evaluation per graph too.
          */
-        if(request.isServiceReorderEnabled() || request.getCurrentSolution() != null)
+        if(request.isServiceReorderEnabled() || scope.getCurrentSolution() != null)
         {
             SqlIntercode call = SqlServiceStub.create(request, name, serviceCode, serviceVariables,
                     SqlEmptySolution.get(), new StrBlankNodeInSegmentClass(--serviceId), service.isSilent(),

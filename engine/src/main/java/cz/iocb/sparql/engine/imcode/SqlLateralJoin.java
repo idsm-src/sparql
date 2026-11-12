@@ -36,14 +36,14 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * to be passed to lateralJoin(). The alias is fixed when the join is created and is kept by all reconstructions of the
  * join during its optimisation. The bindings exposed this way are read by the right side in one of two ways.
  *
- * A live join lets its right side read them as the left side provides them at the moment: while the right side is
- * optimised, the request holds the current bindings of the left side (see Request.beginLateral()), from which the
- * references of the right side take their classes and columns again, so the right side is optimised for the classes and
- * the constants the left side has been optimised to. When the left side is a union, the join is made for every branch,
- * and each of them then optimises the right side for its own branch: an evaluation of a pattern per named graph keeps
- * in the branch of a graph (or of the graphs of a class) only the table accesses that can hold triples of that graph,
- * instead of all accesses of the pattern with the graphs compared when the statement runs. The join keeps the bindings
- * its right side has been optimised for.
+ * A live join lets its right side read them as the left side provides them at the moment: the right side is optimised
+ * in a scope that holds the current bindings of the left side (see Scope.enterLateral()), from which the references of
+ * the right side take their classes and columns again, so the right side is optimised for the classes and the constants
+ * the left side has been optimised to. When the left side is a union, the join is made for every branch, and each of
+ * them then optimises the right side for its own branch: an evaluation of a pattern per named graph keeps in the branch
+ * of a graph (or of the graphs of a class) only the table accesses that can hold triples of that graph, instead of all
+ * accesses of the pattern with the graphs compared when the statement runs. The join keeps the bindings its right side
+ * has been optimised for.
  *
  * The other joins keep the bindings exposed when the join was created, which the copies of a SERVICE call in the
  * branches rely on: the context of the call is evaluated by a statement of its own for all solutions of the left side
@@ -365,7 +365,8 @@ public final class SqlLateralJoin extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -389,7 +390,7 @@ public final class SqlLateralJoin extends SqlIntercode
 
         while(true)
         {
-            optLeft = optLeft.optimize(request, leftRestrictions, leftReduced, evalServices);
+            optLeft = optLeft.optimize(request, scope, leftRestrictions, leftReduced, evalServices);
 
             // a right side reading the current solution of the left side would find every variable of it unbound
             if(live && optLeft.equals(SqlNoSolution.get()))
@@ -401,36 +402,27 @@ public final class SqlLateralJoin extends SqlIntercode
              * have reduced to a single member).
              */
             if(live && optLeft instanceof SqlUnion union)
-                return distribute(request, union, optRight, optLateral, restrictions, reduced, evalServices);
-
-            VariableBindings enclosing = null;
+                return distribute(request, scope, union, optRight, optLateral, restrictions, reduced, evalServices);
 
             // the right side reads the current solution of the left side as the left side provides it now
+            Scope inner = scope;
+
             if(live)
-                enclosing = request.beginLateral(table,
-                        getLateralVariableBindings(relations, table, optLeft, requirements));
+                inner = scope.enterLateral(table, getLateralVariableBindings(relations, table, optLeft, requirements));
 
-            try
+            optRight = optRight.optimize(request, inner, rightRestrictions, reduced, evalServices);
+
+            if(optRight instanceof SqlUnion union)
             {
-                optRight = optRight.optimize(request, rightRestrictions, reduced, evalServices);
+                List<SqlIntercode> unionList = new ArrayList<>();
 
-                if(optRight instanceof SqlUnion union)
-                {
-                    List<SqlIntercode> unionList = new ArrayList<>();
+                for(SqlIntercode child : union.getChilds())
+                    if(isJoinable(relations, optLeft, child))
+                        unionList.add(child);
 
-                    for(SqlIntercode child : union.getChilds())
-                        if(isJoinable(relations, optLeft, child))
-                            unionList.add(child);
-
-                    if(!unionList.equals(union.getChilds()))
-                        optRight = SqlUnion.union(request, unionList).optimize(request, rightRestrictions, reduced,
-                                evalServices);
-                }
-            }
-            finally
-            {
-                if(live)
-                    request.endLateral(table, enclosing);
+                if(!unionList.equals(union.getChilds()))
+                    optRight = SqlUnion.union(request, unionList).optimize(request, inner, rightRestrictions, reduced,
+                            evalServices);
             }
 
             if(live)
@@ -464,10 +456,10 @@ public final class SqlLateralJoin extends SqlIntercode
             return SqlNoSolution.get();
 
         if(optRight.equals(SqlEmptySolution.get()))
-            return optLeft.optimize(request, restrictions, reduced, evalServices);
+            return optLeft.optimize(request, scope, restrictions, reduced, evalServices);
 
         if(optLeft instanceof SqlUnion union)
-            return distribute(request, union, optRight, optLateral, restrictions, reduced, evalServices);
+            return distribute(request, scope, union, optRight, optLateral, restrictions, reduced, evalServices);
 
 
         if(optLeft == left && optRight == right && optLateral.equals(lateral)
@@ -484,6 +476,7 @@ public final class SqlLateralJoin extends SqlIntercode
      * the given bindings until the join of a branch optimises it for the branch.
      *
      * @param request the current request
+     * @param scope the scope of the join
      * @param union the left side
      * @param optRight the right side
      * @param optLateral left-side bindings the right side refers to
@@ -492,20 +485,20 @@ public final class SqlLateralJoin extends SqlIntercode
      * @param evalServices whether SERVICE stubs are evaluated
      * @return union of the joins of the branches of the left side with the right side, optimised
      */
-    private SqlIntercode distribute(Request request, SqlUnion union, SqlIntercode optRight, VariableBindings optLateral,
-            Restrictions restrictions, boolean reduced, boolean evalServices)
+    private SqlIntercode distribute(Request request, Scope scope, SqlUnion union, SqlIntercode optRight,
+            VariableBindings optLateral, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
         List<SqlIntercode> unionList = new ArrayList<>();
 
         for(SqlIntercode child : union.getChilds())
             unionList.add(lateralJoin(request, child, optRight, table, optLateral, live, restrictions));
 
-        return SqlUnion.union(request, unionList).optimize(request, restrictions, reduced, evalServices);
+        return SqlUnion.union(request, unionList).optimize(request, scope, restrictions, reduced, evalServices);
     }
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -522,12 +515,12 @@ public final class SqlLateralJoin extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM (");
-        translateLeft(request, builder);
+        translateLeft(request, scope, builder);
         builder.append(") AS ");
         builder.append(table);
 
         builder.append(" CROSS JOIN LATERAL (");
-        builder.append(right.translate(request));
+        builder.append(right.translate(request, scope));
         builder.append(") AS ");
         builder.append(rightTable);
 
@@ -549,9 +542,10 @@ public final class SqlLateralJoin extends SqlIntercode
      * side no longer provides (from a compatible class, a constant, or NULL).
      *
      * @param request the current request
+     * @param scope the scope of the join
      * @param builder the builder to append to
      */
-    private void translateLeft(Request request, StringBuilder builder)
+    private void translateLeft(Request request, Scope scope, StringBuilder builder)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -569,7 +563,7 @@ public final class SqlLateralJoin extends SqlIntercode
 
         if(supplements.isEmpty())
         {
-            builder.append(left.translate(request));
+            builder.append(left.translate(request, scope));
             return;
         }
 
@@ -589,7 +583,7 @@ public final class SqlLateralJoin extends SqlIntercode
         }
 
         builder.append(" FROM (");
-        builder.append(left.translate(request));
+        builder.append(left.translate(request, scope));
         builder.append(") AS ");
         builder.append(innerTable);
     }

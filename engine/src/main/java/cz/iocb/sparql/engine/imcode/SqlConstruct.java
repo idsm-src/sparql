@@ -464,7 +464,8 @@ public final class SqlConstruct extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         List<Template> optTemplates = templates;
         SqlIntercode optChild = child;
@@ -472,7 +473,7 @@ public final class SqlConstruct extends SqlIntercode
 
         while(true)
         {
-            optChild = optChild.optimize(request, childRestrictions, true, evalServices);
+            optChild = optChild.optimize(request, scope, childRestrictions, true, evalServices);
             optTemplates = getValidTemplates(optTemplates, optChild);
 
             Restrictions newRestrictions = getTemplateRestrictions(optTemplates, optChild.getVariableBindings());
@@ -497,7 +498,7 @@ public final class SqlConstruct extends SqlIntercode
             for(SqlIntercode child : union.getChilds())
                 childs.add(construct(request, optTemplates, child, bnOffset));
 
-            return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
+            return SqlUnion.union(request, childs).optimize(request, scope, restrictions, reduced, evalServices);
         }
 
         if(optTemplates.size() == 1 && optChild instanceof SqlTableAccess acc && !acc.hasValues()
@@ -528,7 +529,7 @@ public final class SqlConstruct extends SqlIntercode
             }
 
             return SqlTableAccess.create(request, acc.getTable(), conditions, internal, true, acc.getDistinctColumns())
-                    .optimize(request, restrictions, reduced, evalServices);
+                    .optimize(request, scope, restrictions, reduced, evalServices);
         }
 
 
@@ -540,7 +541,7 @@ public final class SqlConstruct extends SqlIntercode
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -584,7 +585,7 @@ public final class SqlConstruct extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM (");
-        builder.append(child.translate(request));
+        builder.append(child.translate(request, scope));
         builder.append(") AS tab");
 
         if(canBeNull)

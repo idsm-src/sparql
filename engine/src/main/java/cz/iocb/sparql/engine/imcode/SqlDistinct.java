@@ -93,7 +93,8 @@ public final class SqlDistinct extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -110,7 +111,7 @@ public final class SqlDistinct extends SqlIntercode
                 childRestrictions.setAcceptedValue(variable, restrictions.getAcceptedValue(variable));
         }
 
-        SqlIntercode optChild = child.optimize(request, childRestrictions, true, evalServices);
+        SqlIntercode optChild = child.optimize(request, scope, childRestrictions, true, evalServices);
 
 
         if(optChild.equals(SqlNoSolution.get()))
@@ -126,7 +127,7 @@ public final class SqlDistinct extends SqlIntercode
         boolean childReduced = reduced || !restrictions.canBeOptimized(relations, optChild.getVariableBindings());
 
         if(optChild.isDistinct(request, distinctVariables))
-            return optChild.optimize(request, restrictions, childReduced, evalServices);
+            return optChild.optimize(request, scope, restrictions, childReduced, evalServices);
 
         if(optChild instanceof SqlUnion union)
         {
@@ -145,7 +146,8 @@ public final class SqlDistinct extends SqlIntercode
                 for(SqlIntercode child : segs)
                     childs.add(create(request, child, distinctVariables, restrictions));
 
-                return SqlUnion.union(request, childs).optimize(request, restrictions, childReduced, evalServices);
+                return SqlUnion.union(request, childs).optimize(request, scope, restrictions, childReduced,
+                        evalServices);
             }
         }
 
@@ -173,7 +175,7 @@ public final class SqlDistinct extends SqlIntercode
             }
 
             if(canBeEliminated)
-                return join.optimize(request, restrictions, childReduced, evalServices);
+                return join.optimize(request, scope, restrictions, childReduced, evalServices);
         }
 
 
@@ -185,7 +187,7 @@ public final class SqlDistinct extends SqlIntercode
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -203,7 +205,7 @@ public final class SqlDistinct extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM (");
-        builder.append(child.translate(request));
+        builder.append(child.translate(request, scope));
         builder.append(" ) AS tab");
 
         builder.append(" GROUP BY ");

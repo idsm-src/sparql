@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -20,8 +21,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * Value of a variable in the current solution an EXISTS pattern is evaluated for. The value is no variable of the
  * bindings the expression occurs in: its columns are the columns of the input of the node holding the EXISTS expression
  * (or of a node above it), addressed through the alias of that input, which no node of the pattern declares again (see
- * {@link Request#getInputTable}). On every optimisation the expression takes the columns the current solution of the
- * innermost pattern provides at the moment (see {@link Request#getCurrentSolution}), so it follows the classes the node
+ * {@link Scope#getInputTable}). On every optimisation the expression takes the columns the current solution of the
+ * innermost pattern provides at the moment (see {@link Scope#getCurrentSolution}), so it follows the classes the node
  * holding the EXISTS expression is optimised to.
  */
 public final class SqlOuterVariable extends SqlExpressionIntercode
@@ -75,13 +76,13 @@ public final class SqlOuterVariable extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
-            boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, Scope scope, VariableBindings bindings,
+            Restriction restriction, boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
         // the current solution as the node holding the EXISTS expression provides it now
-        VariableBindings solution = request.getCurrentSolution();
+        VariableBindings solution = scope.getCurrentSolution();
 
         if(solution == null)
             return this;

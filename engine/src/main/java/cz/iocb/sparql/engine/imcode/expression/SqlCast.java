@@ -96,6 +96,7 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
 import cz.iocb.sparql.engine.mapping.classes.DateInZoneClass;
@@ -281,8 +282,8 @@ public final class SqlCast extends SqlUnary
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
-            boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, Scope scope, VariableBindings bindings,
+            Restriction restriction, boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -293,7 +294,8 @@ public final class SqlCast extends SqlUnary
                 if(isCastable(resClass, resourceClass))
                     operandRestriction.add(resClass);
 
-        SqlExpressionIntercode optOperand = operand.optimize(request, bindings, operandRestriction, evalServices);
+        SqlExpressionIntercode optOperand = operand.optimize(request, scope, bindings, operandRestriction,
+                evalServices);
 
         if(optOperand == operand && restriction.isOptimized(relations, variableBinding))
             return this;

@@ -32,12 +32,7 @@ import cz.iocb.sparql.engine.error.MessageCategory;
 import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.error.TranslateMessage;
-import cz.iocb.sparql.engine.imcode.SqlLateralJoin;
 import cz.iocb.sparql.engine.imcode.SqlSelect;
-import cz.iocb.sparql.engine.imcode.SqlShared;
-import cz.iocb.sparql.engine.imcode.expression.SqlExists;
-import cz.iocb.sparql.engine.imcode.expression.SqlLateralVariable;
-import cz.iocb.sparql.engine.imcode.expression.SqlOuterVariable;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
 import cz.iocb.sparql.engine.mapping.classes.DerivedClass;
 import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeInSegmentClass;
@@ -69,7 +64,6 @@ import cz.iocb.sparql.engine.request.Result.ResultType;
 import cz.iocb.sparql.engine.translator.ServiceException;
 import cz.iocb.sparql.engine.translator.ServiceRuntimeException;
 import cz.iocb.sparql.engine.translator.TranslateVisitor;
-import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
@@ -223,22 +217,6 @@ public class Request implements AutoCloseable
     private static final Pattern commonTableExpressionName = Pattern.compile("\"cte[0-9]+\"");
 
     /**
-     * Name of the alias of the input of a node holding expressions, which the depth of the patterns of expressions
-     * follows (see {@link #getInputTable}).
-     */
-    private static final String inputTableName = "outer";
-
-    /**
-     * Name of the alias of the left side of a left join (see {@link #getLeftInputTable}).
-     */
-    private static final String leftInputTableName = "left";
-
-    /**
-     * Name of the alias of the right side of a left join (see {@link #getRightInputTable}).
-     */
-    private static final String rightInputTableName = "right";
-
-    /**
      * Configuration of the endpoint.
      */
     private final SparqlDatabaseConfiguration config;
@@ -288,24 +266,6 @@ public class Request implements AutoCloseable
      * Virtual tables the queries of the common table expressions read, by the aliases of the expressions.
      */
     private final Map<String, Set<VirtualTable>> commonTableExpressionTables = new HashMap<>();
-
-    /**
-     * Depth of the patterns of expressions being optimised (see {@link #isWithinExpression}).
-     */
-    private int expressionDepth = 0;
-
-    /**
-     * Bindings of the current solutions of the patterns of expressions being translated or optimised, innermost last,
-     * null for a pattern that has none of its own (see {@link #beginPattern}); their number is the depth of the
-     * patterns (see {@link #getInputTable}).
-     */
-    private final List<VariableBindings> currentSolutions = new ArrayList<>();
-
-    /**
-     * Bindings of the current solutions of the left sides of the lateral joins whose right sides are being optimised,
-     * by the aliases of the joins (see {@link #beginLateral}).
-     */
-    private final Map<AliasTable, VariableBindings> lateralSolutions = new HashMap<>();
 
     /**
      * Start of the execution in {@link System#nanoTime} units.
@@ -932,227 +892,6 @@ public class Request implements AutoCloseable
     public AliasTable createLateralTable()
     {
         return new AliasTable("lateral" + lateralId++);
-    }
-
-
-    /**
-     * Begins the optimisation of a pattern of an expression (see {@link #isWithinExpression}).
-     */
-    public void beginExpression()
-    {
-        expressionDepth++;
-    }
-
-
-    /**
-     * Ends the optimisation of a pattern of an expression (see {@link #beginExpression}).
-     */
-    public void endExpression()
-    {
-        expressionDepth--;
-    }
-
-
-    /**
-     * True while a pattern of an expression (EXISTS) is being optimised. Only the existence of a solution of such a
-     * pattern matters, and the database stops evaluating it at its first solution, so a walk in it is not seeded from
-     * shared solutions (see {@link SqlShared#canShare}): the seeds would be computed from the whole shared side before
-     * the walk yields anything. The SQL of the pattern is rendered into the expression at once, and the common table
-     * expressions it refers to are declared by the statement holding it (see {@link #getCommonTableExpressions}).
-     *
-     * @return true while a pattern of an expression is being optimised, false otherwise
-     */
-    public boolean isWithinExpression()
-    {
-        return expressionDepth > 0;
-    }
-
-
-    /**
-     * Begins the translation or the optimisation of a pattern of an expression (EXISTS): the nodes of the pattern lie
-     * one level deeper than the node holding the expression (see {@link #getInputTable}). A pattern evaluated for the
-     * current solution of the solutions its expression is evaluated for gets the bindings of that solution, from which
-     * the expressions of the pattern read its values (see {@link SqlOuterVariable}): the bindings the node holding the
-     * expression provides at the moment, joined with the current solution of the pattern the node itself lies in (see
-     * {@link SqlExists#getCurrentSolution}). A pattern independent of those solutions has no current solution of its
-     * own (null); the current solution of the pattern its expression lies in stays in effect for its nodes, because the
-     * optimisation builds such a pattern from nodes of that pattern (the existence test of a leading OPTIONAL).
-     *
-     * @param solution bindings of the current solution of the pattern, its columns addressed through the aliases of the
-     *            inputs of the nodes providing them, or null for a pattern without a current solution of its own
-     */
-    public void beginPattern(VariableBindings solution)
-    {
-        currentSolutions.add(solution);
-    }
-
-
-    /**
-     * Ends the translation or the optimisation of a pattern of an expression (see {@link #beginPattern}).
-     */
-    public void endPattern()
-    {
-        currentSolutions.removeLast();
-    }
-
-
-    /**
-     * Bindings of the current solution in effect: that of the innermost pattern of an expression being translated or
-     * optimised which has one of its own (see {@link #beginPattern}), or null outside any such pattern.
-     *
-     * @return bindings of the current solution in effect, or null outside any pattern evaluated for a current solution
-     */
-    public VariableBindings getCurrentSolution()
-    {
-        for(int i = currentSolutions.size() - 1; i >= 0; i--)
-            if(currentSolutions.get(i) != null)
-                return currentSolutions.get(i);
-
-        return null;
-    }
-
-
-    /**
-     * Begins the optimisation of the right side of a lateral join that reads the current solution of the left side as
-     * the left side provides it at the moment (see {@link SqlLateralJoin}): the expressions of the right side referring
-     * to that solution take its classes and columns from the given bindings (see {@link SqlLateralVariable}). Unlike
-     * the current solution of a pattern of an expression (see {@link #beginPattern}), the solution is no solution the
-     * solutions of the right side extend, so it is kept apart, by the alias of the join, which is unique within the
-     * request (see {@link #createLateralTable}).
-     *
-     * @param table alias through which the right side of the join refers to its left side
-     * @param solution bindings of the current solution of the left side, its columns addressed through the alias
-     * @return the bindings in effect for the alias so far, to be given to {@link #endLateral}; null when there are none
-     */
-    public VariableBindings beginLateral(AliasTable table, VariableBindings solution)
-    {
-        return lateralSolutions.put(table, solution);
-    }
-
-
-    /**
-     * Ends the optimisation of the right side of a lateral join (see {@link #beginLateral}).
-     *
-     * @param table alias through which the right side of the join refers to its left side
-     * @param enclosing the bindings that were in effect for the alias before, or null
-     */
-    public void endLateral(AliasTable table, VariableBindings enclosing)
-    {
-        if(enclosing != null)
-            lateralSolutions.put(table, enclosing);
-        else
-            lateralSolutions.remove(table);
-    }
-
-
-    /**
-     * Bindings of the current solution of the left side of the lateral join with the given alias, as the left side
-     * provides it at the moment, while the right side of the join is being optimised (see {@link #beginLateral}); null
-     * otherwise, and for a join whose right side keeps what the join exposed to it when it was created.
-     *
-     * @param table alias through which the right side of the join refers to its left side
-     * @return bindings of the current solution of the left side of the join, or null
-     */
-    public VariableBindings getLateralSolution(AliasTable table)
-    {
-        return lateralSolutions.get(table);
-    }
-
-
-    /**
-     * True if the SQL refers to the input of a node holding an expression whose pattern is being translated or
-     * optimised (see {@link #getInputTable}), so to a value of a current solution: such SQL has a meaning only at its
-     * place inside the pattern, it can neither be moved into a common table expression nor explained on its own. The
-     * aliases are found in the text, so one spelled in a string constant counts as well, which only keeps the SQL at
-     * its place.
-     *
-     * @param sql the SQL
-     * @return true if the SQL refers to the input of a node holding an expression whose pattern is being translated or
-     *         optimised, false otherwise
-     */
-    public boolean refersToEnclosingInput(String sql)
-    {
-        for(int depth = 0; depth < currentSolutions.size(); depth++)
-            if(refersToInput(sql, depth))
-                return true;
-
-        return false;
-    }
-
-
-    /**
-     * The inputs the SQL refers to among the inputs of the nodes holding the expressions whose patterns are being
-     * translated or optimised (see {@link #refersToEnclosingInput}), each given by the number of the patterns its node
-     * lies in. SQL referring to such an input is evaluated for every row of the input anew, wherever in the patterns
-     * below the node it stands.
-     *
-     * @param sql the SQL
-     * @return depths of the inputs the SQL refers to
-     */
-    public Set<Integer> getEnclosingInputs(String sql)
-    {
-        Set<Integer> depths = new HashSet<>();
-
-        for(int depth = 0; depth < currentSolutions.size(); depth++)
-            if(refersToInput(sql, depth))
-                depths.add(depth);
-
-        return depths;
-    }
-
-
-    /**
-     * True if the SQL refers to the input of a node holding expressions that lies in the given number of patterns of
-     * expressions (see {@link #getInputTable}).
-     *
-     * @param sql the SQL
-     * @param depth the number of the patterns the node lies in
-     * @return true if the SQL refers to the input of such a node, false otherwise
-     */
-    private static boolean refersToInput(String sql, int depth)
-    {
-        for(String name : List.of(inputTableName, leftInputTableName, rightInputTableName))
-            if(sql.contains("\"" + name + depth + "\"."))
-                return true;
-
-        return false;
-    }
-
-
-    /**
-     * Alias of the input of a node holding expressions (a filter, a bind, an aggregation or a procedure call): a name
-     * followed by the depth of the patterns of expressions the node lies in. A pattern of an expression held by the
-     * node can refer to the columns of the input through the alias from any depth, because no subquery between such a
-     * reference and the node declares the alias again: the subqueries belong to the pattern, whose nodes lie deeper.
-     *
-     * @return alias of the input of a node holding expressions at the current depth
-     */
-    public AliasTable getInputTable()
-    {
-        return new AliasTable(inputTableName + currentSolutions.size());
-    }
-
-
-    /**
-     * Alias of the left side of a left join, whose conditions are expressions over the solutions of both sides (see
-     * {@link #getInputTable}).
-     *
-     * @return alias of the left side of a left join at the current depth
-     */
-    public AliasTable getLeftInputTable()
-    {
-        return new AliasTable(leftInputTableName + currentSolutions.size());
-    }
-
-
-    /**
-     * Alias of the right side of a left join (see {@link #getLeftInputTable}).
-     *
-     * @return alias of the right side of a left join at the current depth
-     */
-    public AliasTable getRightInputTable()
-    {
-        return new AliasTable(rightInputTableName + currentSolutions.size());
     }
 
 

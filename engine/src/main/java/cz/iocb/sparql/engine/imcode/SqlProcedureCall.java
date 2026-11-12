@@ -55,7 +55,7 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * occurs several times, e.g. in every branch of a union a join above it was distributed over, or in the pattern of an
  * EXISTS evaluated for every current solution; PostgreSQL folds a common table expression referenced once into the
  * query unless the function is volatile. A call inside an EXISTS pattern whose parameter takes a value of the current
- * solution (see {@link Request#refersToEnclosingInput}) stays in its place, where the value is known. A result is bound
+ * solution (see {@link Scope#refersToEnclosingInput}) stays in its place, where the value is known. A result is bound
  * to the classes the parent accepts a value of only, and a specialiser of the procedure may adapt the call to them (see
  * {@link ProcedureDefinition#setSpecializer}).
  */
@@ -252,7 +252,8 @@ public final class SqlProcedureCall extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -272,8 +273,8 @@ public final class SqlProcedureCall extends SqlIntercode
 
         //FIXME: is procedure deterministic?
 
-        SqlIntercode optChild = child.optimize(request, childRestrictions, reduced, evalServices);
-        LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> optParameters = optimize(request, parameters,
+        SqlIntercode optChild = child.optimize(request, scope, childRestrictions, reduced, evalServices);
+        LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> optParameters = optimize(request, scope, parameters,
                 optChild);
 
 
@@ -283,12 +284,12 @@ public final class SqlProcedureCall extends SqlIntercode
 
             for(SqlIntercode child : union.getChilds())
             {
-                LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> childParams = optimize(request,
+                LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> childParams = optimize(request, scope,
                         optParameters, child);
                 childs.add(create(request, procedure, childParams, optResults, child, restrictions, resultClasses));
             }
 
-            return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
+            return SqlUnion.union(request, childs).optimize(request, scope, restrictions, reduced, evalServices);
         }
 
 
@@ -369,17 +370,18 @@ public final class SqlProcedureCall extends SqlIntercode
      * Optimises the parameter expressions over the child's bindings.
      *
      * @param request the current request
+     * @param scope the scope of the call
      * @param parameters expression of each parameter
      * @param context solutions the call is evaluated for
      * @return the optimised parameter expressions
      */
-    protected static LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> optimize(Request request,
+    protected static LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> optimize(Request request, Scope scope,
             LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameters, SqlIntercode context)
     {
         LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> result = new LinkedHashMap<>();
 
         for(Entry<ParameterDefinition, SqlExpressionIntercode> e : parameters.entrySet())
-            result.put(e.getKey(), e.getValue().optimize(request, context.getVariableBindings(),
+            result.put(e.getKey(), e.getValue().optimize(request, scope, context.getVariableBindings(),
                     new Restriction(getAcceptedClass(e.getKey().getParameterClass())), false));
 
         return result;
@@ -387,7 +389,7 @@ public final class SqlProcedureCall extends SqlIntercode
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
         Set<Column> columns = bindings.getNonConstantColumns();
 
@@ -403,8 +405,8 @@ public final class SqlProcedureCall extends SqlIntercode
 
         builder.append(" FROM ");
 
-        String call = translateCall(request);
-        AliasTable table = child.equals(SqlEmptySolution.get()) && !request.refersToEnclosingInput(call) ?
+        String call = translateCall(request, scope);
+        AliasTable table = child.equals(SqlEmptySolution.get()) && !scope.refersToEnclosingInput(call) ?
                 request.getCommonTableExpression(call) : null;
 
         if(table != null)
@@ -427,10 +429,11 @@ public final class SqlProcedureCall extends SqlIntercode
      * solution of the child.
      *
      * @param request the current request
+     * @param scope the scope of the call
      * @return SQL calling the function with the values of the parameters in the columns of their declared classes for
      *         every solution of the child
      */
-    private String translateCall(Request request)
+    private String translateCall(Request request, Scope scope)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -470,9 +473,9 @@ public final class SqlProcedureCall extends SqlIntercode
         if(!child.equals(SqlEmptySolution.get()))
         {
             builder.append(" FROM (");
-            builder.append(child.translate(request));
+            builder.append(child.translate(request, scope));
             builder.append(" ) AS ");
-            builder.append(request.getInputTable());
+            builder.append(scope.getInputTable());
         }
 
         return builder.toString();

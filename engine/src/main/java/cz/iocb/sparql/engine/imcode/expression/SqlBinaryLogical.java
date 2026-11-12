@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Objects;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
@@ -243,8 +244,8 @@ public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpre
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
-            boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, Scope scope, VariableBindings bindings,
+            Restriction restriction, boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -253,8 +254,9 @@ public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpre
         if(restriction.contains(relations, xsdBoolean))
             operandRestriction.add(genBoolean);
 
-        SqlExpressionIntercode optLeft = left.optimize(request, bindings, operandRestriction, evalServices);
-        SqlExpressionIntercode optRight = getRight().optimize(request, bindings, operandRestriction, evalServices);
+        SqlExpressionIntercode optLeft = left.optimize(request, scope, bindings, operandRestriction, evalServices);
+        SqlExpressionIntercode optRight = getRight().optimize(request, scope, bindings, operandRestriction,
+                evalServices);
 
         if(optLeft == left && optRight == getRight())
             return this;

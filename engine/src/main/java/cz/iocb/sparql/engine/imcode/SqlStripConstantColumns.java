@@ -116,9 +116,10 @@ public final class SqlStripConstantColumns extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
-        SqlIntercode optChild = child.optimize(request, restrictions, reduced, evalServices);
+        SqlIntercode optChild = child.optimize(request, scope, restrictions, reduced, evalServices);
 
         boolean hasConstantColumn = false;
 
@@ -141,7 +142,7 @@ public final class SqlStripConstantColumns extends SqlIntercode
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -165,7 +166,7 @@ public final class SqlStripConstantColumns extends SqlIntercode
         }
 
         builder.append(" FROM (");
-        builder.append(child.translate(request));
+        builder.append(child.translate(request, scope));
         builder.append(" ) AS tab");
 
         return builder.toString();

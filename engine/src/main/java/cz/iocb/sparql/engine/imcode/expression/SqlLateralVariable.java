@@ -7,6 +7,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.imcode.SqlLateralJoin;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
@@ -24,7 +25,7 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * {@link SqlVariable}, it is no variable of the bindings it occurs in, so it needs nothing of them and is never
  * resolved against them; the join keeps its columns available. When the join lets its right side read the solution as
  * the left side provides it at the moment, the expression takes its classes and columns from that solution on every
- * optimisation (see {@link Request#getLateralSolution}), like a value of the current solution of an EXISTS pattern (see
+ * optimisation (see {@link Scope#getLateralSolution}), like a value of the current solution of an EXISTS pattern (see
  * {@link SqlOuterVariable}), so it follows the classes and the constants the left side is optimised to; otherwise it
  * keeps what the join exposed when it was created.
  */
@@ -81,13 +82,13 @@ public final class SqlLateralVariable extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
-            boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, Scope scope, VariableBindings bindings,
+            Restriction restriction, boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
         // the current solution as the left side of the join provides it now, when the join lets the right side read it
-        VariableBindings solution = request.getLateralSolution(table);
+        VariableBindings solution = scope.getLateralSolution(table);
         VariableBinding binding = solution == null ? variableBinding : solution.get(variable);
 
         if(binding == null)

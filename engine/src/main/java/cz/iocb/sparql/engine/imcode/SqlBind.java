@@ -134,7 +134,8 @@ public final class SqlBind extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -171,8 +172,8 @@ public final class SqlBind extends SqlIntercode
                 for(Variable copied : optExpression.getReferencedVariables())
                     childRestrictions.setAcceptedValue(copied, restrictions.getAcceptedValue(variable));
 
-            optChild = optChild.optimize(request, childRestrictions, optReduced, evalServices);
-            optExpression = optExpression.optimize(request, optChild.getVariableBindings(), varRestriction,
+            optChild = optChild.optimize(request, scope, childRestrictions, optReduced, evalServices);
+            optExpression = optExpression.optimize(request, scope, optChild.getVariableBindings(), varRestriction,
                     evalServices);
 
             if(optExpression.getRequirements(relations).equals(expressionRequirements))
@@ -185,7 +186,7 @@ public final class SqlBind extends SqlIntercode
 
         // a variable the parent does not need at all is left out, and so is one never bound
         if(optExpression.equals(SqlNull.get()) || !needed)
-            return optChild.optimize(request, restrictions, reduced, false);
+            return optChild.optimize(request, scope, restrictions, reduced, false);
 
         if(optChild instanceof SqlUnion union)
         {
@@ -193,13 +194,13 @@ public final class SqlBind extends SqlIntercode
 
             for(SqlIntercode child : union.getChilds())
             {
-                SqlExpressionIntercode expr = optExpression.optimize(request, child.getVariableBindings(),
+                SqlExpressionIntercode expr = optExpression.optimize(request, scope, child.getVariableBindings(),
                         varRestriction, evalServices);
 
                 childs.add(bind(request, variable, expr, child, restrictions));
             }
 
-            return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
+            return SqlUnion.union(request, childs).optimize(request, scope, restrictions, reduced, evalServices);
         }
 
         if(optChild instanceof SqlTableAccess access && optExpression instanceof SqlVariable var)
@@ -208,7 +209,8 @@ public final class SqlBind extends SqlIntercode
             VariableBindings internal = new VariableBindings(access.getInternalVariableBindings());
             internal.add(new VariableBinding(variable, binding.getMappings(), binding.canBeNull()));
 
-            return access.with(access.getConditions(), internal).optimize(request, restrictions, reduced, evalServices);
+            return access.with(access.getConditions(), internal).optimize(request, scope, restrictions, reduced,
+                    evalServices);
         }
 
 
@@ -220,10 +222,10 @@ public final class SqlBind extends SqlIntercode
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
         if(!expression.getBinding().hasExpressionColumn())
-            return child.translate(request);
+            return child.translate(request, scope);
 
 
         StringBuilder builder = new StringBuilder();
@@ -280,9 +282,9 @@ public final class SqlBind extends SqlIntercode
         if(!child.equals(SqlEmptySolution.get()))
         {
             builder.append(" FROM (");
-            builder.append(child.translate(request));
+            builder.append(child.translate(request, scope));
             builder.append(" ) AS ");
-            builder.append(request.getInputTable());
+            builder.append(scope.getInputTable());
         }
 
 

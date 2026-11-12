@@ -22,6 +22,7 @@ import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.TableColumn;
+import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlIntercode;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.imcode.SqlNoSolution;
@@ -124,11 +125,12 @@ public class StoredResultHandler extends ResultHandler
      * Creates the handler.
      *
      * @param request the current request
+     * @param scope the scope of the call whose solutions are received
      * @param restrictions what the parent needs of the variables
      */
-    public StoredResultHandler(Request request, Restrictions restrictions)
+    public StoredResultHandler(Request request, Scope scope, Restrictions restrictions)
     {
-        super(request, restrictions);
+        super(request, scope, restrictions);
 
         columns.put(new TableColumn("__", INT4), INT4);
     }
@@ -289,7 +291,8 @@ public class StoredResultHandler extends ResultHandler
             }
 
 
-            return SqlValues.create(varBindings, types, values, rowCount).optimize(request, restrictions, false, false);
+            return SqlValues.create(varBindings, types, values, rowCount).optimize(request, scope, restrictions, false,
+                    false);
         }
 
 
@@ -316,7 +319,7 @@ public class StoredResultHandler extends ResultHandler
         }
 
 
-        return SqlTableAccess.create(request, table, varBindings).optimize(request, restrictions, false, false);
+        return SqlTableAccess.create(request, table, varBindings).optimize(request, scope, restrictions, false, false);
     }
 
 

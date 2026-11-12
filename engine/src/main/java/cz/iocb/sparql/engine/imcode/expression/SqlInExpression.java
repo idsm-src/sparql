@@ -23,6 +23,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonType;
@@ -100,8 +101,8 @@ public final class SqlInExpression extends SqlExpressionIntercode
         }
 
         @Override
-        public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
-                boolean evalServices)
+        public SqlExpressionIntercode optimize(Request request, Scope scope, VariableBindings bindings,
+                Restriction restriction, boolean evalServices)
         {
             throw new UnsupportedOperationException();
         }
@@ -280,8 +281,8 @@ public final class SqlInExpression extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
-            boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, Scope scope, VariableBindings bindings,
+            Restriction restriction, boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -311,10 +312,10 @@ public final class SqlInExpression extends SqlExpressionIntercode
             }
 
             if(isComparable)
-                optRights.add(right.optimize(request, bindings, rightSet, evalServices));
+                optRights.add(right.optimize(request, scope, bindings, rightSet, evalServices));
         }
 
-        SqlExpressionIntercode optLeft = left.optimize(request, bindings, leftSet, evalServices);
+        SqlExpressionIntercode optLeft = left.optimize(request, scope, bindings, leftSet, evalServices);
 
         if(optRights.equals(rights) && optLeft == left)
             return this;

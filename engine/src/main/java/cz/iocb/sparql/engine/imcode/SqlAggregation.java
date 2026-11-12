@@ -134,7 +134,8 @@ public final class SqlAggregation extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -148,8 +149,9 @@ public final class SqlAggregation extends SqlIntercode
 
         while(true)
         {
-            optChild = optChild.optimize(request, childRestrictions, childReduce, evalServices);
-            optAggregations = optimizeAggregations(request, optAggregations, optChild, restrictions, evalServices);
+            optChild = optChild.optimize(request, scope, childRestrictions, childReduce, evalServices);
+            optAggregations = optimizeAggregations(request, scope, optAggregations, optChild, restrictions,
+                    evalServices);
 
             boolean newChildReduce = optAggregations.values().stream()
                     .allMatch(a -> a instanceof SqlBuiltinCall c && c.isDistinct());
@@ -175,12 +177,12 @@ public final class SqlAggregation extends SqlIntercode
 
                 for(SqlIntercode child : segs)
                 {
-                    Map<Variable, SqlExpressionIntercode> aggregations = optimizeAggregations(request, optAggregations,
-                            child, restrictions, evalServices);
+                    Map<Variable, SqlExpressionIntercode> aggregations = optimizeAggregations(request, scope,
+                            optAggregations, child, restrictions, evalServices);
                     childs.add(aggregate(request, groupVariables, aggregations, child));
                 }
 
-                return SqlUnion.union(request, childs).optimize(request, restrictions, true, evalServices);
+                return SqlUnion.union(request, childs).optimize(request, scope, restrictions, true, evalServices);
             }
         }
 
@@ -235,8 +237,8 @@ public final class SqlAggregation extends SqlIntercode
             Map<Variable, SqlExpressionIntercode> outerAggregations = new LinkedHashMap<>();
             outerAggregations.put(optAggregations.keySet().iterator().next(), expr);
 
-            return aggregate(request, groupVariables, outerAggregations, optUnion).optimize(request, restrictions,
-                    reduced, evalServices);
+            return aggregate(request, groupVariables, outerAggregations, optUnion).optimize(request, scope,
+                    restrictions, reduced, evalServices);
         }
 
 
@@ -259,8 +261,8 @@ public final class SqlAggregation extends SqlIntercode
             Map<Variable, SqlExpressionIntercode> subAggregations = Map.of(optAggregations.keySet().iterator().next(),
                     SqlBuiltinCall.create(request, "count", false, args));
 
-            return aggregate(request, groupVariables, subAggregations, child).optimize(request, restrictions, reduced,
-                    evalServices);
+            return aggregate(request, groupVariables, subAggregations, child).optimize(request, scope, restrictions,
+                    reduced, evalServices);
         }
 
 
@@ -274,7 +276,7 @@ public final class SqlAggregation extends SqlIntercode
                 if(!entry.getValue().equals(SqlNull.get()))
                     result = SqlBind.bind(request, entry.getKey(), entry.getValue(), result);
 
-            return result.optimize(request, restrictions, reduced, evalServices);
+            return result.optimize(request, scope, restrictions, reduced, evalServices);
         }
 
 
@@ -290,13 +292,14 @@ public final class SqlAggregation extends SqlIntercode
      * COUNT(x)} of a never-null argument and {@code COUNT(DISTINCT key)} over a table key into a plain row count.
      *
      * @param request the current request
+     * @param scope the scope of the aggregation
      * @param aggregations aggregate expression of each result variable
      * @param child the child node
      * @param restrictions what the parent needs of the variables
      * @param evalServices whether SERVICE stubs are evaluated
      * @return the optimised aggregates by result variable
      */
-    private Map<Variable, SqlExpressionIntercode> optimizeAggregations(Request request,
+    private Map<Variable, SqlExpressionIntercode> optimizeAggregations(Request request, Scope scope,
             Map<Variable, SqlExpressionIntercode> aggregations, SqlIntercode child, Restrictions restrictions,
             boolean evalServices)
     {
@@ -306,7 +309,7 @@ public final class SqlAggregation extends SqlIntercode
 
         for(Entry<Variable, SqlExpressionIntercode> e : aggregations.entrySet())
         {
-            SqlExpressionIntercode optExpr = e.getValue().optimize(request, child.getVariableBindings(),
+            SqlExpressionIntercode optExpr = e.getValue().optimize(request, scope, child.getVariableBindings(),
                     restrictions.getRestriction(e.getKey()), evalServices);
 
             // the parent may need a result in no class (a join comparing it with classes it never takes), and it has
@@ -376,7 +379,7 @@ public final class SqlAggregation extends SqlIntercode
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
         Set<Column> groupByColumns = new HashSet<>();
 
@@ -435,9 +438,9 @@ public final class SqlAggregation extends SqlIntercode
 
 
         builder.append(" FROM (");
-        builder.append(child.translate(request));
+        builder.append(child.translate(request, scope));
         builder.append(" ) AS ");
-        builder.append(request.getInputTable());
+        builder.append(scope.getInputTable());
 
         if(!groupByColumns.isEmpty())
             builder.append(groupByColumns.stream().map(Object::toString).collect(joining(", ", " GROUP BY ", "")));

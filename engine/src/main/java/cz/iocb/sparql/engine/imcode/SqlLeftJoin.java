@@ -59,14 +59,14 @@ public final class SqlLeftJoin extends SqlIntercode
     private final List<SqlExpressionIntercode> conditions;
 
     /**
-     * Alias of the left side (see {@link Request#getLeftInputTable}), fixed when the join is created, because the
-     * column map and the conditions address the columns of the side through it.
+     * Alias of the left side (see {@link Scope#getLeftInputTable}), fixed when the join is created, because the column
+     * map and the conditions address the columns of the side through it.
      */
     private final AliasTable leftTable;
 
     /**
-     * Alias of the right side (see {@link Request#getRightInputTable}), fixed when the join is created like the alias
-     * of the left side.
+     * Alias of the right side (see {@link Scope#getRightInputTable}), fixed when the join is created like the alias of
+     * the left side.
      */
     private final AliasTable rightTable;
 
@@ -107,15 +107,16 @@ public final class SqlLeftJoin extends SqlIntercode
      * Left join with the given filter conditions of the optional pattern.
      *
      * @param request the current request
+     * @param scope the scope of the join
      * @param left the left side
      * @param right the right side
      * @param conditions the conditions
      * @return left join with the given filter conditions of the optional pattern
      */
-    public static SqlIntercode leftJoin(Request request, SqlIntercode left, SqlIntercode right,
+    public static SqlIntercode leftJoin(Request request, Scope scope, SqlIntercode left, SqlIntercode right,
             List<SqlExpressionIntercode> conditions)
     {
-        return leftJoin(request, left, right, conditions, null);
+        return leftJoin(request, scope, left, right, conditions, null);
     }
 
 
@@ -124,6 +125,7 @@ public final class SqlLeftJoin extends SqlIntercode
      * they can be tested for NULL.
      *
      * @param request the current request
+     * @param scope the scope of the join
      * @param left the left side
      * @param right the right side
      * @param conditions the conditions
@@ -131,7 +133,7 @@ public final class SqlLeftJoin extends SqlIntercode
      * @return left join exposing only what the parent needs; constant columns of the right side are turned into real
      *         columns so they can be tested for NULL
      */
-    protected static SqlIntercode leftJoin(Request request, SqlIntercode left, SqlIntercode right,
+    protected static SqlIntercode leftJoin(Request request, Scope scope, SqlIntercode left, SqlIntercode right,
             List<SqlExpressionIntercode> conditions, Restrictions restrictions)
     {
         boolean hasConstantColumn = false;
@@ -146,8 +148,8 @@ public final class SqlLeftJoin extends SqlIntercode
         if(hasConstantColumn)
             right = SqlStripConstantColumns.strip(right);
 
-        AliasTable leftTable = request.getLeftInputTable();
-        AliasTable rightTable = request.getRightInputTable();
+        AliasTable leftTable = scope.getLeftInputTable();
+        AliasTable rightTable = scope.getRightInputTable();
 
         Map<Column, Column> map = new HashMap<>();
         VariableBindings bindings = getJoinVariableBindings(request, left.getVariableBindings(),
@@ -196,20 +198,20 @@ public final class SqlLeftJoin extends SqlIntercode
 
     /**
      * Bindings under which the join conditions are evaluated: the variables of both sides addressed through the aliases
-     * of the join, which are those of a left join created at the current depth of the patterns of expressions (see
-     * {@link Request#getLeftInputTable}).
+     * of the join, which are those of a left join created in the given scope (see {@link Scope#getLeftInputTable}).
      *
      * @param request the current request
+     * @param scope the scope of the join
      * @param left bindings of the left side
      * @param right bindings of the right side
      * @return bindings under which the join conditions are evaluated: the variables of both sides addressed through the
      *         aliases of the join
      */
-    public static VariableBindings getExpressionVariableBindings(Request request, VariableBindings left,
+    public static VariableBindings getExpressionVariableBindings(Request request, Scope scope, VariableBindings left,
             VariableBindings right)
     {
-        AliasTable leftTable = request.getLeftInputTable();
-        AliasTable rightTable = request.getRightInputTable();
+        AliasTable leftTable = scope.getLeftInputTable();
+        AliasTable rightTable = scope.getRightInputTable();
 
         Map<Column, Column> map = new HashMap<>();
         VariableBindings joinBindings = getJoinVariableBindings(request, left, right, leftTable, rightTable, null, map);
@@ -261,7 +263,8 @@ public final class SqlLeftJoin extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -285,8 +288,8 @@ public final class SqlLeftJoin extends SqlIntercode
         // no solution of the left side, so the right side may leave such solutions out; the classes are read once from
         // the sides as built, whose bindings still carry every class
         Restrictions accepted = new Restrictions();
-        addAcceptedClasses(request, accepted, conditions,
-                getExpressionVariableBindings(request, left.getVariableBindings(), right.getVariableBindings()));
+        addAcceptedClasses(request, scope, accepted, conditions,
+                getExpressionVariableBindings(request, scope, left.getVariableBindings(), right.getVariableBindings()));
 
         Restrictions leftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
                 optRight.getVariableBindings(), cndRestrictions, false);
@@ -303,7 +306,7 @@ public final class SqlLeftJoin extends SqlIntercode
 
         while(true)
         {
-            optLeft = optLeft.optimize(request, leftRestrictions, optReduced, evalServices);
+            optLeft = optLeft.optimize(request, scope, leftRestrictions, optReduced, evalServices);
 
             // a join on the right side holding a walk whose start the left side binds always is offered the distinct
             // values of the start read from the left side, shared so that the statement evaluates it once, before its
@@ -314,15 +317,16 @@ public final class SqlLeftJoin extends SqlIntercode
 
                 Variable seedVar = SqlRecursive.seedVariable(optRight, optLeft.getVariableBindings());
 
-                if(seedVar != null && SqlShared.canShare(request, optLeft))
+                if(seedVar != null && SqlShared.canShare(request, scope, optLeft))
                 {
                     optLeft = SqlShared.share(optLeft);
-                    optRight = SqlJoin.join(request, SqlShared.seed(request, optLeft, seedVar, evalServices), optRight);
+                    optRight = SqlJoin.join(request, SqlShared.seed(request, scope, optLeft, seedVar, evalServices),
+                            optRight);
                 }
             }
 
-            optRight = optRight.optimize(request, rightRestrictions, optReduced, evalServices);
-            optConditions = optimize(request, optConditions, optLeft.getVariableBindings(),
+            optRight = optRight.optimize(request, scope, rightRestrictions, optReduced, evalServices);
+            optConditions = optimize(request, scope, optConditions, optLeft.getVariableBindings(),
                     optRight.getVariableBindings(), evalServices);
 
             if(optRight instanceof SqlUnion union)
@@ -330,16 +334,16 @@ public final class SqlLeftJoin extends SqlIntercode
                 List<SqlIntercode> unionList = new ArrayList<>();
 
                 for(SqlIntercode child : union.getChilds())
-                    if(isJoinable(relations, optLeft, child, optimize(request, optConditions,
+                    if(isJoinable(relations, optLeft, child, optimize(request, scope, optConditions,
                             optLeft.getVariableBindings(), child.getVariableBindings(), evalServices)))
                         unionList.add(child);
 
                 if(!unionList.equals(union.getChilds()))
                 {
-                    optRight = SqlUnion.union(request, unionList).optimize(request, rightRestrictions, optReduced,
-                            evalServices);
+                    optRight = SqlUnion.union(request, unionList).optimize(request, scope, rightRestrictions,
+                            optReduced, evalServices);
 
-                    optConditions = optimize(request, optConditions, optLeft.getVariableBindings(),
+                    optConditions = optimize(request, scope, optConditions, optLeft.getVariableBindings(),
                             optRight.getVariableBindings(), evalServices);
                 }
             }
@@ -379,11 +383,11 @@ public final class SqlLeftJoin extends SqlIntercode
 
         if(optRight.equals(SqlNoSolution.get()) || optRight.equals(SqlEmptySolution.get())
                 || !isJoinable(relations, optLeft, optRight, optConditions))
-            return optLeft.optimize(request, restrictions, optReduced, evalServices);
+            return optLeft.optimize(request, scope, restrictions, optReduced, evalServices);
 
         if(optLeft instanceof SqlLeftJoin join && join.isLeadingOptional() && !Collections
                 .disjoint(optLeft.getVariableBindings().getVariables(), optRight.getVariableBindings().getVariables()))
-            optLeft = join.toUnion(request, evalServices);
+            optLeft = join.toUnion(request, scope, evalServices);
 
         if(optLeft instanceof SqlUnion union)
         {
@@ -391,33 +395,34 @@ public final class SqlLeftJoin extends SqlIntercode
 
             for(SqlIntercode child : union.getChilds())
             {
-                List<SqlExpressionIntercode> cnds = optimize(request, optConditions, child.getVariableBindings(),
+                List<SqlExpressionIntercode> cnds = optimize(request, scope, optConditions, child.getVariableBindings(),
                         optRight.getVariableBindings(), evalServices);
 
-                unionList.add(leftJoin(request, child, optRight, cnds, restrictions));
+                unionList.add(leftJoin(request, scope, child, optRight, cnds, restrictions));
             }
 
-            return SqlUnion.union(request, unionList).optimize(request, restrictions, optReduced, evalServices);
+            return SqlUnion.union(request, unionList).optimize(request, scope, restrictions, optReduced, evalServices);
         }
 
         // the zero-length paths of a walk match every node of the graph, so a walk of zero or more steps from nodes
         // the left side always binds has a solution for every solution of the left side: the OPTIONAL is a join (which
         // may then seed the walk with the left side)
         if(optConditions.isEmpty() && optRight instanceof SqlRecursive walk && walk.matchesEverySolutionOf(optLeft))
-            return SqlJoin.join(request, optLeft, optRight).optimize(request, restrictions, optReduced, evalServices);
+            return SqlJoin.join(request, optLeft, optRight).optimize(request, scope, restrictions, optReduced,
+                    evalServices);
 
         // a walk on the right side whose start the left side binds always is seeded with the distinct values of the
         // start read from the left side, shared so that the statement evaluates it once
         Variable seedVar = optLeft instanceof SqlShared ? null :
                 SqlRecursive.seedVariable(optRight, optLeft.getVariableBindings());
 
-        if(seedVar != null && SqlShared.canShare(request, optLeft))
+        if(seedVar != null && SqlShared.canShare(request, scope, optLeft))
         {
             SqlIntercode shared = SqlShared.share(optLeft);
-            SqlIntercode seed = SqlShared.seed(request, shared, seedVar, evalServices);
+            SqlIntercode seed = SqlShared.seed(request, scope, shared, seedVar, evalServices);
 
-            return leftJoin(request, shared, SqlJoin.join(request, seed, optRight), optConditions, restrictions)
-                    .optimize(request, restrictions, optReduced, evalServices);
+            return leftJoin(request, scope, shared, SqlJoin.join(request, seed, optRight), optConditions, restrictions)
+                    .optimize(request, scope, restrictions, optReduced, evalServices);
         }
 
         if(optLeft instanceof SqlTableAccess l && optRight instanceof SqlTableAccess r && optConditions.isEmpty())
@@ -435,7 +440,7 @@ public final class SqlLeftJoin extends SqlIntercode
                 && restrictions.isOptimized(relations, bindings))
             return this;
 
-        return leftJoin(request, optLeft, optRight, optConditions, restrictions);
+        return leftJoin(request, scope, optLeft, optRight, optConditions, restrictions);
     }
 
 
@@ -443,20 +448,22 @@ public final class SqlLeftJoin extends SqlIntercode
      * Optimises the conditions over the joined bindings, dropping those that are always true.
      *
      * @param request the current request
+     * @param scope the scope of the join
      * @param conditions the conditions
      * @param left bindings of the left side
      * @param right bindings of the right side
      * @param evalServices whether SERVICE stubs are evaluated
      * @return the optimised conditions
      */
-    private static List<SqlExpressionIntercode> optimize(Request request, List<SqlExpressionIntercode> conditions,
-            VariableBindings left, VariableBindings right, boolean evalServices)
+    private static List<SqlExpressionIntercode> optimize(Request request, Scope scope,
+            List<SqlExpressionIntercode> conditions, VariableBindings left, VariableBindings right,
+            boolean evalServices)
     {
-        VariableBindings bindings = getExpressionVariableBindings(request, left, right);
+        VariableBindings bindings = getExpressionVariableBindings(request, scope, left, right);
 
         List<SqlExpressionIntercode> result = new ArrayList<>(conditions.size());
 
-        conditions.stream().map(f -> f.optimize(request, bindings, new Restriction(xsdBoolean), evalServices))
+        conditions.stream().map(f -> f.optimize(request, scope, bindings, new Restriction(xsdBoolean), evalServices))
                 .filter(f -> !f.equals(trueValue)).forEach(f -> result.add(f));
 
         return result;
@@ -483,21 +490,23 @@ public final class SqlLeftJoin extends SqlIntercode
      * by an existence test of the pattern evaluated once.
      *
      * @param request the current request
+     * @param scope the scope of the join
      * @param evalServices whether SERVICE stubs are evaluated
      * @return union a leading OPTIONAL stands for
      */
-    protected SqlIntercode toUnion(Request request, boolean evalServices)
+    protected SqlIntercode toUnion(Request request, Scope scope, boolean evalServices)
     {
         SqlIntercode pattern = right instanceof SqlStripConstantColumns strip ? strip.getChild() : right;
         VariableBindings patternBindings = pattern.getVariableBindings();
 
         List<SqlExpressionIntercode> cnds = conditions.stream()
-                .map(c -> c.optimize(request, patternBindings, new Restriction(xsdBoolean), evalServices)).toList();
+                .map(c -> c.optimize(request, scope, patternBindings, new Restriction(xsdBoolean), evalServices))
+                .toList();
 
         if(!cnds.isEmpty())
             pattern = SqlFilter.filter(request, cnds, pattern);
 
-        SqlExpressionIntercode missing = SqlExists.create(request, true, pattern, new VariableBindings());
+        SqlExpressionIntercode missing = SqlExists.create(request, scope, true, pattern, new VariableBindings());
         SqlIntercode none = SqlFilter.filter(request, List.of(missing), SqlEmptySolution.get());
 
         return SqlUnion.union(request, List.of(pattern, none));
@@ -505,7 +514,7 @@ public final class SqlLeftJoin extends SqlIntercode
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -522,12 +531,12 @@ public final class SqlLeftJoin extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM (");
-        builder.append(left.translate(request));
+        builder.append(left.translate(request, scope));
         builder.append(" ) AS ");
         builder.append(leftTable);
 
         builder.append(" LEFT JOIN (");
-        builder.append(right.translate(request));
+        builder.append(right.translate(request, scope));
         builder.append(" ) AS ");
         builder.append(rightTable);
 

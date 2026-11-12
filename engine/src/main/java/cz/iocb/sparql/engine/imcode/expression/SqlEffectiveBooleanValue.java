@@ -25,6 +25,7 @@ import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.SqlType;
+import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
@@ -114,8 +115,8 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
-            boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, Scope scope, VariableBindings bindings,
+            Restriction restriction, boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -124,7 +125,8 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
         if(restriction.contains(relations, xsdBoolean))
             operandRestriction.add(operandClasses);
 
-        SqlExpressionIntercode optOperand = operand.optimize(request, bindings, operandRestriction, evalServices);
+        SqlExpressionIntercode optOperand = operand.optimize(request, scope, bindings, operandRestriction,
+                evalServices);
 
         if(optOperand.getResourceClasses().stream().allMatch(r -> r.isSubclassOf(xsdBoolean)))
             return optOperand;

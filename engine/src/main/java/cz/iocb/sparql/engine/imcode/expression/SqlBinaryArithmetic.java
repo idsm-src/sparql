@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
@@ -257,8 +258,8 @@ public final class SqlBinaryArithmetic extends SqlBinary
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
-            boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, Scope scope, VariableBindings bindings,
+            Restriction restriction, boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -271,8 +272,8 @@ public final class SqlBinaryArithmetic extends SqlBinary
             if(restriction.contains(relations, results.get(i)))
                 operandRestriction.add(numericBaseClasses.subList(0, numericBaseClasses.size() - i));
 
-        SqlExpressionIntercode optLeft = left.optimize(request, bindings, operandRestriction, evalServices);
-        SqlExpressionIntercode optRight = right.optimize(request, bindings, operandRestriction, evalServices);
+        SqlExpressionIntercode optLeft = left.optimize(request, scope, bindings, operandRestriction, evalServices);
+        SqlExpressionIntercode optRight = right.optimize(request, scope, bindings, operandRestriction, evalServices);
 
         if(optLeft == left && optRight == right && restriction.isOptimized(relations, variableBinding))
             return this;

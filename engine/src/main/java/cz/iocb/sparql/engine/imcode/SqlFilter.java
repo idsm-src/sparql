@@ -90,7 +90,8 @@ public final class SqlFilter extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -107,18 +108,18 @@ public final class SqlFilter extends SqlIntercode
         // the classes of a variable in which no condition can hold never pass the filter, so the child may leave their
         // solutions out; they are read once from the child as built, whose bindings still carry every class
         Restrictions accepted = new Restrictions();
-        addAcceptedClasses(request, accepted, conditions, child.getVariableBindings());
+        addAcceptedClasses(request, scope, accepted, conditions, child.getVariableBindings());
         childRestrictions.add(accepted);
 
         while(true)
         {
-            SqlIntercode newOptChild = optChild.optimize(request, childRestrictions, childReduced, evalServices);
+            SqlIntercode newOptChild = optChild.optimize(request, scope, childRestrictions, childReduced, evalServices);
 
             List<SqlExpressionIntercode> newOptCnds = new LinkedList<>();
 
             for(SqlExpressionIntercode cnd : optCnds)
             {
-                SqlExpressionIntercode expression = cnd.optimize(request, newOptChild.getVariableBindings(),
+                SqlExpressionIntercode expression = cnd.optimize(request, scope, newOptChild.getVariableBindings(),
                         new Restriction(xsdBoolean), evalServices);
 
                 if(expression.equals(SqlNull.get()) || expression.equals(falseValue))
@@ -149,7 +150,7 @@ public final class SqlFilter extends SqlIntercode
             return SqlNoSolution.get();
 
         if(optCnds.isEmpty())
-            return optChild.optimize(request, restrictions, reduced, evalServices);
+            return optChild.optimize(request, scope, restrictions, reduced, evalServices);
 
         if(optChild instanceof SqlFilter filter)
         {
@@ -157,10 +158,10 @@ public final class SqlFilter extends SqlIntercode
             merged.addAll(filter.conditions);
             merged.addAll(optCnds);
 
-            List<SqlExpressionIntercode> cnds = merged.stream().map(c -> c.optimize(request,
+            List<SqlExpressionIntercode> cnds = merged.stream().map(c -> c.optimize(request, scope,
                     filter.child.getVariableBindings(), new Restriction(xsdBoolean), evalServices)).toList();
 
-            return filter(request, cnds, filter.child).optimize(request, restrictions, reduced, evalServices);
+            return filter(request, cnds, filter.child).optimize(request, scope, restrictions, reduced, evalServices);
         }
 
         if(optChild instanceof SqlUnion union)
@@ -169,13 +170,13 @@ public final class SqlFilter extends SqlIntercode
 
             for(SqlIntercode child : union.getChilds())
             {
-                List<SqlExpressionIntercode> cnds = optCnds.stream().map(c -> c.optimize(request,
+                List<SqlExpressionIntercode> cnds = optCnds.stream().map(c -> c.optimize(request, scope,
                         child.getVariableBindings(), new Restriction(xsdBoolean), evalServices)).toList();
 
                 childs.add(filter(request, cnds, child, restrictions));
             }
 
-            return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
+            return SqlUnion.union(request, childs).optimize(request, scope, restrictions, reduced, evalServices);
         }
 
 
@@ -187,7 +188,7 @@ public final class SqlFilter extends SqlIntercode
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -201,9 +202,9 @@ public final class SqlFilter extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM (");
-        builder.append(child.translate(request));
+        builder.append(child.translate(request, scope));
         builder.append(" ) AS ");
-        builder.append(request.getInputTable());
+        builder.append(scope.getInputTable());
 
         builder.append(" WHERE ");
         builder.append(translateConditions(request));
@@ -215,7 +216,7 @@ public final class SqlFilter extends SqlIntercode
     /**
      * SQL of the conjunction of the conditions. It reads the columns of the child by their names, so it belongs to a
      * query whose only source is the child, under the alias of the input of a node holding expressions (see
-     * {@link Request#getInputTable}), which the patterns of the conditions refer to.
+     * {@link Scope#getInputTable}), which the patterns of the conditions refer to.
      *
      * @param request the current request
      * @return SQL of the conjunction of the conditions

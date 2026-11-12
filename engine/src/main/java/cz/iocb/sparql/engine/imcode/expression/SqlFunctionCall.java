@@ -10,6 +10,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -127,8 +128,8 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
-            boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, Scope scope, VariableBindings bindings,
+            Restriction restriction, boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -141,7 +142,7 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
             if(restriction.contains(relations, definition.getResultClass()))
                 argRestriction.add(getAcceptedClass(definition.getArgumentClasses().get(i)));
 
-            optArguments.add(arguments.get(i).optimize(request, bindings, argRestriction, evalServices));
+            optArguments.add(arguments.get(i).optimize(request, scope, bindings, argRestriction, evalServices));
         }
 
         if(optArguments.equals(arguments))

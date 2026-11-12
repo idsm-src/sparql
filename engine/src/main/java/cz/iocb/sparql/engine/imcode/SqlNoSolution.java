@@ -41,14 +41,15 @@ public final class SqlNoSolution extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
+            boolean evalServices)
     {
         return this;
     }
 
 
     @Override
-    public String translate(Request request)
+    public String translate(Request request, Scope scope)
     {
         return "SELECT 1 WHERE false";
     }
