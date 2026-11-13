@@ -261,6 +261,23 @@ public class QueryVisitor extends BaseVisitor<Query>
             }
 
             @Override
+            public Void visitFilter(FilterContext ctx)
+            {
+                // A filter does not end the basic graph pattern it stands in, whereas the patterns inside the filter
+                // are other basic graph patterns. The labels of the pattern are thus used ones inside the filter, and
+                // the pattern goes on with them after the filter.
+                Set<String> labels = new HashSet<>(patternBlankNodes);
+                labels.removeAll(usedBlankNodes);
+
+                super.visitFilter(ctx);
+
+                usedBlankNodes.removeAll(labels);
+                patternBlankNodes.addAll(labels);
+
+                return null;
+            }
+
+            @Override
             public Void visitBind(BindContext ctx)
             {
                 usedBlankNodes.addAll(patternBlankNodes);
