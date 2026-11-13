@@ -412,24 +412,20 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             {
                 SqlExpressionIntercode argument = arguments.get(0);
 
-                boolean canBeNull = argument.getResourceClasses().stream().anyMatch(r -> !isNumeric(r));
-
-                if(argument.equals(SqlNull.get()))
-                {
-                    if(restriction.contains(relations, xsdInteger))
-                        return SqlLiteral.create(request, new TypedLiteral("0", xsdIntegerIri));
-                    else
-                        return new SqlBuiltinCall(function, distinct, arguments, singletonMap(xsdInteger, null), false);
-                }
-
                 Set<ResourceClass> relevantClasses = argument.getResourceClasses().stream().filter(r -> hasNumeric(r))
                         .collect(toSet());
+
+                if(relevantClasses.isEmpty())
+                    return createAggregateOfErrors(relations, function, distinct, arguments, restriction, xsdInteger,
+                            new ValueColumn("0", NUMERIC));
 
                 Set<ResourceClass> promotedClasses = relevantClasses.stream()
                         .flatMap(r -> getNumericClasses(r).stream()).map(r -> determineResultClass(r)).collect(toSet());
 
-                if(relevantClasses.isEmpty())
-                    return SqlNull.get();
+                // a value that is unbound or no number is an error, and so is an exact sum that gets out of range
+                boolean canBeNull = argument.canBeNull()
+                        || argument.getResourceClasses().stream().anyMatch(r -> !isNumeric(r))
+                        || promotedClasses.contains(xsdInteger) || promotedClasses.contains(xsdDecimal);
 
                 Set<ResourceClass> resultClasses = new HashSet<>(promotedClasses);
                 resultClasses.add(xsdInteger);
@@ -442,13 +438,15 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
 
                 if(!restriction.contains(relations, resultClass))
-                    return new SqlBuiltinCall(function, distinct, arguments, singletonMap(resultClass, null), false);
+                    return new SqlBuiltinCall(function, distinct, arguments, singletonMap(resultClass, null),
+                            canBeNull);
 
 
                 SqlBuilder builder = new SqlBuilder();
 
-                if(promotedClasses.size() == 1 && relevantClasses.size() == argument.getResourceClasses().size())
+                if(promotedClasses.size() == 1)
                 {
+                    // a value that is no number is promoted to NULL, which the aggregate takes for an error as well
                     ResourceClass promotedClass = promotedClasses.iterator().next();
                     Column op = argument.promoteNumericAs(relevantClasses, promotedClass);
 
@@ -529,13 +527,16 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             {
                 SqlExpressionIntercode argument = arguments.get(0);
 
-                boolean canBeNull = argument.getResourceClasses().stream().anyMatch(r -> !isStringLiteral(r));
+                if(argument.getResourceClasses().stream().noneMatch(r -> hasStringLiteral(r)))
+                    return createAggregateOfErrors(relations, function, distinct, arguments, restriction, xsdString,
+                            new ValueColumn("", VARCHAR));
+
+                // a value that is unbound or no string is an error
+                boolean canBeNull = argument.canBeNull()
+                        || argument.getResourceClasses().stream().anyMatch(r -> !isStringLiteral(r));
 
                 if(!restriction.contains(relations, xsdString))
                     return new SqlBuiltinCall(function, distinct, arguments, singletonMap(xsdString, null), canBeNull);
-
-                if(argument.equals(SqlNull.get()))
-                    return SqlLiteral.create(request, new TypedLiteral("", xsdStringIri));
 
                 boolean simple = argument.getResourceClasses().stream().allMatch(r -> isStringLiteral(r))
                         && !argument.getResourceClasses().stream().allMatch(r -> r.getEffectiveClass().equals(box));
@@ -3026,6 +3027,34 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
     private static boolean isFixedTagClass(ResourceClass resClass)
     {
         return resClass instanceof LangStringWithTagClass || resClass instanceof DirLangStringWithTagClass;
+    }
+
+
+    /**
+     * Aggregate whose argument is an error in every solution, because it is unbound or never of the kind the aggregate
+     * takes: the aggregate of a group of solutions is an error then, and so it is unbound, whereas the aggregate of no
+     * solution has the given value all the same.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param function the lower-case function name
+     * @param distinct the DISTINCT flag
+     * @param arguments the arguments
+     * @param restriction the result classes the parent needs
+     * @param resultClass the class of the value
+     * @param value the value of the aggregate of no solution
+     * @return the call of the aggregate
+     */
+    private static SqlExpressionIntercode createAggregateOfErrors(ClassRelations relations, String function,
+            boolean distinct, List<SqlExpressionIntercode> arguments, Restriction restriction,
+            ResourceClass resultClass, ValueColumn value)
+    {
+        if(!restriction.contains(relations, resultClass))
+            return new SqlBuiltinCall(function, distinct, arguments, singletonMap(resultClass, null), true);
+
+        List<Column> result = List
+                .of(new ExpressionColumn(SqlCode.of("CASE WHEN count(*) = 0 THEN ", value, " END"), value.getType()));
+
+        return new SqlBuiltinCall(function, distinct, arguments, singletonMap(resultClass, result), true);
     }
 
 
