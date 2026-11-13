@@ -1395,6 +1395,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         || type.getResourceClasses().stream().anyMatch(r -> !isIri(r));
 
                 ResourceClass resultClass = literal;
+                String constructor = "sparql.strdt_string(";
 
                 if(type instanceof SqlIri iri)
                 {
@@ -1431,17 +1432,29 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     }
                     else
                     {
+                        // a datatype that is not handled has no lexical form to parse
                         resultClass = unionize(Set.of(unsupportedType), box);
+                        constructor = "sparql.rdfbox_create_from_typedliteral(";
                     }
+                }
+                else
+                {
+                    // a datatype that is neither handled nor an absolute IRI makes the call an error
+                    canBeNull = true;
                 }
 
                 if(!restriction.contains(relations, resultClass))
                     return new SqlBuiltinCall(function, distinct, arguments, singletonMap(resultClass, null),
                             canBeNull);
 
-                List<Column> result = List.of(new ExpressionColumn(SqlCode.of("sparql.rdfbox_create_from_typedliteral(",
-                        argument.get(relations, xsdString).get(0), ", ", type.get(relations, iri).get(0), ")"), RDFBOX,
-                        canBeNull));
+                /* NOTE: The lexical form of a handled datatype is parsed, so that the literal is a value of its
+                 * datatype: a valid form gives a literal of the class of the datatype, which keeps a form that is not
+                 * the canonical one, and an invalid form gives a literal of the unsupported class.
+                 */
+                SqlCode code = SqlCode.of(constructor, argument.get(relations, xsdString).get(0), ", ",
+                        type.get(relations, iri).get(0), ")");
+
+                List<Column> result = List.of(new ExpressionColumn(code, RDFBOX, canBeNull));
 
                 return new SqlBuiltinCall(function, distinct, arguments, singletonMap(resultClass, result), canBeNull);
             }
