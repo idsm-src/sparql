@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -47,7 +48,8 @@ import cz.iocb.sparql.testing.Database;
  * (1, 7, 10), (7, 7, 70) and (3, 3, 30), so a is 7 or equal to id in every row. The table {@code pair} with the
  * composite key (a, b) holds the pairs (1, 1) and (5, 7); the table {@code pair_child} references the pair (5, 7), and
  * the table {@code pair_child_null}, whose column b is nullable, references the pair (1, 1) and holds the row (9,
- * NULL), which references no pair. The table {@code other} holds the item 50.
+ * NULL), which references no pair. The table {@code other} holds the item 50. The table {@code optional} holds the
+ * items 1 to 4 with a nullable reference to an item: the item 1 refers to none, the others to the items 5, 7 and 1.
  */
 public class KeyMergeTest
 {
@@ -73,7 +75,8 @@ public class KeyMergeTest
      * ex:refers. The rows of {@code item} refer to the items of their a by ex:r when a is 7 or equal to id (a
      * disjunction whose second disjunct alone equates a with the key) and to the items of their b by ex:s. The pairs
      * are typed ex:Pair by their a, the rows of {@code pair_child} refer to the a of their pairs by ex:refersPair and
-     * the rows of {@code pair_child_null} by ex:refersPairNull. The rows of {@code other} are typed ex:Other.
+     * the rows of {@code pair_child_null} by ex:refersPairNull. The rows of {@code other} are typed ex:Other. The rows
+     * of {@code optional} are typed ex:Optional and refer to the items of their nullable column by ex:opt.
      *
      * @throws SQLException on database errors
      */
@@ -109,6 +112,9 @@ public class KeyMergeTest
 
             statement.execute("create table keymerge_test.other (id int primary key)");
             statement.execute("insert into keymerge_test.other values (50)");
+
+            statement.execute("create table keymerge_test.optional (id int primary key, opt int)");
+            statement.execute("insert into keymerge_test.optional values (1, null), (2, 5), (3, 7), (4, 1)");
         }
 
         DatabaseSchema schema = new DatabaseSchema(connectionPool);
@@ -126,6 +132,7 @@ public class KeyMergeTest
         DatabaseTable pairChild = new DatabaseTable("keymerge_test", "pair_child");
         DatabaseTable pairChildNull = new DatabaseTable("keymerge_test", "pair_child_null");
         DatabaseTable other = new DatabaseTable("keymerge_test", "other");
+        DatabaseTable optional = new DatabaseTable("keymerge_test", "optional");
         ConstantIriMapping graph = config.createIriMapping("<http://example.org/graph>");
 
         config.addQuadMapping(parent, graph, config.createIriMapping("item", "id"), config.createIriMapping("rdf:type"),
@@ -154,6 +161,12 @@ public class KeyMergeTest
 
         config.addQuadMapping(other, graph, config.createIriMapping("item", "id"), config.createIriMapping("rdf:type"),
                 config.createIriMapping("ex:Other"));
+
+        config.addQuadMapping(optional, graph, config.createIriMapping("item", "id"),
+                config.createIriMapping("rdf:type"), config.createIriMapping("ex:Optional"));
+
+        config.addQuadMapping(optional, graph, config.createIriMapping("item", "id"), config.createIriMapping("ex:opt"),
+                config.createIriMapping("item", "opt"));
     }
 
 
@@ -222,6 +235,35 @@ public class KeyMergeTest
             row.add(new Iri("http://example.org/item/" + id));
 
         return row;
+    }
+
+
+    /**
+     * Expected row of an item and of the item it refers to.
+     *
+     * @param item the item id
+     * @param optional the id of the item it refers to, or null if it refers to none
+     * @return row of the item and of the item it refers to
+     */
+    private static List<RdfTerm> optional(int item, Integer optional)
+    {
+        return Arrays.asList(new Iri("http://example.org/item/" + item),
+                optional == null ? null : new Iri("http://example.org/item/" + optional));
+    }
+
+
+    /**
+     * How many times the SQL reads the table.
+     *
+     * @param sql the SQL
+     * @param table the name of a table of the test schema
+     * @return number of the accesses to the table in the SQL
+     */
+    private static int reads(String sql, String table)
+    {
+        String name = "\"keymerge_test\".\"" + table + "\"";
+
+        return (sql.length() - sql.replace(name, "").length()) / name.length();
     }
 
 
@@ -308,5 +350,32 @@ public class KeyMergeTest
                 + "{ SELECT DISTINCT ?y WHERE { { ?y a ex:Pair } UNION { ?y a ex:Other } } } }";
 
         assertThat(execute(query), containsInAnyOrder(childItem(30, 1)));
+    }
+
+
+    @Test
+    @DisplayName("a distinct access is not merged over a variable that may be unbound")
+    void distinctOverUnboundVariable() throws Exception
+    {
+        String query = "SELECT ?x ?o WHERE { { ?x a ex:Optional OPTIONAL { ?x ex:opt ?o } } "
+                + "{ SELECT DISTINCT ?o WHERE { ?s a ex:Optional OPTIONAL { ?s ex:opt ?o } } } }";
+
+        // an unbound value is compatible with any value: the item 1, which refers to no item, is joined with every
+        // solution of the sub-select, and the solution of the sub-select that binds no item with every item
+        assertThat(execute(query), containsInAnyOrder(optional(1, null), optional(1, 5), optional(1, 7), optional(1, 1),
+                optional(2, 5), optional(2, 5), optional(3, 7), optional(3, 7), optional(4, 1), optional(4, 1)));
+    }
+
+
+    @Test
+    @DisplayName("a distinct access determined by the key is merged with a variable that may be unbound")
+    void distinctByKeyWithUnboundVariable() throws Exception
+    {
+        String query = "SELECT ?x ?o WHERE { { ?x a ex:Optional OPTIONAL { ?x ex:opt ?o } } "
+                + "{ SELECT DISTINCT ?x ?o WHERE { ?x a ex:Optional OPTIONAL { ?x ex:opt ?o } } } }";
+
+        assertThat(execute(query),
+                containsInAnyOrder(optional(1, null), optional(2, 5), optional(3, 7), optional(4, 1)));
+        assertThat(reads(translate(query), "optional"), is(1));
     }
 }

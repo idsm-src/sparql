@@ -742,7 +742,9 @@ public final class SqlTableAccess extends SqlIntercode
 
     /**
      * Columns on which two accesses to the same table are equated through their shared variables; empty if the tables
-     * differ or the variables are not joined in a single class.
+     * differ or the variables are not joined in a single class. A shared variable that may be unbound on a side equates
+     * no columns, because an unbound value is compatible with any value: when its bindings on the two sides are the
+     * same, it contributes nothing, otherwise the result is empty as well.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param left the left access
@@ -770,8 +772,13 @@ public final class SqlTableAccess extends SqlIntercode
                 return Set.of();
 
             if(leftBinding.canBeNull() || rightBinding.canBeNull())
+            {
                 if(!leftBinding.equals(rightBinding)) // TODO: take representatives into account
                     return Set.of();
+
+                // an unbound value is compatible with any value, so the columns of the variable are not equated
+                continue;
+            }
 
             for(ResourceClassPair pairedClass : pair.getClasses())
             {
@@ -1156,10 +1163,11 @@ public final class SqlTableAccess extends SqlIntercode
      * Returns whether the distinct access, which denotes a set of rows over the given distinct columns, is pinned by
      * the join to at most one row for each row of the other access to the same table, so that it only restricts the
      * rows of the other access and does not change their multiplicities. That requires the join columns (the columns
-     * tied on both sides to the same variables, or to the same constants) to cover the distinct columns, all columns
-     * the distinct access binds and all columns its conditions depend on. Otherwise the existence of a matching row is
-     * not decided by the row of the other access itself: another row with the same join values may satisfy the
-     * conditions while that row does not.
+     * tied on both sides to the same variables that are always bound, or to the same constants, see
+     * {@link #getJoinColumns}) to cover the distinct columns, all columns the distinct access binds and all columns its
+     * conditions depend on. Otherwise the existence of a matching row is not decided by the row of the other access
+     * itself: another row with the same join values may satisfy the conditions while that row does not, and a variable
+     * that may be unbound is compatible also with the rows that differ in its columns.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param access the other access
