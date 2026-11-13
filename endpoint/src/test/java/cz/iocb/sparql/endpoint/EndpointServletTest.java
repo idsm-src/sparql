@@ -1,5 +1,6 @@
 package cz.iocb.sparql.endpoint;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static java.util.stream.Collectors.joining;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -7,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringReader;
 import java.io.StringWriter;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
@@ -17,6 +19,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
+import javax.sql.DataSource;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,20 +29,29 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
+import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
+import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.Engine;
 import cz.iocb.sparql.testing.Database;
 
 
 
 /**
- * The protocol handling of the servlet with stub requests and responses over an empty configuration: the
+ * The protocol handling of the servlet with stub requests and responses over a configuration of two constant quads: the
  * {@code version} parameter of the request (as a query parameter, a form parameter and a media type parameter), its
  * errors, and the announcement of RDF 1.2 in the results (the {@code version} member of the JSON head, the VERSION
  * directive of Turtle and N-Triples and the {@code version} parameter of the media types). The JSON formats are also
- * checked to escape the characters of a literal that a JSON string cannot hold as they are.
+ * checked to escape the characters of a literal that a JSON string cannot hold as they are, and the XML formats to
+ * write the white space and the markup of a term so that an XML parser reads them back.
  */
 public class EndpointServletTest
 {
@@ -47,10 +61,13 @@ public class EndpointServletTest
     private static final String sparqlJson = "application/sparql-results+json";
     private static final String sparqlXml = "application/sparql-results+xml";
     private static final String rdfJson = "application/rdf+json";
+    private static final String rdfXml = "application/rdf+xml";
     private static final String turtle = "text/turtle";
     private static final String ntriples = "application/n-triples";
     private static final String form = "application/x-www-form-urlencoded";
     private static final String sparqlQuery = "application/sparql-query";
+    private static final String sparqlNamespace = "http://www.w3.org/2005/sparql-results#";
+    private static final String rdfNamespace = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 
     /**
      * The characters a JSON string has to escape: the control characters (all of them but U+0000, which the database
@@ -58,6 +75,18 @@ public class EndpointServletTest
      */
     private static final String special = IntStream.range(1, 0x20).mapToObj(Character::toString).collect(joining())
             + "\"\\";
+
+    /**
+     * White space and markup of a term, which an XML parser reads as something else unless they are escaped: a carriage
+     * return as a line feed, and a tabulator or a line feed of an attribute value as a space.
+     */
+    private static final String markup = " a\tb\nc\rd\r\ne<f>g&h\"i'j]]> ";
+
+    /**
+     * IRI holding the white space and the markup, which no query can write: the configuration has it as the subject and
+     * the object of a constant quad, and as the datatype of the object of another one.
+     */
+    private static final String markupIri = "http://example.org/" + markup;
 
     private static EndpointServlet servlet = null;
 
@@ -121,11 +150,26 @@ public class EndpointServletTest
     }
 
 
+    /**
+     * Creates the servlet over the configuration of two constant quads, {@code <iri> ex:iri <iri>} and
+     * {@code <iri> ex:typed "x"^^<iri>}, where {@code <iri>} is {@link #markupIri}.
+     *
+     * @throws SQLException on database errors
+     */
     @BeforeAll
     static void init() throws SQLException
     {
-        servlet = new EndpointServlet(
-                new Engine(new SparqlDatabaseConfiguration(null, Database.getPool(), null, false)));
+        DataSource connectionPool = Database.getPool();
+        SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool,
+                new DatabaseSchema(connectionPool), false);
+
+        ConstantIriMapping iri = new ConstantIriMapping(new Iri(markupIri));
+
+        config.addQuadMapping(null, iri, new ConstantIriMapping(new Iri("http://example.org/iri")), iri);
+        config.addQuadMapping(null, iri, new ConstantIriMapping(new Iri("http://example.org/typed")),
+                config.createLiteralMapping(unsupportedType, new TypedLiteral("x", new Iri(markupIri))));
+
+        servlet = new EndpointServlet(new Engine(config));
     }
 
 
@@ -321,6 +365,40 @@ public class EndpointServletTest
     {
         assertEquals(HttpServletResponse.SC_OK, response.status);
         return new ObjectMapper().readTree(response.getBody());
+    }
+
+
+    /**
+     * The body parsed as XML.
+     *
+     * @param response the response
+     * @return the body parsed as XML
+     * @throws ParserConfigurationException if the parser cannot be created
+     * @throws SAXException if the body is not well-formed
+     * @throws IOException on parsing errors
+     */
+    private static Document xml(Response response) throws ParserConfigurationException, SAXException, IOException
+    {
+        assertEquals(HttpServletResponse.SC_OK, response.status);
+
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
+
+        return factory.newDocumentBuilder().parse(new InputSource(new StringReader(response.getBody())));
+    }
+
+
+    /**
+     * The first element of the name in the document.
+     *
+     * @param document the document
+     * @param namespace the namespace of the element
+     * @param name the local name of the element
+     * @return the first element of the name in the document
+     */
+    private static Element element(Document document, String namespace, String name)
+    {
+        return (Element) document.getElementsByTagNameNS(namespace, name).item(0);
     }
 
 
@@ -524,5 +602,43 @@ public class EndpointServletTest
 
         assertEquals(special,
                 json.get("http://example.org/s").get("http://example.org/p").get(0).get("value").asText());
+    }
+
+
+    @Test
+    @DisplayName("the XML results keep the white space and the markup of a term")
+    void markupInXmlResults() throws Exception
+    {
+        String query = "SELECT (" + literal(markup) + " AS ?x) WHERE {}";
+        Document document = xml(get(parameters("query", query), sparqlXml));
+
+        assertEquals(markup, element(document, sparqlNamespace, "literal").getTextContent());
+
+        document = xml(get(parameters("query", "SELECT ?o WHERE { ?s <http://example.org/iri> ?o }"), sparqlXml));
+
+        assertEquals(markupIri, element(document, sparqlNamespace, "uri").getTextContent());
+
+        document = xml(get(parameters("query", "SELECT ?o WHERE { ?s <http://example.org/typed> ?o }"), sparqlXml));
+
+        assertEquals(markupIri, element(document, sparqlNamespace, "literal").getAttribute("datatype"));
+    }
+
+
+    @Test
+    @DisplayName("RDF/XML keeps the white space and the markup of a term")
+    void markupInRdfXml() throws Exception
+    {
+        String query = "CONSTRUCT { <http://example.org/s> <http://example.org/p> " + literal(markup) + " } WHERE {}";
+        Document document = xml(get(parameters("query", query), rdfXml));
+
+        assertEquals(markup, element(document, "http://example.org/", "p").getTextContent());
+
+        document = xml(get(parameters("query", "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"), rdfXml));
+
+        assertEquals(markupIri, element(document, rdfNamespace, "Description").getAttributeNS(rdfNamespace, "about"));
+        assertEquals(markupIri,
+                element(document, "http://example.org/", "iri").getAttributeNS(rdfNamespace, "resource"));
+        assertEquals(markupIri,
+                element(document, "http://example.org/", "typed").getAttributeNS(rdfNamespace, "datatype"));
     }
 }

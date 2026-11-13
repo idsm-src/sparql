@@ -1196,7 +1196,7 @@ public class EndpointServlet extends HttpServlet
         for(Variable head : result.getHeads())
         {
             out.print("\t\t<variable name=\"");
-            writeXmlValue(out, head.getName());
+            writeXmlAttributeValue(out, head.getName());
             out.println("\"/>");
         }
 
@@ -1217,7 +1217,7 @@ public class EndpointServlet extends HttpServlet
 
 
                 out.print("\t\t\t<binding name=\"");
-                writeXmlValue(out, result.getHeads().get(i).getName());
+                writeXmlAttributeValue(out, result.getHeads().get(i).getName());
                 out.print("\">");
                 writeXmlNode(out, term);
                 out.println("</binding>");
@@ -1562,12 +1562,12 @@ public class EndpointServlet extends HttpServlet
         if(subject instanceof Iri iri)
         {
             out.print("rdf:about=\"");
-            writeXmlValue(out, iri.getValue());
+            writeXmlAttributeValue(out, iri.getValue());
         }
         else if(subject instanceof BlankNode bnode)
         {
             out.print("rdf:nodeID=\"");
-            writeXmlValue(out, bnode.getLabel());
+            writeXmlAttributeValue(out, bnode.getLabel());
         }
         else
         {
@@ -1603,25 +1603,25 @@ public class EndpointServlet extends HttpServlet
         out.print("<p:");
         out.print(name);
         out.print(" xmlns:p=\"");
-        writeXmlValue(out, prefix);
+        writeXmlAttributeValue(out, prefix);
         out.print("\"");
 
         if(object instanceof Iri value)
         {
             out.print(" rdf:resource=\"");
-            writeXmlValue(out, value.getValue());
+            writeXmlAttributeValue(out, value.getValue());
             out.println("\"/>");
         }
         else if(object instanceof BlankNode node)
         {
             out.print(" rdf:nodeID=\"");
-            writeXmlValue(out, node.getLabel());
+            writeXmlAttributeValue(out, node.getLabel());
             out.println("\"/>");
         }
         else if(object instanceof LangStringLiteral literal)
         {
             out.print(" xml:lang=\"");
-            writeXmlValue(out, literal.getTag());
+            writeXmlAttributeValue(out, literal.getTag());
             out.print("\">");
             writeXmlValue(out, literal.getValue());
             out.print("</p:");
@@ -1632,9 +1632,9 @@ public class EndpointServlet extends HttpServlet
         {
             out.print(" xmlns:its=\"http://www.w3.org/2005/11/its\" rdf:version=\"1.2\" its:version=\"2.0\"");
             out.print(" xml:lang=\"");
-            writeXmlValue(out, literal.getTag());
+            writeXmlAttributeValue(out, literal.getTag());
             out.print("\" its:dir=\"");
-            writeXmlValue(out, literal.getDirection().getText());
+            writeXmlAttributeValue(out, literal.getDirection().getText());
             out.print("\">");
             writeXmlValue(out, literal.getValue());
             out.print("</p:");
@@ -1644,7 +1644,7 @@ public class EndpointServlet extends HttpServlet
         else if(object instanceof TypedLiteral literal)
         {
             out.print(" rdf:datatype=\"");
-            writeXmlValue(out, literal.getType().getValue());
+            writeXmlAttributeValue(out, literal.getType().getValue());
             out.print("\">");
             writeXmlValue(out, literal.getValue());
             out.print("</p:");
@@ -1888,7 +1888,7 @@ public class EndpointServlet extends HttpServlet
         else if(term instanceof LangStringLiteral literal)
         {
             out.print("<literal xml:lang=\"");
-            writeXmlValue(out, literal.getTag());
+            writeXmlAttributeValue(out, literal.getTag());
             out.print("\">");
             writeXmlValue(out, literal.getValue());
             out.print("</literal>");
@@ -1896,9 +1896,9 @@ public class EndpointServlet extends HttpServlet
         else if(term instanceof DirLangStringLiteral literal)
         {
             out.print("<literal xmlns:its=\"http://www.w3.org/2005/11/its\" its:version=\"2.0\" xml:lang=\"");
-            writeXmlValue(out, literal.getTag());
+            writeXmlAttributeValue(out, literal.getTag());
             out.print("\" its:dir=\"");
-            writeXmlValue(out, literal.getDirection().getText());
+            writeXmlAttributeValue(out, literal.getDirection().getText());
             out.print("\">");
             writeXmlValue(out, literal.getValue());
             out.print("</literal>");
@@ -1906,7 +1906,7 @@ public class EndpointServlet extends HttpServlet
         else if(term instanceof TypedLiteral literal)
         {
             out.print("<literal datatype=\"");
-            writeXmlValue(out, literal.getType().getValue());
+            writeXmlAttributeValue(out, literal.getType().getValue());
             out.print("\">");
             writeXmlValue(out, literal.getValue());
             out.print("</literal>");
@@ -2233,13 +2233,44 @@ public class EndpointServlet extends HttpServlet
 
 
     /**
-     * Writes text with the XML special characters escaped.
+     * Writes text as the content of an XML element: the markup characters are escaped, and a carriage return is written
+     * as a character reference, because a parser reads a literal one as a line feed. XML 1.0 has no way of writing the
+     * other control characters (but the tabulator and the line feed), so they are written as they are and a document
+     * holding them is not well-formed.
      *
      * @param out the output writer
      * @param value the value
      * @throws IOException on output errors
      */
     private static void writeXmlValue(PrintWriter out, String value) throws IOException
+    {
+        writeXmlValue(out, value, false);
+    }
+
+
+    /**
+     * Writes text as the value of an XML attribute: besides what {@link #writeXmlValue(PrintWriter, String)} escapes, a
+     * tabulator and a line feed are written as character references, because a parser reads literal ones as spaces.
+     *
+     * @param out the output writer
+     * @param value the value
+     * @throws IOException on output errors
+     */
+    private static void writeXmlAttributeValue(PrintWriter out, String value) throws IOException
+    {
+        writeXmlValue(out, value, true);
+    }
+
+
+    /**
+     * Writes text with the characters escaped that have a meaning in XML or that an XML parser would not read back.
+     *
+     * @param out the output writer
+     * @param value the value
+     * @param attribute whether the text is the value of an attribute
+     * @throws IOException on output errors
+     */
+    private static void writeXmlValue(PrintWriter out, String value, boolean attribute) throws IOException
     {
         for(char val : value.toCharArray())
         {
@@ -2253,6 +2284,12 @@ public class EndpointServlet extends HttpServlet
                 out.print("&gt;");
             else if(val == '&')
                 out.print("&amp;");
+            else if(val == '\r')
+                out.print("&#xD;");
+            else if(val == '\t' && attribute)
+                out.print("&#x9;");
+            else if(val == '\n' && attribute)
+                out.print("&#xA;");
             else
                 out.print(val);
         }
