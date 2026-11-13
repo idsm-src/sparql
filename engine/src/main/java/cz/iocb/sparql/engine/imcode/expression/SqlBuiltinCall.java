@@ -1285,8 +1285,6 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             case "iri":
             case "uri":
             {
-                final ResourceClass argClasses = unionize(xsdString, iri);
-
                 SqlExpressionIntercode argument = arguments.get(0);
 
                 if(argument.getResourceClasses().stream().noneMatch(r -> hasString(r) || hasIri(r)))
@@ -1295,11 +1293,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 if(argument.getResourceClasses().stream().allMatch(r -> isIri(r)))
                     return argument;
 
-                boolean canBeNull = argument.canBeNull()
-                        || argument.getResourceClasses().stream().anyMatch(r -> !r.isSubclassOf(argClasses));
-
+                // a string that is no IRI reference is an error, so the result may be unbound whatever the argument is
                 if(!restriction.contains(relations, iri))
-                    return new SqlBuiltinCall(function, distinct, arguments, singletonMap(iri, null), canBeNull);
+                    return new SqlBuiltinCall(function, distinct, arguments, singletonMap(iri, null), true);
 
                 boolean partCanBeBull = argument.canBeNull() || argument.getResourceClasses().size() > 1;
                 Column base = arguments.get(1).get(relations, iri).get(0);
@@ -1345,7 +1341,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                 List<Column> result = List.of(coalesce(variants));
 
-                return new SqlBuiltinCall(function, distinct, arguments, singletonMap(iri, result), canBeNull);
+                return new SqlBuiltinCall(function, distinct, arguments, singletonMap(iri, result), true);
             }
 
             case "bnode":
