@@ -2356,7 +2356,10 @@ public class EndpointServlet extends HttpServlet
 
 
     /**
-     * Writes an IRI as a TSV field in angle brackets, escaping control characters.
+     * Writes the text of an IRI as the RDF languages and the TSV results write it between angle brackets. The
+     * characters that their {@code IRIREF} production excludes (the control characters, the space, the backslash and
+     * {@code <>"{}|^`}) are written by numeric escapes, the only escapes an IRI may hold, so that a parser reads the
+     * text of the IRI back, although a text with such characters is no IRI.
      *
      * @param out the output writer
      * @param value the value
@@ -2366,16 +2369,8 @@ public class EndpointServlet extends HttpServlet
     {
         for(char val : value.toCharArray())
         {
-            if(val == '\\')
-                out.print("\\\\");
-            else if(val == '\t')
-                out.print("\\t");
-            else if(val == '\r')
-                out.print("\\r");
-            else if(val == '\n')
-                out.print("\\n");
-            else if(val == '>')
-                out.print("\\>");
+            if(val <= ' ' || "<>\"{}|^`\\".indexOf(val) >= 0)
+                out.printf("\\u%04X", (int) val);
             else
                 out.print(val);
         }

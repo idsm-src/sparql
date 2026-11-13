@@ -18,6 +18,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 import javax.sql.DataSource;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -51,8 +53,9 @@ import cz.iocb.sparql.testing.Database;
  * errors, and the announcement of RDF 1.2 in the results (the {@code version} member of the JSON head, the VERSION
  * directive of Turtle and N-Triples and the {@code version} parameter of the media types). The JSON formats are also
  * checked to escape the characters of a literal that a JSON string cannot hold as they are, the XML formats to write
- * the white space and the markup of a term so that an XML parser reads them back, and the TSV and CSV formats to write
- * the header and the ends of the lines as their specification says.
+ * the white space and the markup of a term so that an XML parser reads them back, the RDF languages to write an IRI
+ * with the characters that their syntax excludes escaped, and the TSV and CSV formats to write the header and the ends
+ * of the lines as their specification says.
  */
 public class EndpointServletTest
 {
@@ -86,10 +89,27 @@ public class EndpointServletTest
     private static final String markup = " a\tb\nc\rd\r\ne<f>g&h\"i'j]]> ";
 
     /**
-     * IRI holding the white space and the markup, which no query can write: the configuration has it as the subject and
-     * the object of a constant quad, and as the datatype of the object of another one.
+     * IRI holding the white space, the markup and the other characters that the syntax of IRIs excludes, which no query
+     * can write: the configuration has it as the subject and the object of a constant quad, and as the datatype of the
+     * object of another one.
      */
-    private static final String markupIri = "http://example.org/" + markup;
+    private static final String markupIri = "http://example.org/" + markup + "{|}^`\\";
+
+    /**
+     * Texts between angle brackets, as the RDF languages write IRIs.
+     */
+    private static final Pattern irirefPattern = Pattern.compile("<([^>]*)>");
+
+    /**
+     * Text of an IRI in the RDF languages: characters that their {@code IRIREF} production does not exclude, and
+     * numeric escapes.
+     */
+    private static final Pattern iriTextPattern = Pattern.compile("(?:[^\\x00-\\x20<>\"{}|^`\\\\]|\\\\u[0-9A-F]{4})*");
+
+    /**
+     * Numeric escape of a character.
+     */
+    private static final Pattern escapePattern = Pattern.compile("\\\\u([0-9A-F]{4})");
 
     private static EndpointServlet servlet = null;
 
@@ -392,6 +412,32 @@ public class EndpointServletTest
 
 
     /**
+     * The IRIs written in a document of an RDF language, in the order of their occurrence: the texts between angle
+     * brackets with the numeric escapes resolved. The texts must not hold a character that the syntax of IRIs excludes.
+     *
+     * @param document the document
+     * @return the IRIs written in the document
+     */
+    private static List<String> iris(String document)
+    {
+        List<String> iris = new ArrayList<>();
+        Matcher matcher = irirefPattern.matcher(document);
+
+        while(matcher.find())
+        {
+            String text = matcher.group(1);
+
+            assertTrue(iriTextPattern.matcher(text).matches(), text);
+
+            iris.add(escapePattern.matcher(text).replaceAll(
+                    escape -> Matcher.quoteReplacement(Character.toString(Integer.parseInt(escape.group(1), 16)))));
+        }
+
+        return iris;
+    }
+
+
+    /**
      * The first element of the name in the document.
      *
      * @param document the document
@@ -643,6 +689,26 @@ public class EndpointServletTest
                 element(document, "http://example.org/", "iri").getAttributeNS(rdfNamespace, "resource"));
         assertEquals(markupIri,
                 element(document, "http://example.org/", "typed").getAttributeNS(rdfNamespace, "datatype"));
+    }
+
+
+    @Test
+    @DisplayName("the RDF languages and TSV write the characters that the syntax of IRIs excludes by numeric escapes")
+    void irisInRdfLanguages() throws Exception
+    {
+        for(String format : List.of(ntriples, turtle, tsv))
+        {
+            // an IRI as the subject and the object, and as the datatype of a literal
+            for(String predicate : List.of("http://example.org/iri", "http://example.org/typed"))
+            {
+                String pattern = "{ ?s <" + predicate + "> ?o }";
+                String query = "CONSTRUCT " + pattern + " WHERE " + pattern;
+                Response response = get(parameters("query", query), format);
+
+                assertEquals(HttpServletResponse.SC_OK, response.status);
+                assertEquals(List.of(markupIri, predicate, markupIri), iris(response.getBody()), format);
+            }
+        }
     }
 
 
