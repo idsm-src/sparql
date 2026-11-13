@@ -407,7 +407,7 @@ public final class SqlProcedureCall extends SqlIntercode
         builder.append(" FROM ");
 
         SqlCode call = translateCall(request, scope);
-        CommonTable table = child.equals(SqlEmptySolution.get()) && !scope.refersToEnclosingInput(call.getText()) ?
+        CommonTable table = child.equals(SqlEmptySolution.get()) && !scope.refersToEnclosingInput(call) ?
                 request.getCommonTableExpression(call) : null;
 
         if(table != null)

@@ -25,11 +25,11 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.function.Supplier;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
-import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.LateralTable;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.SourceTable;
@@ -871,7 +871,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         if(graphBinding == null)
             return SqlNoSolution.get();
 
-        AliasTable lateralTable = request.createLateralTable();
+        LateralTable lateralTable = request.createLateralTable();
         Restrictions requirements = new Restrictions(List.of(variable));
         VariableBindings lateral = SqlLateralJoin.getLateralVariableBindings(request.getConfiguration(), lateralTable,
                 graphs, requirements);

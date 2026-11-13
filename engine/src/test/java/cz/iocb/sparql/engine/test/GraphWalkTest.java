@@ -34,7 +34,9 @@ import cz.iocb.sparql.testing.Database;
  * of the first step and joins every further step with it. The step was joined with the graph only as far as the parent
  * needed the graph variable: when the parent did not need it, the paths crossed the graphs, and when it needed the
  * variable in some of its classes only (a MINUS or an OPTIONAL whose other side binds it in fewer classes), the
- * translation failed.
+ * translation failed. In a pattern evaluated per graph, the side of an OPTIONAL or a MINUS that would seed a walk of
+ * the other side reads the graph of the evaluation, so its solutions cannot be shared in a common table expression,
+ * which would not see the graph.
  */
 public class GraphWalkTest
 {
@@ -298,5 +300,28 @@ public class GraphWalkTest
         String query = "SELECT ?x WHERE { GRAPH ?g { ?x ex:s+ <http://example.org/a/4> } }";
 
         assertThat(execute(query), containsInAnyOrder(row(a(3))));
+    }
+
+
+    @Test
+    @DisplayName("a walk in an OPTIONAL of a pattern evaluated per graph, whose left side reads the graph")
+    void optionalPerGraph() throws Exception
+    {
+        String query = "SELECT ?g ?x ?z ?w WHERE { GRAPH ?g { { SELECT ?x ?z ?w WHERE "
+                + "{ ?x ex:s ?y OPTIONAL { ?x ex:t+ ?z . ?z ex:t ?w } } } } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(a(100), a(1), a(2), b(30)), row(a(101), a(2), null, null),
+                row(b(200), a(3), null, null)));
+    }
+
+
+    @Test
+    @DisplayName("a walk in a MINUS of a pattern evaluated per graph, whose left side reads the graph")
+    void minusPerGraph() throws Exception
+    {
+        String query = "SELECT ?g ?x WHERE { GRAPH ?g { { SELECT ?x WHERE "
+                + "{ ?x ex:s ?y MINUS { ?x ex:t+ ?z . ?z ex:t ?w } } } } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(a(101), a(2)), row(b(200), a(3))));
     }
 }

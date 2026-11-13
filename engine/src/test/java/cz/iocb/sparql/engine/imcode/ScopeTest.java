@@ -10,7 +10,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
-import cz.iocb.sparql.engine.database.AliasTable;
+import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.LateralTable;
+import cz.iocb.sparql.engine.database.SqlCode;
+import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.translator.VariableBinding;
@@ -21,9 +24,11 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 /**
  * Scopes of intermediate code (see {@link Scope}): entering a pattern of an expression or the right side of a lateral
  * join gives a new scope and leaves the scope it was entered from as it was; the nodes of a pattern name their inputs
- * one level deeper; a pattern without a current solution of its own keeps the enclosing one; SQL referring to the
- * inputs of the enclosing nodes is told from SQL referring to an input of the scope itself; and the current solution of
- * the left side of a lateral join is kept by the alias of the join, apart from the current solutions of the patterns.
+ * one level deeper; a pattern without a current solution of its own keeps the enclosing one; SQL code whose columns are
+ * addressed through the inputs of the enclosing nodes is told from code addressing an input of the scope itself, and
+ * from code that only gives or spells such an alias; code addressing the left side of a lateral join refers to a
+ * current solution too; and the current solution of the left side of a lateral join is kept by the alias of the join,
+ * apart from the current solutions of the patterns.
  */
 public class ScopeTest
 {
@@ -93,30 +98,79 @@ public class ScopeTest
     }
 
 
+    /**
+     * An integer column of the given name addressed through the table.
+     *
+     * @param name the name of the column
+     * @param table the table
+     * @return the column addressed through the table
+     */
+    private static Column column(String name, Table table)
+    {
+        return new TableColumn(name, INT4).fromTable(table);
+    }
+
+
     @Test
     void enclosingInputsAreFoundByDepth()
     {
-        Scope nested = Scope.TOP.enterPattern(outer).enterPattern(inner);
+        Scope pattern = Scope.TOP.enterPattern(outer);
+        Scope nested = pattern.enterPattern(inner);
 
-        assertEquals(Set.of(0), nested.getEnclosingInputs("\"outer0\".\"x\" = \"outer2\".\"z\""));
-        assertEquals(Set.of(0, 1), nested.getEnclosingInputs("\"left0\".\"x\" = \"right1\".\"y\""));
-        assertTrue(nested.refersToEnclosingInput("\"outer1\".\"y\""));
-        assertFalse(nested.refersToEnclosingInput("\"outer2\".\"z\""));
-        assertFalse(nested.refersToEnclosingInput("(SELECT 1) AS \"outer1\""));
-        assertFalse(Scope.TOP.refersToEnclosingInput("\"outer0\".\"x\""));
+        Column top = column("x", Scope.TOP.getInputTable());
+        Column left = column("x", Scope.TOP.getLeftInputTable());
+        Column right = column("y", pattern.getRightInputTable());
+        Column middle = column("y", pattern.getInputTable());
+        Column own = column("z", nested.getInputTable());
+
+        assertEquals("\"outer0\".\"x\" = \"outer2\".\"z\"", SqlCode.of(top, " = ", own).getText());
+        assertEquals(Set.of(0), nested.getEnclosingInputs(SqlCode.of(top, " = ", own)));
+        assertEquals("\"left0\".\"x\" = \"right1\".\"y\"", SqlCode.of(left, " = ", right).getText());
+        assertEquals(Set.of(0, 1), nested.getEnclosingInputs(SqlCode.of(left, " = ", right)));
+        assertTrue(nested.refersToEnclosingInput(middle.getCode()));
+        assertFalse(nested.refersToEnclosingInput(own.getCode()));
+        assertFalse(Scope.TOP.refersToEnclosingInput(top.getCode()));
+
+        // code that gives the alias, or spells it in a constant, addresses no column through it
+        assertFalse(nested.refersToEnclosingInput(SqlCode.of("(SELECT 1) AS ", pattern.getInputTable())));
+        assertFalse(nested.refersToEnclosingInput(new SqlCode("'\"outer1\".\"y\"'::varchar")));
+    }
+
+
+    @Test
+    void codeAddressingLateralSideRefersToCurrentSolution()
+    {
+        Scope pattern = Scope.TOP.enterPattern(outer);
+        LateralTable table = new LateralTable(0);
+
+        Column side = column("x", table);
+        Column enclosing = column("x", Scope.TOP.getInputTable());
+        Column own = column("y", pattern.getInputTable());
+
+        assertEquals("\"lateral0\".\"x\"", side.toString());
+        assertTrue(Scope.TOP.refersToCurrentSolution(side.getCode()));
+        assertTrue(pattern.refersToCurrentSolution(SqlCode.of(own, " = ", side)));
+        assertFalse(pattern.refersToEnclosingInput(SqlCode.of(own, " = ", side)));
+        assertTrue(pattern.refersToCurrentSolution(enclosing.getCode()));
+        assertFalse(pattern.refersToCurrentSolution(own.getCode()));
+        assertFalse(Scope.TOP.refersToCurrentSolution(enclosing.getCode()));
+
+        // neither code that gives the alias nor a column whose name spells it addresses the left side
+        assertFalse(Scope.TOP.refersToCurrentSolution(SqlCode.of("(SELECT 1) AS ", table)));
+        assertFalse(Scope.TOP.refersToCurrentSolution(new TableColumn("lateral0", INT4).getCode()));
     }
 
 
     @Test
     void lateralSolutionIsKeptByAlias()
     {
-        AliasTable table = new AliasTable("lateral0");
+        LateralTable table = new LateralTable(0);
         Scope right = Scope.TOP.enterLateral(table, outer);
         Scope narrowed = right.enterLateral(table, inner);
 
         assertSame(outer, right.getLateralSolution(table));
         assertSame(inner, narrowed.getLateralSolution(table));
-        assertNull(right.getLateralSolution(new AliasTable("lateral1")));
+        assertNull(right.getLateralSolution(new LateralTable(1)));
         assertNull(Scope.TOP.getLateralSolution(table));
 
         // the solution of the left side is no solution the code of the right side extends

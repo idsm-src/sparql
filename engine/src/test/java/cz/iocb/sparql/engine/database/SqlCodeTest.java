@@ -15,10 +15,12 @@ import org.junit.jupiter.api.Test;
 
 /**
  * SQL code, its builder and the columns made of it (see {@link SqlCode}, {@link SqlBuilder} and
- * {@link ExpressionColumn}): code keeps the declared tables its text reads; a builder takes them over from the code and
- * from the expression columns appended to it and records a declared table written by its name, whereas plain text, the
- * other tables and the other columns record nothing; code made of pieces by concatenation, by a format or by joining
- * reads what the pieces read; code is compared and ordered by its text; and the string form of code is no SQL.
+ * {@link ExpressionColumn}): code keeps the declared tables its text reads and the outer tables its columns are
+ * addressed through; a builder takes them over from the code and from the expression columns appended to it and records
+ * a declared table written by its name, whereas plain text, the other tables and the other columns record nothing, and
+ * neither does an outer table written by its name alone; code made of pieces by concatenation, by a format or by
+ * joining has the tables of the pieces; code is compared and ordered by its text; and the string form of code is no
+ * SQL.
  */
 public class SqlCodeTest
 {
@@ -39,6 +41,16 @@ public class SqlCodeTest
     private static final Column exists = new ExpressionColumn(SqlCode.of("EXISTS (SELECT 1 FROM ", common, ")"), BOOL,
             false);
 
+    /**
+     * The alias of the input of a node holding expressions.
+     */
+    private static final InputTable input = new InputTable("outer", 1);
+
+    /**
+     * The alias of the left side of a lateral join.
+     */
+    private static final LateralTable lateral = new LateralTable(2);
+
 
     @Test
     void plainTextAndOtherPiecesRecordNothing()
@@ -54,6 +66,7 @@ public class SqlCodeTest
         assertFalse(builder.isEmpty());
         assertEquals("SELECT 1, \"id\", 'x'::varchar FROM \"schema\".\"table\" AS \"tab\"", builder.toCode().getText());
         assertTrue(builder.toCode().getDeclaredTables().isEmpty());
+        assertTrue(builder.toCode().getOuterTables().isEmpty());
     }
 
 
@@ -133,6 +146,70 @@ public class SqlCodeTest
 
 
     @Test
+    void columnAddressedThroughOuterTableRefersToIt()
+    {
+        Column column = new TableColumn("id", INT4);
+
+        assertEquals("\"outer1\".\"id\"", column.fromTable(input).toString());
+        assertEquals(Set.of(input), column.fromTable(input).getCode().getOuterTables());
+        assertEquals("\"lateral2\".\"id\"", column.fromTable(lateral).toString());
+        assertEquals(Set.of(lateral), column.fromTable(lateral).getCode().getOuterTables());
+
+        assertTrue(column.fromTable(virtual).getCode().getOuterTables().isEmpty());
+        assertTrue(column.fromTable(new AliasTable("tab")).getCode().getOuterTables().isEmpty());
+        assertTrue(column.fromTable(input).getCode().getDeclaredTables().isEmpty());
+
+        // a constant is the same wherever it is read, so it is addressed through nothing
+        Column constant = new ValueColumn("x", SqlType.VARCHAR);
+
+        assertEquals(constant, constant.fromTable(input));
+        assertTrue(constant.fromTable(input).getCode().getOuterTables().isEmpty());
+    }
+
+
+    @Test
+    void outerTableWrittenAloneGivesTheAlias()
+    {
+        SqlCode given = new SqlBuilder().append("(SELECT 1) AS ").append(input).append(", ").append(lateral).toCode();
+
+        assertEquals("(SELECT 1) AS \"outer1\", \"lateral2\"", given.getText());
+        assertTrue(given.getOuterTables().isEmpty());
+
+        // an alias of another kind with the same name is another table
+        assertNotEquals(input, new AliasTable("outer1"));
+        assertNotEquals(lateral, new AliasTable("lateral2"));
+        assertEquals(input, new InputTable("outer", 1));
+        assertEquals(lateral, new LateralTable(2));
+        assertEquals(1, input.getDepth());
+    }
+
+
+    @Test
+    void codeMadeOfPiecesRefersToWhatTheyReferTo()
+    {
+        Column first = new TableColumn("x", INT4).fromTable(input);
+        Column second = new TableColumn("y", INT4).fromTable(lateral);
+
+        SqlCode condition = SqlCode.of("(", first, " = ", second, ")");
+
+        assertEquals("(\"outer1\".\"x\" = \"lateral2\".\"y\")", condition.getText());
+        assertEquals(Set.of(input, lateral), condition.getOuterTables());
+
+        Column expression = new ExpressionColumn(SqlCode.format("COALESCE(%s, %s)", first, exists), INT4);
+
+        assertEquals(Set.of(input), expression.getCode().getOuterTables());
+        assertEquals(Set.of(common), expression.getCode().getDeclaredTables());
+
+        SqlCode query = new SqlBuilder().append("SELECT ").append(expression).append(" FROM (SELECT 1) AS ")
+                .append(lateral).append(" WHERE ").append(Stream.of(condition).collect(SqlCode.joining(" AND ")))
+                .toCode();
+
+        assertEquals(Set.of(input, lateral), query.getOuterTables());
+        assertEquals(Set.of(common), query.getDeclaredTables());
+    }
+
+
+    @Test
     void commonTableIsNamedByItsNumberAndKeepsItsQuery()
     {
         assertEquals("cte3", common.getName());
@@ -149,6 +226,7 @@ public class SqlCodeTest
         assertEquals(SqlCode.TRUE.hashCode(), "true".hashCode());
         assertNotEquals(SqlCode.TRUE, SqlCode.FALSE);
         assertNotEquals(new SqlCode("\"cte3\""), SqlCode.of(common));
+        assertNotEquals(new SqlCode("\"outer1\".\"id\""), new TableColumn("id", INT4).fromTable(input).getCode());
         assertTrue(new SqlCode("").isEmpty());
         assertFalse(SqlCode.FALSE.isEmpty());
 

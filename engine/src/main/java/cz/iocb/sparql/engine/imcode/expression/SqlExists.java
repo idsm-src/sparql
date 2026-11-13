@@ -16,8 +16,10 @@ import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.InputTable;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
+import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlEmptySolution;
@@ -287,7 +289,7 @@ public final class SqlExists extends SqlExpressionIntercode
     public static VariableBindings getCurrentSolution(Request request, Scope scope, VariableBindings bindings,
             Set<Variable> variables, boolean chained)
     {
-        AliasTable table = scope.getInputTable();
+        InputTable table = scope.getInputTable();
 
         VariableBindings own = new VariableBindings();
 
@@ -512,7 +514,7 @@ public final class SqlExists extends SqlExpressionIntercode
     private static Map<Variable, SqlExpressionIntercode> getValues(Scope scope, SqlIntercode pattern,
             VariableBindings solution, SqlCode sql)
     {
-        Set<Integer> read = scope.getEnclosingInputs(sql.getText());
+        Set<Integer> read = scope.getEnclosingInputs(sql);
 
         Map<Variable, SqlExpressionIntercode> values = new LinkedHashMap<>();
 
@@ -521,10 +523,9 @@ public final class SqlExists extends SqlExpressionIntercode
             if(binding.canBeNull() || pattern.getVariable(binding.getVariable()) == null)
                 continue;
 
-            String columns = binding.getMappings().values().stream().filter(Objects::nonNull).flatMap(List::stream)
-                    .map(Object::toString).collect(joining(" "));
-
-            if(read.containsAll(scope.getEnclosingInputs(columns)))
+            // the value is read from the inputs its columns are addressed through
+            if(binding.getMappings().values().stream().filter(Objects::nonNull).flatMap(List::stream)
+                    .allMatch(c -> read.containsAll(scope.getEnclosingInputs(c.getCode()))))
                 values.put(binding.getVariable(), SqlOuterVariable.create(binding.getVariable(), solution));
         }
 
@@ -543,8 +544,7 @@ public final class SqlExists extends SqlExpressionIntercode
      */
     private static SqlFilter getTopFilter(Request request, Scope scope, SqlIntercode pattern)
     {
-        if(pattern instanceof SqlFilter filter
-                && scope.refersToEnclosingInput(filter.translateConditions(request).getText()))
+        if(pattern instanceof SqlFilter filter && scope.refersToEnclosingInput(filter.translateConditions(request)))
             return filter;
 
         return null;
@@ -585,7 +585,7 @@ public final class SqlExists extends SqlExpressionIntercode
         // refer to the current solution because of the filter
         SqlFilter filter = getTopFilter(request, scope, pattern);
         SqlIntercode source = filter != null ? filter.getChild() : pattern;
-        AliasTable table = filter != null ? scope.getInputTable() : patternTable;
+        Table table = filter != null ? scope.getInputTable() : patternTable;
 
         builder.append("EXISTS (SELECT 1 FROM (");
         builder.append(sql != null ? sql : source.translate(request, scope));

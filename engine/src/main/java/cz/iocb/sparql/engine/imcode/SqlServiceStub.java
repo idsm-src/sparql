@@ -38,8 +38,8 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import cz.iocb.sparql.engine.config.ServiceSettings;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
-import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.LateralTable;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.error.MessageType;
@@ -176,18 +176,19 @@ public final class SqlServiceStub extends SqlIntercode
      * @param binding binding of the variable as the left side exposes it to the right side: the columns the right side
      *            reads through the alias
      */
-    public static record Enclosure(SqlIntercode solutions, AliasTable table, VariableBinding binding)
+    public static record Enclosure(SqlIntercode solutions, LateralTable table, VariableBinding binding)
     {
         /**
-         * True if the code refers to the current solution of the left side: it mentions the alias, which is unique
-         * within the request (see {@link Request#createLateralTable}) and defined only by the enclosing join.
+         * True if the code refers to the current solution of the left side: a column of the code is addressed through
+         * the alias (see {@link SqlCode#getOuterTables}), which is unique within the request (see
+         * {@link Request#createLateralTable}) and given only by the enclosing join.
          *
          * @param code SQL code of the context
          * @return true if the code refers to the current solution of the left side, false otherwise
          */
-        boolean isReferredBy(String code)
+        boolean isReferredBy(SqlCode code)
         {
-            return code.contains(table + ".");
+            return code.getOuterTables().contains(table);
         }
 
 
@@ -943,7 +944,7 @@ public final class SqlServiceStub extends SqlIntercode
 
             SqlIntercode evaluated = local;
             SqlSelect query = SqlSelect.createTopLevel(request, vars, evaluated, null, limit);
-            String code = query.translateStatement(request, scope);
+            SqlCode code = query.translate(request, scope);
 
             for(Enclosure enclosure : enclosures)
             {
@@ -958,11 +959,13 @@ public final class SqlServiceStub extends SqlIntercode
             if(!referred.isEmpty())
             {
                 query = SqlSelect.createTopLevel(request, vars, evaluated, null, limit).optimize(request, scope, true);
-                code = query.translateStatement(request, scope);
+                code = query.translate(request, scope);
             }
 
+            String statement = SqlSelect.translateStatement(request, code);
+
             try(Result result = new Result(ResultType.SELECT, query.getResultDescription(),
-                    request.getStatement().executeQuery(code), request.getBegin(), request.getTimeout()))
+                    request.getStatement().executeQuery(statement), request.getBegin(), request.getTimeout()))
             {
                 varIndexes = result.getVariableIndexes();
 

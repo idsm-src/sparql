@@ -65,13 +65,14 @@ public final class SqlShared extends SqlIntercode
 
 
     /**
-     * True if the node can be shared: it is deterministic, holds no SERVICE call not evaluated yet, refers neither to
-     * the current solution of an EXISTS (see {@link Scope#refersToEnclosingInput}) nor to a lateral join (its SQL would
-     * read an alias a common table expression cannot see), and it does not lie in a pattern of an expression (see
-     * {@link Scope#isWithinExpression}): seeding a walk inside an EXISTS from shared solutions would evaluate them in
-     * full before the first solution of the pattern, which the database would otherwise stop at. The named graphs the
-     * translation pairs zero-length paths from constants with are shared as code of the statement (see
-     * {@link #shareOptimized}), so EXISTS patterns read them from the common table expression too.
+     * True if the node can be shared: it is deterministic, holds no SERVICE call not evaluated yet, refers to no
+     * current solution (see {@link Scope#refersToCurrentSolution}), neither to that of an EXISTS nor to that of the
+     * left side of a lateral join (its SQL would read an alias a common table expression cannot see), and it does not
+     * lie in a pattern of an expression (see {@link Scope#isWithinExpression}): seeding a walk inside an EXISTS from
+     * shared solutions would evaluate them in full before the first solution of the pattern, which the database would
+     * otherwise stop at. The named graphs the translation pairs zero-length paths from constants with are shared as
+     * code of the statement (see {@link #shareOptimized}), so EXISTS patterns read them from the common table
+     * expression too.
      *
      * @param request the current request
      * @param scope the scope of the node
@@ -87,9 +88,7 @@ public final class SqlShared extends SqlIntercode
                 || node.equals(SqlNoSolution.get()))
             return false;
 
-        String sql = node.translate(request, scope).getText();
-
-        return !sql.contains("\"lateral") && !scope.refersToEnclosingInput(sql);
+        return !scope.refersToCurrentSolution(node.translate(request, scope));
     }
 
 

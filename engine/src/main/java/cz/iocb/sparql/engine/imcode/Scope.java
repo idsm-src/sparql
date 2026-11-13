@@ -6,7 +6,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import cz.iocb.sparql.engine.database.AliasTable;
+import cz.iocb.sparql.engine.database.InputTable;
+import cz.iocb.sparql.engine.database.LateralTable;
+import cz.iocb.sparql.engine.database.OuterTable;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExists;
 import cz.iocb.sparql.engine.imcode.expression.SqlLateralVariable;
 import cz.iocb.sparql.engine.imcode.expression.SqlOuterVariable;
@@ -61,7 +64,7 @@ public final class Scope
      * Bindings of the current solutions of the left sides of the lateral joins in whose right sides the code lies, by
      * the aliases of the joins (see {@link #enterLateral}).
      */
-    private final Map<AliasTable, VariableBindings> lateralSolutions;
+    private final Map<LateralTable, VariableBindings> lateralSolutions;
 
 
     /**
@@ -71,7 +74,7 @@ public final class Scope
      * @param lateralSolutions bindings of the current solutions of the left sides of the lateral joins, by their
      *            aliases
      */
-    private Scope(List<VariableBindings> currentSolutions, Map<AliasTable, VariableBindings> lateralSolutions)
+    private Scope(List<VariableBindings> currentSolutions, Map<LateralTable, VariableBindings> lateralSolutions)
     {
         this.currentSolutions = currentSolutions;
         this.lateralSolutions = lateralSolutions;
@@ -113,9 +116,9 @@ public final class Scope
      * @param solution bindings of the current solution of the left side, its columns addressed through the alias
      * @return the scope of the right side of the join
      */
-    public Scope enterLateral(AliasTable table, VariableBindings solution)
+    public Scope enterLateral(LateralTable table, VariableBindings solution)
     {
-        Map<AliasTable, VariableBindings> solutions = new HashMap<>(lateralSolutions);
+        Map<LateralTable, VariableBindings> solutions = new HashMap<>(lateralSolutions);
         solutions.put(table, solution);
 
         return new Scope(currentSolutions, solutions);
@@ -146,7 +149,7 @@ public final class Scope
      * @param table alias through which the right side of the join refers to its left side
      * @return bindings of the current solution of the left side of the join, or null
      */
-    public VariableBindings getLateralSolution(AliasTable table)
+    public VariableBindings getLateralSolution(LateralTable table)
     {
         return lateralSolutions.get(table);
     }
@@ -167,61 +170,57 @@ public final class Scope
 
 
     /**
-     * True if the SQL refers to the input of a node holding an expression in whose pattern the code lies (see
-     * {@link #getInputTable}), so to a value of a current solution: such SQL has a meaning only at its place inside the
-     * pattern, it can neither be moved into a common table expression nor explained on its own. The aliases are found
-     * in the text, so one spelled in a string constant counts as well, which only keeps the SQL at its place.
+     * True if the SQL code refers to the input of a node holding an expression in whose pattern the code lies (see
+     * {@link #getInputTable}), so to a value of a current solution: such code has a meaning only at its place inside
+     * the pattern. The code keeps the aliases its columns are addressed through (see {@link SqlCode#getOuterTables});
+     * those of the nodes the code lies in are the ones given at a lesser depth than the depth of this scope, because
+     * the nodes of the code itself give theirs at this depth or deeper.
      *
-     * @param sql the SQL
-     * @return true if the SQL refers to the input of a node holding an expression in whose pattern the code lies, false
-     *         otherwise
+     * @param code the SQL code
+     * @return true if the SQL code refers to the input of a node holding an expression in whose pattern the code lies,
+     *         false otherwise
      */
-    public boolean refersToEnclosingInput(String sql)
+    public boolean refersToEnclosingInput(SqlCode code)
     {
-        for(int depth = 0; depth < currentSolutions.size(); depth++)
-            if(refersToInput(sql, depth))
-                return true;
-
-        return false;
+        return !getEnclosingInputs(code).isEmpty();
     }
 
 
     /**
-     * The inputs the SQL refers to among the inputs of the nodes holding the expressions in whose patterns the code
-     * lies (see {@link #refersToEnclosingInput}), each given by the number of the patterns its node lies in. SQL
+     * The inputs the SQL code refers to among the inputs of the nodes holding the expressions in whose patterns the
+     * code lies (see {@link #refersToEnclosingInput}), each given by the number of the patterns its node lies in. Code
      * referring to such an input is evaluated for every row of the input anew, wherever in the patterns below the node
      * it stands.
      *
-     * @param sql the SQL
-     * @return depths of the inputs the SQL refers to
+     * @param code the SQL code
+     * @return depths of the inputs the SQL code refers to
      */
-    public Set<Integer> getEnclosingInputs(String sql)
+    public Set<Integer> getEnclosingInputs(SqlCode code)
     {
         Set<Integer> depths = new HashSet<>();
 
-        for(int depth = 0; depth < currentSolutions.size(); depth++)
-            if(refersToInput(sql, depth))
-                depths.add(depth);
+        for(OuterTable table : code.getOuterTables())
+            if(table instanceof InputTable input && input.getDepth() < currentSolutions.size())
+                depths.add(input.getDepth());
 
         return depths;
     }
 
 
     /**
-     * True if the SQL refers to the input of a node holding expressions that lies in the given number of patterns of
-     * expressions (see {@link #getInputTable}).
+     * True if the SQL code refers to a current solution: to the input of a node holding an expression in whose pattern
+     * the code lies (see {@link #refersToEnclosingInput}), or to the left side of a lateral join (see
+     * {@link SqlLateralJoin}). Such code can neither be moved into a common table expression nor explained on its own.
+     * The alias of a lateral join does not tell whether the code lies in the right side of the join or holds the whole
+     * join, so code holding a lateral join whose columns are addressed through the alias counts as well, and stays at
+     * its place too.
      *
-     * @param sql the SQL
-     * @param depth the number of the patterns the node lies in
-     * @return true if the SQL refers to the input of such a node, false otherwise
+     * @param code the SQL code
+     * @return true if the SQL code refers to a current solution, false otherwise
      */
-    private static boolean refersToInput(String sql, int depth)
+    public boolean refersToCurrentSolution(SqlCode code)
     {
-        for(String name : List.of(inputTableName, leftInputTableName, rightInputTableName))
-            if(sql.contains("\"" + name + depth + "\"."))
-                return true;
-
-        return false;
+        return refersToEnclosingInput(code) || code.getOuterTables().stream().anyMatch(t -> t instanceof LateralTable);
     }
 
 
@@ -234,9 +233,9 @@ public final class Scope
      *
      * @return alias of the input of a node of this scope holding expressions
      */
-    public AliasTable getInputTable()
+    public InputTable getInputTable()
     {
-        return new AliasTable(inputTableName + currentSolutions.size());
+        return new InputTable(inputTableName, currentSolutions.size());
     }
 
 
@@ -246,9 +245,9 @@ public final class Scope
      *
      * @return alias of the left side of a left join of this scope
      */
-    public AliasTable getLeftInputTable()
+    public InputTable getLeftInputTable()
     {
-        return new AliasTable(leftInputTableName + currentSolutions.size());
+        return new InputTable(leftInputTableName, currentSolutions.size());
     }
 
 
@@ -257,8 +256,8 @@ public final class Scope
      *
      * @return alias of the right side of a left join of this scope
      */
-    public AliasTable getRightInputTable()
+    public InputTable getRightInputTable()
     {
-        return new AliasTable(rightInputTableName + currentSolutions.size());
+        return new InputTable(rightInputTableName, currentSolutions.size());
     }
 }

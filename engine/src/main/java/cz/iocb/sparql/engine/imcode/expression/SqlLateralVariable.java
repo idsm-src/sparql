@@ -3,8 +3,8 @@ package cz.iocb.sparql.engine.imcode.expression;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.LateralTable;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.imcode.SqlLateralJoin;
@@ -32,7 +32,7 @@ public final class SqlLateralVariable extends SqlExpressionIntercode
     /**
      * Alias through which the right side of the join refers to its left side.
      */
-    private final AliasTable table;
+    private final LateralTable table;
 
     /**
      * The variable of the left side.
@@ -48,7 +48,7 @@ public final class SqlLateralVariable extends SqlExpressionIntercode
      * @param mappings columns per resource class
      * @param canBeNull whether the value may be null
      */
-    private SqlLateralVariable(AliasTable table, Variable variable, Map<ResourceClass, List<Column>> mappings,
+    private SqlLateralVariable(LateralTable table, Variable variable, Map<ResourceClass, List<Column>> mappings,
             boolean canBeNull)
     {
         super(mappings, canBeNull, true);
@@ -66,7 +66,7 @@ public final class SqlLateralVariable extends SqlExpressionIntercode
      * @param binding the binding of the variable as seen by the right side
      * @return reference to the variable of the binding
      */
-    public static SqlExpressionIntercode create(AliasTable table, VariableBinding binding)
+    public static SqlExpressionIntercode create(LateralTable table, VariableBinding binding)
     {
         return new SqlLateralVariable(table, binding.getVariable(), binding.getMappings(), binding.canBeNull());
     }

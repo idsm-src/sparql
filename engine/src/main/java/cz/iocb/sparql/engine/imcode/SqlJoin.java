@@ -1270,7 +1270,8 @@ public final class SqlJoin extends SqlIntercode
     /**
      * True if the database estimates fewer distinct values of the end variable in the seeds of the end than of the
      * begin variable in the seeds of the begin (see {@link Estimator}); false on a tie, when an estimate fails, or when
-     * seeds refer to the current solution of an EXISTS or to a lateral join, which cannot be explained on their own.
+     * seeds refer to a current solution (see {@link Scope#refersToCurrentSolution}), that of an EXISTS or of the left
+     * side of a lateral join, because such seeds cannot be explained on their own.
      *
      * @param request the current request
      * @param scope the scope of the join
@@ -1288,12 +1289,8 @@ public final class SqlJoin extends SqlIntercode
         SqlIntercode beginJoin = join(request, beginSeeds.stream().map(childs::get).toList());
 
         for(SqlIntercode join : List.of(endJoin, beginJoin))
-        {
-            String sql = join.translate(request, scope).getText();
-
-            if(sql.contains("\"lateral") || scope.refersToEnclosingInput(sql))
+            if(scope.refersToCurrentSolution(join.translate(request, scope)))
                 return false;
-        }
 
         Estimator estimator = new Estimator(request);
 

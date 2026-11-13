@@ -13,6 +13,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.database.LateralTable;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
@@ -86,7 +87,7 @@ public final class SqlLateralJoin extends SqlIntercode
     /**
      * Alias through which the right side refers to the left side.
      */
-    private final AliasTable table;
+    private final LateralTable table;
 
     /**
      * Left-side bindings the right side may refer to: those the right side has been optimised for when the right side
@@ -123,7 +124,7 @@ public final class SqlLateralJoin extends SqlIntercode
      * @param live whether the right side reads the exposed bindings as the left side provides them at the moment
      * @param columnMap the column map
      */
-    protected SqlLateralJoin(VariableBindings bindings, SqlIntercode left, SqlIntercode right, AliasTable table,
+    protected SqlLateralJoin(VariableBindings bindings, SqlIntercode left, SqlIntercode right, LateralTable table,
             VariableBindings lateral, boolean live, Map<Column, Column> columnMap)
     {
         super(bindings, left.isDeterministic() && right.isDeterministic());
@@ -161,7 +162,7 @@ public final class SqlLateralJoin extends SqlIntercode
      * @param table alias through which the right side refers to the left side
      * @return lateral join through the given alias; the right side may refer to all variables of the left side
      */
-    public static SqlIntercode lateralJoin(Request request, SqlIntercode left, SqlIntercode right, AliasTable table)
+    public static SqlIntercode lateralJoin(Request request, SqlIntercode left, SqlIntercode right, LateralTable table)
     {
         //NOTE: the right side may refer to all variables of the left side, so the left side cannot drop any of them
         return lateralJoin(request, left, right, table, null, false);
@@ -182,7 +183,7 @@ public final class SqlLateralJoin extends SqlIntercode
      * @return lateral join through the given alias; the right side may refer to the left-side bindings returned by
      *         {@link #getLateralVariableBindings} for the same alias and requirements
      */
-    public static SqlIntercode lateralJoin(Request request, SqlIntercode left, SqlIntercode right, AliasTable table,
+    public static SqlIntercode lateralJoin(Request request, SqlIntercode left, SqlIntercode right, LateralTable table,
             Restrictions requirements, boolean live)
     {
         //NOTE: the right side may refer to the bindings returned by getLateralVariableBindings() for these arguments
@@ -205,8 +206,8 @@ public final class SqlLateralJoin extends SqlIntercode
      * @return lateral join exposing only what the parent needs; degrades to an ordinary join when the right side is
      *         deterministic and refers to nothing
      */
-    protected static SqlIntercode lateralJoin(Request request, SqlIntercode left, SqlIntercode right, AliasTable table,
-            VariableBindings lateral, boolean live, Restrictions restrictions)
+    protected static SqlIntercode lateralJoin(Request request, SqlIntercode left, SqlIntercode right,
+            LateralTable table, VariableBindings lateral, boolean live, Restrictions restrictions)
     {
         /* NOTE: If the right side does not refer to the left side, all optimizations of the ordinary join apply. This
          * does not hold for a nondeterministic right side, which the ordinary join evaluates only once, whereas the
@@ -235,7 +236,7 @@ public final class SqlLateralJoin extends SqlIntercode
      * @return bindings of the left side as seen by the right side: its columns addressed through the lateral alias,
      *         restricted to the requirements
      */
-    public static VariableBindings getLateralVariableBindings(ClassRelations relations, AliasTable table,
+    public static VariableBindings getLateralVariableBindings(ClassRelations relations, LateralTable table,
             SqlIntercode left, Restrictions requirements)
     {
         //NOTE: the returned bindings refer to the current solution of the left side through the given alias
@@ -618,7 +619,7 @@ public final class SqlLateralJoin extends SqlIntercode
      *
      * @return alias through which the right side refers to the left side
      */
-    public final AliasTable getLateralTable()
+    public final LateralTable getLateralTable()
     {
         return table;
     }

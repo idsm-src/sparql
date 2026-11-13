@@ -11,15 +11,17 @@ import java.util.stream.Collector;
 
 
 /**
- * SQL code, together with the declared tables it reads (see {@link DeclaredTable}): a query, a condition, the
- * expression of a column (see {@link ExpressionColumn}) or any other part of a statement. The code is no statement yet:
- * it becomes a part of larger code, which then reads the tables as well, until a statement is made of it, whose
- * {@code WITH} clause declares the tables. What the code reads is recorded where the name of the table is written and
- * passed on wherever code is made of pieces (see {@link SqlBuilder}, {@link #of}, {@link #format} and
- * {@link #joining(String)}), so it never has to be found in the text again. Plain strings are pieces of SQL text that
- * read no declared table, like keywords, operators and the names of functions. The text itself is given only by
- * {@link #getText}; the string form of the object serves debugging and is no SQL, so that code joined to a string by
- * mistake, which would lose the tables, does not pass for SQL.
+ * SQL code, together with the tables it depends on from outside: the declared tables it reads (see
+ * {@link DeclaredTable}), which the statement the code becomes a part of declares in its {@code WITH} clause, and the
+ * outer tables it refers to (see {@link OuterTable}), the aliases through which nested code addresses the columns of
+ * the solutions of enclosing code. The code is a query, a condition, the expression of a column (see
+ * {@link ExpressionColumn}) or any other part of a statement; it becomes a part of larger code, which then depends on
+ * the tables as well. A dependence is recorded where it arises, a declared table where its name is written and an outer
+ * table where a column is addressed through it, and it is passed on wherever code is made of pieces (see
+ * {@link SqlBuilder}, {@link #of}, {@link #format} and {@link #joining(String)}), so it never has to be found in the
+ * text again. Plain strings are pieces of SQL text without such a dependence, like keywords, operators and the names of
+ * functions. The text itself is given only by {@link #getText}; the string form of the object serves debugging and is
+ * no SQL, so that code joined to a string by mistake, which would lose the tables, does not pass for SQL.
  */
 public final class SqlCode implements Comparable<SqlCode>
 {
@@ -41,31 +43,38 @@ public final class SqlCode implements Comparable<SqlCode>
     /**
      * The declared tables the text reads.
      */
-    private final Set<DeclaredTable> tables;
+    private final Set<DeclaredTable> declaredTables;
+
+    /**
+     * The outer tables the text refers to.
+     */
+    private final Set<OuterTable> outerTables;
 
 
     /**
-     * Creates code that reads no declared table.
+     * Creates code that reads no declared table and refers to no outer table.
      *
      * @param text the SQL text
      */
     public SqlCode(String text)
     {
-        this(text, Set.of());
+        this(text, Set.of(), Set.of());
     }
 
 
     /**
-     * Creates code reading the given declared tables; only a builder makes such code, as it records the tables where
-     * their names are written (see {@link SqlBuilder}).
+     * Creates code with the given tables; only a builder makes such code, as it records the tables where the code comes
+     * to depend on them (see {@link SqlBuilder}).
      *
      * @param text the SQL text
-     * @param tables the declared tables the text reads
+     * @param declaredTables the declared tables the text reads
+     * @param outerTables the outer tables the text refers to
      */
-    SqlCode(String text, Set<DeclaredTable> tables)
+    SqlCode(String text, Set<DeclaredTable> declaredTables, Set<OuterTable> outerTables)
     {
         this.text = Objects.requireNonNull(text);
-        this.tables = Set.copyOf(tables);
+        this.declaredTables = Set.copyOf(declaredTables);
+        this.outerTables = Set.copyOf(outerTables);
     }
 
 
@@ -88,8 +97,7 @@ public final class SqlCode implements Comparable<SqlCode>
 
     /**
      * Code made of the format string, as {@link String#format} makes a string of it (in the root locale), with pieces
-     * of SQL as the arguments: the code reads the declared tables the pieces read (see
-     * {@link SqlBuilder#append(Object)}).
+     * of SQL as the arguments: the code has the tables of the pieces (see {@link SqlBuilder#append(Object)}).
      *
      * @param format the format string
      * @param arguments the arguments, pieces of SQL
@@ -189,7 +197,20 @@ public final class SqlCode implements Comparable<SqlCode>
      */
     public Set<DeclaredTable> getDeclaredTables()
     {
-        return tables;
+        return declaredTables;
+    }
+
+
+    /**
+     * The outer tables the text refers to: the aliases through which its columns are addressed, whether enclosing code
+     * gives them or the code itself. Code referring to an outer table that it does not give itself has a meaning only
+     * inside the query that gives the alias.
+     *
+     * @return the outer tables the text refers to
+     */
+    public Set<OuterTable> getOuterTables()
+    {
+        return outerTables;
     }
 
 
@@ -222,13 +243,14 @@ public final class SqlCode implements Comparable<SqlCode>
         if(!(object instanceof SqlCode other))
             return false;
 
-        return text.equals(other.text) && tables.equals(other.tables);
+        return text.equals(other.text) && declaredTables.equals(other.declaredTables)
+                && outerTables.equals(other.outerTables);
     }
 
 
     @Override
     public String toString()
     {
-        return "SqlCode[text=" + text + ", tables=" + tables + "]";
+        return "SqlCode[text=" + text + ", declaredTables=" + declaredTables + ", outerTables=" + outerTables + "]";
     }
 }

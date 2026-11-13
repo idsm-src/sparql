@@ -662,22 +662,20 @@ public final class SqlSelect extends SqlIntercode
      */
     public String translate(Request request)
     {
-        return translateStatement(request, Scope.TOP);
+        return translateStatement(request, translate(request, Scope.TOP));
     }
 
 
     /**
-     * SQL of the statement of the select: the code of the select preceded by the {@code WITH} clause that declares the
-     * tables the code reads (see {@link #translateWithClause}).
+     * SQL of the statement made of the code of a top-level select: the code preceded by the {@code WITH} clause that
+     * declares the tables the code reads (see {@link #translateWithClause}).
      *
      * @param request the current request
-     * @param scope the scope of the select
+     * @param select SQL code of the select
      * @return SQL of the statement
      */
-    public String translateStatement(Request request, Scope scope)
+    public static String translateStatement(Request request, SqlCode select)
     {
-        SqlCode select = translate(request, scope);
-
         return translateWithClause(request, select) + select.getText();
     }
 

@@ -17,10 +17,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
-import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.CommonTable;
 import cz.iocb.sparql.engine.database.DatabaseTable;
+import cz.iocb.sparql.engine.database.LateralTable;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.error.MessageCategory;
@@ -869,13 +869,13 @@ public class Request implements AutoCloseable
 
 
     /**
-     * Fresh alias for a LATERAL subquery.
+     * Fresh alias for the left side of a lateral join.
      *
-     * @return fresh alias for a LATERAL subquery
+     * @return fresh alias for the left side of a lateral join
      */
-    public AliasTable createLateralTable()
+    public LateralTable createLateralTable()
     {
-        return new AliasTable("lateral" + lateralId++);
+        return new LateralTable(lateralId++);
     }
 
 

@@ -56,7 +56,10 @@ public final class TableColumn extends Column
         if(table == null)
             return this;
 
-        return new ExpressionColumn(SqlCode.of(table, ".", this), type, canBeNull);
+        // a column addressed through a table refers to the table: this is where the references to tables arise
+        SqlBuilder builder = new SqlBuilder().appendQualifier(table).append(".").append(this);
+
+        return new ExpressionColumn(builder.toCode(), type, canBeNull);
     }
 
 
