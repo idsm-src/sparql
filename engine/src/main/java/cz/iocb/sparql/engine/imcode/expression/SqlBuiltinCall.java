@@ -143,6 +143,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
@@ -189,14 +190,15 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 public final class SqlBuiltinCall extends SqlExpressionIntercode
 {
     /**
-     * Regular expression of a well-formed language tag, the one the extension checks.
+     * Regular expression of a well-formed language tag, the one the extension checks, matched regardless of case as
+     * there.
      */
-    private static final String languageTagPattern = """
+    private static final Pattern languageTagPattern = Pattern.compile("""
             ([A-Za-z]{2,3}(-[A-Za-z]{3}){0,3}|[A-Za-z]{4,8})\
             (-[A-Za-z]{4})?(-([A-Za-z]{2}|[0-9]{3}))?(-([A-Za-z0-9]{5,8}|[0-9][A-Za-z0-9]{3}))*\
             (-[0-9A-WY-Za-wy-z](-[A-Za-z0-9]{2,8})+)*(-x(-[A-Za-z0-9]{1,8})+)?|x(-[A-Za-z0-9]{1,8})+\
             |i-ami|i-bnn|i-default|i-enochian|i-hak|i-klingon|i-lux|i-mingo|i-navajo|i-pwn\
-            |i-tao|i-tay|i-tsu|sgn-BE-FR|sgn-BE-NL|sgn-CH-DE""";
+            |i-tao|i-tay|i-tsu|sgn-BE-FR|sgn-BE-NL|sgn-CH-DE""", Pattern.CASE_INSENSITIVE);
 
     /**
      * String literals of every kind stored in a box column.
@@ -1474,7 +1476,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 {
                     String tag = literal.getLiteral().getValue();
 
-                    if(!tag.matches(languageTagPattern))
+                    if(!languageTagPattern.matcher(tag).matches())
                         return SqlNull.get();
 
                     // TODO: add a variant for case the argument is a constant
@@ -1496,7 +1498,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                 ResourceClass resultClass = unionize(Set.of(rdfLangString), box);
 
-                List<Column> result = List.of(new ExpressionColumn(SqlCode.of("sparql.rdfbox_create_from_langstring(",
+                // the tag is checked and lower-cased, as a constant tag is; a tag that is not well-formed is an error
+                List<Column> result = List.of(new ExpressionColumn(SqlCode.of("sparql.strlang_string(",
                         argument.get(relations, xsdString).get(0), ", ", lang.get(relations, xsdString).get(0), ")"),
                         RDFBOX));
 
@@ -1523,7 +1526,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     String tag = langLiteral.getLiteral().getValue();
                     Direction direction = Direction.fromText(dirLiteral.getLiteral().getValue());
 
-                    if(!tag.matches(languageTagPattern) || direction == null)
+                    if(!languageTagPattern.matcher(tag).matches() || direction == null)
                         return SqlNull.get();
 
                     // TODO: add a variant for case the argument is a constant
