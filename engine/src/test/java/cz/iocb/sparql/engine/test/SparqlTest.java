@@ -33,7 +33,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -548,8 +547,7 @@ public class SparqlTest
             {
                 QuerySolution test = tests.nextSolution();
 
-                Path queryPath = Paths.get(new URI(test.get("?QUERY").asResource().getURI()).getPath());
-                String query = new String(Files.readAllBytes(queryPath));
+                String query = getQuery(test.get("?QUERY"));
                 String name = test.get("?NAME").asLiteral().getLexicalForm();
 
                 queries.add(Arguments.of(name, query));
@@ -589,8 +587,7 @@ public class SparqlTest
             {
                 QuerySolution test = tests.nextSolution();
 
-                Path queryPath = Paths.get(new URI(test.get("?QUERY").asResource().getURI()).getPath());
-                String query = new String(Files.readAllBytes(queryPath));
+                String query = getQuery(test.get("?QUERY"));
                 String name = test.get("?NAME").asLiteral().getLexicalForm();
 
                 queries.add(Arguments.of(name, query));
@@ -629,8 +626,7 @@ public class SparqlTest
             {
                 QuerySolution test = tests.nextSolution();
 
-                Path queryPath = Paths.get(new URI(test.get("?QUERY").asResource().getURI()).getPath());
-                String query = new String(Files.readAllBytes(queryPath));
+                String query = getQuery(test.get("?QUERY"));
                 String name = test.get("?NAME").asLiteral().getLexicalForm();
 
                 queries.add(Arguments.of(name, query));
@@ -673,8 +669,7 @@ public class SparqlTest
             {
                 QuerySolution test = tests.nextSolution();
 
-                Path queryPath = Paths.get(new URI(test.get("?QUERY").asResource().getURI()).getPath());
-                String query = new String(Files.readAllBytes(queryPath));
+                String query = getQuery(test.get("?QUERY"));
                 String name = test.get("?NAME").asLiteral().getLexicalForm();
                 List<Quad> data = new ArrayList<>();
                 ExpectedResult expected = getResult(test.get("?RESULT"));
@@ -705,6 +700,19 @@ public class SparqlTest
         }
 
         return queries;
+    }
+
+
+    /**
+     * Text of the query of a test, preceded by the declaration of its base IRI: the relative IRIs of a test query are
+     * resolved against the location of the query, as Jena resolves those of the data and of the expected results
+     * against the locations of their files.
+     */
+    static String getQuery(RDFNode query) throws URISyntaxException, IOException
+    {
+        String location = query.asResource().getURI();
+
+        return "BASE <" + location + ">\n" + new String(Files.readAllBytes(Paths.get(new URI(location).getPath())));
     }
 
 
@@ -908,16 +916,16 @@ public class SparqlTest
 
 
     /**
-     * Engine term of a Jena node: file IRIs are shortened to their name, blank nodes keep their label (in the test
-     * blank node segment) when {@code keepLabels}, which the data need, or lose it, as the labels of expected results
-     * are not compared; the components of a triple term are converted recursively.
+     * Engine term of a Jena node: blank nodes keep their label (in the test blank node segment) when
+     * {@code keepLabels}, which the data need, or lose it, as the labels of expected results are not compared; the
+     * components of a triple term are converted recursively.
      */
     static RdfTerm getTerm(Node node, boolean keepLabels)
     {
         if(node == null)
             return null;
         else if(node.isURI())
-            return new Iri(node.getURI().replaceFirst("file://.*/", ""));
+            return new Iri(node.getURI());
         else if(node.isLiteral() && node.getLiteralBaseDirection() != null)
             return new DirLangStringLiteral(node.getLiteralLexicalForm(), node.getLiteralLanguage(),
                     Direction.fromText(node.getLiteralBaseDirection().direction()));

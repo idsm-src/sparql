@@ -38,6 +38,8 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsign
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedIntType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedLongType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedShortType;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -1428,6 +1430,28 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     public Iri getServiceIri()
     {
         return serviceIri;
+    }
+
+
+    /**
+     * Default base IRI of the queries of this endpoint, which the relative IRIs of a query are resolved against until
+     * the query declares a BASE of its own (the default base IRI of section 5.1.4 of RFC 3986): the IRI of this
+     * endpoint's service.
+     *
+     * @return default base IRI of the queries, or null when the endpoint has no service IRI or one that is not absolute
+     */
+    public Iri getBaseIri()
+    {
+        try
+        {
+            if(serviceIri != null && new URI(serviceIri.getValue()).isAbsolute())
+                return serviceIri;
+        }
+        catch(URISyntaxException e)
+        {
+        }
+
+        return null;
     }
 
 

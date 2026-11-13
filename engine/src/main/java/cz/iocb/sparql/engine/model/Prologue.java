@@ -23,7 +23,8 @@ public class Prologue extends BaseElement
     public static final List<String> versionLabels = List.of("1.2", "1.2-basic", "1.1");
 
     /**
-     * BASE IRI, empty when not declared.
+     * Base IRI in effect: that of the last BASE declaration, before it the base IRI the prologue was created with;
+     * empty when there is none.
      */
     private String base;
 
@@ -44,22 +45,36 @@ public class Prologue extends BaseElement
 
 
     /**
-     * Creates a prologue with an empty BASE and the given predefined prefixes (typically those of the configuration).
+     * Creates a prologue with no base IRI and the given predefined prefixes (typically those of the configuration).
      *
      * @param predefinedPrefixes prefixes configured for the endpoint
      */
     public Prologue(Map<String, String> predefinedPrefixes)
     {
-        setBase("");
+        this("", predefinedPrefixes);
+    }
+
+
+    /**
+     * Creates a prologue with the base IRI that is in effect until a BASE declaration replaces it (the default base IRI
+     * of the endpoint) and the given predefined prefixes (typically those of the configuration).
+     *
+     * @param base the base IRI, an empty string for none
+     * @param predefinedPrefixes prefixes configured for the endpoint
+     */
+    public Prologue(String base, Map<String, String> predefinedPrefixes)
+    {
+        setBase(base);
         prefixDefinitions = new ArrayList<>();
         prefixes = new LinkedHashMap<>(predefinedPrefixes);
     }
 
 
     /**
-     * The BASE IRI; an empty string when none is declared.
+     * The base IRI in effect, which the relative IRIs are resolved against: that of the last BASE declaration, or the
+     * one the prologue was created with; an empty string when there is none.
      *
-     * @return the BASE IRI; an empty string when none is declared
+     * @return the base IRI in effect; an empty string when there is none
      */
     public String getBase()
     {
@@ -68,9 +83,9 @@ public class Prologue extends BaseElement
 
 
     /**
-     * Sets the BASE IRI.
+     * Sets the base IRI in effect.
      *
-     * @param base the BASE IRI
+     * @param base the base IRI
      */
     public void setBase(String base)
     {

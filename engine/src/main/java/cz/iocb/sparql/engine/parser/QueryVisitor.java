@@ -24,6 +24,7 @@ import java.util.stream.Stream;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import cz.iocb.sparql.engine.common.IriResolver;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.error.TranslateMessage;
@@ -309,7 +310,7 @@ public class QueryVisitor extends BaseVisitor<Query>
         }
         else
         {
-            prologue = new Prologue(config.getPrefixes());
+            prologue = PrologueVisitor.createPrologue(config);
         }
 
 
@@ -1025,7 +1026,8 @@ public class QueryVisitor extends BaseVisitor<Query>
 
 
 /**
- * Collects BASE, PREFIX and VERSION declarations into a {@link Prologue} initialised with the configured prefixes.
+ * Collects BASE, PREFIX and VERSION declarations into a {@link Prologue} initialised with the configured prefixes and
+ * the default base IRI of the configuration.
  */
 class PrologueVisitor extends BaseVisitor<Void>
 {
@@ -1049,7 +1051,22 @@ class PrologueVisitor extends BaseVisitor<Void>
     public PrologueVisitor(SparqlDatabaseConfiguration config, List<TranslateMessage> messages)
     {
         this.messages = messages;
-        this.prologue = new Prologue(config.getPrefixes());
+        this.prologue = createPrologue(config);
+    }
+
+
+    /**
+     * Prologue in effect before the declarations of a query: the prefixes of the configuration and its default base
+     * IRI, if it has one (see {@link SparqlDatabaseConfiguration#getBaseIri()}).
+     *
+     * @param config the endpoint configuration
+     * @return prologue in effect before the declarations of a query
+     */
+    public static Prologue createPrologue(SparqlDatabaseConfiguration config)
+    {
+        Iri base = config.getBaseIri();
+
+        return new Prologue(base != null ? base.getValue() : "", config.getPrefixes());
     }
 
 
@@ -2337,8 +2354,9 @@ class IriVisitor extends BaseVisitor<IriNode>
 
 
     /**
-     * Strips the angle brackets of an IRI reference and resolves it against BASE if it is relative; a malformed IRI is
-     * reported and returned as is.
+     * Strips the angle brackets of an IRI reference and resolves it against the base IRI in effect if it is relative; a
+     * malformed IRI and a relative IRI that has no base IRI to be resolved against are reported and returned as they
+     * are.
      *
      * @param iriRef the IRIREF token
      * @param prologue the prologue of the query
@@ -2352,7 +2370,12 @@ class IriVisitor extends BaseVisitor<IriNode>
         try
         {
             if(!(new URI(uri)).isAbsolute())
-                uri = (new URI(prologue.getBase())).resolve(uri).toString();
+            {
+                if(prologue.getBase().isEmpty())
+                    messages.add(new TranslateMessage(MessageType.relativeIriWithoutBase, range, uri));
+                else
+                    uri = IriResolver.resolve(prologue.getBase(), uri);
+            }
         }
         catch(URISyntaxException e)
         {

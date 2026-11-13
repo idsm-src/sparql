@@ -5,6 +5,7 @@ import java.net.URISyntaxException;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import cz.iocb.sparql.engine.common.IriResolver;
 import cz.iocb.sparql.engine.model.base.BaseComplexNode;
 import cz.iocb.sparql.engine.model.triple.Path;
 import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
@@ -127,8 +128,8 @@ public class IriNode extends BaseComplexNode implements VarOrIri, Path
 
 
     /**
-     * Renders the IRI for messages: as a prefixed name if a prologue prefix applies, otherwise relative to BASE if
-     * possible, otherwise as {@code <iri>}.
+     * Renders the IRI for messages: as a prefixed name if a prologue prefix applies, otherwise relative to the base IRI
+     * in effect if the parser resolves the relative form back to the IRI, otherwise as {@code <iri>}.
      *
      * @param prologue the prologue of the query
      * @return the rendered IRI
@@ -145,8 +146,13 @@ public class IriNode extends BaseComplexNode implements VarOrIri, Path
 
         try
         {
-            if(prologue.getBase() != null)
-                return '<' + new URI(prologue.getBase()).relativize(new URI(value)).toString() + '>';
+            if(!prologue.getBase().isEmpty())
+            {
+                URI relative = new URI(prologue.getBase()).relativize(new URI(value));
+
+                if(!relative.isAbsolute() && IriResolver.resolve(prologue.getBase(), relative.toString()).equals(value))
+                    return '<' + relative.toString() + '>';
+            }
         }
         catch(URISyntaxException e)
         {

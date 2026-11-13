@@ -102,6 +102,12 @@ public enum MessageType
     invalidBaseIri(ERROR, "Base IRI must be absolute."),
 
     /**
+     * A relative IRI in a query that has no base IRI to resolve it against: the query declares none and the endpoint
+     * has no default one.
+     */
+    relativeIriWithoutBase(ERROR, "Relative IRI '%s' cannot be resolved, because there is no base IRI."),
+
+    /**
      * An IRI reference cannot be parsed as an IRI.
      */
     malformedIri(ERROR, "IRI is malformed."),

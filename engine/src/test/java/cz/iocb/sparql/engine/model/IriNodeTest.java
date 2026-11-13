@@ -51,4 +51,26 @@ public class IriNodeTest
         assertEquals("<http://example.org/f>", new IriNode("http://example.org/f").toString(prologue));
         assertEquals("e:urn:x", new IriNode("urn:x").toString(prologue));
     }
+
+
+    @Test
+    @DisplayName("an IRI is rendered relative to the base IRI only in a form that resolves back to it")
+    void relativeToBase()
+    {
+        Prologue directory = new Prologue("http://example.org/dir/", Map.of());
+
+        assertEquals("<f>", new IriNode("http://example.org/dir/f").toString(directory));
+        assertEquals("<sub/f>", new IriNode("http://example.org/dir/sub/f").toString(directory));
+        assertEquals("<http://example.org/f>", new IriNode("http://example.org/f").toString(directory));
+
+        // a relative form replaces the last segment of the base IRI, so the IRIs below the document have none
+        Prologue document = new Prologue("http://example.org/dir/doc", Map.of());
+
+        assertEquals("<http://example.org/dir/doc/f>", new IriNode("http://example.org/dir/doc/f").toString(document));
+        assertEquals("<http://example.org/dir/f>", new IriNode("http://example.org/dir/f").toString(document));
+        assertEquals("<>", new IriNode("http://example.org/dir/doc").toString(document));
+
+        assertEquals("<http://example.org/dir/f>",
+                new IriNode("http://example.org/dir/f").toString(new Prologue(Map.of())));
+    }
 }
