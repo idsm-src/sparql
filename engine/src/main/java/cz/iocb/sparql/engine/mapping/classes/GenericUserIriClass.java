@@ -21,6 +21,7 @@ import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.request.Request;
@@ -208,7 +209,7 @@ public class GenericUserIriClass extends UserIriClass
         if(targetClass.equals(this))
             return columns;
 
-        String call = columns.stream().map(Object::toString).collect(joining(", ", function + "(", ")"));
+        SqlCode call = columns.stream().collect(SqlCode.joining(", ", function + "(", ")"));
 
         if(targetClass.equals(box))
             return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_iri(%s)", call));

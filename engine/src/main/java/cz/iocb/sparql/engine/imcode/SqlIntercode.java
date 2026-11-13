@@ -6,7 +6,6 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.intersect;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
-import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,7 +24,6 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
-import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.Table;
@@ -1163,7 +1161,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             // the joined columns are equal, so the value is not null when any of them is not null
             if(column instanceof ExpressionColumn && column.canBeNull()
                     && mappings.stream().anyMatch(m -> !m.get(position).canBeNull()))
-                column = new ExpressionColumn(column.getName(), column.getType(), false);
+                column = new ExpressionColumn(column.getCode(), column.getType(), false);
 
             columns.add(column);
         }
@@ -1229,8 +1227,9 @@ public abstract class SqlIntercode extends SqlBaseClass
             return variants.getFirst();
 
         return IntStream.range(0, cols)
-                .mapToObj(i -> (Column) new ExpressionColumn(variants.stream().map(l -> l.get(i).toString()).distinct()
-                        .sorted().collect(joining(", ", "COALESCE(", ")")), variants.getFirst().get(i).getType()))
+                .mapToObj(i -> (Column) new ExpressionColumn(variants.stream().map(l -> l.get(i).getCode()).distinct()
+                        .sorted().collect(SqlCode.joining(", ", "COALESCE(", ")")),
+                        variants.getFirst().get(i).getType()))
                 .toList();
     }
 
@@ -1386,13 +1385,13 @@ public abstract class SqlIntercode extends SqlBaseClass
      * @param tables the tables
      * @return SQL condition joining every pair of children on their shared variables, or null if none is needed
      */
-    public static String generateJoinCondition(ClassRelations relations, List<VariableBindings> vars,
+    public static SqlCode generateJoinCondition(ClassRelations relations, List<VariableBindings> vars,
             List<? extends Table> tables)
     {
         int size = vars.size();
         Map<Variable, Set<ResourceClass>> joined = getJoinedClasses(relations, vars);
 
-        List<String> conditions = IntStream.range(0, size)
+        List<SqlCode> conditions = IntStream.range(0, size)
                 .mapToObj(i -> IntStream.range(i + 1, size).mapToObj(j -> generateJoinCondition(relations, vars.get(i),
                         vars.get(j), tables.get(i), tables.get(j), joined)))
                 .flatMap(c -> c).filter(c -> c != null).toList();
@@ -1400,7 +1399,7 @@ public abstract class SqlIntercode extends SqlBaseClass
         if(conditions.isEmpty())
             return null;
 
-        return conditions.stream().collect(joining(" AND ", "(", ")"));
+        return conditions.stream().collect(SqlCode.joining(" AND ", "(", ")"));
     }
 
 
@@ -1416,7 +1415,7 @@ public abstract class SqlIntercode extends SqlBaseClass
      * @return SQL condition that every shared variable is compatible on both sides (equal values after conversion to a
      *         common class, or unbound on either side), or null if it always holds
      */
-    public static String generateJoinCondition(ClassRelations relations, VariableBindings left, VariableBindings right,
+    public static SqlCode generateJoinCondition(ClassRelations relations, VariableBindings left, VariableBindings right,
             Table leftTable, Table rightTable)
     {
         return generateJoinCondition(relations, left, right, leftTable, rightTable, Map.of());
@@ -1436,14 +1435,14 @@ public abstract class SqlIntercode extends SqlBaseClass
      * @param joined classes per variable in the whole join; a variable without an entry compares all its classes
      * @return SQL condition that every shared variable is compatible on both sides, or null if it always holds
      */
-    public static String generateJoinCondition(ClassRelations relations, VariableBindings left, VariableBindings right,
+    public static SqlCode generateJoinCondition(ClassRelations relations, VariableBindings left, VariableBindings right,
             Table leftTable, Table rightTable, Map<Variable, Set<ResourceClass>> joined)
     {
-        Set<String> join = new HashSet<>();
+        Set<SqlCode> join = new HashSet<>();
 
         for(VariableBindingPair pair : VariableBindingPair.getPairs(relations, left, right))
         {
-            String condition = generateJoinCondition(relations, pair, leftTable, rightTable,
+            SqlCode condition = generateJoinCondition(relations, pair, leftTable, rightTable,
                     joined.get(pair.getVariable()));
 
             if(condition != null)
@@ -1453,7 +1452,7 @@ public abstract class SqlIntercode extends SqlBaseClass
         if(join.isEmpty())
             return null;
 
-        return join.stream().sorted().collect(joining(" AND ", "(", ")"));
+        return join.stream().sorted().collect(SqlCode.joining(" AND ", "(", ")"));
     }
 
 
@@ -1468,7 +1467,7 @@ public abstract class SqlIntercode extends SqlBaseClass
      * @param rightTable the right table
      * @return SQL condition that one variable is compatible on both sides, or null if it always holds
      */
-    public static String generateJoinCondition(ClassRelations relations, VariableBinding leftBinding,
+    public static SqlCode generateJoinCondition(ClassRelations relations, VariableBinding leftBinding,
             VariableBinding rightBinding, Table leftTable, Table rightTable)
     {
         if(leftBinding == null || rightBinding == null)
@@ -1492,13 +1491,13 @@ public abstract class SqlIntercode extends SqlBaseClass
      * @param joined classes the variable takes in the whole join, or null to compare all pairs of classes
      * @return SQL condition that the paired variable is compatible on both sides, or null if it always holds
      */
-    private static String generateJoinCondition(ClassRelations relations, VariableBindingPair pair, Table leftTable,
+    private static SqlCode generateJoinCondition(ClassRelations relations, VariableBindingPair pair, Table leftTable,
             Table rightTable, Set<ResourceClass> joined)
     {
         VariableBinding leftBinding = pair.getLeftVariableBinding();
         VariableBinding rightBinding = pair.getRightVariableBinding();
 
-        Set<String> condition = new HashSet<>();
+        Set<SqlCode> condition = new HashSet<>();
 
         if(leftBinding.canBeNull())
             condition.add(leftBinding.getIsNull(leftTable));
@@ -1526,7 +1525,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             List<Column> genLeftCols = leftClass.toGeneralClass(unionClass, leftCols, false);
             List<Column> genRightCols = rightClass.toGeneralClass(unionClass, rightCols, false);
 
-            Set<String> compare = new HashSet<>();
+            Set<SqlCode> compare = new HashSet<>();
 
             for(int i = 0; i < unionClass.getColumnCount(); i++)
             {
@@ -1537,7 +1536,7 @@ public abstract class SqlIntercode extends SqlBaseClass
                 if(leftCol instanceof ConstantColumn && rightCol instanceof ConstantColumn)
                 {
                     if(!leftCol.equals(rightCol))
-                        compare.add("false");
+                        compare.add(SqlCode.FALSE);
                 }
                 else if(!unionClass.isOptionalColumn(i))
                 {
@@ -1545,11 +1544,11 @@ public abstract class SqlIntercode extends SqlBaseClass
                 }
                 else if(leftCol instanceof NullColumn)
                 {
-                    compare.add(rightCol.canBeNull() ? "(" + rightCol + " IS NULL)" : "false");
+                    compare.add(rightCol.canBeNull() ? SqlCode.of("(", rightCol, " IS NULL)") : SqlCode.FALSE);
                 }
                 else if(rightCol instanceof NullColumn)
                 {
-                    compare.add(leftCol.canBeNull() ? "(" + leftCol + " IS NULL)" : "false");
+                    compare.add(leftCol.canBeNull() ? SqlCode.of("(", leftCol, " IS NULL)") : SqlCode.FALSE);
                 }
                 else if(!leftCol.canBeNull() || !rightCol.canBeNull())
                 {
@@ -1562,25 +1561,24 @@ public abstract class SqlIntercode extends SqlBaseClass
             }
 
             if(compare.isEmpty())
-                compare.add("true");
+                compare.add(SqlCode.TRUE);
 
-            if(!compare.contains("false"))
-                condition.add(compare.stream().sorted().collect(joining(" AND ")));
+            if(!compare.contains(SqlCode.FALSE))
+                condition.add(compare.stream().sorted().collect(SqlCode.joining(" AND ")));
         }
 
         if(condition.isEmpty())
-            condition.add("false");
+            condition.add(SqlCode.FALSE);
 
-        if(condition.contains("true"))
+        if(condition.contains(SqlCode.TRUE))
             return null;
 
-        return condition.stream().sorted().collect(joining(" OR ", "(", ")"));
+        return condition.stream().sorted().collect(SqlCode.joining(" OR ", "(", ")"));
     }
 
 
     /**
-     * SQL code of the conjunction of the conditions: their boolean columns, which read the declared tables the SQL of
-     * the conditions reads (see {@link SqlExpressionIntercode#getDeclaredTables()}).
+     * SQL code of the conjunction of the conditions: their boolean columns joined by {@code AND}.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param conditions the conditions
@@ -1588,17 +1586,7 @@ public abstract class SqlIntercode extends SqlBaseClass
      */
     protected static SqlCode translateConditions(ClassRelations relations, List<SqlExpressionIntercode> conditions)
     {
-        SqlBuilder builder = new SqlBuilder();
-
-        for(SqlExpressionIntercode condition : conditions)
-        {
-            appendAnd(builder, !builder.isEmpty());
-
-            builder.append(condition.get(relations, xsdBoolean).get(0));
-            builder.addDeclaredTables(condition.getDeclaredTables());
-        }
-
-        return builder.toCode();
+        return conditions.stream().map(c -> c.get(relations, xsdBoolean).get(0)).collect(SqlCode.joining(" AND "));
     }
 
 

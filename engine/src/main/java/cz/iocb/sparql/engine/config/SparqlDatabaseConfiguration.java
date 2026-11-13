@@ -62,6 +62,7 @@ import cz.iocb.sparql.engine.database.DefaultStatistics;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SourceTable;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.TableStatistics;
@@ -1224,7 +1225,7 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     private static Column parseColumn(String value)
     {
         if(value.matches("(?s)\\(.*\\)::[_a-zA-Z0-9.]+"))
-            return new ExpressionColumn(value,
+            return new ExpressionColumn(new SqlCode(value),
                     SqlType.of(value.replaceFirst("(?s)^\\(.*\\)::([_a-zA-Z0-9.]+)$", "$1")));
         else if(value.startsWith("("))
             throw new IllegalArgumentException(

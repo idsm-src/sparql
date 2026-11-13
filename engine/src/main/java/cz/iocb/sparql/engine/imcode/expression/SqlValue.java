@@ -18,6 +18,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.common.UnionFind;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
@@ -147,7 +148,7 @@ public final class SqlValue extends SqlExpressionIntercode
             case OBJECT -> "sparql.rdfbox_get_tripleterm_object";
         };
 
-        return List.of(new ExpressionColumn(function + "(" + columns.get(0) + ")",
+        return List.of(new ExpressionColumn(SqlCode.of(function, "(", columns.get(0), ")"),
                 component == Component.PREDICATE ? VARCHAR : RDFBOX));
     }
 

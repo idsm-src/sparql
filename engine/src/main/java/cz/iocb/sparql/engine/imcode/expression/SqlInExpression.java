@@ -10,7 +10,6 @@ import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static java.util.Collections.singletonMap;
-import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import java.util.ArrayList;
@@ -18,10 +17,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.DeclaredTable;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
@@ -236,19 +235,19 @@ public final class SqlInExpression extends SqlExpressionIntercode
         }
         else if(wrappedLeft instanceof OperandWrapper wrapped)
         {
-            StringBuilder builder = new StringBuilder();
+            SqlBuilder builder = new SqlBuilder();
 
             Map<Column, Column> columnMap = wrapped.getColumnMap();
 
             builder.append("(SELECT ");
             builder.append(expression.get(relations, xsdBoolean).get(0));
             builder.append(" FROM (VALUES (");
-            builder.append(columnMap.keySet().stream().map(c -> c.toString()).collect(joining(", ")));
+            builder.append(columnMap.keySet().stream().collect(SqlCode.joining(", ")));
             builder.append(")) AS \"tab\"(");
-            builder.append(columnMap.values().stream().map(c -> c.toString()).collect(joining(", ")));
+            builder.append(columnMap.values().stream().collect(SqlCode.joining(", ")));
             builder.append("))");
 
-            List<Column> result = List.of(new ExpressionColumn(builder.toString(), BOOL));
+            List<Column> result = List.of(new ExpressionColumn(builder.toCode(), BOOL));
 
             return new SqlInExpression(negated, left, rights, singletonMap(xsdBoolean, result), expression.canBeNull());
         }
@@ -361,15 +360,6 @@ public final class SqlInExpression extends SqlExpressionIntercode
             return false;
 
         return true;
-    }
-
-
-    @Override
-    public Set<DeclaredTable> getDeclaredTables()
-    {
-        Set<DeclaredTable> tables = getDeclaredTables(rights);
-        tables.addAll(left.getDeclaredTables());
-        return tables;
     }
 
 

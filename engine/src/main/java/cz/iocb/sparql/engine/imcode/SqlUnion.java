@@ -328,7 +328,7 @@ public final class SqlUnion extends SqlIntercode
      *            branches get no conditions
      * @return SQL code of the union
      */
-    public SqlCode translate(Request request, Scope scope, BiFunction<SqlIntercode, Table, String> conditions)
+    public SqlCode translate(Request request, Scope scope, BiFunction<SqlIntercode, Table, SqlCode> conditions)
     {
         SqlBuilder builder = new SqlBuilder();
 
@@ -392,7 +392,7 @@ public final class SqlUnion extends SqlIntercode
 
             if(conditions != null)
             {
-                String condition = conditions.apply(child, new AliasTable("tab" + i));
+                SqlCode condition = conditions.apply(child, new AliasTable("tab" + i));
 
                 if(condition != null)
                 {

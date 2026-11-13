@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -107,7 +108,7 @@ public final class SqlUnaryLogical extends SqlUnary implements SqlBooleanExpress
      */
     private static List<Column> translate(ClassRelations relations, SqlExpressionIntercode operand)
     {
-        return List.of(new ExpressionColumn("(not " + operand.get(relations, genBoolean).get(0) + ")", BOOL,
+        return List.of(new ExpressionColumn(SqlCode.of("(not ", operand.get(relations, genBoolean).get(0), ")"), BOOL,
                 operand.canBeNull()));
     }
 

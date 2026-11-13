@@ -1,6 +1,5 @@
 package cz.iocb.sparql.engine.database;
 
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -8,8 +7,9 @@ import java.util.Set;
 
 /**
  * Builder of SQL code (see {@link SqlCode}): the text is appended piece by piece, and the declared tables the pieces
- * read are collected along with it. A piece of code brings the tables it reads, and a declared table written by its
- * name is read by the code from then on, so writing a reference and recording it are one step.
+ * read are collected along with it. A piece of code brings the tables it reads, so does a column whose expression reads
+ * some, and a declared table written by its name is read by the code from then on, so writing a reference and recording
+ * it are one step.
  */
 public final class SqlBuilder
 {
@@ -47,49 +47,70 @@ public final class SqlBuilder
 
 
     /**
-     * Appends a piece of SQL: code with the declared tables it reads, a declared table by its name, which the code then
-     * reads, or anything else (a column, another table, a number) by its string form.
+     * Appends a piece of SQL: code with the declared tables it reads, a column with the declared tables its expression
+     * reads, a declared table by its name, which the code then reads, or anything else (another table, a type, a
+     * number) by its string form.
      *
      * @param piece the piece of SQL
      * @return this builder
      */
     public SqlBuilder append(Object piece)
     {
-        if(piece instanceof SqlCode code)
-        {
-            text.append(code.getText());
-            addDeclaredTables(code.getDeclaredTables());
-        }
-        else
-        {
-            if(piece instanceof DeclaredTable table)
-                addDeclaredTables(Set.of(table));
-
-            text.append(piece);
-        }
+        text.append(record(piece));
 
         return this;
     }
 
 
     /**
-     * Adds declared tables read by SQL that is appended as plain text: the columns of an expression, whose SQL has been
-     * rendered beforehand (see {@code SqlExpressionIntercode#getDeclaredTables}).
+     * Records the declared tables a piece of SQL reads (see {@link #append(Object)}) as read by the code built here,
+     * wherever the text of the piece is then written into it.
+     *
+     * @param piece the piece of SQL
+     * @return the piece as it is written: the SQL text of code, of a column or of a declared table, the piece itself
+     *         otherwise
+     */
+    Object record(Object piece)
+    {
+        return switch(piece)
+        {
+            case SqlCode code ->
+            {
+                addTables(code.getDeclaredTables());
+                yield code.getText();
+            }
+
+            case ExpressionColumn column ->
+            {
+                addTables(column.getCode().getDeclaredTables());
+                yield column.toString();
+            }
+
+            case DeclaredTable table ->
+            {
+                addTables(Set.of(table));
+                yield table.toString();
+            }
+
+            case null, default -> piece;
+        };
+    }
+
+
+    /**
+     * Adds declared tables to those the code built here reads.
      *
      * @param tables the declared tables
-     * @return this builder
      */
-    public SqlBuilder addDeclaredTables(Collection<? extends DeclaredTable> tables)
+    private void addTables(Set<DeclaredTable> tables)
     {
-        if(!tables.isEmpty())
-        {
-            if(this.tables == null)
-                this.tables = new HashSet<>();
+        if(tables.isEmpty())
+            return;
 
-            this.tables.addAll(tables);
-        }
+        if(this.tables == null)
+            this.tables = new HashSet<>();
 
-        return this;
+        this.tables.addAll(tables);
     }
 
 

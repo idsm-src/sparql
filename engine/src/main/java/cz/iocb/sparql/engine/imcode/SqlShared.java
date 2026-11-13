@@ -1,6 +1,5 @@
 package cz.iocb.sparql.engine.imcode;
 
-import static java.util.stream.Collectors.joining;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -162,7 +161,7 @@ public final class SqlShared extends SqlIntercode
         SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT ");
-        builder.append(columns.isEmpty() ? "1" : columns.stream().map(Object::toString).collect(joining(", ")));
+        builder.append(columns.isEmpty() ? "1" : columns.stream().collect(SqlCode.joining(", ")));
         builder.append(" FROM ");
         builder.append(table);
 

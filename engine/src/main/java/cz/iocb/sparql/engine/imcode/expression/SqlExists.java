@@ -15,7 +15,6 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.DeclaredTable;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
@@ -66,7 +65,8 @@ public final class SqlExists extends SqlExpressionIntercode
      * database, as the second optimisation pass rebuilds the expression once the call is evaluated, and would fail
      * there otherwise.
      */
-    private static final Column unevaluated = new ExpressionColumn("sparql.unevaluated_service()", BOOL, false);
+    private static final Column unevaluated = new ExpressionColumn(new SqlCode("sparql.unevaluated_service()"), BOOL,
+            false);
 
     /**
      * Upper bound of the rounds in which the pattern is optimised for a current solution (see {@link #optimize}).
@@ -126,12 +126,6 @@ public final class SqlExists extends SqlExpressionIntercode
      */
     private final boolean optimized;
 
-    /**
-     * The declared tables the SQL of the test reads: those the code of the test was rendered with (see
-     * {@link #translate}), none while the test has no SQL.
-     */
-    private final Set<DeclaredTable> tables;
-
 
     /**
      * Creates the expression; it is deterministic if the pattern is.
@@ -141,7 +135,6 @@ public final class SqlExists extends SqlExpressionIntercode
      * @param evaluated the pattern as the test evaluates it
      * @param origin the pattern as translated
      * @param mappings columns per resource class
-     * @param tables the declared tables the SQL of the test reads
      * @param bindings the variable bindings
      * @param variables the variables of the current solution the pattern may refer to
      * @param chained whether the current solution extends the current solution of the pattern the node holding the
@@ -150,8 +143,8 @@ public final class SqlExists extends SqlExpressionIntercode
      * @param optimized whether the expression was built by the optimisation
      */
     private SqlExists(boolean negated, SqlIntercode pattern, SqlIntercode evaluated, SqlIntercode origin,
-            Map<ResourceClass, List<Column>> mappings, Set<DeclaredTable> tables, VariableBindings bindings,
-            Set<Variable> variables, boolean chained, VariableBindings solution, boolean optimized)
+            Map<ResourceClass, List<Column>> mappings, VariableBindings bindings, Set<Variable> variables,
+            boolean chained, VariableBindings solution, boolean optimized)
     {
         super(mappings, false, pattern.isDeterministic());
 
@@ -159,7 +152,6 @@ public final class SqlExists extends SqlExpressionIntercode
         this.pattern = pattern;
         this.evaluated = evaluated;
         this.origin = origin;
-        this.tables = tables;
         this.bindings = bindings;
         this.variables = variables;
         this.chained = chained;
@@ -256,23 +248,22 @@ public final class SqlExists extends SqlExpressionIntercode
 
 
         if(!restriction.contains(relations, xsdBoolean))
-            return new SqlExists(negated, pattern, evaluated, origin, singletonMap(xsdBoolean, null), Set.of(),
-                    bindings, variables, chained, solution, optimized);
+            return new SqlExists(negated, pattern, evaluated, origin, singletonMap(xsdBoolean, null), bindings,
+                    variables, chained, solution, optimized);
 
         // the call is evaluated by the second optimisation pass, which rebuilds the expression and everything built
         // on it; until then a placeholder stands for the test
         if(pattern.hasServiceSubpattern())
             return new SqlExists(negated, pattern, evaluated, origin, singletonMap(xsdBoolean, List.of(unevaluated)),
-                    Set.of(), bindings, variables, chained, solution, optimized);
+                    bindings, variables, chained, solution, optimized);
 
 
-        // the SQL of the test is rendered at once, as the column of the expression; the declared tables it reads are
-        // kept with the expression for the node that writes the column into its SQL
+        // the SQL of the test is rendered at once, as the column of the expression, which keeps what the code reads
         SqlCode test = translate(request, scope, negated, evaluated, solution, sql);
-        List<Column> result = List.of(new ExpressionColumn(test.getText(), BOOL, false));
+        List<Column> result = List.of(new ExpressionColumn(test, BOOL, false));
 
-        return new SqlExists(negated, pattern, evaluated, origin, singletonMap(xsdBoolean, result),
-                test.getDeclaredTables(), bindings, variables, chained, solution, optimized);
+        return new SqlExists(negated, pattern, evaluated, origin, singletonMap(xsdBoolean, result), bindings, variables,
+                chained, solution, optimized);
     }
 
 
@@ -601,7 +592,7 @@ public final class SqlExists extends SqlExpressionIntercode
         builder.append(") AS ");
         builder.append(table);
 
-        String condition = solution == null ? null :
+        SqlCode condition = solution == null ? null :
                 SqlIntercode.generateJoinCondition(relations, solution, pattern.getVariableBindings(), null, table);
 
         if(condition != null || filter != null)
@@ -682,13 +673,6 @@ public final class SqlExists extends SqlExpressionIntercode
             return false;
 
         return true;
-    }
-
-
-    @Override
-    public Set<DeclaredTable> getDeclaredTables()
-    {
-        return tables;
     }
 
 

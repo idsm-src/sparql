@@ -777,12 +777,12 @@ public final class SqlSelect extends SqlIntercode
      * @return SELECT list of a top-level select: for each variable, one column group per result class (NULL for classes
      *         it cannot take), named by the class
      */
-    private static String translateSelectVariables(ClassRelations relations,
+    private static SqlCode translateSelectVariables(ClassRelations relations,
             Map<Variable, List<ResourceClass>> description, VariableBindings bindings)
     {
         ColumnMap columnMap = new ColumnMap();
 
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
         boolean hasSelect = false;
 
         for(Entry<Variable, List<ResourceClass>> entry : description.entrySet())
@@ -813,7 +813,7 @@ public final class SqlSelect extends SqlIntercode
         if(!hasSelect)
             builder.append("1");
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -823,18 +823,14 @@ public final class SqlSelect extends SqlIntercode
      * @param bindings the variable bindings
      * @return SELECT list of a sub-select: the non-constant columns of the bindings, or {@code 1}
      */
-    private String translateInnerSelectVariables(VariableBindings bindings)
+    private SqlCode translateInnerSelectVariables(VariableBindings bindings)
     {
-        StringBuilder builder = new StringBuilder();
-
         Set<Column> columns = bindings.getNonConstantColumns();
 
-        if(!columns.isEmpty())
-            builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
-        else
-            builder.append("1");
+        if(columns.isEmpty())
+            return new SqlCode("1");
 
-        return builder.toString();
+        return columns.stream().collect(SqlCode.joining(", "));
     }
 
 
@@ -845,9 +841,9 @@ public final class SqlSelect extends SqlIntercode
      * @param condition the SQL condition
      * @return true if the SQL condition is the constant {@code true} or {@code false}, false otherwise
      */
-    private static boolean isConstantCondition(String condition)
+    private static boolean isConstantCondition(SqlCode condition)
     {
-        return condition.equals("true") || condition.equals("false");
+        return condition.equals(SqlCode.TRUE) || condition.equals(SqlCode.FALSE);
     }
 
 
@@ -861,7 +857,7 @@ public final class SqlSelect extends SqlIntercode
      * @param column the column
      * @param codepoints whether the default collation of the database orders by code points
      */
-    private static void addOrderKey(List<String> keys, Column column, boolean codepoints)
+    private static void addOrderKey(List<SqlCode> keys, Column column, boolean codepoints)
     {
         if(column instanceof ConstantColumn)
             return;
@@ -869,7 +865,7 @@ public final class SqlSelect extends SqlIntercode
         SqlType type = column.getType();
         boolean character = type.equals(VARCHAR) || type.equals(TEXT) || type.equals(CHAR);
 
-        keys.add(character && !codepoints ? column + " COLLATE \"C\"" : column.toString());
+        keys.add(character && !codepoints ? SqlCode.of(column, " COLLATE \"C\"") : column.getCode());
     }
 
 
@@ -888,13 +884,13 @@ public final class SqlSelect extends SqlIntercode
      * @return ORDER BY clause over the sortable representation of the variables, optionally followed by the simple
      *         ordering
      */
-    private String translateOrderBy(Request request, boolean withSimple)
+    private SqlCode translateOrderBy(Request request, boolean withSimple)
     {
         ClassRelations relations = request.getConfiguration();
         DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
         boolean codepoints = schema != null && schema.hasCodepointDefaultCollation();
 
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         builder.append(" ORDER BY ");
         boolean hasOrderCondition = false;
@@ -951,7 +947,7 @@ public final class SqlSelect extends SqlIntercode
                 sortSet = Map.of(box, sortSet.values().stream().flatMap(r -> r.stream()).collect(toSet()));
 
 
-            List<String> keys = new ArrayList<>();
+            List<SqlCode> keys = new ArrayList<>();
 
             // order unbounded (a constant condition does not order anything and is not allowed in ORDER BY)
             if(binding.canBeNull() && !isConstantCondition(binding.getIsNotNull()))
@@ -961,7 +957,7 @@ public final class SqlSelect extends SqlIntercode
             if(sortSet.get(scalarBlankNode) != null)
             {
                 Set<ResourceClass> blankNodes = sortSet.get(scalarBlankNode);
-                String isNull = binding.getIsNull(relations, unionize(blankNodes));
+                SqlCode isNull = binding.getIsNull(relations, unionize(blankNodes));
 
                 if(!isConstantCondition(isNull))
                     keys.add(isNull);
@@ -1013,7 +1009,7 @@ public final class SqlSelect extends SqlIntercode
 
                 if(!userLiterals.stream().allMatch(r -> r.isSubclassOf(userType)))
                 {
-                    keys.add("(" + columns.get(2) + " <> ''::varchar)");
+                    keys.add(SqlCode.of("(", columns.get(2), " <> ''::varchar)"));
                     addOrderKey(keys, columns.get(2), codepoints);
                 }
             }
@@ -1105,7 +1101,7 @@ public final class SqlSelect extends SqlIntercode
                 addOrderKey(keys, binding.deriveMapping(relations, unionize(sortSet.get(box), box)).get(0), codepoints);
 
 
-            for(String key : keys)
+            for(SqlCode key : keys)
             {
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
@@ -1139,9 +1135,9 @@ public final class SqlSelect extends SqlIntercode
 
 
         if(!hasOrderCondition)
-            return "";
+            return new SqlCode("");
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 

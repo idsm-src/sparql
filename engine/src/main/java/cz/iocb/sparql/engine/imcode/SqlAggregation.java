@@ -415,9 +415,6 @@ public final class SqlAggregation extends SqlIntercode
                 List<Column> cols = expression.get(request.getConfiguration(), resClass);
                 aggregated |= expression instanceof SqlBuiltinCall c && c.isAggregateFunction();
 
-                // the columns of the expression are written here, so the code reads what their SQL reads
-                builder.addDeclaredTables(expression.getDeclaredTables());
-
                 for(int i = 0; i < resClass.getColumnCount(); i++)
                 {
                     appendComma(builder, hasSelect);
@@ -434,7 +431,7 @@ public final class SqlAggregation extends SqlIntercode
         {
             appendComma(builder, hasSelect);
             hasSelect = true;
-            builder.append(groupByColumns.stream().map(Object::toString).collect(joining(", ")));
+            builder.append(groupByColumns.stream().collect(SqlCode.joining(", ")));
         }
 
         if(!hasSelect)
@@ -447,7 +444,7 @@ public final class SqlAggregation extends SqlIntercode
         builder.append(scope.getInputTable());
 
         if(!groupByColumns.isEmpty())
-            builder.append(groupByColumns.stream().map(Object::toString).collect(joining(", ", " GROUP BY ", "")));
+            builder.append(groupByColumns.stream().collect(SqlCode.joining(", ", " GROUP BY ", "")));
         else if(!groupVariables.isEmpty())
             builder.append(" GROUP BY true::boolean");
         else if(!aggregated)

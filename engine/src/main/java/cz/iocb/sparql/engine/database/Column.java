@@ -1,6 +1,5 @@
 package cz.iocb.sparql.engine.database;
 
-import static java.util.stream.Collectors.joining;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -56,6 +55,18 @@ public abstract sealed class Column implements Comparable<Column> permits TableC
     public final SqlType getType()
     {
         return type;
+    }
+
+
+    /**
+     * SQL code of the column: its SQL text, which reads no declared table unless the column is an expression that reads
+     * some (see {@link ExpressionColumn}).
+     *
+     * @return SQL code of the column
+     */
+    public SqlCode getCode()
+    {
+        return new SqlCode(toString());
     }
 
 
@@ -144,7 +155,7 @@ public abstract sealed class Column implements Comparable<Column> permits TableC
         if(list.get(0) instanceof ConstantColumn || list.size() == 1)
             return list.get(0);
 
-        return new ExpressionColumn(list.stream().map(Object::toString).collect(joining(",", "COALESCE(", ")")),
+        return new ExpressionColumn(list.stream().collect(SqlCode.joining(",", "COALESCE(", ")")),
                 list.get(0).getType());
     }
 }

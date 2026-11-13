@@ -27,7 +27,6 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.common.UnionFind;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.DeclaredTable;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SqlCode;
@@ -275,39 +274,6 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     public boolean hasServiceSubpattern()
     {
         return false;
-    }
-
-
-    /**
-     * The declared tables the SQL of the expression reads (see {@link SqlCode}): those read by the patterns of the
-     * EXISTS tests the expression holds, whose SQL is rendered into the columns of the expression when the expression
-     * is built. A node that writes columns of the expression into its SQL reads the tables too, so it adds them to its
-     * code (see {@link cz.iocb.sparql.engine.database.SqlBuilder#addDeclaredTables}). An expression without operands
-     * reads none.
-     *
-     * @return the declared tables the SQL of the expression reads
-     */
-    public Set<DeclaredTable> getDeclaredTables()
-    {
-        return Set.of();
-    }
-
-
-    /**
-     * The declared tables the SQL of the given expressions reads (see {@link #getDeclaredTables()}), in a set of its
-     * own that the caller may extend.
-     *
-     * @param expressions the expressions
-     * @return the declared tables the SQL of the given expressions reads
-     */
-    protected static Set<DeclaredTable> getDeclaredTables(Collection<? extends SqlExpressionIntercode> expressions)
-    {
-        Set<DeclaredTable> tables = new HashSet<>();
-
-        for(SqlExpressionIntercode expression : expressions)
-            tables.addAll(expression.getDeclaredTables());
-
-        return tables;
     }
 
 
@@ -667,9 +633,9 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      * @param right the columns of the right term
      * @return SQL conditions, one per position, that two column tuples of the class represent the same term
      */
-    public static List<String> getIdentityConditions(ResourceClass resClass, List<Column> left, List<Column> right)
+    public static List<SqlCode> getIdentityConditions(ResourceClass resClass, List<Column> left, List<Column> right)
     {
-        List<String> conditions = new ArrayList<>(left.size());
+        List<SqlCode> conditions = new ArrayList<>(left.size());
 
         for(int i = 0; i < left.size(); i++)
         {
@@ -680,9 +646,9 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
             if(!resClass.isOptionalColumn(i))
                 conditions.add(type.equal(l, r));
             else if(isNullConstant(l))
-                conditions.add(r.canBeNull() ? "(" + r + " IS NULL)" : "false");
+                conditions.add(r.canBeNull() ? SqlCode.of("(", r, " IS NULL)") : SqlCode.FALSE);
             else if(isNullConstant(r))
-                conditions.add(l.canBeNull() ? "(" + l + " IS NULL)" : "false");
+                conditions.add(l.canBeNull() ? SqlCode.of("(", l, " IS NULL)") : SqlCode.FALSE);
             else if(!l.canBeNull() || !r.canBeNull())
                 conditions.add(type.equal(l, r));
             else
@@ -702,9 +668,9 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      * @param right the columns of the right term
      * @return SQL conditions, one per position, that two column tuples of the class represent different terms
      */
-    public static List<String> getNonIdentityConditions(ResourceClass resClass, List<Column> left, List<Column> right)
+    public static List<SqlCode> getNonIdentityConditions(ResourceClass resClass, List<Column> left, List<Column> right)
     {
-        List<String> conditions = new ArrayList<>(left.size());
+        List<SqlCode> conditions = new ArrayList<>(left.size());
 
         for(int i = 0; i < left.size(); i++)
         {
@@ -715,9 +681,9 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
             if(!resClass.isOptionalColumn(i))
                 conditions.add(type.notEqual(l, r));
             else if(isNullConstant(l))
-                conditions.add(r.canBeNull() ? "(" + r + " IS NOT NULL)" : "true");
+                conditions.add(r.canBeNull() ? SqlCode.of("(", r, " IS NOT NULL)") : SqlCode.TRUE);
             else if(isNullConstant(r))
-                conditions.add(l.canBeNull() ? "(" + l + " IS NOT NULL)" : "true");
+                conditions.add(l.canBeNull() ? SqlCode.of("(", l, " IS NOT NULL)") : SqlCode.TRUE);
             else if(!l.canBeNull() || !r.canBeNull())
                 conditions.add(type.notEqual(l, r));
             else
@@ -733,7 +699,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      *
      * @return SQL condition that the value is NULL
      */
-    public String getIsNull()
+    public SqlCode getIsNull()
     {
         return variableBinding.getIsNull();
     }
@@ -744,7 +710,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      *
      * @return SQL condition that the value is not NULL
      */
-    public String getIsNotNull()
+    public SqlCode getIsNotNull()
     {
         return variableBinding.getIsNotNull();
     }
@@ -757,7 +723,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      * @param resClass the resource class
      * @return SQL condition that the value has no value of the given class
      */
-    public String getIsNull(ClassRelations relations, ResourceClass resClass)
+    public SqlCode getIsNull(ClassRelations relations, ResourceClass resClass)
     {
         return variableBinding.getIsNull(relations, resClass);
     }
@@ -770,7 +736,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      * @param resClass the resource class
      * @return SQL condition that the value has a value of the given class
      */
-    public String getIsNotNull(ClassRelations relations, ResourceClass resClass)
+    public SqlCode getIsNotNull(ClassRelations relations, ResourceClass resClass)
     {
         return variableBinding.getIsNotNull(relations, resClass);
     }

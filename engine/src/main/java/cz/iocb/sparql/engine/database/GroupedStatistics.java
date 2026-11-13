@@ -144,9 +144,10 @@ public final class GroupedStatistics extends TableStatisticsBase
      */
     private double count(Request request, Group group, TableColumn column, Column value)
     {
-        String sql = "SELECT count(*) FROM " + table + " WHERE "
-                + key.getType().equal(key, new ExpressionColumn(group.key(), key.getType())) + " AND "
-                + column.getType().equal(column, value);
+        Column groupKey = new ExpressionColumn(new SqlCode(group.key()), key.getType());
+
+        String sql = "SELECT count(*) FROM " + table + " WHERE " + key.getType().equal(key, groupKey).getText()
+                + " AND " + column.getType().equal(column, value).getText();
 
         return query(request, sql, result -> result.next() ? result.getDouble(1) : 0);
     }
@@ -220,6 +221,6 @@ public final class GroupedStatistics extends TableStatisticsBase
     private String keyCondition(Object value, String alias)
     {
         return key.getType().equal(new TableColumn("key_value", key.getType()).fromTable(new AliasTable(alias)),
-                new ExpressionColumn(value.toString(), key.getType()));
+                new ExpressionColumn(new SqlCode(value.toString()), key.getType())).getText();
     }
 }

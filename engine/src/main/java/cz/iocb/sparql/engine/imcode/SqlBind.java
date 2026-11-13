@@ -1,6 +1,5 @@
 package cz.iocb.sparql.engine.imcode;
 
-import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -233,9 +232,6 @@ public final class SqlBind extends SqlIntercode
 
         builder.append("SELECT ");
 
-        // the columns of the expression are written here, so the code reads what their SQL reads
-        builder.addDeclaredTables(expression.getDeclaredTables());
-
         VariableBinding binding = getVariableBindings().get(variable);
         boolean hasSelect = false;
 
@@ -279,7 +275,7 @@ public final class SqlBind extends SqlIntercode
         if(!columns.isEmpty())
         {
             builder.append(", ");
-            builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
+            builder.append(columns.stream().collect(SqlCode.joining(", ")));
         }
 
 

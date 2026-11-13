@@ -96,6 +96,7 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
@@ -430,7 +431,7 @@ public final class SqlCast extends SqlUnary
             LiteralClass castClass, boolean partCanBeNull)
     {
         ResourceClass effClass = resClass.getEffectiveClass();
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
 
         /* identity cats */
@@ -602,7 +603,7 @@ public final class SqlCast extends SqlUnary
             builder.append(")");
         }
 
-        return new ExpressionColumn(builder.toString(), castClass.getSqlTypes().get(0));
+        return new ExpressionColumn(builder.toCode(), castClass.getSqlTypes().get(0));
     }
 
 

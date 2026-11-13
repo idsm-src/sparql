@@ -3,7 +3,6 @@ package cz.iocb.sparql.engine.imcode;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
-import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
@@ -198,7 +197,7 @@ public final class SqlFilter extends SqlIntercode
         Set<Column> columns = getVariableBindings().getNonConstantColumns();
 
         if(!columns.isEmpty())
-            builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
+            builder.append(columns.stream().collect(SqlCode.joining(", ")));
         else
             builder.append("1");
 

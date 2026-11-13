@@ -8,8 +8,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.DeclaredTable;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
@@ -163,7 +163,7 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
     private static List<Column> translate(ClassRelations relations, FunctionDefinition definition,
             List<SqlExpressionIntercode> arguments)
     {
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         builder.append(definition.getSqlFunction());
         builder.append("(");
@@ -182,7 +182,7 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
 
         builder.append(")");
 
-        return List.of(new ExpressionColumn(builder.toString(), definition.getResultClass().getSqlTypes().get(0)));
+        return List.of(new ExpressionColumn(builder.toCode(), definition.getResultClass().getSqlTypes().get(0)));
     }
 
 
@@ -223,13 +223,6 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
             return false;
 
         return true;
-    }
-
-
-    @Override
-    public Set<DeclaredTable> getDeclaredTables()
-    {
-        return getDeclaredTables(arguments);
     }
 
 

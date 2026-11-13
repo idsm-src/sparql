@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
@@ -162,18 +163,19 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
             {
                 SqlType type = numericBase.getSqlTypes().get(0);
                 Column col = e.getKey().toGeneralClass(numericBase, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("(" + col + " not in ('0'::" + type + ", 'NaN'::" + type + "))", BOOL));
+                cols.add(new ExpressionColumn(SqlCode.of("(", col, " not in ('0'::", type, ", 'NaN'::", type, "))"),
+                        BOOL));
             }
             else if(numericBase != null)
             {
                 SqlType type = numericBase.getSqlTypes().get(0);
                 Column col = e.getKey().toGeneralClass(numericBase, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("(" + col + " != '0'::" + type + ")", BOOL));
+                cols.add(new ExpressionColumn(SqlCode.of("(", col, " != '0'::", type, ")"), BOOL));
             }
             else if(isString(e.getKey()))
             {
                 Column col = e.getKey().toGeneralClass(xsdString, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("(octet_length(" + col + ") != 0)", BOOL));
+                cols.add(new ExpressionColumn(SqlCode.of("(octet_length(", col, ") != 0)"), BOOL));
             }
             else if(isBoolean(e.getKey()))
             {
@@ -184,7 +186,7 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
             {
                 // the extension yields NULL for the boxed terms without an effective boolean value
                 Column col = e.getKey().toGeneralClass(box, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("sparql.ebv_rdfbox(" + col + ")", BOOL));
+                cols.add(new ExpressionColumn(SqlCode.of("sparql.ebv_rdfbox(", col, ")"), BOOL));
             }
         }
 

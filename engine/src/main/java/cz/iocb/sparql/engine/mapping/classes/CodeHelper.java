@@ -1,8 +1,8 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import java.util.Locale;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.ValueColumn;
 
@@ -47,15 +47,17 @@ public class CodeHelper
 
 
     /**
-     * Expression column of the given type formatted with {@link String#format} (US locale).
+     * Expression column of the given type whose SQL code is made of the format string and the arguments (see
+     * {@link SqlCode#format}): the columns and the code among the arguments are written by their SQL texts, and the
+     * expression reads the declared tables they read.
      *
      * @param type SQL type of the expression
      * @param format the format string
-     * @param args the format arguments
-     * @return expression column of the given type formatted with {@link String#format} (US locale)
+     * @param args the format arguments, pieces of SQL
+     * @return expression column of the given type
      */
     public static Column expression(SqlType type, String format, Object... args)
     {
-        return new ExpressionColumn(String.format(Locale.US, format, args), type, true);
+        return new ExpressionColumn(SqlCode.format(format, args), type, true);
     }
 }

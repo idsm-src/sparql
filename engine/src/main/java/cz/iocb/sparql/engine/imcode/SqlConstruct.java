@@ -8,7 +8,6 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasReference;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import static java.util.Objects.isNull;
-import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -553,7 +552,7 @@ public final class SqlConstruct extends SqlIntercode
 
         if(canBeNull)
         {
-            builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
+            builder.append(columns.stream().collect(SqlCode.joining(", ")));
 
             if(columns.isEmpty())
                 builder.append("1");
@@ -576,7 +575,7 @@ public final class SqlConstruct extends SqlIntercode
             if(Collections.frequency(cols, cols.get(0)) == cols.size())
                 builder.append(cols.get(0));
             else
-                builder.append(cols.stream().map(Object::toString).collect(joining(", ", "unnest(array[", "])")));
+                builder.append(cols.stream().collect(SqlCode.joining(", ", "unnest(array[", "])")));
 
             builder.append(" AS ");
             builder.append(column);
@@ -816,7 +815,7 @@ public final class SqlConstruct extends SqlIntercode
                 ResourceClass resClass = bnResourceClasses.computeIfAbsent(bnode,
                         _ -> new IntBlankNodeInSegmentClass(bnOffset.decrementAndGet()));
 
-                List<Column> columns = List.of(new ExpressionColumn("(row_number() OVER ())::int4", INT4));
+                List<Column> columns = List.of(new ExpressionColumn(new SqlCode("(row_number() OVER ())::int4"), INT4));
                 return new VariableBinding(column.getVariable(), resClass, columns, false);
             }
 

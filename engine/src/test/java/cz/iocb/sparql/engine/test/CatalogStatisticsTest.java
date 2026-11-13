@@ -21,6 +21,7 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.GroupedStatistics;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.TableStatistics;
 import cz.iocb.sparql.engine.database.ValueColumn;
@@ -207,7 +208,8 @@ public class CatalogStatisticsTest
         try(Request request = new Engine(config).getRequest())
         {
             Condition condition = new Condition();
-            condition.addAreEqual(new TableColumn("column_name", VARCHAR), new ExpressionColumn("'s'::text", VARCHAR));
+            condition.addAreEqual(new TableColumn("column_name", VARCHAR),
+                    new ExpressionColumn(new SqlCode("'s'::text"), VARCHAR));
 
             assertThat(config.getTableStatistics(other).estimateRows(request, new Conditions(condition)),
                     greaterThan(0.0));

@@ -15,7 +15,6 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLtrLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfRtlLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
-import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,6 +30,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -304,8 +304,7 @@ public class VariableBinding
             if(set.size() == 1)
                 columns.add(variants.get(0).get(i));
             else
-                columns.add(new ExpressionColumn(
-                        set.stream().sorted().map(Object::toString).collect(joining(",", "COALESCE(", ")")),
+                columns.add(new ExpressionColumn(set.stream().sorted().collect(SqlCode.joining(",", "COALESCE(", ")")),
                         targetClass.getSqlTypes().get(i)));
         }
 
@@ -403,12 +402,12 @@ public class VariableBinding
      * @param table the table the columns are accessed through, or null
      * @return SQL condition that no value of the class is present in the given columns
      */
-    private static String getIsNull(ResourceClass resClass, List<Column> columns, Table table)
+    private static SqlCode getIsNull(ResourceClass resClass, List<Column> columns, Table table)
     {
         return switch(getNullTest(resClass, columns))
         {
-            case Boolean b -> b.toString();
-            case Column witness -> witness.fromTable(table) + " IS NULL";
+            case Boolean b -> b ? SqlCode.TRUE : SqlCode.FALSE;
+            case Column witness -> SqlCode.of(witness.fromTable(table), " IS NULL");
             default -> throw new IllegalStateException();
         };
     }
@@ -423,12 +422,12 @@ public class VariableBinding
      * @param table the table the columns are accessed through, or null
      * @return SQL condition that a value of the class is present in the given columns
      */
-    private static String getIsNotNull(ResourceClass resClass, List<Column> columns, Table table)
+    private static SqlCode getIsNotNull(ResourceClass resClass, List<Column> columns, Table table)
     {
         return switch(getNullTest(resClass, columns))
         {
-            case Boolean b -> Boolean.toString(!b);
-            case Column witness -> witness.fromTable(table) + " IS NOT NULL";
+            case Boolean b -> b ? SqlCode.FALSE : SqlCode.TRUE;
+            case Column witness -> SqlCode.of(witness.fromTable(table), " IS NOT NULL");
             default -> throw new IllegalStateException();
         };
     }
@@ -441,17 +440,17 @@ public class VariableBinding
      * @param conditions the conditions
      * @return the conjunction
      */
-    private static String and(Stream<String> conditions)
+    private static SqlCode and(Stream<SqlCode> conditions)
     {
-        List<String> list = conditions.filter(c -> !c.equals("true")).sorted().toList();
+        List<SqlCode> list = conditions.filter(c -> !c.equals(SqlCode.TRUE)).sorted().toList();
 
-        if(list.contains("false"))
-            return "false";
+        if(list.contains(SqlCode.FALSE))
+            return SqlCode.FALSE;
 
         if(list.isEmpty())
-            return "true";
+            return SqlCode.TRUE;
 
-        return list.stream().collect(joining(" AND ", "(", ")"));
+        return list.stream().collect(SqlCode.joining(" AND ", "(", ")"));
     }
 
 
@@ -462,17 +461,17 @@ public class VariableBinding
      * @param conditions the conditions
      * @return the disjunction
      */
-    private static String or(Stream<String> conditions)
+    private static SqlCode or(Stream<SqlCode> conditions)
     {
-        List<String> list = conditions.filter(c -> !c.equals("false")).sorted().toList();
+        List<SqlCode> list = conditions.filter(c -> !c.equals(SqlCode.FALSE)).sorted().toList();
 
-        if(list.contains("true"))
-            return "true";
+        if(list.contains(SqlCode.TRUE))
+            return SqlCode.TRUE;
 
         if(list.isEmpty())
-            return "false";
+            return SqlCode.FALSE;
 
-        return list.stream().collect(joining(" OR ", "(", ")"));
+        return list.stream().collect(SqlCode.joining(" OR ", "(", ")"));
     }
 
 
@@ -483,7 +482,7 @@ public class VariableBinding
      * @param table the table the columns are accessed through, or null
      * @return SQL condition that the variable is unbound
      */
-    public String getIsNull(Table table)
+    public SqlCode getIsNull(Table table)
     {
         return and(mappings.entrySet().stream().filter(e -> e.getValue() != null)
                 .map(e -> getIsNull(e.getKey(), e.getValue(), table)));
@@ -495,7 +494,7 @@ public class VariableBinding
      *
      * @return SQL condition that the variable is unbound
      */
-    public String getIsNull()
+    public SqlCode getIsNull()
     {
         return getIsNull((Table) null);
     }
@@ -508,7 +507,7 @@ public class VariableBinding
      * @param table the table the columns are accessed through, or null
      * @return SQL condition that the variable is bound
      */
-    public String getIsNotNull(Table table)
+    public SqlCode getIsNotNull(Table table)
     {
         return or(mappings.entrySet().stream().filter(e -> e.getValue() != null)
                 .map(e -> getIsNotNull(e.getKey(), e.getValue(), table)));
@@ -520,7 +519,7 @@ public class VariableBinding
      *
      * @return SQL condition that the variable is bound
      */
-    public String getIsNotNull()
+    public SqlCode getIsNotNull()
     {
         return getIsNotNull((Table) null);
     }
@@ -533,7 +532,7 @@ public class VariableBinding
      * @param resClass the resource class
      * @return SQL condition that the variable has no value of the given class
      */
-    public String getIsNull(ClassRelations relations, ResourceClass resClass)
+    public SqlCode getIsNull(ClassRelations relations, ResourceClass resClass)
     {
         return and(Stream.of(getIsNull(resClass, deriveMapping(relations, resClass), null)));
     }
@@ -546,7 +545,7 @@ public class VariableBinding
      * @param resClass the resource class
      * @return SQL condition that the variable has a value of the given class
      */
-    public String getIsNotNull(ClassRelations relations, ResourceClass resClass)
+    public SqlCode getIsNotNull(ClassRelations relations, ResourceClass resClass)
     {
         return or(Stream.of(getIsNotNull(resClass, deriveMapping(relations, resClass), null)));
     }
@@ -576,8 +575,8 @@ public class VariableBinding
             else if(isRtlLangString(e.getKey()))
                 variants.add(e.getKey().toClass(rdfRtlLangString, e.getValue(), literalCanBeNull).get(0));
             else if(hasStringLiteral(e.getKey()))
-                variants.add(new ExpressionColumn("sparql.rdfbox_get_string_literal("
-                        + e.getKey().toClass(box, e.getValue(), literalCanBeNull).get(0) + ")", VARCHAR));
+                variants.add(new ExpressionColumn(SqlCode.of("sparql.rdfbox_get_string_literal(",
+                        e.getKey().toClass(box, e.getValue(), literalCanBeNull).get(0), ")"), VARCHAR));
         }
 
         return coalesce(variants);
@@ -611,8 +610,8 @@ public class VariableBinding
             else if(isRtlLangString(resClass))
                 variants.add(resClass.toClass(rdfRtlLangString, columns, literalCanBeNull).get(0));
             else if(hasStringLiteral(resClass))
-                variants.add(new ExpressionColumn("sparql.rdfbox_get_string_literal("
-                        + resClass.toClass(box, columns, literalCanBeNull).get(0) + ")", VARCHAR));
+                variants.add(new ExpressionColumn(SqlCode.of("sparql.rdfbox_get_string_literal(",
+                        resClass.toClass(box, columns, literalCanBeNull).get(0), ")"), VARCHAR));
             else
                 throw new IllegalArgumentException();
         }
@@ -640,13 +639,14 @@ public class VariableBinding
         Column value = deriveMapping(ClassRelations.NONE, base).get(0);
 
         if(base.equals(box))
-            return new ExpressionColumn("sparql.rdfbox_promote_to_" + getLiteralClassName(target) + "(" + value + ")",
+            return new ExpressionColumn(
+                    SqlCode.of("sparql.rdfbox_promote_to_", getLiteralClassName(target), "(", value, ")"),
                     target.getSqlTypes().get(0));
         else if(target.isSubclassOf(base))
             return value;
         else
-            return new ExpressionColumn("sparql.cast_as_" + target.getResourceName() + "_from_"
-                    + getLiteralClassName(base) + "(" + value + ")", target.getSqlTypes().get(0));
+            return new ExpressionColumn(SqlCode.of("sparql.cast_as_", target.getResourceName(), "_from_",
+                    getLiteralClassName(base), "(", value, ")"), target.getSqlTypes().get(0));
     }
 
 

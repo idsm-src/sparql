@@ -1,6 +1,5 @@
 package cz.iocb.sparql.engine.imcode;
 
-import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 import java.sql.SQLException;
 import java.util.ArrayDeque;
@@ -905,8 +904,9 @@ public final class SqlJoin extends SqlIntercode
         builder.append("SELECT ");
 
         if(!columns.isEmpty())
-            builder.append(columns.stream().map(c -> (columnMap.get(c) != null ? columnMap.get(c) + " AS " : "") + c)
-                    .collect(joining(", ")));
+            builder.append(columns.stream()
+                    .map(c -> columnMap.get(c) != null ? SqlCode.of(columnMap.get(c), " AS ", c) : c.getCode())
+                    .collect(SqlCode.joining(", ")));
         else
             builder.append("1");
 
@@ -932,7 +932,7 @@ public final class SqlJoin extends SqlIntercode
             builder.append(tables.get(i));
         }
 
-        String condition = generateJoinCondition(relations, childs.stream().map(c -> c.getVariableBindings()).toList(),
+        SqlCode condition = generateJoinCondition(relations, childs.stream().map(c -> c.getVariableBindings()).toList(),
                 tables);
 
         if(condition != null)
@@ -980,14 +980,14 @@ public final class SqlJoin extends SqlIntercode
             int outer = translateTree(request, scope, lookup.outer(), joined, builder);
             SqlTableAccess access = (SqlTableAccess) childs.get(lookup.child());
 
-            List<String> conditions = new ArrayList<>();
+            List<SqlCode> conditions = new ArrayList<>();
 
             for(int i = 0; i < childs.size(); i++)
             {
                 if((outer >> i & 1) == 0)
                     continue;
 
-                String condition = generateJoinCondition(relations, childs.get(i).getVariableBindings(),
+                SqlCode condition = generateJoinCondition(relations, childs.get(i).getVariableBindings(),
                         access.getInternalVariableBindings(), tables.get(i), null, joined);
 
                 if(condition != null)
@@ -995,8 +995,8 @@ public final class SqlJoin extends SqlIntercode
             }
 
             builder.append(" CROSS JOIN LATERAL (");
-            builder.append(access.translateLateral(request,
-                    conditions.isEmpty() ? "true" : conditions.stream().collect(joining(" AND ", "(", ")"))));
+            builder.append(access.translateLateral(request, conditions.isEmpty() ? SqlCode.TRUE :
+                    conditions.stream().collect(SqlCode.joining(" AND ", "(", ")"))));
             builder.append(") AS ");
             builder.append(tables.get(lookup.child()));
 
@@ -1010,7 +1010,7 @@ public final class SqlJoin extends SqlIntercode
         SqlBuilder rightBuilder = new SqlBuilder();
         int right = translateTree(request, scope, join.right(), joined, rightBuilder);
 
-        List<String> conditions = new ArrayList<>();
+        List<SqlCode> conditions = new ArrayList<>();
 
         for(int i = 0; i < childs.size(); i++)
         {
@@ -1022,7 +1022,7 @@ public final class SqlJoin extends SqlIntercode
                 if((right >> j & 1) == 0)
                     continue;
 
-                String condition = generateJoinCondition(relations, childs.get(i).getVariableBindings(),
+                SqlCode condition = generateJoinCondition(relations, childs.get(i).getVariableBindings(),
                         childs.get(j).getVariableBindings(), tables.get(i), tables.get(j), joined);
 
                 if(condition != null)
@@ -1045,7 +1045,7 @@ public final class SqlJoin extends SqlIntercode
         if(!conditions.isEmpty())
         {
             builder.append(" ON ");
-            builder.append(conditions.stream().collect(joining(" AND ", "(", ")")));
+            builder.append(conditions.stream().collect(SqlCode.joining(" AND ", "(", ")")));
         }
 
         return left | right;

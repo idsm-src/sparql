@@ -52,7 +52,6 @@ import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.estimateAsUnion
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getExpressionClass;
-import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -66,6 +65,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
@@ -423,8 +423,8 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             Set<ResourceClass> lset = set.stream().map(c -> c.get(0)).collect(toSet());
             Set<ResourceClass> rset = set.stream().map(c -> c.get(1)).collect(toSet());
 
-            String code = "(" + getBox(left, lset) + " operator(sparql." + operator.getText() + ") "
-                    + getBox(right, rset) + ")";
+            SqlCode code = SqlCode.of("(", getBox(left, lset), " operator(sparql.", operator.getText(), ") ",
+                    getBox(right, rset), ")");
 
             mappings.put(xsdBoolean,
                     restriction.contains(relations, xsdBoolean) ? List.of(new ExpressionColumn(code, BOOL)) : null);
@@ -744,7 +744,7 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
      * @param right the right operand
      * @return SQL comparing the operands taken in the given classes, according to their comparison mode
      */
-    private static String translate(ClassRelations relations, ComparisonOperator operator, Set<ResourceClass> lset,
+    private static SqlCode translate(ClassRelations relations, ComparisonOperator operator, Set<ResourceClass> lset,
             Set<ResourceClass> rset, SqlExpressionIntercode left, SqlExpressionIntercode right)
     {
         return switch(getComparisonMode(relations, operator, lset, rset))
@@ -753,7 +753,7 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             {
                 Column cl = left.get(relations, genBoolean).get(0);
                 Column cr = right.get(relations, genBoolean).get(0);
-                yield "(" + cl + " " + operator.getText() + " " + cr + ")";
+                yield SqlCode.of("(", cl, " ", operator.getText(), " ", cr, ")");
             }
 
             case DECIMAL ->
@@ -761,7 +761,7 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                 ResourceClass cmp = determineNumericComparisonType(lset, rset);
                 Column cl = left.promoteNumericAs(lset, cmp);
                 Column cr = right.promoteNumericAs(rset, cmp);
-                yield "(" + cl + " " + operator.getText() + " " + cr + ")";
+                yield SqlCode.of("(", cl, " ", operator.getText(), " ", cr, ")");
             }
 
             case FLOAT ->
@@ -769,7 +769,7 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                 ResourceClass cmp = determineNumericComparisonType(lset, rset);
                 Column cl = left.promoteNumericAs(lset, cmp);
                 Column cr = right.promoteNumericAs(rset, cmp);
-                yield "(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")";
+                yield SqlCode.of("(", cl, " operator(sparql.", operator.getText(), ") ", cr, ")");
             }
 
             case DATETIME ->
@@ -777,21 +777,21 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                 //FIXME: we assume that genScalarDateTime is equivalent to genDateTime
                 Column cl = left.get(relations, genDateTime).get(0);
                 Column cr = right.get(relations, genDateTime).get(0);
-                yield "(" + cl + " " + operator.getText() + " " + cr + ")";
+                yield SqlCode.of("(", cl, " ", operator.getText(), " ", cr, ")");
             }
 
             case DATE ->
             {
                 Column cl = left.get(relations, genScalarDate).get(0);
                 Column cr = right.get(relations, genScalarDate).get(0);
-                yield "(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")";
+                yield SqlCode.of("(", cl, " operator(sparql.", operator.getText(), ") ", cr, ")");
             }
 
             case DATE_SAME_TZ ->
             {
                 Column cl = left.get(relations, genDate).get(0);
                 Column cr = right.get(relations, genDate).get(0);
-                yield "(" + cl + " " + operator.getText() + " " + cr + ")";
+                yield SqlCode.of("(", cl, " ", operator.getText(), " ", cr, ")");
             }
 
             case DATE_EARLIER_TZ ->
@@ -807,7 +807,7 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
 
                 Column cl = left.get(relations, genDate).get(0);
                 Column cr = right.get(relations, genDate).get(0);
-                yield "(" + cl + " " + effectiveOperator.getText() + " " + cr + ")";
+                yield SqlCode.of("(", cl, " ", effectiveOperator.getText(), " ", cr, ")");
             }
 
             case DATE_LATER_TZ ->
@@ -823,7 +823,7 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
 
                 Column cl = left.get(relations, genDate).get(0);
                 Column cr = right.get(relations, genDate).get(0);
-                yield "(" + cl + " " + effectiveOperator.getText() + " " + cr + ")";
+                yield SqlCode.of("(", cl, " ", effectiveOperator.getText(), " ", cr, ")");
             }
 
             case TRIPLE_TERM ->
@@ -831,7 +831,7 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                 // the operator mapping of SPARQL 1.2: (A.subject = B.subject) && (A.predicate = B.predicate) &&
                 // (A.object = B.object), the three-valued && of SPARQL being the AND of SQL, so that a component that
                 // differs decides even when another one is an error
-                List<String> parts = new ArrayList<>();
+                List<SqlCode> parts = new ArrayList<>();
                 boolean different = false;
 
                 for(Component component : Component.values())
@@ -841,44 +841,44 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                     SqlExpressionIntercode comparison = create(relations, EQUAL, l, r);
 
                     if(comparison.equals(SqlNull.get()))
-                        parts.add("NULL::bool");
+                        parts.add(new SqlCode("NULL::bool"));
                     else if(comparison.equals(falseValue))
                         different = true;
                     else if(!comparison.equals(trueValue))
-                        parts.add(comparison.get(relations, xsdBoolean).get(0).toString());
+                        parts.add(comparison.get(relations, xsdBoolean).get(0).getCode());
                 }
 
-                String equality;
+                SqlCode equality;
 
                 if(different)
-                    equality = "false";
+                    equality = SqlCode.FALSE;
                 else if(parts.isEmpty())
-                    equality = "true";
+                    equality = SqlCode.TRUE;
                 else
-                    equality = parts.stream().collect(joining(" AND ", "(", ")"));
+                    equality = parts.stream().collect(SqlCode.joining(" AND ", "(", ")"));
 
-                yield operator == EQUAL ? equality : "NOT " + equality;
+                yield operator == EQUAL ? equality : SqlCode.of("NOT ", equality);
             }
 
             case BOX ->
             {
                 Column cl = left.get(relations, unionize(lset, box)).get(0);
                 Column cr = right.get(relations, unionize(rset, box)).get(0);
-                yield "(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")";
+                yield SqlCode.of("(", cl, " operator(sparql.", operator.getText(), ") ", cr, ")");
             }
 
             case DIFF ->
             {
                 // decided only for values of the classes compared here, the other variants cover the other classes
-                String present = Stream
+                SqlCode present = Stream
                         .of(lset.stream().map(c -> left.getIsNotNull(relations, c)),
                                 rset.stream().map(c -> right.getIsNotNull(relations, c)))
-                        .map(s -> s.collect(joining(" OR ", "(", ")"))).collect(joining(" AND "));
+                        .map(s -> s.collect(SqlCode.joining(" OR ", "(", ")"))).collect(SqlCode.joining(" AND "));
 
                 if(operator == EQUAL)
-                    yield "CASE WHEN " + present + " THEN false END";
+                    yield SqlCode.of("CASE WHEN ", present, " THEN false END");
                 else if(operator == NOT_EQUAL)
-                    yield "CASE WHEN " + present + " THEN true END";
+                    yield SqlCode.of("CASE WHEN ", present, " THEN true END");
                 else
                     throw new IllegalArgumentException();
             }
@@ -898,13 +898,13 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                 List<Column> cr = right.get(relations, cmp);
 
                 if(operator == EQUAL)
-                    yield getIdentityConditions(cmp, cl, cr).stream().collect(joining(" AND ", "(", ")"));
+                    yield getIdentityConditions(cmp, cl, cr).stream().collect(SqlCode.joining(" AND ", "(", ")"));
                 else if(operator == NOT_EQUAL && cmp.getColumnCount() > 1)
-                    yield getNonIdentityConditions(cmp, cl, cr).stream().collect(joining(" OR ", "(", ")"));
+                    yield getNonIdentityConditions(cmp, cl, cr).stream().collect(SqlCode.joining(" OR ", "(", ")"));
 
                 yield IntStream.range(0, cmp.getColumnCount())
-                        .mapToObj(i -> cl.get(i) + " " + operator.getText() + " " + cr.get(i))
-                        .collect(joining(" AND ", "(", ")"));
+                        .mapToObj(i -> SqlCode.of(cl.get(i), " ", operator.getText(), " ", cr.get(i)))
+                        .collect(SqlCode.joining(" AND ", "(", ")"));
             }
 
             case LITERAL ->
@@ -922,9 +922,11 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                 List<Column> cr = right.get(relations, cmp);
 
                 if(operator == EQUAL)
-                    yield getIdentityConditions(cmp, cl, cr).stream().collect(joining(" AND ", "NULLIF(", ", false)"));
+                    yield getIdentityConditions(cmp, cl, cr).stream()
+                            .collect(SqlCode.joining(" AND ", "NULLIF(", ", false)"));
                 else if(operator == NOT_EQUAL)
-                    yield getNonIdentityConditions(cmp, cl, cr).stream().collect(joining(" OR ", "NULLIF(", ", true)"));
+                    yield getNonIdentityConditions(cmp, cl, cr).stream()
+                            .collect(SqlCode.joining(" OR ", "NULLIF(", ", true)"));
                 throw new IllegalArgumentException();
             }
 

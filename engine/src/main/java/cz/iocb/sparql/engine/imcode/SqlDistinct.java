@@ -201,7 +201,7 @@ public final class SqlDistinct extends SqlIntercode
         Set<Column> columns = getVariableBindings().getNonConstantColumns();
 
         if(!columns.isEmpty())
-            builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
+            builder.append(columns.stream().collect(SqlCode.joining(", ")));
         else
             builder.append("1");
 
@@ -215,7 +215,7 @@ public final class SqlDistinct extends SqlIntercode
                 .getNonConstantColumns();
 
         if(!groupColumns.isEmpty())
-            builder.append(groupColumns.stream().map(Object::toString).collect(joining(", ")));
+            builder.append(groupColumns.stream().collect(SqlCode.joining(", ")));
         else
             builder.append("1");
 

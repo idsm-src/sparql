@@ -1393,7 +1393,7 @@ public final class SqlTableAccess extends SqlIntercode
                             modified.add(col);
                         else
                             modified.add(new ExpressionColumn(
-                                    "CASE WHEN " + extraCondition + " IS NOT NULL THEN " + col + " END",
+                                    SqlCode.of("CASE WHEN ", extraCondition, " IS NOT NULL THEN ", col, " END"),
                                     col.getType()));
                     }
 
@@ -1897,9 +1897,9 @@ public final class SqlTableAccess extends SqlIntercode
      * @param relations declarations which unrelated user IRI classes may overlap
      * @return SQL condition restricting the rows to the values of the current solution, or null
      */
-    private String translateValues(ClassRelations relations)
+    private SqlCode translateValues(ClassRelations relations)
     {
-        List<String> comparisons = new ArrayList<>();
+        List<SqlCode> comparisons = new ArrayList<>();
 
         for(ValueCondition condition : values)
         {
@@ -1910,13 +1910,13 @@ public final class SqlTableAccess extends SqlIntercode
             VariableBinding required = !isComparedInClass(relations, resClass, value) ? value.getBinding() :
                     new VariableBinding(Map.of(resClass, value.getBinding().deriveMapping(relations, resClass)), false);
 
-            String comparison = generateJoinCondition(relations, held, required, null, null);
+            SqlCode comparison = generateJoinCondition(relations, held, required, null, null);
 
             if(comparison != null)
                 comparisons.add(comparison);
         }
 
-        return comparisons.isEmpty() ? null : String.join(" AND ", comparisons);
+        return comparisons.isEmpty() ? null : comparisons.stream().collect(SqlCode.joining(" AND "));
     }
 
 
@@ -1952,7 +1952,7 @@ public final class SqlTableAccess extends SqlIntercode
      * @param correlatedCondition SQL condition over the columns of the table and of the outer tables
      * @return SQL code of the access evaluated for a row of the outer tables
      */
-    public SqlCode translateLateral(Request request, String correlatedCondition)
+    public SqlCode translateLateral(Request request, SqlCode correlatedCondition)
     {
         return translateAccess(request, correlatedCondition);
     }
@@ -1967,12 +1967,12 @@ public final class SqlTableAccess extends SqlIntercode
      * @param correlatedCondition SQL condition over the columns of the table and of the outer tables, or null
      * @return SQL code of the access
      */
-    private SqlCode translateAccess(Request request, String correlatedCondition)
+    private SqlCode translateAccess(Request request, SqlCode correlatedCondition)
     {
         // the values of the current solution restrict the rows along with the conditions
-        String valueCondition = translateValues(request.getConfiguration());
-        String extraCondition = valueCondition == null ? correlatedCondition :
-                correlatedCondition == null ? valueCondition : valueCondition + " AND " + correlatedCondition;
+        SqlCode valueCondition = translateValues(request.getConfiguration());
+        SqlCode extraCondition = valueCondition == null ? correlatedCondition :
+                correlatedCondition == null ? valueCondition : SqlCode.of(valueCondition, " AND ", correlatedCondition);
 
         Map<Column, Column> rev = getExpressions();
 
@@ -2018,8 +2018,9 @@ public final class SqlTableAccess extends SqlIntercode
             builder.append("DISTINCT ");
 
         if(!columns.isEmpty())
-            builder.append(columns.stream().map(c -> (rev.containsKey(c) ? rev.get(c) + " AS " : "") + c)
-                    .collect(joining(", ")));
+            builder.append(
+                    columns.stream().map(c -> rev.containsKey(c) ? SqlCode.of(rev.get(c), " AS ", c) : c.getCode())
+                            .collect(SqlCode.joining(", ")));
         else
             builder.append("1");
 
@@ -2034,13 +2035,10 @@ public final class SqlTableAccess extends SqlIntercode
 
         appendConditions(builder, conditions, extraCondition);
 
-        // the conditions hold the columns of the values of the current solution, so the code reads what their SQL reads
-        values.forEach(v -> builder.addDeclaredTables(v.value().getDeclaredTables()));
-
         if(groupColumns != null)
         {
             builder.append(" GROUP BY ");
-            builder.append(groupColumns.stream().sorted().map(Object::toString).collect(joining(", ")));
+            builder.append(groupColumns.stream().sorted().collect(SqlCode.joining(", ")));
         }
 
         if(existence)
@@ -2103,9 +2101,9 @@ public final class SqlTableAccess extends SqlIntercode
      *
      * @param builder the SQL code being built
      * @param conditions the conditions
-     * @param extra SQL of an extra condition in conjunction with the conditions, or null
+     * @param extra SQL code of an extra condition in conjunction with the conditions, or null
      */
-    private static void appendConditions(SqlBuilder builder, Conditions conditions, String extra)
+    private static void appendConditions(SqlBuilder builder, Conditions conditions, SqlCode extra)
     {
         if(conditions.isTrue() && extra == null)
             return;
@@ -2269,8 +2267,10 @@ public final class SqlTableAccess extends SqlIntercode
         Condition r = right.conditions.getConditions().iterator().next();
         Column discriminator = getDiscriminator(left, right);
 
-        String leftTest = discriminator + (l.getIsNull().contains(discriminator) ? " IS NULL" : " IS NOT NULL");
-        String rightTest = discriminator + (r.getIsNull().contains(discriminator) ? " IS NULL" : " IS NOT NULL");
+        SqlCode leftTest = SqlCode.of(discriminator,
+                l.getIsNull().contains(discriminator) ? " IS NULL" : " IS NOT NULL");
+        SqlCode rightTest = SqlCode.of(discriminator,
+                r.getIsNull().contains(discriminator) ? " IS NULL" : " IS NOT NULL");
 
         Map<Column, Column> leftExpressions = left.getExpressions();
         Map<Column, Column> rightExpressions = right.getExpressions();

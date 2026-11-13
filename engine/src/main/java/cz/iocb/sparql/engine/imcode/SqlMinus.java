@@ -3,7 +3,6 @@ package cz.iocb.sparql.engine.imcode;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
-import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -311,7 +310,7 @@ public final class SqlMinus extends SqlIntercode
         Set<Column> columns = getVariableBindings().getNonConstantColumns();
 
         if(!columns.isEmpty())
-            builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
+            builder.append(columns.stream().collect(SqlCode.joining(", ")));
         else
             builder.append("1");
 
@@ -325,7 +324,7 @@ public final class SqlMinus extends SqlIntercode
         builder.append(") AS ");
         builder.append(rightTable);
 
-        String condition = generateCondition(relations, left.getVariableBindings(), right.getVariableBindings(),
+        SqlCode condition = generateCondition(relations, left.getVariableBindings(), right.getVariableBindings(),
                 leftTable, rightTable);
 
         if(condition != null)
@@ -333,10 +332,6 @@ public final class SqlMinus extends SqlIntercode
             builder.append(" WHERE ");
             builder.append(condition);
         }
-
-        // the condition may hold the test of the current solution, so the code reads what the SQL of the test reads
-        if(solutionBound != null)
-            builder.addDeclaredTables(solutionBound.getDeclaredTables());
 
         builder.append(")");
 
@@ -357,10 +352,10 @@ public final class SqlMinus extends SqlIntercode
      * @return SQL condition that a right solution removes a left one: the shared variables (the graph variable
      *         included) are compatible and at least one of them (the graph variable excluded) is bound on both sides
      */
-    private String generateCondition(ClassRelations relations, VariableBindings left, VariableBindings right,
+    private SqlCode generateCondition(ClassRelations relations, VariableBindings left, VariableBindings right,
             AliasTable leftTable, AliasTable rightTable)
     {
-        String joinCondition = generateJoinCondition(relations, left, right, leftTable, rightTable);
+        SqlCode joinCondition = generateJoinCondition(relations, left, right, leftTable, rightTable);
 
         List<VariableBindingPair> pairs = VariableBindingPair.getPairs(relations, left, right).stream()
                 .filter(p -> !p.getVariable().equals(graph)).toList();
@@ -373,14 +368,14 @@ public final class SqlMinus extends SqlIntercode
             return joinCondition;
 
 
-        List<String> condition = new ArrayList<>();
+        List<SqlCode> condition = new ArrayList<>();
 
         for(VariableBindingPair pair : pairs)
         {
             VariableBinding leftBinding = pair.getLeftVariableBinding();
             VariableBinding rightBinding = pair.getRightVariableBinding();
 
-            StringBuilder builder = new StringBuilder();
+            SqlBuilder builder = new SqlBuilder();
 
             if(leftBinding.canBeNull())
                 builder.append(leftBinding.getIsNotNull(leftTable));
@@ -391,22 +386,22 @@ public final class SqlMinus extends SqlIntercode
             if(rightBinding.canBeNull())
                 builder.append(rightBinding.getIsNotNull(rightTable));
 
-            condition.add(builder.toString());
+            condition.add(builder.toCode());
         }
 
         if(solutionBound != null)
-            condition.add(solutionBound.get(relations, xsdBoolean).get(0).toString());
+            condition.add(solutionBound.get(relations, xsdBoolean).get(0).getCode());
 
-        String domCondition = condition.stream().sorted().collect(joining(" OR "));
+        SqlCode domCondition = condition.stream().sorted().collect(SqlCode.joining(" OR "));
 
         if(domCondition.isEmpty())
-            domCondition = "false";
+            domCondition = SqlCode.FALSE;
 
 
         if(joinCondition == null)
             return domCondition;
         else
-            return "(" + joinCondition + ") AND (" + domCondition + ")";
+            return SqlCode.of("(", joinCondition, ") AND (", domCondition, ")");
     }
 
 

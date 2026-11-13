@@ -11,6 +11,7 @@ import java.util.Objects;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.request.Request;
@@ -97,7 +98,7 @@ public class ListUserIriClass extends SimpleUserIriClass
         if(!check)
             return column;
 
-        String access = String.format("(SELECT %s as \"@col\" FROM %s) as \"@rctab\"", column, table);
+        SqlCode access = SqlCode.format("(SELECT %s as \"@col\" FROM %s) as \"@rctab\"", column, table);
 
         return expression(VARCHAR, "(SELECT \"@col\"::varchar FROM %s WHERE \"@col\" = %s)", access, column);
     }

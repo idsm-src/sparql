@@ -2,7 +2,6 @@ package cz.iocb.sparql.engine.imcode;
 
 import static cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.getAcceptedClass;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.intersect;
-import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -399,8 +398,9 @@ public final class SqlProcedureCall extends SqlIntercode
         builder.append("SELECT ");
 
         if(!columns.isEmpty())
-            builder.append(columns.stream().map(c -> (columnMap.get(c) != null ? columnMap.get(c) + " AS " : "") + c)
-                    .collect(joining(", ")));
+            builder.append(columns.stream()
+                    .map(c -> columnMap.get(c) != null ? SqlCode.of(columnMap.get(c), " AS ", c) : c.getCode())
+                    .collect(SqlCode.joining(", ")));
         else
             builder.append("1");
 
@@ -438,7 +438,7 @@ public final class SqlProcedureCall extends SqlIntercode
     {
         ClassRelations relations = request.getConfiguration();
 
-        List<String> declared = new ArrayList<>();
+        List<SqlCode> declared = new ArrayList<>();
 
         for(Entry<ParameterDefinition, SqlExpressionIntercode> entry : parameters.entrySet())
         {
@@ -446,25 +446,22 @@ public final class SqlProcedureCall extends SqlIntercode
             SqlExpressionIntercode node = entry.getValue();
 
             for(Column column : node.getValue(relations, resClass))
-                declared.add(columnMap.getOrDefault(column, column).toString());
+                declared.add(columnMap.getOrDefault(column, column).getCode());
         }
 
         Function function = specialization == null || specialization.getSqlProcedure() == null ?
                 procedure.getSqlProcedure() : specialization.getSqlProcedure();
-        List<String> arguments = specialization == null ? declared : specialization.getArguments(declared);
+        List<SqlCode> arguments = specialization == null ? declared : specialization.getArguments(declared);
 
         SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT ");
         builder.append(function);
-        builder.append(arguments.stream().collect(joining(", ", "(", ")")));
+        builder.append(arguments.stream().collect(SqlCode.joining(", ", "(", ")")));
 
         builder.append(" AS \"");
         builder.append(resultVar);
         builder.append('"');
-
-        // the columns of the parameters are written here, so the code reads what their SQL reads
-        parameters.values().forEach(p -> builder.addDeclaredTables(p.getDeclaredTables()));
 
         for(Column column : child.getVariableBindings()
                 .restrict(relations, new Restrictions(this.getVariableBindings().getVariables()))
@@ -556,14 +553,14 @@ public final class SqlProcedureCall extends SqlIntercode
 
         if(fields == null)
         {
-            result.add(new ExpressionColumn("\"" + resultVar + "\"", resClass.getSqlTypes().get(0)));
+            result.add(new ExpressionColumn(SqlCode.of("\"", resultVar, "\""), resClass.getSqlTypes().get(0)));
         }
         else
         {
             for(Column field : fields)
             {
                 if(field instanceof TableColumn)
-                    result.add(new ExpressionColumn("(\"" + resultVar + "\")." + field, field.getType()));
+                    result.add(new ExpressionColumn(SqlCode.of("(\"", resultVar, "\").", field), field.getType()));
                 else if(field instanceof ConstantColumn)
                     result.add(field);
                 else

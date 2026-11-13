@@ -248,12 +248,12 @@ public class SqlType
      * @param right the right value
      * @return SQL condition that two not-null values of the type are identical
      */
-    public String equal(Column left, Column right)
+    public SqlCode equal(Column left, Column right)
     {
         if(hasIdentityOperators())
-            return "(" + left + " operator(sparql.@=) " + right + ")";
+            return SqlCode.of("(", left, " operator(sparql.@=) ", right, ")");
 
-        return "(" + left + " = " + right + ")";
+        return SqlCode.of("(", left, " = ", right, ")");
     }
 
 
@@ -265,13 +265,13 @@ public class SqlType
      * @param right the right value
      * @return SQL condition that two nullable values of the type are identical or both NULL
      */
-    public String notDistinct(Column left, Column right)
+    public SqlCode notDistinct(Column left, Column right)
     {
         if(hasIdentityOperators())
-            return "COALESCE(" + left + " operator(sparql.@=) " + right + ", " + left + " IS NULL AND " + right
-                    + " IS NULL)";
+            return SqlCode.of("COALESCE(", left, " operator(sparql.@=) ", right, ", ", left, " IS NULL AND ", right,
+                    " IS NULL)");
 
-        return "(" + left + " IS NOT DISTINCT FROM " + right + ")";
+        return SqlCode.of("(", left, " IS NOT DISTINCT FROM ", right, ")");
     }
 
 
@@ -283,13 +283,13 @@ public class SqlType
      * @param right the right value
      * @return SQL condition that two nullable values of the type differ or exactly one of them is NULL
      */
-    public String distinct(Column left, Column right)
+    public SqlCode distinct(Column left, Column right)
     {
         if(hasIdentityOperators())
-            return "(NOT COALESCE(" + left + " operator(sparql.@=) " + right + ", " + left + " IS NULL AND " + right
-                    + " IS NULL))";
+            return SqlCode.of("(NOT COALESCE(", left, " operator(sparql.@=) ", right, ", ", left, " IS NULL AND ",
+                    right, " IS NULL))");
 
-        return "(" + left + " IS DISTINCT FROM " + right + ")";
+        return SqlCode.of("(", left, " IS DISTINCT FROM ", right, ")");
     }
 
 
@@ -301,12 +301,12 @@ public class SqlType
      * @param right the right value
      * @return SQL condition that two not-null values of the type are not identical
      */
-    public String notEqual(Column left, Column right)
+    public SqlCode notEqual(Column left, Column right)
     {
         if(hasIdentityOperators())
-            return "(" + left + " operator(sparql.@<>) " + right + ")";
+            return SqlCode.of("(", left, " operator(sparql.@<>) ", right, ")");
 
-        return "(" + left + " != " + right + ")";
+        return SqlCode.of("(", left, " != ", right, ")");
     }
 
 

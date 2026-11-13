@@ -18,6 +18,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -135,8 +136,8 @@ public final class SqlUnaryArithmetic extends SqlUnary
             for(List<Set<ResourceClass>> variant : variants)
             {
                 Column op = operand.promoteNumericAs(variant.get(0), resultClass);
-                cols.add(isMinus ?
-                        new ExpressionColumn("(operator(sparql.-) " + op + ")", resultClass.getSqlTypes().get(0)) : op);
+                cols.add(isMinus ? new ExpressionColumn(SqlCode.of("(operator(sparql.-) ", op, ")"),
+                        resultClass.getSqlTypes().get(0)) : op);
             }
         }
         else
@@ -144,7 +145,7 @@ public final class SqlUnaryArithmetic extends SqlUnary
             for(List<Set<ResourceClass>> variant : variants)
             {
                 Column op = operand.get(relations, unionize(variant.get(0), box)).get(0);
-                cols.add(new ExpressionColumn("(operator(sparql." + (isMinus ? "-" : "+") + ") " + op + ")",
+                cols.add(new ExpressionColumn(SqlCode.of("(operator(sparql.", (isMinus ? "-" : "+"), ") ", op, ")"),
                         resultClass.getSqlTypes().get(0)));
             }
         }

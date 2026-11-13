@@ -26,6 +26,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.Function;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.imcode.SqlSelect;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -134,10 +135,10 @@ public class ProcedureSelectionTest
             return new ProcedureSpecialization()
             {
                 @Override
-                public List<String> getArguments(List<String> declared)
+                public List<SqlCode> getArguments(List<SqlCode> declared)
                 {
-                    List<String> arguments = new ArrayList<>();
-                    arguments.add(parts);
+                    List<SqlCode> arguments = new ArrayList<>();
+                    arguments.add(new SqlCode(parts));
                     arguments.addAll(declared);
                     return arguments;
                 }

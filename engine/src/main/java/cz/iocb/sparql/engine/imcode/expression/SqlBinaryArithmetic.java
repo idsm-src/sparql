@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -237,7 +238,8 @@ public final class SqlBinaryArithmetic extends SqlBinary
                 Column cl = left.promoteNumericAs(variant.get(0), resultClass);
                 Column cr = right.promoteNumericAs(variant.get(1), resultClass);
 
-                cols.add(new ExpressionColumn("(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")",
+                cols.add(new ExpressionColumn(
+                        SqlCode.of("(", cl, " operator(sparql.", operator.getText(), ") ", cr, ")"),
                         resultClass.getSqlTypes().get(0)));
             }
         }
@@ -248,7 +250,8 @@ public final class SqlBinaryArithmetic extends SqlBinary
                 Column cl = left.get(relations, unionize(variant.get(0), box)).get(0);
                 Column cr = right.get(relations, unionize(variant.get(1), box)).get(0);
 
-                cols.add(new ExpressionColumn("(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")",
+                cols.add(new ExpressionColumn(
+                        SqlCode.of("(", cl, " operator(sparql.", operator.getText(), ") ", cr, ")"),
                         resultClass.getSqlTypes().get(0)));
             }
         }

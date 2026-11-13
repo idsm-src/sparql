@@ -20,6 +20,7 @@ import java.util.stream.IntStream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.TripleTerm;
@@ -1133,12 +1134,12 @@ public final class DerivedClass extends ResourceClass
         if(checkOptional)
             return result;
 
-        String condition = getMembershipCondition(superClass, columns);
+        SqlCode condition = getMembershipCondition(superClass, columns);
 
-        if(condition.equals("true"))
+        if(condition.equals(SqlCode.TRUE))
             return result;
 
-        if(condition.equals("false"))
+        if(condition.equals(SqlCode.FALSE))
             return effectiveClass.getSqlTypes().stream().map(t -> (Column) new NullColumn(t)).toList();
 
         return result.stream().map(c -> expression(c.getType(), "CASE WHEN %s THEN %s END", condition, c)).toList();
@@ -1180,13 +1181,13 @@ public final class DerivedClass extends ResourceClass
      * @param columns the columns representing the value in the effective class of the superclass
      * @return SQL condition that the value belongs to this class
      */
-    private String getMembershipCondition(ResourceClass superClass, List<Column> columns)
+    private SqlCode getMembershipCondition(ResourceClass superClass, List<Column> columns)
     {
-        List<String> alternatives = new ArrayList<>();
+        List<SqlCode> alternatives = new ArrayList<>();
 
         for(Map<PrimitiveResourceClass, Boolean> term : terms)
         {
-            List<String> tests = new ArrayList<>();
+            List<SqlCode> tests = new ArrayList<>();
 
             for(Entry<PrimitiveResourceClass, Boolean> literal : term.entrySet())
                 tests.add(getMembershipCondition(superClass, columns, literal.getKey(), literal.getValue()));
@@ -1211,11 +1212,11 @@ public final class DerivedClass extends ResourceClass
      * @param positive false for a negated literal
      * @return SQL condition that the value belongs (or does not belong) to the primitive class
      */
-    private String getMembershipCondition(ResourceClass superClass, List<Column> columns,
+    private SqlCode getMembershipCondition(ResourceClass superClass, List<Column> columns,
             PrimitiveResourceClass resClass, boolean positive)
     {
         if(superClass.isSubclassOf(resClass) || effectiveClass.isSubclassOf(resClass))
-            return Boolean.toString(positive);
+            return positive ? SqlCode.TRUE : SqlCode.FALSE;
 
         List<Column> converted = convert(superClass.getEffectiveClass(), resClass, columns, true, false);
 
@@ -1225,12 +1226,12 @@ public final class DerivedClass extends ResourceClass
         Column column = converted.get(index);
 
         if(column instanceof NullColumn)
-            return Boolean.toString(!positive);
+            return positive ? SqlCode.FALSE : SqlCode.TRUE;
 
         if(column instanceof ConstantColumn)
-            return Boolean.toString(positive);
+            return positive ? SqlCode.TRUE : SqlCode.FALSE;
 
-        return column + (positive ? " IS NOT NULL" : " IS NULL");
+        return SqlCode.of(column, positive ? " IS NOT NULL" : " IS NULL");
     }
 
 
@@ -1241,20 +1242,20 @@ public final class DerivedClass extends ResourceClass
      * @param conditions the conditions
      * @return the conjunction
      */
-    private static String and(List<String> conditions)
+    private static SqlCode and(List<SqlCode> conditions)
     {
-        List<String> list = conditions.stream().filter(c -> !c.equals("true")).distinct().sorted().toList();
+        List<SqlCode> list = conditions.stream().filter(c -> !c.equals(SqlCode.TRUE)).distinct().sorted().toList();
 
-        if(list.contains("false"))
-            return "false";
+        if(list.contains(SqlCode.FALSE))
+            return SqlCode.FALSE;
 
         if(list.isEmpty())
-            return "true";
+            return SqlCode.TRUE;
 
         if(list.size() == 1)
             return list.get(0);
 
-        return list.stream().collect(joining(" AND ", "(", ")"));
+        return list.stream().collect(SqlCode.joining(" AND ", "(", ")"));
     }
 
 
@@ -1265,20 +1266,20 @@ public final class DerivedClass extends ResourceClass
      * @param conditions the conditions
      * @return the disjunction
      */
-    private static String or(List<String> conditions)
+    private static SqlCode or(List<SqlCode> conditions)
     {
-        List<String> list = conditions.stream().filter(c -> !c.equals("false")).distinct().sorted().toList();
+        List<SqlCode> list = conditions.stream().filter(c -> !c.equals(SqlCode.FALSE)).distinct().sorted().toList();
 
-        if(list.contains("true"))
-            return "true";
+        if(list.contains(SqlCode.TRUE))
+            return SqlCode.TRUE;
 
         if(list.isEmpty())
-            return "false";
+            return SqlCode.FALSE;
 
         if(list.size() == 1)
             return list.get(0);
 
-        return list.stream().collect(joining(" OR ", "(", ")"));
+        return list.stream().collect(SqlCode.joining(" OR ", "(", ")"));
     }
 
 

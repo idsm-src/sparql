@@ -257,7 +257,7 @@ public final class SqlValues extends SqlIntercode
     @Override
     public SqlCode translate(Request request, Scope scope)
     {
-        CommonTable table = request.getCommonTableExpression(new SqlCode(translateValues()));
+        CommonTable table = request.getCommonTableExpression(translateValues());
 
         SqlBuilder builder = new SqlBuilder();
 
@@ -275,9 +275,9 @@ public final class SqlValues extends SqlIntercode
      *
      * @return SQL selecting the rows of the inline table from a VALUES list
      */
-    private String translateValues()
+    private SqlCode translateValues()
     {
-        StringBuilder builder = new StringBuilder();
+        SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT * FROM (VALUES ");
 
@@ -306,7 +306,7 @@ public final class SqlValues extends SqlIntercode
         builder.append(translateColumns());
         builder.append(")");
 
-        return builder.toString();
+        return builder.toCode();
     }
 
 
@@ -315,12 +315,12 @@ public final class SqlValues extends SqlIntercode
      *
      * @return the column list of the inline table
      */
-    private String translateColumns()
+    private SqlCode translateColumns()
     {
         if(data.isEmpty())
-            return "\"#null\"";
+            return new SqlCode("\"#null\"");
 
-        return data.keySet().stream().map(Object::toString).collect(joining(","));
+        return data.keySet().stream().collect(SqlCode.joining(","));
     }
 
 

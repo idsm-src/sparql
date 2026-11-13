@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.imcode;
 
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
-import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -202,8 +201,9 @@ public final class SqlMerge extends SqlIntercode
         builder.append("SELECT ");
 
         if(!columns.isEmpty())
-            builder.append(columns.stream().map(c -> (columnMap.get(c) != null ? columnMap.get(c) + " AS " : "") + c)
-                    .collect(joining(", ")));
+            builder.append(columns.stream()
+                    .map(c -> columnMap.get(c) != null ? SqlCode.of(columnMap.get(c), " AS ", c) : c.getCode())
+                    .collect(SqlCode.joining(", ")));
         else
             builder.append("1");
 
@@ -212,7 +212,7 @@ public final class SqlMerge extends SqlIntercode
         builder.append(" ) AS ");
         builder.append("tab");
 
-        String condition = generateJoinCondition(request.getConfiguration(), binding1, binding2, null, null);
+        SqlCode condition = generateJoinCondition(request.getConfiguration(), binding1, binding2, null, null);
 
         if(condition != null)
         {

@@ -510,8 +510,9 @@ public final class SqlLateralJoin extends SqlIntercode
         builder.append("SELECT ");
 
         if(!columns.isEmpty())
-            builder.append(columns.stream().map(c -> (columnMap.get(c) != null ? columnMap.get(c) + " AS " : "") + c)
-                    .collect(joining(", ")));
+            builder.append(columns.stream()
+                    .map(c -> columnMap.get(c) != null ? SqlCode.of(columnMap.get(c), " AS ", c) : c.getCode())
+                    .collect(SqlCode.joining(", ")));
         else
             builder.append("1");
 
@@ -525,7 +526,7 @@ public final class SqlLateralJoin extends SqlIntercode
         builder.append(") AS ");
         builder.append(rightTable);
 
-        String condition = generateJoinCondition(relations, left.getVariableBindings(), right.getVariableBindings(),
+        SqlCode condition = generateJoinCondition(relations, left.getVariableBindings(), right.getVariableBindings(),
                 table, rightTable);
 
         if(condition != null)
@@ -571,8 +572,8 @@ public final class SqlLateralJoin extends SqlIntercode
 
         builder.append("SELECT ");
 
-        builder.append(supplements.entrySet().stream().map(e -> e.getValue() + " AS " + e.getKey()).sorted()
-                .collect(joining(", ")));
+        builder.append(supplements.entrySet().stream().map(e -> SqlCode.of(e.getValue(), " AS ", e.getKey())).sorted()
+                .collect(SqlCode.joining(", ")));
 
         Set<Column> columns = new HashSet<>(left.getVariableBindings().getNonConstantColumns());
         columns.removeAll(supplements.keySet());

@@ -1,20 +1,38 @@
 package cz.iocb.sparql.engine.database;
 
+import static java.util.Locale.ROOT;
+import static java.util.stream.Collectors.collectingAndThen;
+import static java.util.stream.Collectors.toList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collector;
 
 
 
 /**
- * SQL code of a query or of a part of one, together with the declared tables it reads (see {@link DeclaredTable}). The
- * code is no statement yet: it becomes a part of larger code, which then reads the tables as well (see
- * {@link SqlBuilder}), until a statement is made of it, whose {@code WITH} clause declares the tables. What the code
- * reads is recorded where the name of the table is written, so it never has to be found in the text again. The text
- * itself is given only by {@link #getText}; the string form of the object serves debugging and is no SQL, so that code
- * joined to a string by mistake, which would lose the tables, does not pass for SQL.
+ * SQL code, together with the declared tables it reads (see {@link DeclaredTable}): a query, a condition, the
+ * expression of a column (see {@link ExpressionColumn}) or any other part of a statement. The code is no statement yet:
+ * it becomes a part of larger code, which then reads the tables as well, until a statement is made of it, whose
+ * {@code WITH} clause declares the tables. What the code reads is recorded where the name of the table is written and
+ * passed on wherever code is made of pieces (see {@link SqlBuilder}, {@link #of}, {@link #format} and
+ * {@link #joining(String)}), so it never has to be found in the text again. Plain strings are pieces of SQL text that
+ * read no declared table, like keywords, operators and the names of functions. The text itself is given only by
+ * {@link #getText}; the string form of the object serves debugging and is no SQL, so that code joined to a string by
+ * mistake, which would lose the tables, does not pass for SQL.
  */
-public final class SqlCode
+public final class SqlCode implements Comparable<SqlCode>
 {
+    /**
+     * The condition that always holds.
+     */
+    public static final SqlCode TRUE = new SqlCode("true");
+
+    /**
+     * The condition that never holds.
+     */
+    public static final SqlCode FALSE = new SqlCode("false");
+
     /**
      * The SQL text.
      */
@@ -38,15 +56,106 @@ public final class SqlCode
 
 
     /**
-     * Creates code reading the given declared tables.
+     * Creates code reading the given declared tables; only a builder makes such code, as it records the tables where
+     * their names are written (see {@link SqlBuilder}).
      *
      * @param text the SQL text
      * @param tables the declared tables the text reads
      */
-    public SqlCode(String text, Set<? extends DeclaredTable> tables)
+    SqlCode(String text, Set<DeclaredTable> tables)
     {
         this.text = Objects.requireNonNull(text);
         this.tables = Set.copyOf(tables);
+    }
+
+
+    /**
+     * Code made of the pieces written one after another (see {@link SqlBuilder#append(Object)}).
+     *
+     * @param pieces the pieces of SQL
+     * @return code made of the pieces
+     */
+    public static SqlCode of(Object... pieces)
+    {
+        SqlBuilder builder = new SqlBuilder();
+
+        for(Object piece : pieces)
+            builder.append(piece);
+
+        return builder.toCode();
+    }
+
+
+    /**
+     * Code made of the format string, as {@link String#format} makes a string of it (in the root locale), with pieces
+     * of SQL as the arguments: the code reads the declared tables the pieces read (see
+     * {@link SqlBuilder#append(Object)}).
+     *
+     * @param format the format string
+     * @param arguments the arguments, pieces of SQL
+     * @return code made of the format string and the arguments
+     */
+    public static SqlCode format(String format, Object... arguments)
+    {
+        SqlBuilder builder = new SqlBuilder();
+        Object[] texts = new Object[arguments.length];
+
+        for(int i = 0; i < arguments.length; i++)
+            texts[i] = builder.record(arguments[i]);
+
+        return builder.append(String.format(ROOT, format, texts)).toCode();
+    }
+
+
+    /**
+     * Collector making code of pieces of SQL (see {@link SqlBuilder#append(Object)}) separated by the delimiter.
+     *
+     * @param delimiter SQL text written between the pieces
+     * @return collector making code of pieces of SQL separated by the delimiter
+     */
+    public static Collector<Object, ?, SqlCode> joining(String delimiter)
+    {
+        return joining(delimiter, "", "");
+    }
+
+
+    /**
+     * Collector making code of pieces of SQL (see {@link SqlBuilder#append(Object)}) separated by the delimiter,
+     * between the prefix and the suffix.
+     *
+     * @param delimiter SQL text written between the pieces
+     * @param prefix SQL text written before the pieces
+     * @param suffix SQL text written after the pieces
+     * @return collector making code of pieces of SQL separated by the delimiter, between the prefix and the suffix
+     */
+    public static Collector<Object, ?, SqlCode> joining(String delimiter, String prefix, String suffix)
+    {
+        return collectingAndThen(toList(), pieces -> join(pieces, delimiter, prefix, suffix));
+    }
+
+
+    /**
+     * Code made of the pieces separated by the delimiter, between the prefix and the suffix.
+     *
+     * @param pieces the pieces of SQL
+     * @param delimiter SQL text written between the pieces
+     * @param prefix SQL text written before the pieces
+     * @param suffix SQL text written after the pieces
+     * @return code made of the pieces
+     */
+    private static SqlCode join(List<Object> pieces, String delimiter, String prefix, String suffix)
+    {
+        SqlBuilder builder = new SqlBuilder().append(prefix);
+
+        for(int i = 0; i < pieces.size(); i++)
+        {
+            if(i > 0)
+                builder.append(delimiter);
+
+            builder.append(pieces.get(i));
+        }
+
+        return builder.append(suffix).toCode();
     }
 
 
@@ -62,6 +171,17 @@ public final class SqlCode
 
 
     /**
+     * True if the code has no text.
+     *
+     * @return true if the code has no text, false otherwise
+     */
+    public boolean isEmpty()
+    {
+        return text.isEmpty();
+    }
+
+
+    /**
      * The declared tables the text reads, which a statement holding the code has to declare in its {@code WITH} clause,
      * along with the declared tables their own queries read.
      *
@@ -70,6 +190,19 @@ public final class SqlCode
     public Set<DeclaredTable> getDeclaredTables()
     {
         return tables;
+    }
+
+
+    /**
+     * Compares the texts, so that pieces of code are sorted as their texts are.
+     *
+     * @param other the other code
+     * @return the result of comparing the texts
+     */
+    @Override
+    public int compareTo(SqlCode other)
+    {
+        return text.compareTo(other.text);
     }
 
 

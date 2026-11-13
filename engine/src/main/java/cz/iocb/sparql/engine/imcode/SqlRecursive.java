@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.imcode;
 
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
-import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -1085,7 +1084,7 @@ public final class SqlRecursive extends SqlIntercode
 
         builder.append("WITH RECURSIVE recursion(");
 
-        builder.append(ev.stream().map(Object::toString).collect(joining(", ")));
+        builder.append(ev.stream().collect(SqlCode.joining(", ")));
 
         boolean hasRecursionVariable = !ev.isEmpty();
 
@@ -1110,7 +1109,7 @@ public final class SqlRecursive extends SqlIntercode
 
         builder.append(") AS (SELECT ");
 
-        builder.append(iv.stream().map(Object::toString).collect(joining(", ")));
+        builder.append(iv.stream().collect(SqlCode.joining(", ")));
 
         boolean hasInitSelect = !iv.isEmpty();
 
@@ -1164,16 +1163,13 @@ public final class SqlRecursive extends SqlIntercode
         Map<Variable, SqlExpressionIntercode> compared = new LinkedHashMap<>(start);
         compared.entrySet().removeIf(e -> init.isRestricted(e.getKey(), e.getValue()));
 
-        String startCondition = generateJoinCondition(relations, getStartBindings(compared), init.getVariableBindings(),
-                null, initTable);
+        SqlCode startCondition = generateJoinCondition(relations, getStartBindings(compared),
+                init.getVariableBindings(), null, initTable);
 
         if(startCondition != null)
         {
             builder.append(" WHERE ");
             builder.append(startCondition);
-
-            // the condition holds the columns of the start values, so the code reads what their SQL reads
-            compared.values().forEach(v -> builder.addDeclaredTables(v.getDeclaredTables()));
         }
 
         builder.append(" UNION SELECT ");
@@ -1193,7 +1189,7 @@ public final class SqlRecursive extends SqlIntercode
         AliasTable left = lateral ? walkTable : leftTable;
         AliasTable right = lateral ? stepTable : rightTable;
 
-        builder.append(ev.stream().map(c -> c.fromTable(left).toString()).collect(joining(", ")));
+        builder.append(ev.stream().map(c -> c.fromTable(left)).collect(SqlCode.joining(", ")));
 
         boolean hasUnionSelect = !ev.isEmpty();
 
@@ -1246,10 +1242,10 @@ public final class SqlRecursive extends SqlIntercode
             // with the join optimizer on, the planner is told not to nest loops, so a step reading a table is looked
             // up laterally through an index of the table for every row of the recursion instead of being hashed whole
             // in every round (see JoinOptimizer)
-            String condition = generateJoinCondition(relations, tmp, access.getInternalVariableBindings(), left, null);
+            SqlCode condition = generateJoinCondition(relations, tmp, access.getInternalVariableBindings(), left, null);
 
             builder.append(" CROSS JOIN LATERAL (");
-            builder.append(access.translateLateral(request, condition != null ? condition : "true"));
+            builder.append(access.translateLateral(request, condition != null ? condition : SqlCode.TRUE));
             builder.append(") AS ");
             builder.append(right);
         }
@@ -1260,7 +1256,7 @@ public final class SqlRecursive extends SqlIntercode
             builder.append(") AS ");
             builder.append(right);
 
-            String condition = generateJoinCondition(relations, tmp, next.getVariableBindings(), left, right);
+            SqlCode condition = generateJoinCondition(relations, tmp, next.getVariableBindings(), left, right);
 
             if(condition != null)
             {
@@ -1274,7 +1270,7 @@ public final class SqlRecursive extends SqlIntercode
         Set<Column> columns = getVariableBindings().getNonConstantColumns();
 
         if(!columns.isEmpty())
-            builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
+            builder.append(columns.stream().collect(SqlCode.joining(", ")));
         else
             builder.append("1");
 

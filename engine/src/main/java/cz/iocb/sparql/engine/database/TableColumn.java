@@ -56,7 +56,7 @@ public final class TableColumn extends Column
         if(table == null)
             return this;
 
-        return new ExpressionColumn(table + "." + this, type, canBeNull);
+        return new ExpressionColumn(SqlCode.of(table, ".", this), type, canBeNull);
     }
 
 

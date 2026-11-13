@@ -2,9 +2,7 @@ package cz.iocb.sparql.engine.imcode.expression;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.DeclaredTable;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -53,13 +51,6 @@ public abstract class SqlUnary extends SqlExpressionIntercode
     public SqlExpressionIntercode getOperand()
     {
         return operand;
-    }
-
-
-    @Override
-    public Set<DeclaredTable> getDeclaredTables()
-    {
-        return operand.getDeclaredTables();
     }
 
 

@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.mapping.extension;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Function;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 
@@ -26,14 +27,14 @@ public interface ProcedureSpecialization
 
 
     /**
-     * Arguments of the call, given the arguments of the declared parameters as rendered for the current solutions: one
-     * SQL expression per column of a parameter, in declaration order. The default passes them as they are; an
-     * implementation may add arguments or replace some.
+     * Arguments of the call, given the arguments of the declared parameters as rendered for the current solutions: the
+     * SQL code of one expression per column of a parameter, in declaration order. The default passes them as they are;
+     * an implementation may add arguments or replace some.
      *
-     * @param declared arguments of the declared parameters, one SQL expression per column of a parameter
+     * @param declared arguments of the declared parameters, the SQL code of one expression per column of a parameter
      * @return arguments of the call
      */
-    default List<String> getArguments(List<String> declared)
+    default List<SqlCode> getArguments(List<SqlCode> declared)
     {
         return declared;
     }
