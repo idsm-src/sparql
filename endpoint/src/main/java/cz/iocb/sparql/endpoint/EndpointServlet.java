@@ -2260,7 +2260,8 @@ public class EndpointServlet extends HttpServlet
 
 
     /**
-     * Writes text with the JSON special characters escaped.
+     * Writes text as the content of a JSON string: the quotation mark, the reverse solidus and the control characters
+     * below U+0020 are escaped.
      *
      * @param out the output writer
      * @param value the value
@@ -2278,14 +2279,8 @@ public class EndpointServlet extends HttpServlet
                 out.print("\\n");
             else if(val >= 32)
                 out.print(val);
-            else if(val < 10)
-                out.print("\\u000" + (int) val);
-            else if(val < 16)
-                out.print("\\u000" + ('A' + val - 10));
-            else if(val < 26)
-                out.print("\\u001" + (val - 16));
-            else if(val < 32)
-                out.print("\\u001" + ('A' + val - 26));
+            else
+                out.printf("\\u%04X", (int) val);
         }
     }
 

@@ -1,5 +1,6 @@
 package cz.iocb.sparql.endpoint;
 
+import static java.util.stream.Collectors.joining;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -15,6 +16,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,7 +36,8 @@ import cz.iocb.sparql.testing.Database;
  * The protocol handling of the servlet with stub requests and responses over an empty configuration: the
  * {@code version} parameter of the request (as a query parameter, a form parameter and a media type parameter), its
  * errors, and the announcement of RDF 1.2 in the results (the {@code version} member of the JSON head, the VERSION
- * directive of Turtle and N-Triples and the {@code version} parameter of the media types).
+ * directive of Turtle and N-Triples and the {@code version} parameter of the media types). The JSON formats are also
+ * checked to escape the characters of a literal that a JSON string cannot hold as they are.
  */
 public class EndpointServletTest
 {
@@ -43,10 +46,18 @@ public class EndpointServletTest
     private static final String construct = "CONSTRUCT { <http://example.org/s> <http://example.org/p> 1 } WHERE {}";
     private static final String sparqlJson = "application/sparql-results+json";
     private static final String sparqlXml = "application/sparql-results+xml";
+    private static final String rdfJson = "application/rdf+json";
     private static final String turtle = "text/turtle";
     private static final String ntriples = "application/n-triples";
     private static final String form = "application/x-www-form-urlencoded";
     private static final String sparqlQuery = "application/sparql-query";
+
+    /**
+     * The characters a JSON string has to escape: the control characters (all of them but U+0000, which the database
+     * cannot store), the quotation mark and the reverse solidus.
+     */
+    private static final String special = IntStream.range(1, 0x20).mapToObj(Character::toString).collect(joining())
+            + "\"\\";
 
     private static EndpointServlet servlet = null;
 
@@ -288,6 +299,18 @@ public class EndpointServletTest
 
 
     /**
+     * String literal of a query holding the characters, each written by its numeric escape.
+     *
+     * @param value the characters
+     * @return string literal of a query holding the characters
+     */
+    private static String literal(String value)
+    {
+        return value.chars().mapToObj(c -> String.format("\\u%04X", c)).collect(joining("", "\"", "\""));
+    }
+
+
+    /**
      * The body parsed as JSON.
      *
      * @param response the response
@@ -478,5 +501,28 @@ public class EndpointServletTest
         JsonNode results = json(get(parameters("query", "SELECT ?x WHERE { SERVICE SILENT " + pattern), sparqlJson));
 
         assertEquals(1, results.get("results").get("bindings").size());
+    }
+
+
+    @Test
+    @DisplayName("the JSON results escape the special characters of a literal")
+    void specialCharactersInJsonResults() throws Exception
+    {
+        String query = "SELECT (" + literal(special) + " AS ?x) WHERE {}";
+        JsonNode json = json(get(parameters("query", query), sparqlJson));
+
+        assertEquals(special, json.get("results").get("bindings").get(0).get("x").get("value").asText());
+    }
+
+
+    @Test
+    @DisplayName("RDF/JSON escapes the special characters of a literal")
+    void specialCharactersInRdfJson() throws Exception
+    {
+        String query = "CONSTRUCT { <http://example.org/s> <http://example.org/p> " + literal(special) + " } WHERE {}";
+        JsonNode json = json(get(parameters("query", query), rdfJson));
+
+        assertEquals(special,
+                json.get("http://example.org/s").get("http://example.org/p").get(0).get("value").asText());
     }
 }
