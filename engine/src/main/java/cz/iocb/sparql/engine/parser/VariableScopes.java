@@ -135,9 +135,10 @@ public class VariableScopes
      * Resolves the variable {@code name} (leading {@code ?} or {@code $} is ignored) to the name of the scope it is
      * bound in, binding it in the innermost scope if it is not bound yet. With {@code asPrivate}, an unbound variable
      * is instead given a fresh unique scope without being bound, so it stays unbound for later occurrences (used for
-     * variables in expressions). A variable hidden by the projection of a sub-select is still a variable of the current
-     * solution of an EXISTS pattern the sub-select is nested in, which binds the variables of the scopes enclosing the
-     * pattern: those scopes are searched as well.
+     * variables in expressions; an expression therefore has to be parsed after the patterns whose variables it sees,
+     * which is why the filters of a group graph pattern are parsed after its other members). A variable hidden by the
+     * projection of a sub-select is still a variable of the current solution of an EXISTS pattern the sub-select is
+     * nested in, which binds the variables of the scopes enclosing the pattern: those scopes are searched as well.
      *
      * @param name the variable name
      * @param asPrivate whether an unbound variable gets a private scope

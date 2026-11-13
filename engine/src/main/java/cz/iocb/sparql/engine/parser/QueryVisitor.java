@@ -39,6 +39,7 @@ import cz.iocb.sparql.engine.grammar.SparqlParser.DatasetClauseContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.ExistsFunctionContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.FilterContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.GraphGraphPatternContext;
+import cz.iocb.sparql.engine.grammar.SparqlParser.GraphPatternNotTriplesContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.GroupClauseContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.GroupConditionContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.GroupGraphPatternContext;
@@ -1846,6 +1847,18 @@ class TripleExpander extends ComplexElementVisitor<Node>
 class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
 {
     /**
+     * A FILTER of a group graph pattern, which is parsed after the other members of the group.
+     *
+     * @param context the parse tree node of the filter
+     * @param pattern index of the filter among the patterns of the group
+     * @param message index among the messages at which the messages of the filter belong
+     */
+    private record DeferredFilter(GraphPatternNotTriplesContext context, int pattern, int message)
+    {
+    }
+
+
+    /**
      * Configuration of the endpoint.
      */
     private final SparqlDatabaseConfiguration config;
@@ -1924,11 +1937,45 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
     @Override
     public Stream<Pattern> visitGroupGraphPatternSub(GroupGraphPatternSubContext ctx)
     {
-        Stream<Pattern> triplesPatterns = visitIfNotNull(ctx.triplesBlock());
+        PatternVisitor patternVisitor = new PatternVisitor(config, prologue, graphs, services, scopes, usedBlankNodes,
+                messages);
 
-        Stream<Pattern> groupGraphPatterns = ctx.groupGraphPatternSubList().stream().flatMap(this::visit);
+        List<Pattern> patterns = new ArrayList<>(visitIfNotNull(ctx.triplesBlock()).toList());
+        List<DeferredFilter> filters = new ArrayList<>();
 
-        return Stream.concat(triplesPatterns, groupGraphPatterns);
+        // A filter restricts the solutions of its whole group, so its expression sees the variables of all members of
+        // the group, also of those that follow it, whereas a variable of an expression that is not bound yet when the
+        // expression is parsed is a variable of its own. The filters are therefore parsed after the other members.
+        for(GroupGraphPatternSubListContext member : ctx.groupGraphPatternSubList())
+        {
+            if(member.graphPatternNotTriples().filter() != null)
+            {
+                filters.add(new DeferredFilter(member.graphPatternNotTriples(), patterns.size(), messages.size()));
+                patterns.add(null);
+            }
+            else
+            {
+                patterns.add(patternVisitor.visit(member.graphPatternNotTriples()));
+            }
+
+            patterns.addAll(visitIfNotNull(member.triplesBlock()).toList());
+        }
+
+        int moved = 0;
+
+        for(DeferredFilter filter : filters)
+        {
+            int end = messages.size();
+
+            patterns.set(filter.pattern(), patternVisitor.visit(filter.context()));
+
+            // the messages of the filter are moved to the place the order of the text gives them
+            int reported = messages.size() - end;
+            Collections.rotate(messages.subList(filter.message() + moved, messages.size()), reported);
+            moved += reported;
+        }
+
+        return patterns.stream();
     }
 
 
@@ -1948,20 +1995,6 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
             tripleExpander.visit(triple);
 
         return tripleExpander.getResults().stream();
-    }
-
-
-    @Override
-    public Stream<Pattern> visitGroupGraphPatternSubList(GroupGraphPatternSubListContext ctx)
-    {
-        PatternVisitor patternVisitor = new PatternVisitor(config, prologue, graphs, services, scopes, usedBlankNodes,
-                messages);
-
-        Pattern graphPattern = patternVisitor.visit(ctx.graphPatternNotTriples());
-
-        Stream<Pattern> triplesPatterns = visitIfNotNull(ctx.triplesBlock());
-
-        return Stream.concat(Stream.of(graphPattern), triplesPatterns);
     }
 }
 
