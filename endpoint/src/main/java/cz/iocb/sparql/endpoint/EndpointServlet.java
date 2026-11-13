@@ -1340,7 +1340,9 @@ public class EndpointServlet extends HttpServlet
 
 
     /**
-     * Writes SELECT results as TSV.
+     * Writes SELECT results as TSV: the header names the variables as a query writes them, with the question mark, and
+     * the lines end by a line feed (unlike those of CSV, which names the variables without it and ends the lines by
+     * CRLF).
      *
      * @param out the output writer
      * @param result the result to write
@@ -1358,10 +1360,11 @@ public class EndpointServlet extends HttpServlet
             else
                 hasHead = true;
 
+            out.print('?');
             writeTsvValue(out, head.getName());
         }
 
-        out.print("\r\n");
+        out.print('\n');
 
 
         while(result.next())
@@ -1378,7 +1381,7 @@ public class EndpointServlet extends HttpServlet
                 writeTripleNode(out, result.get(i));
             }
 
-            out.print("\r\n");
+            out.print('\n');
         }
     }
 
@@ -1475,7 +1478,8 @@ public class EndpointServlet extends HttpServlet
 
 
     /**
-     * Writes an ASK result as TSV (non-standard).
+     * Writes an ASK result as TSV (non-standard): as the result of a SELECT query that binds the variable {@code bool}
+     * to the boolean (see {@link #writeSelectTsv}).
      *
      * @param out the output writer
      * @param result the result to write
@@ -1486,13 +1490,15 @@ public class EndpointServlet extends HttpServlet
     {
         result.next();
 
-        out.println("\"bool\"");
-        out.println(((Literal) result.get(0)).getValue());
+        out.print("?bool\n");
+        writeTripleNode(out, result.get(0));
+        out.print('\n');
     }
 
 
     /**
-     * Writes an ASK result as CSV (non-standard).
+     * Writes an ASK result as CSV (non-standard): as the result of a SELECT query that binds the variable {@code bool}
+     * to the boolean (see {@link #writeSelectCsv}).
      *
      * @param out the output writer
      * @param result the result to write
@@ -1503,8 +1509,9 @@ public class EndpointServlet extends HttpServlet
     {
         result.next();
 
-        out.println("\"bool\"");
-        out.println(((Literal) result.get(0)).getValue());
+        out.print("bool\r\n");
+        writeCsvNode(out, result.get(0));
+        out.print("\r\n");
     }
 
 
@@ -1821,7 +1828,8 @@ public class EndpointServlet extends HttpServlet
 
 
     /**
-     * Writes a graph result as TSV.
+     * Writes a graph result as TSV (non-standard): the triples as the solutions of the variables {@code subject},
+     * {@code predicate} and {@code object}, in the form of the SELECT results (see {@link #writeSelectTsv}).
      *
      * @param out the output writer
      * @param result the result to write
@@ -1830,7 +1838,7 @@ public class EndpointServlet extends HttpServlet
      */
     private static void writeGraphTsv(PrintWriter out, Result result) throws IOException, SQLException
     {
-        out.print("subject\tpredicate\tobject\r\n");
+        out.print("?subject\t?predicate\t?object\n");
 
         while(result.next())
         {
@@ -1839,7 +1847,7 @@ public class EndpointServlet extends HttpServlet
             writeTripleNode(out, result.get(1));
             out.print('\t');
             writeTripleNode(out, result.get(2));
-            out.print("\r\n");
+            out.print('\n');
         }
     }
 

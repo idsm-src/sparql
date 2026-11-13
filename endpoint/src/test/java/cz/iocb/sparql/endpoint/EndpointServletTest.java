@@ -50,8 +50,9 @@ import cz.iocb.sparql.testing.Database;
  * {@code version} parameter of the request (as a query parameter, a form parameter and a media type parameter), its
  * errors, and the announcement of RDF 1.2 in the results (the {@code version} member of the JSON head, the VERSION
  * directive of Turtle and N-Triples and the {@code version} parameter of the media types). The JSON formats are also
- * checked to escape the characters of a literal that a JSON string cannot hold as they are, and the XML formats to
- * write the white space and the markup of a term so that an XML parser reads them back.
+ * checked to escape the characters of a literal that a JSON string cannot hold as they are, the XML formats to write
+ * the white space and the markup of a term so that an XML parser reads them back, and the TSV and CSV formats to write
+ * the header and the ends of the lines as their specification says.
  */
 public class EndpointServletTest
 {
@@ -64,6 +65,8 @@ public class EndpointServletTest
     private static final String rdfXml = "application/rdf+xml";
     private static final String turtle = "text/turtle";
     private static final String ntriples = "application/n-triples";
+    private static final String tsv = "text/tab-separated-values";
+    private static final String csv = "text/csv";
     private static final String form = "application/x-www-form-urlencoded";
     private static final String sparqlQuery = "application/sparql-query";
     private static final String sparqlNamespace = "http://www.w3.org/2005/sparql-results#";
@@ -640,5 +643,55 @@ public class EndpointServletTest
                 element(document, "http://example.org/", "iri").getAttributeNS(rdfNamespace, "resource"));
         assertEquals(markupIri,
                 element(document, "http://example.org/", "typed").getAttributeNS(rdfNamespace, "datatype"));
+    }
+
+
+    @Test
+    @DisplayName("the TSV results name the variables with question marks and end the lines by line feeds")
+    void tsvResults() throws Exception
+    {
+        String integer = "\"1\"^^<http://www.w3.org/2001/XMLSchema#integer>";
+        Response response = get(parameters("query", "SELECT (1 AS ?x) (<http://example.org/s> AS ?y) ?z WHERE {}"),
+                tsv);
+
+        assertEquals(HttpServletResponse.SC_OK, response.status);
+        assertEquals("?x\t?y\t?z\n" + integer + "\t<http://example.org/s>\t\n", response.getBody());
+
+        response = get(parameters("query", construct), tsv);
+
+        assertEquals(HttpServletResponse.SC_OK, response.status);
+        assertEquals("?subject\t?predicate\t?object\n<http://example.org/s>\t<http://example.org/p>\t" + integer + "\n",
+                response.getBody());
+
+        // the answer of an ASK query is written as the solution of the variable bool
+        response = get(parameters("query", ask), tsv);
+
+        assertEquals(HttpServletResponse.SC_OK, response.status);
+        assertEquals("?bool\n\"true\"^^<http://www.w3.org/2001/XMLSchema#boolean>\n", response.getBody());
+        assertEquals(get(parameters("query", "SELECT (true AS ?bool) WHERE {}"), tsv).getBody(), response.getBody());
+    }
+
+
+    @Test
+    @DisplayName("the CSV results name the variables without question marks and end the lines by CRLF")
+    void csvResults() throws Exception
+    {
+        Response response = get(parameters("query", "SELECT (1 AS ?x) (<http://example.org/s> AS ?y) ?z WHERE {}"),
+                csv);
+
+        assertEquals(HttpServletResponse.SC_OK, response.status);
+        assertEquals("x,y,z\r\n1,http://example.org/s,\r\n", response.getBody());
+
+        response = get(parameters("query", construct), csv);
+
+        assertEquals(HttpServletResponse.SC_OK, response.status);
+        assertEquals("subject,predicate,object\r\nhttp://example.org/s,http://example.org/p,1\r\n", response.getBody());
+
+        // the answer of an ASK query is written as the solution of the variable bool
+        response = get(parameters("query", ask), csv);
+
+        assertEquals(HttpServletResponse.SC_OK, response.status);
+        assertEquals("bool\r\ntrue\r\n", response.getBody());
+        assertEquals(get(parameters("query", "SELECT (true AS ?bool) WHERE {}"), csv).getBody(), response.getBody());
     }
 }
