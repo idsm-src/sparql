@@ -2459,11 +2459,6 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 if(flags != null && flags.getResourceClasses().stream().noneMatch(r -> hasString(r)))
                     return SqlNull.get();
 
-                boolean canBeNull = argument.canBeNull() || pattern.canBeNull() || flags != null && flags.canBeNull()
-                        || argument.getResourceClasses().stream().anyMatch(r -> !isStringLiteral(r))
-                        || pattern.getResourceClasses().stream().anyMatch(r -> !isString(r))
-                        || flags != null && flags.getResourceClasses().stream().anyMatch(r -> !isString(r));
-
                 //TODO: group based on string vs rdfbox mode
 
                 Set<List<ResourceClass>> rawVariants = new HashSet<>();
@@ -2523,7 +2518,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                 Map<ResourceClass, List<Column>> mappings = singletonMap(xsdBoolean, List.of(coalesce(cols)));
 
-                return new SqlBuiltinCall(function, distinct, arguments, mappings, canBeNull);
+                // an invalid pattern, invalid flags and a matching that fails are errors, so the result may be unbound
+                // whatever the arguments are
+                return new SqlBuiltinCall(function, distinct, arguments, mappings, true);
             }
 
             case "replace":
@@ -2545,16 +2542,6 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 if(flags != null && flags.getResourceClasses().stream().noneMatch(r -> hasString(r)))
                     return SqlNull.get();
 
-                boolean additionalCanBeNull = pattern.canBeNull() || replacement.canBeNull()
-                        || flags != null && flags.canBeNull()
-                        || pattern.getResourceClasses().stream().anyMatch(r -> !isString(r))
-                        || replacement.getResourceClasses().stream().anyMatch(r -> !isString(r))
-                        || flags != null && flags.getResourceClasses().stream().anyMatch(r -> !isString(r));
-
-                boolean canBeNull = additionalCanBeNull || argument.canBeNull()
-                        || argument.getResourceClasses().stream().anyMatch(r -> !isStringLiteral(r));
-
-
                 Map<ResourceClass, Set<List<ResourceClass>>> map = new HashMap<>();
 
                 for(ResourceClass resClass : argument.getResourceClasses())
@@ -2564,8 +2551,10 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     ResourceClass resultClass = getStringLiteralResultClass(resClass);
 
-                    if((resultClass.equals(rdfLangString) || resultClass.equals(rdfLtrLangString)
-                            || resultClass.equals(rdfRtlLangString)) && additionalCanBeNull)
+                    // the result may be unbound for an argument that is bound (see below), which the column of the
+                    // language tag of a string could not tell, so such a string is boxed
+                    if(resultClass.equals(rdfLangString) || resultClass.equals(rdfLtrLangString)
+                            || resultClass.equals(rdfRtlLangString))
                         resultClass = unionize(Set.of(resultClass), box);
 
                     List<ResourceClass> list = new ArrayList<>();
@@ -2614,28 +2603,6 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                             result = List.of(new ExpressionColumn(builder.toCode(), VARCHAR));
                         }
-                        else if(rdfLangString.equals(e.getKey()) || rdfLtrLangString.equals(e.getKey())
-                                || rdfRtlLangString.equals(e.getKey()))
-                        {
-                            List<Column> cols = argument.get(relations,
-                                    unionize(resClasses, (PrimitiveResourceClass) e.getKey()));
-
-                            SqlBuilder builder = new SqlBuilder();
-
-                            builder.append("sparql.replace_string(");
-                            builder.append(cols.get(0));
-                            builder.append(", ");
-                            builder.append(pattern.get(relations, xsdString).get(0));
-                            builder.append(", ");
-                            builder.append(replacement.get(relations, xsdString).get(0));
-
-                            if(flags != null)
-                                builder.append(", ").append(flags.get(relations, xsdString).get(0));
-
-                            builder.append(")");
-
-                            result = List.of(new ExpressionColumn(builder.toCode(), VARCHAR), cols.get(1));
-                        }
                         else if(e.getKey() != null)
                         {
                             List<Column> cols = argument.get(relations, unionize(resClasses, box));
@@ -2661,7 +2628,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     mappings.put(e.getKey(), result);
                 }
 
-                return new SqlBuiltinCall(function, distinct, arguments, mappings, canBeNull);
+                // an invalid pattern, replacement or flags, a pattern matching the empty string and a substitution
+                // that fails are errors, so the result may be unbound whatever the arguments are
+                return new SqlBuiltinCall(function, distinct, arguments, mappings, true);
             }
 
 

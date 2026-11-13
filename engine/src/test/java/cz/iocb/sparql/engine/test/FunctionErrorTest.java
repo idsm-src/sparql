@@ -30,8 +30,9 @@ import cz.iocb.sparql.testing.Database;
 /**
  * Functions that are an error for some arguments of the kinds they take, run against an empty configuration: the call
  * is unbound for such arguments whether they are constants or come with the solutions, and what is built on the call
- * sees that, so BOUND is false, COALESCE takes its next argument and a CONSTRUCT template gives no triple. Such a
- * function is IRI (and URI) of a string that is no IRI reference.
+ * sees that, so BOUND is false, COALESCE takes its next argument and a CONSTRUCT template gives no triple. Such
+ * functions are IRI (and URI) of a string that is no IRI reference, REGEX with an invalid pattern or invalid flags, and
+ * REPLACE with these, with an invalid replacement or with a pattern matching the empty string.
  */
 public class FunctionErrorTest
 {
@@ -42,6 +43,8 @@ public class FunctionErrorTest
     private static final TypedLiteral bound = new TypedLiteral("true", xsdBooleanIri);
     private static final TypedLiteral unbound = new TypedLiteral("false", xsdBooleanIri);
     private static final TypedLiteral fallback = new TypedLiteral("fallback", xsdStringIri);
+    private static final TypedLiteral matched = new TypedLiteral("true", xsdBooleanIri);
+    private static final TypedLiteral replaced = new TypedLiteral("axc", xsdStringIri);
 
     /**
      * Selection of a value, of whether it is bound and of the value or a fallback.
@@ -135,5 +138,61 @@ public class FunctionErrorTest
         assertThat(execute(template + "WHERE { BIND(IRI(\"http://example.org/a>b\") AS ?v) }"), empty());
         assertThat(execute(template + "WHERE { VALUES ?x { \"http://example.org/a\" \"http://example.org/a>b\" } "
                 + "BIND(IRI(?x) AS ?v) }"), contains(row(subject, predicate, first)));
+    }
+
+
+    @Test
+    @DisplayName("REGEX with an invalid pattern or invalid flags is unbound")
+    void regex() throws Exception
+    {
+        assertThat(execute(select + "WHERE { BIND(REGEX(\"abc\", \"(\") AS ?v) }"),
+                contains(row(null, unbound, fallback)));
+        assertThat(execute(select + "WHERE { BIND(REGEX(\"abc\", \"b\", \"z\") AS ?v) }"),
+                contains(row(null, unbound, fallback)));
+        assertThat(execute(select + "WHERE { BIND(REGEX(\"abc\"@en, \"(\") AS ?v) }"),
+                contains(row(null, unbound, fallback)));
+
+        assertThat(execute(select + "WHERE { VALUES ?p { \"b\" \"(\" } BIND(REGEX(\"abc\", ?p) AS ?v) }"),
+                containsInAnyOrder(row(matched, bound, matched), row(null, unbound, fallback)));
+        assertThat(execute(select + "WHERE { VALUES ?f { \"i\" \"z\" } BIND(REGEX(\"abc\", \"B\", ?f) AS ?v) }"),
+                containsInAnyOrder(row(matched, bound, matched), row(null, unbound, fallback)));
+    }
+
+
+    @Test
+    @DisplayName("REPLACE with an invalid pattern, replacement or flags is unbound")
+    void replace() throws Exception
+    {
+        assertThat(execute(select + "WHERE { BIND(REPLACE(\"abc\", \"(\", \"x\") AS ?v) }"),
+                contains(row(null, unbound, fallback)));
+        assertThat(execute(select + "WHERE { BIND(REPLACE(\"abc\", \"b\", \"x\", \"z\") AS ?v) }"),
+                contains(row(null, unbound, fallback)));
+        assertThat(execute(select + "WHERE { BIND(REPLACE(\"abc\", \"b\", \"$\") AS ?v) }"),
+                contains(row(null, unbound, fallback)));
+
+        // a pattern matching the empty string is an error of fn:replace
+        assertThat(execute(select + "WHERE { BIND(REPLACE(\"abc\", \"\", \"x\") AS ?v) }"),
+                contains(row(null, unbound, fallback)));
+
+        assertThat(execute(select + "WHERE { VALUES ?p { \"b\" \"(\" \"\" } BIND(REPLACE(\"abc\", ?p, \"x\") AS ?v) }"),
+                containsInAnyOrder(row(replaced, bound, replaced), row(null, unbound, fallback),
+                        row(null, unbound, fallback)));
+        assertThat(execute(select + "WHERE { VALUES ?r { \"x\" \"$\" } BIND(REPLACE(\"abc\", \"b\", ?r) AS ?v) }"),
+                containsInAnyOrder(row(replaced, bound, replaced), row(null, unbound, fallback)));
+    }
+
+
+    @Test
+    @DisplayName("a failing REPLACE of a language-tagged string has no language tag")
+    void replaceOfLanguageTaggedString() throws Exception
+    {
+        String selection = "SELECT ?v (LANG(?v) AS ?l) (BOUND(?v) AS ?b) ";
+
+        assertThat(execute(selection + "WHERE { BIND(REPLACE(\"abc\"@en, \"(\", \"x\") AS ?v) }"),
+                contains(row(null, null, unbound)));
+        assertThat(
+                execute(selection + "WHERE { VALUES ?x { \"abc\"@en \"abc\"@en--ltr } "
+                        + "BIND(REPLACE(?x, \"(\", \"x\") AS ?v) }"),
+                contains(row(null, null, unbound), row(null, null, unbound)));
     }
 }

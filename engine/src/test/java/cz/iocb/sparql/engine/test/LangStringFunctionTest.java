@@ -1,7 +1,9 @@
 package cz.iocb.sparql.engine.test;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdBooleanIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import java.sql.Connection;
@@ -34,7 +36,9 @@ import cz.iocb.sparql.testing.Database;
 
 /**
  * String functions over a language-tagged string whose tag comes from a column of its own (the general language string
- * class of two columns): the functions preserving the string type keep the tag column next to the new value.
+ * class of two columns): the functions preserving the string type keep the tag column next to the new value. REPLACE
+ * may fail whatever its arguments are, and the tag column could not tell that its result is unbound, so the result of
+ * REPLACE is boxed.
  */
 public class LangStringFunctionTest
 {
@@ -128,6 +132,19 @@ public class LangStringFunctionTest
                 contains(row(new LangStringLiteral("bonono", "en"))));
         assertThat(execute("SELECT ?r WHERE { ?x ex:label ?l BIND(REPLACE(?l, \"A\", \"o\", \"i\") AS ?r) }"),
                 contains(row(new LangStringLiteral("bonono", "en"))));
+        assertThat(execute("SELECT (LANG(?r) AS ?t) WHERE { ?x ex:label ?l BIND(REPLACE(?l, \"a\", \"o\") AS ?r) }"),
+                contains(row(new TypedLiteral("en", xsdStringIri))));
+    }
+
+
+    @Test
+    @DisplayName("a failing REPLACE is unbound and has no language tag")
+    void failingReplace() throws Exception
+    {
+        assertThat(
+                execute("SELECT ?r (LANG(?r) AS ?t) (BOUND(?r) AS ?b) WHERE { ?x ex:label ?l "
+                        + "BIND(REPLACE(?l, \"(\", \"o\") AS ?r) }"),
+                contains(row(null, null, new TypedLiteral("false", xsdBooleanIri))));
     }
 
 
