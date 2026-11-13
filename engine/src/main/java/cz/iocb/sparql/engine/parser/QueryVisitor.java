@@ -566,6 +566,13 @@ public class QueryVisitor extends BaseVisitor<Query>
             GraphPattern pattern = new GraphPatternVisitor(config, prologue, graphs, services, scopes, usedBlankNodes,
                     messages).visit(whereClauseCtx);
 
+            // The expressions of the projection are evaluated after the grouping and after the join with the trailing
+            // VALUES clause, so they see the variables these clauses introduce, whereas a variable of an expression
+            // that is not bound yet when the expression is parsed is a variable of its own. The two clauses are
+            // therefore parsed before the projection.
+            Values values = parseValues(valuesClauseContext);
+            List<GroupCondition> groupByConditions = parseGroupClause(solutionModifierCtx.groupClause());
+
             LinkedList<Projection> projections = new LinkedList<>();
 
             if(!selectClauseCtx.selectVariable().isEmpty())
@@ -655,8 +662,6 @@ public class QueryVisitor extends BaseVisitor<Query>
                 messages.add(new TranslateMessage(MessageType.invalidProjection, Range.compute(selectClauseCtx)));
             }
 
-            Values values = parseValues(valuesClauseContext);
-
             Select result = new Select(projections, pattern, values, isSubSelect);
 
             if(selectClauseCtx.DISTINCT() != null)
@@ -667,7 +672,7 @@ public class QueryVisitor extends BaseVisitor<Query>
             if(dataSetClauseCtxs != null)
                 result.getDataSets().addAll(dataSetClauseCtxs.stream().map(this::parseDataSet).toList());
 
-            result.getGroupByConditions().addAll(parseGroupClause(solutionModifierCtx.groupClause()));
+            result.getGroupByConditions().addAll(groupByConditions);
             result.getHavingConditions().addAll(parseHavingClause(solutionModifierCtx.havingClause()));
             result.getOrderByConditions().addAll(parseOrderClause(solutionModifierCtx.orderClause()));
             result.setLimit(parseLimitClause(solutionModifierCtx.limitOffsetClauses()));
