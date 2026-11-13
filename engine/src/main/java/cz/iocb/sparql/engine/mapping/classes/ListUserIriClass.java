@@ -19,7 +19,8 @@ import cz.iocb.sparql.engine.request.Request;
 
 
 /**
- * IRIs stored as full text whose membership is defined by the values of a table column.
+ * IRIs stored as full text whose membership is defined by the values of a table column. The column may list an IRI
+ * several times and may hold NULLs.
  */
 public class ListUserIriClass extends SimpleUserIriClass
 {
@@ -86,21 +87,23 @@ public class ListUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    protected Column generateFunction(Column column)
+    protected Column generateFunction(Column value)
     {
-        return column;
+        return value;
     }
 
 
     @Override
-    protected Column generateInverseFunction(Column column, boolean check)
+    protected Column generateInverseFunction(Column value, boolean check)
     {
         if(!check)
-            return column;
+            return value;
 
+        // the listed IRIs are read under a name of their own, so that no column of the table hides a column the value
+        // refers to; one row is enough, because the column may list the IRI several times
         SqlCode access = SqlCode.format("(SELECT %s as \"@col\" FROM %s) as \"@rctab\"", column, table);
 
-        return expression(VARCHAR, "(SELECT \"@col\"::varchar FROM %s WHERE \"@col\" = %s)", access, column);
+        return expression(VARCHAR, "(SELECT \"@col\"::varchar FROM %s WHERE \"@col\" = %s LIMIT 1)", access, value);
     }
 
 
