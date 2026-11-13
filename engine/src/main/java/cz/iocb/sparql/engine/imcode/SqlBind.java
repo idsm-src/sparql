@@ -284,7 +284,7 @@ public final class SqlBind extends SqlIntercode
             builder.append(" FROM (");
             builder.append(child.translate(request, scope));
             builder.append(" ) AS ");
-            builder.append(scope.getInputTable());
+            builder.appendAlias(scope.getInputTable());
         }
 
 

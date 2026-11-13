@@ -172,9 +172,10 @@ public final class Scope
     /**
      * True if the SQL code refers to the input of a node holding an expression in whose pattern the code lies (see
      * {@link #getInputTable}), so to a value of a current solution: such code has a meaning only at its place inside
-     * the pattern. The code keeps the aliases its columns are addressed through (see {@link SqlCode#getOuterTables});
-     * those of the nodes the code lies in are the ones given at a lesser depth than the depth of this scope, because
-     * the nodes of the code itself give theirs at this depth or deeper.
+     * the pattern. The code keeps the aliases it refers to (see {@link SqlCode#getOuterTables}); those of the nodes the
+     * code lies in are the ones given at a lesser depth than the depth of this scope, whereas a part of the code of a
+     * node of this scope, like the conditions of a filter, refers also to the input of that node, given at the depth of
+     * this scope.
      *
      * @param code the SQL code
      * @return true if the SQL code refers to the input of a node holding an expression in whose pattern the code lies,
@@ -209,11 +210,10 @@ public final class Scope
 
     /**
      * True if the SQL code refers to a current solution: to the input of a node holding an expression in whose pattern
-     * the code lies (see {@link #refersToEnclosingInput}), or to the left side of a lateral join (see
-     * {@link SqlLateralJoin}). Such code can neither be moved into a common table expression nor explained on its own.
-     * The alias of a lateral join does not tell whether the code lies in the right side of the join or holds the whole
-     * join, so code holding a lateral join whose columns are addressed through the alias counts as well, and stays at
-     * its place too.
+     * the code lies (see {@link #refersToEnclosingInput}), or to the left side of a lateral join in whose right side
+     * the code lies (see {@link SqlLateralJoin}). Such code can neither be moved into a common table expression nor
+     * explained on its own. Code holding a whole lateral join does not refer to the left side of that join, because the
+     * join gives the alias itself.
      *
      * @param code the SQL code
      * @return true if the SQL code refers to a current solution, false otherwise

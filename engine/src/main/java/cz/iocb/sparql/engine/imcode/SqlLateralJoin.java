@@ -36,7 +36,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * otherwise shadow the alias of the outer one. The columns are given to the right side by getLateralVariableBindings()
  * (an expression of the right side refers to them through SqlLateralVariable) and the same alias and requirements have
  * to be passed to lateralJoin(). The alias is fixed when the join is created and is kept by all reconstructions of the
- * join during its optimisation. The bindings exposed this way are read by the right side in one of two ways.
+ * join during its optimisation. The code of the right side refers to the alias, so it has a meaning only inside the
+ * join, whereas the code of the join gives the alias and refers to it no longer: a node holding the whole join can be
+ * shared or estimated like any other. The bindings exposed this way are read by the right side in one of two ways.
  *
  * A live join lets its right side read them as the left side provides them at the moment: the right side is optimised
  * in a scope that holds the current bindings of the left side (see Scope.enterLateral()), from which the references of
@@ -520,7 +522,7 @@ public final class SqlLateralJoin extends SqlIntercode
         builder.append(" FROM (");
         translateLeft(request, scope, builder);
         builder.append(") AS ");
-        builder.append(table);
+        builder.appendAlias(table);
 
         builder.append(" CROSS JOIN LATERAL (");
         builder.append(right.translate(request, scope));

@@ -204,7 +204,7 @@ public final class SqlFilter extends SqlIntercode
         builder.append(" FROM (");
         builder.append(child.translate(request, scope));
         builder.append(" ) AS ");
-        builder.append(scope.getInputTable());
+        builder.appendAlias(scope.getInputTable());
 
         builder.append(" WHERE ");
         builder.append(translateConditions(request));

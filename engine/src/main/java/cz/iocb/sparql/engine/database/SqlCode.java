@@ -19,9 +19,11 @@ import java.util.stream.Collector;
  * the tables as well. A dependence is recorded where it arises, a declared table where its name is written and an outer
  * table where a column is addressed through it, and it is passed on wherever code is made of pieces (see
  * {@link SqlBuilder}, {@link #of}, {@link #format} and {@link #joining(String)}), so it never has to be found in the
- * text again. Plain strings are pieces of SQL text without such a dependence, like keywords, operators and the names of
- * functions. The text itself is given only by {@link #getText}; the string form of the object serves debugging and is
- * no SQL, so that code joined to a string by mistake, which would lose the tables, does not pass for SQL.
+ * text again; the dependence on an outer table ends in the code that gives the alias (see
+ * {@link SqlBuilder#appendAlias}). Plain strings are pieces of SQL text without such a dependence, like keywords,
+ * operators and the names of functions. The text itself is given only by {@link #getText}; the string form of the
+ * object serves debugging and is no SQL, so that code joined to a string by mistake, which would lose the tables, does
+ * not pass for SQL.
  */
 public final class SqlCode implements Comparable<SqlCode>
 {
@@ -202,9 +204,10 @@ public final class SqlCode implements Comparable<SqlCode>
 
 
     /**
-     * The outer tables the text refers to: the aliases through which its columns are addressed, whether enclosing code
-     * gives them or the code itself. Code referring to an outer table that it does not give itself has a meaning only
-     * inside the query that gives the alias.
+     * The outer tables the text refers to: the aliases through which its columns are addressed and which the code does
+     * not give itself (see {@link SqlBuilder#appendAlias}). Code referring to an outer table has a meaning only inside
+     * the query that gives the alias. A part of a query, like a condition of a filter, refers to the input of its own
+     * node too, because the alias is given by the code of the node.
      *
      * @return the outer tables the text refers to
      */

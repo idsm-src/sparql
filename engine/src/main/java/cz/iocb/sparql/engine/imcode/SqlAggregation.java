@@ -441,7 +441,7 @@ public final class SqlAggregation extends SqlIntercode
         builder.append(" FROM (");
         builder.append(child.translate(request, scope));
         builder.append(" ) AS ");
-        builder.append(scope.getInputTable());
+        builder.appendAlias(scope.getInputTable());
 
         if(!groupByColumns.isEmpty())
             builder.append(groupByColumns.stream().collect(SqlCode.joining(", ", " GROUP BY ", "")));

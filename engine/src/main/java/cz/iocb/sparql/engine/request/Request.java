@@ -885,13 +885,17 @@ public class Request implements AutoCloseable
      * table is numbered by the order it is asked for (see {@link CommonTable}). SQL code written with the table reads
      * it (see {@link SqlCode}), so every statement made of such code declares it in its {@code WITH} clause (see
      * {@link SqlSelect#translateWithClause}), also when the code has gone through the SQL of an expression, which is
-     * rendered at once during the optimisation, before any statement is translated.
+     * rendered at once during the optimisation, before any statement is translated. The query is declared at the top of
+     * the statement, where no alias given inside the statement is visible, so it must refer to no outer table (see
+     * {@link SqlCode#getOuterTables}).
      *
      * @param query SQL code of the query
      * @return the common table expression evaluating the query
      */
     public CommonTable getCommonTableExpression(SqlCode query)
     {
+        assert query.getOuterTables().isEmpty();
+
         CommonTable table = commonTableExpressions.get(query.getText());
 
         if(table == null)

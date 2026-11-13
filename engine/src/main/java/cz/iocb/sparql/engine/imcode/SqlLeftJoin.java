@@ -534,12 +534,12 @@ public final class SqlLeftJoin extends SqlIntercode
         builder.append(" FROM (");
         builder.append(left.translate(request, scope));
         builder.append(" ) AS ");
-        builder.append(leftTable);
+        builder.appendAlias(leftTable);
 
         builder.append(" LEFT JOIN (");
         builder.append(right.translate(request, scope));
         builder.append(" ) AS ");
-        builder.append(rightTable);
+        builder.appendAlias(rightTable);
 
         SqlCode condition = generateJoinCondition(relations, left.bindings, right.getVariableBindings(), leftTable,
                 rightTable);

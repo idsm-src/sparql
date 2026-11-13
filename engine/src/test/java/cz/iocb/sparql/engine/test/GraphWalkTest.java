@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.test;
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -17,14 +18,17 @@ import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
+import cz.iocb.sparql.engine.imcode.SqlSelect;
 import cz.iocb.sparql.engine.mapping.classes.IntegerUserIriClass;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.request.Engine;
 import cz.iocb.sparql.engine.request.LimitExceedException;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.request.Request.PreparedQuery;
 import cz.iocb.sparql.engine.request.Result;
 import cz.iocb.sparql.engine.translator.ServiceException;
+import cz.iocb.sparql.engine.translator.TranslateVisitor;
 import cz.iocb.sparql.testing.Database;
 
 
@@ -36,7 +40,8 @@ import cz.iocb.sparql.testing.Database;
  * variable in some of its classes only (a MINUS or an OPTIONAL whose other side binds it in fewer classes), the
  * translation failed. In a pattern evaluated per graph, the side of an OPTIONAL or a MINUS that would seed a walk of
  * the other side reads the graph of the evaluation, so its solutions cannot be shared in a common table expression,
- * which would not see the graph.
+ * which would not see the graph; a side holding a whole pattern evaluated per graph reads nothing from outside, so it
+ * is shared and seeds the walk like any other.
  */
 public class GraphWalkTest
 {
@@ -193,6 +198,44 @@ public class GraphWalkTest
 
 
     /**
+     * The code of the first common table expression of the statement, the shared solutions the others are made of.
+     *
+     * @param sql SQL of a statement
+     * @return the code of the first common table expression of the statement, empty when it declares none
+     */
+    private static String shared(String sql)
+    {
+        String begin = "WITH \"cte0\" AS (";
+
+        if(!sql.startsWith(begin))
+            return "";
+
+        return sql.substring(begin.length(), sql.indexOf("\"cte1\" AS ("));
+    }
+
+
+    /**
+     * SQL of the query under the configuration without the join optimizer.
+     *
+     * @param query the query, without the prefix declaration
+     * @return SQL of the query
+     * @throws Exception on errors
+     */
+    private static String translate(String query) throws Exception
+    {
+        Engine engine = new Engine(config);
+
+        try(Request request = engine.getRequest())
+        {
+            PreparedQuery prepared = request.prepareQuery(prefix + query, null);
+            SqlSelect imcode = new TranslateVisitor(request).translate(prepared.getSyntaxTree(), null, null, List.of());
+
+            return imcode.optimize(request, false).optimize(request, true).translate(request);
+        }
+    }
+
+
+    /**
      * Row of the terms.
      *
      * @param terms the terms
@@ -323,5 +366,30 @@ public class GraphWalkTest
                 + "{ ?x ex:s ?y MINUS { ?x ex:t+ ?z . ?z ex:t ?w } } } } }";
 
         assertThat(execute(query), containsInAnyOrder(row(a(101), a(2)), row(b(200), a(3))));
+    }
+
+
+    @Test
+    @DisplayName("a walk in an OPTIONAL seeded from a left side holding a pattern evaluated per graph")
+    void optionalAfterPatternPerGraph() throws Exception
+    {
+        String query = "SELECT ?g ?x ?z ?w WHERE { GRAPH ?g { { SELECT ?x WHERE { ?x ex:s ?y } } } "
+                + "OPTIONAL { ?x ex:t+ ?z . ?z ex:t ?w } }";
+
+        assertThat(shared(translate(query)), containsString(" CROSS JOIN LATERAL "));
+        assertThat(execute(query), containsInAnyOrder(row(a(100), a(1), a(2), a(3)), row(a(100), a(1), a(2), b(30)),
+                row(a(100), a(1), a(3), a(4)), row(a(101), a(2), a(3), a(4)), row(b(200), a(3), null, null)));
+    }
+
+
+    @Test
+    @DisplayName("a walk in a MINUS seeded from a left side holding a pattern evaluated per graph")
+    void minusAfterPatternPerGraph() throws Exception
+    {
+        String query = "SELECT ?g ?x WHERE { GRAPH ?g { { SELECT ?x WHERE { ?x ex:s ?y } } } "
+                + "MINUS { ?x ex:t+ ?z . ?z ex:t ?w } }";
+
+        assertThat(shared(translate(query)), containsString(" CROSS JOIN LATERAL "));
+        assertThat(execute(query), containsInAnyOrder(row(b(200), a(3))));
     }
 }

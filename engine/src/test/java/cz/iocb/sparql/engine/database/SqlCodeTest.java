@@ -18,9 +18,9 @@ import org.junit.jupiter.api.Test;
  * {@link ExpressionColumn}): code keeps the declared tables its text reads and the outer tables its columns are
  * addressed through; a builder takes them over from the code and from the expression columns appended to it and records
  * a declared table written by its name, whereas plain text, the other tables and the other columns record nothing, and
- * neither does an outer table written by its name alone; code made of pieces by concatenation, by a format or by
- * joining has the tables of the pieces; code is compared and ordered by its text; and the string form of code is no
- * SQL.
+ * neither does an outer table written by its name alone; code that gives the alias of an outer table refers to the
+ * table no longer; code made of pieces by concatenation, by a format or by joining has the tables of the pieces; code
+ * is compared and ordered by its text; and the string form of code is no SQL.
  */
 public class SqlCodeTest
 {
@@ -168,12 +168,12 @@ public class SqlCodeTest
 
 
     @Test
-    void outerTableWrittenAloneGivesTheAlias()
+    void outerTableWrittenAloneRefersToNothing()
     {
-        SqlCode given = new SqlBuilder().append("(SELECT 1) AS ").append(input).append(", ").append(lateral).toCode();
+        SqlCode named = new SqlBuilder().append("(SELECT 1) AS ").append(input).append(", ").append(lateral).toCode();
 
-        assertEquals("(SELECT 1) AS \"outer1\", \"lateral2\"", given.getText());
-        assertTrue(given.getOuterTables().isEmpty());
+        assertEquals("(SELECT 1) AS \"outer1\", \"lateral2\"", named.getText());
+        assertTrue(named.getOuterTables().isEmpty());
 
         // an alias of another kind with the same name is another table
         assertNotEquals(input, new AliasTable("outer1"));
@@ -181,6 +181,35 @@ public class SqlCodeTest
         assertEquals(input, new InputTable("outer", 1));
         assertEquals(lateral, new LateralTable(2));
         assertEquals(1, input.getDepth());
+    }
+
+
+    @Test
+    void codeGivingTheAliasRefersToTheTableNoLonger()
+    {
+        Column first = new TableColumn("x", INT4).fromTable(lateral);
+        Column second = new TableColumn("y", INT4).fromTable(input);
+        SqlCode right = SqlCode.of("SELECT 1 WHERE ", first, " = ", second);
+
+        assertEquals(Set.of(input, lateral), right.getOuterTables());
+
+        // the join gives the alias its right side and its own columns are addressed through
+        SqlBuilder builder = new SqlBuilder().append("SELECT ").append(first).append(" FROM (SELECT 1 AS \"x\") AS ");
+        builder.appendAlias(lateral).append(" CROSS JOIN LATERAL (").append(right).append(") AS ");
+        builder.appendAlias(new AliasTable("tab1"));
+        SqlCode join = builder.toCode();
+
+        assertEquals("SELECT \"lateral2\".\"x\" FROM (SELECT 1 AS \"x\") AS \"lateral2\" CROSS JOIN LATERAL "
+                + "(SELECT 1 WHERE \"lateral2\".\"x\" = \"outer1\".\"y\") AS \"tab1\"", join.getText());
+        assertEquals(Set.of(input), join.getOuterTables());
+
+        // code made of the join refers to the alias no more than the join does
+        assertEquals(Set.of(input), SqlCode.of("SELECT * FROM (", join, ") AS \"tab\"").getOuterTables());
+
+        SqlCode filter = new SqlBuilder().append("SELECT 1 FROM (").append(join).append(") AS ").appendAlias(input)
+                .append(" WHERE ").append(second).append(" > 0").toCode();
+
+        assertTrue(filter.getOuterTables().isEmpty());
     }
 
 

@@ -12,6 +12,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.LateralTable;
+import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
@@ -27,8 +28,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * one level deeper; a pattern without a current solution of its own keeps the enclosing one; SQL code whose columns are
  * addressed through the inputs of the enclosing nodes is told from code addressing an input of the scope itself, and
  * from code that only gives or spells such an alias; code addressing the left side of a lateral join refers to a
- * current solution too; and the current solution of the left side of a lateral join is kept by the alias of the join,
- * apart from the current solutions of the patterns.
+ * current solution too, unless it holds the join whole; and the current solution of the left side of a lateral join is
+ * kept by the alias of the join, apart from the current solutions of the patterns.
  */
 public class ScopeTest
 {
@@ -158,6 +159,18 @@ public class ScopeTest
         // neither code that gives the alias nor a column whose name spells it addresses the left side
         assertFalse(Scope.TOP.refersToCurrentSolution(SqlCode.of("(SELECT 1) AS ", table)));
         assertFalse(Scope.TOP.refersToCurrentSolution(new TableColumn("lateral0", INT4).getCode()));
+
+        // code holding the whole join gives the alias, so it refers only to what the join refers to from outside
+        SqlBuilder join = new SqlBuilder().append("SELECT ").append(side).append(" FROM (SELECT 1 AS \"x\") AS ");
+        join.appendAlias(table).append(" CROSS JOIN LATERAL (SELECT 1 WHERE ").append(side).append(" > 0) AS \"tab1\"");
+
+        assertFalse(Scope.TOP.refersToCurrentSolution(join.toCode()));
+        assertFalse(pattern.refersToCurrentSolution(join.toCode()));
+
+        join.append(" WHERE ").append(enclosing).append(" > 0");
+
+        assertTrue(pattern.refersToCurrentSolution(join.toCode()));
+        assertEquals(Set.of(0), pattern.getEnclosingInputs(join.toCode()));
     }
 
 

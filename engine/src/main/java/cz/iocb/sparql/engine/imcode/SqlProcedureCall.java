@@ -54,10 +54,10 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * expression (see {@link Request#getCommonTableExpression}), so that the statement evaluates it once even when it
  * occurs several times, e.g. in every branch of a union a join above it was distributed over, or in the pattern of an
  * EXISTS evaluated for every current solution; PostgreSQL folds a common table expression referenced once into the
- * query unless the function is volatile. A call inside an EXISTS pattern whose parameter takes a value of the current
- * solution (see {@link Scope#refersToEnclosingInput}) stays in its place, where the value is known. A result is bound
- * to the classes the parent accepts a value of only, and a specialiser of the procedure may adapt the call to them (see
- * {@link ProcedureDefinition#setSpecializer}).
+ * query unless the function is volatile. A call whose parameter takes a value of a current solution, that of an EXISTS
+ * pattern or of the left side of a lateral join (see {@link Scope#refersToCurrentSolution}), stays in its place, where
+ * the value is known. A result is bound to the classes the parent accepts a value of only, and a specialiser of the
+ * procedure may adapt the call to them (see {@link ProcedureDefinition#setSpecializer}).
  */
 public final class SqlProcedureCall extends SqlIntercode
 {
@@ -407,7 +407,7 @@ public final class SqlProcedureCall extends SqlIntercode
         builder.append(" FROM ");
 
         SqlCode call = translateCall(request, scope);
-        CommonTable table = child.equals(SqlEmptySolution.get()) && !scope.refersToEnclosingInput(call) ?
+        CommonTable table = child.equals(SqlEmptySolution.get()) && !scope.refersToCurrentSolution(call) ?
                 request.getCommonTableExpression(call) : null;
 
         if(table != null)
@@ -476,7 +476,7 @@ public final class SqlProcedureCall extends SqlIntercode
             builder.append(" FROM (");
             builder.append(child.translate(request, scope));
             builder.append(" ) AS ");
-            builder.append(scope.getInputTable());
+            builder.appendAlias(scope.getInputTable());
         }
 
         return builder.toCode();

@@ -590,7 +590,7 @@ public final class SqlExists extends SqlExpressionIntercode
         builder.append("EXISTS (SELECT 1 FROM (");
         builder.append(sql != null ? sql : source.translate(request, scope));
         builder.append(") AS ");
-        builder.append(table);
+        builder.appendAlias(table);
 
         SqlCode condition = solution == null ? null :
                 SqlIntercode.generateJoinCondition(relations, solution, pattern.getVariableBindings(), null, table);

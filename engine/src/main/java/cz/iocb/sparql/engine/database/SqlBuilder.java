@@ -10,8 +10,9 @@ import java.util.Set;
  * read and the outer tables they refer to are collected along with it. A piece of code brings its tables, and so does a
  * column whose expression has some; a declared table written by its name is read by the code from then on, so writing a
  * reference and recording it are one step. An outer table is referred to where a column is addressed through it (see
- * {@link TableColumn#fromTable}), and such a column brings the reference with it; the name of an outer table written
- * alone gives the alias to a subquery and refers to nothing.
+ * {@link TableColumn#fromTable}), and such a column brings the reference with it. The references end in the code that
+ * gives the alias of the table to a subquery (see {@link #appendAlias}): that code holds the query the alias belongs
+ * to, so it refers to the table no longer.
  */
 public final class SqlBuilder
 {
@@ -29,6 +30,12 @@ public final class SqlBuilder
      * The outer tables the text built so far refers to; null while there is none.
      */
     private Set<OuterTable> outerTables;
+
+    /**
+     * The outer tables whose aliases the text built so far gives to subqueries (see {@link #appendAlias}); null while
+     * there is none.
+     */
+    private Set<OuterTable> givenTables;
 
 
     /**
@@ -65,6 +72,30 @@ public final class SqlBuilder
         text.append(record(piece));
 
         return this;
+    }
+
+
+    /**
+     * Appends the name of a table as the alias the code gives to a subquery ({@code (...) AS "lateral0"}). The
+     * references to an outer table in the code of the query the alias belongs to are references to that subquery, so
+     * the code built here, which has to hold that query whole, does not refer to the table, whichever of its pieces
+     * holds the references and whether they are appended before the alias or after it. An alias of another kind is only
+     * written.
+     *
+     * @param table the table
+     * @return this builder
+     */
+    public SqlBuilder appendAlias(Table table)
+    {
+        if(table instanceof OuterTable outer)
+        {
+            if(givenTables == null)
+                givenTables = new HashSet<>();
+
+            givenTables.add(outer);
+        }
+
+        return append(table);
     }
 
 
@@ -164,13 +195,21 @@ public final class SqlBuilder
 
 
     /**
-     * The code built so far: the text with its tables.
+     * The code built so far: the text with its tables. The outer tables whose aliases the text gives are not among them
+     * (see {@link #appendAlias}).
      *
      * @return the code built so far
      */
     public SqlCode toCode()
     {
-        return new SqlCode(text.toString(), declaredTables == null ? Set.of() : declaredTables,
-                outerTables == null ? Set.of() : outerTables);
+        Set<OuterTable> outer = outerTables == null ? Set.of() : outerTables;
+
+        if(givenTables != null && !outer.isEmpty())
+        {
+            outer = new HashSet<>(outer);
+            outer.removeAll(givenTables);
+        }
+
+        return new SqlCode(text.toString(), declaredTables == null ? Set.of() : declaredTables, outer);
     }
 }
