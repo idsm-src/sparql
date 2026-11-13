@@ -613,6 +613,7 @@ public class QueryVisitor extends BaseVisitor<Query>
                     {
                         if(!ctx.selectClause().selectVariable().isEmpty())
                         {
+                            // a sub-select with a projection brings only the projected variables into scope
                             for(SelectVariableContext var : ctx.selectClause().selectVariable())
                                 if(var.var() != null)
                                     visit(var.var());
@@ -625,10 +626,10 @@ public class QueryVisitor extends BaseVisitor<Query>
                                 for(GroupConditionContext cnd : ctx.solutionModifier().groupClause().groupCondition())
                                     if(cnd.var() != null)
                                         visit(cnd.var());
-                        }
 
-                        if(ctx.valuesClause() != null)
-                            visit(ctx.valuesClause());
+                            if(ctx.valuesClause() != null)
+                                visit(ctx.valuesClause());
+                        }
 
                         return null;
                     }
