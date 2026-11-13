@@ -122,6 +122,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedBy
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedLong;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedShort;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.estimateAsUnion;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
@@ -1112,17 +1113,17 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         if(partCanBeBull)
                             builder.append(SqlCode.of("CASE WHEN ", argument.getIsNotNull(relations, argumentClass),
-                                    " THEN '", langClass.getTag(), "' END"));
+                                    " THEN ", string(langClass.getTag()), " END"));
                         else
-                            builder.append(SqlCode.of("'", langClass.getTag(), "'"));
+                            builder.append(string(langClass.getTag()));
                     }
                     else if(argumentClass instanceof DirLangStringWithTagClass langClass)
                     {
                         if(partCanBeBull)
                             builder.append(SqlCode.of("CASE WHEN ", argument.getIsNotNull(relations, argumentClass),
-                                    " THEN '", langClass.getTag(), "' END"));
+                                    " THEN ", string(langClass.getTag()), " END"));
                         else
-                            builder.append(SqlCode.of("'", langClass.getTag(), "'"));
+                            builder.append(string(langClass.getTag()));
                     }
                     else if(argument.canSafelyGeneralize(relations, argumentClass, rdfLangString))
                     {
@@ -2131,9 +2132,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         List<Column> leftCols = left.get(relations, unionize(leftClasses, leftUnionClass));
                         List<Column> rightCols = right.get(relations, unionize(rightClasses, rightTaggedClass));
 
-                        builder.append("CASE WHEN '");
-                        builder.append(getFixedTag(leftUnionClass, rightTaggedClass));
-                        builder.append("'::varchar = ");
+                        builder.append("CASE WHEN ");
+                        builder.append(new ValueColumn(getFixedTag(leftUnionClass, rightTaggedClass), VARCHAR));
+                        builder.append(" = ");
                         builder.append(rightCols.get(1));
                         builder.append(" THEN sparql.");
                         builder.append(function);
@@ -2150,9 +2151,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                         builder.append("CASE WHEN ");
                         builder.append(leftCols.get(1));
-                        builder.append(" = '");
-                        builder.append(getFixedTag(rightUnionClass, leftTaggedClass));
-                        builder.append("'::varchar THEN sparql.");
+                        builder.append(" = ");
+                        builder.append(new ValueColumn(getFixedTag(rightUnionClass, leftTaggedClass), VARCHAR));
+                        builder.append(" THEN sparql.");
                         builder.append(function);
                         builder.append("_string_string(");
                         builder.append(leftCols.get(0));

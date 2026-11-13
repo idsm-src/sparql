@@ -43,6 +43,10 @@ public class ColumnSpecificationTest
         assertEquals(List.of(new TableColumn("s", SqlType.VARCHAR)), getColumns(xsdString, "s"));
         assertEquals(SqlType.VARCHAR, getColumns(xsdString, "s").get(0).getType());
 
+        // the quotes of a name are doubled, so that it stays a single identifier
+        assertEquals("a\"b", getColumns(xsdString, "a\"b").get(0).getName());
+        assertEquals("\"a\"\"b\"", getColumns(xsdString, "a\"b").get(0).toString());
+
         assertThrows(IllegalArgumentException.class, () -> getColumns(xsdString, "s", "t"));
         assertThrows(IllegalArgumentException.class, () -> getColumns(xsdDate, "d"));
     }

@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
@@ -271,6 +272,12 @@ public final class SqlServiceStub extends SqlIntercode
         private static final String itsNamespace = "http://www.w3.org/2005/11/its";
 
         /**
+         * Language tags the grammar of SPARQL can write ({@code LANG_DIR} without the base direction); a received
+         * literal with another tag is no term, so the document holding it is not accepted.
+         */
+        private static final Pattern languageTagPattern = Pattern.compile("[A-Za-z]+(-[A-Za-z0-9]+)*");
+
+        /**
          * Current request, whose configuration knows the datatypes of the received literals.
          */
         private final Request request;
@@ -341,7 +348,7 @@ public final class SqlServiceStub extends SqlIntercode
         private String datatype;
 
         /**
-         * Language tag attribute of the literal being read.
+         * Language tag attribute of the literal being read; null when absent or empty.
          */
         private String lang;
 
@@ -397,8 +404,14 @@ public final class SqlServiceStub extends SqlIntercode
                 datatype = attributes.getValue("datatype");
                 data = new StringBuilder();
 
+                if(lang != null && lang.isEmpty())
+                    lang = null;
+
                 if(direction != null && direction.isEmpty())
                     direction = null;
+
+                if(lang != null && !languageTagPattern.matcher(lang).matches())
+                    throw new SAXException("invalid language tag '" + lang + "'");
             }
             else if(localName.equalsIgnoreCase("uri") || localName.equalsIgnoreCase("bnode"))
             {

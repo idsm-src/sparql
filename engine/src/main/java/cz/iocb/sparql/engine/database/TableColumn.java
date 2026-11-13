@@ -3,8 +3,10 @@ package cz.iocb.sparql.engine.database;
 
 
 /**
- * Named column of a table, rendered double-quoted. The type comes from the database schema, from the resource class of
- * the mapped term or from the column the reference stands for (see {@code SparqlDatabaseConfiguration#getColumns}).
+ * Named column of a table, rendered double-quoted with the embedded quotes doubled: a name may hold any characters, as
+ * the generated names carry the names of the resource classes, and those the language tags of the stored terms. The
+ * type comes from the database schema, from the resource class of the mapped term or from the column the reference
+ * stands for (see {@code SparqlDatabaseConfiguration#getColumns}).
  */
 public final class TableColumn extends Column
 {
@@ -46,7 +48,7 @@ public final class TableColumn extends Column
     @Override
     public String toString()
     {
-        return "\"" + value + "\"";
+        return "\"" + value.replace("\"", "\"\"") + "\"";
     }
 
 

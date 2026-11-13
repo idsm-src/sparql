@@ -136,14 +136,15 @@ public final class DirLangStringWithTagClass extends CanonicalLiteralClass
             return columns;
 
         Column string = columns.get(0);
+        Column lang = constant(tag, VARCHAR);
 
         if(targetClass.equals(box))
-            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_%slangstring(%s, '%s'::varchar)",
-                    direction.getText(), string, tag));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_%slangstring(%s, %s)", direction.getText(),
+                    string, lang));
 
         if(targetClass.equals(getDirectionClass()))
-            return List.of(string, !canBeNull ? constant(tag, VARCHAR) :
-                    expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN '%s'::varchar END", string, tag));
+            return List.of(string,
+                    !canBeNull ? lang : expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN %s END", string, lang));
 
         throw new IllegalArgumentException();
     }
@@ -159,13 +160,14 @@ public final class DirLangStringWithTagClass extends CanonicalLiteralClass
 
         assert isSubclassOf(sourceClass);
 
+        Column lang = constant(tag, VARCHAR);
+
         if(sourceClass.equals(box))
-            return List.of(expression(VARCHAR, "sparql.rdfbox_get_%slangstring_value_of_lang(%s, '%s'::varchar)",
-                    direction.getText(), columns.get(0), tag));
+            return List.of(expression(VARCHAR, "sparql.rdfbox_get_%slangstring_value_of_lang(%s, %s)",
+                    direction.getText(), columns.get(0), lang));
 
         if(sourceClass.equals(getDirectionClass()))
-            return List.of(expression(VARCHAR, "CASE WHEN %s = '%s'::varchar THEN %s END", columns.get(1), tag,
-                    columns.get(0)));
+            return List.of(expression(VARCHAR, "CASE WHEN %s = %s THEN %s END", columns.get(1), lang, columns.get(0)));
 
         throw new IllegalArgumentException();
     }
