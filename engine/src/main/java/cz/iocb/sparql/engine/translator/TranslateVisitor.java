@@ -191,14 +191,16 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private final Stack<Enclosure> enclosures = new Stack<>();
 
     /**
-     * Code enumerating the named graphs, by the variable bound to them (see {@link #getGraphEnumeration}).
+     * Code enumerating the named graphs of the mappings in effect, by the variable bound to them (see
+     * {@link #getGraphEnumeration}).
      */
-    private final Map<Variable, SqlIntercode> graphEnumerations = new HashMap<>();
+    private Map<Variable, SqlIntercode> graphEnumerations = new HashMap<>();
 
     /**
-     * The named graphs shared by the statement, by the variable bound to them (see {@link #getNamedGraphs}).
+     * The named graphs of the mappings in effect shared by the statement, by the variable bound to them (see
+     * {@link #getNamedGraphs}).
      */
-    private final Map<Variable, SqlIntercode> namedGraphs = new HashMap<>();
+    private Map<Variable, SqlIntercode> namedGraphs = new HashMap<>();
 
     /**
      * Scope of the pattern being translated: that of the statement, and inside an EXISTS pattern the scope of that
@@ -229,7 +231,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private Map<String, List<Range>> variableOccurrences;
 
     /**
-     * Quad mappings in effect after applying the dataset clauses.
+     * Quad mappings in effect at the current position: the mappings of the queried service the dataset clauses of the
+     * query select, and inside a SERVICE pattern naming a service of the configuration all mappings of that service.
      */
     private List<QuadMapping> mappings;
 
@@ -2000,9 +2003,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     /**
-     * Translates a SERVICE pattern: a service known to the configuration is translated in place with its own mappings,
-     * any other becomes a {@link SqlServiceStub} evaluated later against the remote endpoint, which knows the lateral
-     * joins of the evaluations per graph it lies in (see {@link #enclosures}).
+     * Translates a SERVICE pattern: a service known to the configuration is translated in place, with its own
+     * procedures and functions and over all its own mappings, which the dataset clauses of the query do not restrict,
+     * as they would not restrict a call of the endpoint of that service; any other service becomes a
+     * {@link SqlServiceStub} evaluated later against the remote endpoint, which knows the lateral joins of the
+     * evaluations per graph it lies in (see {@link #enclosures}).
      *
      * @param service the SERVICE pattern
      * @param context solutions the call is evaluated for
@@ -2014,6 +2019,15 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         if(configuration.getServices().contains(name))
         {
+            // the mappings of the service come into effect, and with them the named graphs they enumerate
+            List<QuadMapping> enclosingMappings = mappings;
+            Map<Variable, SqlIntercode> enclosingGraphEnumerations = graphEnumerations;
+            Map<Variable, SqlIntercode> enclosingNamedGraphs = namedGraphs;
+
+            mappings = configuration.getMappings((Iri) name);
+            graphEnumerations = new HashMap<>();
+            namedGraphs = new HashMap<>();
+
             serviceRestrictions.add((Iri) name);
             graphRestrictions.add(null);
 
@@ -2025,6 +2039,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             graphRestrictions.pop();
             serviceRestrictions.pop();
+
+            mappings = enclosingMappings;
+            graphEnumerations = enclosingGraphEnumerations;
+            namedGraphs = enclosingNamedGraphs;
 
             return result;
         }
