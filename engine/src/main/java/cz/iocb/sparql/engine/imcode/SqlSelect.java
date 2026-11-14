@@ -40,6 +40,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.estimateAsUnion;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import static java.util.Comparator.comparing;
@@ -73,6 +74,7 @@ import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
+import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.model.OrderCondition.Direction;
@@ -1061,20 +1063,24 @@ public final class SqlSelect extends SqlIntercode
             {
                 Set<ResourceClass> numerics = sortSet.get(numeric);
 
-                if(numerics.stream().allMatch(r -> isFloatPoint(r)))
+                // a class may span several datatypes (a sum of decimals is an integer when there is nothing to sum), so
+                // the datatypes are taken from the primitive classes the classes are built of
+                Set<PrimitiveResourceClass> datatypes = estimateAsUnion(numerics);
+
+                if(datatypes.stream().allMatch(r -> isFloatPoint(r)))
                 {
                     ResourceClass sortClass = xsdFloat;
 
-                    for(ResourceClass r : numerics)
+                    for(ResourceClass r : datatypes)
                         sortClass = determineResultClass(sortClass, r);
 
                     addOrderKey(keys, binding.promoteNumericAs(numerics, sortClass), codepoints);
                 }
-                else if(numerics.stream().allMatch(r -> !isFloatPoint(r)))
+                else if(datatypes.stream().allMatch(r -> !isFloatPoint(r)))
                 {
                     ResourceClass sortClass = xsdShort;
 
-                    for(ResourceClass r : numerics)
+                    for(ResourceClass r : datatypes)
                         sortClass = determineResultClass(sortClass, r);
 
                     addOrderKey(keys, binding.promoteNumericAs(numerics, sortClass), codepoints);

@@ -8,6 +8,7 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateTi
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDayTimeDurationIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDecimalIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDoubleIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdFloatIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -20,6 +21,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -53,7 +55,9 @@ import cz.iocb.sparql.testing.Database;
  * variable does not depend on how its terms are stored. The kinds come as the box has them (IRIs, literals of unknown
  * datatypes, language-tagged strings with a base direction and without, strings, durations, dates, date-times,
  * numerics, booleans, triple terms), the strings compared by code points like in the box, and the IRIs by their text,
- * which an IRI class delivers through the columns of its identifiers.
+ * which an IRI class delivers through the columns of its identifiers. Numerics are ordered by their values also when
+ * one class holds the values of several datatypes, like a value of IF with branches of two datatypes, a sum (an integer
+ * when there is nothing to sum) or an average.
  */
 public class TermOrderTest
 {
@@ -178,6 +182,19 @@ public class TermOrderTest
     }
 
 
+    /**
+     * The groups as the xsd:integer literals identifying them.
+     *
+     * @param groups the numbers of the groups
+     * @return the xsd:integer literals of the numbers
+     */
+    private static List<RdfTerm> groups(int... groups)
+    {
+        return IntStream.of(groups).<RdfTerm> mapToObj(g -> new TypedLiteral(Integer.toString(g), xsdIntegerIri))
+                .toList();
+    }
+
+
     @Test
     @DisplayName("terms in their own classes are ordered as the box orders them")
     void nativeOrder() throws Exception
@@ -219,6 +236,78 @@ public class TermOrderTest
         assertThat(execute("SELECT ?v WHERE { VALUES ?v { 1 1.5e0 2 0.5 } } ORDER BY ?v"),
                 contains(new TypedLiteral("0.5", xsdDecimalIri), new TypedLiteral("1", xsdIntegerIri),
                         new TypedLiteral("1.5e0", xsdDoubleIri), new TypedLiteral("2", xsdIntegerIri)));
+    }
+
+
+    @Test
+    @DisplayName("numerics of one class holding several datatypes are ordered by their values")
+    void numericsOfOneClass() throws Exception
+    {
+        // the branches of different datatypes make the class of the value of IF span both
+        String pattern = "VALUES (?c ?a ?b) { %s } BIND(IF(?c, ?a, ?b) AS ?v) ";
+
+        String doubles = pattern.formatted("(true 1 2.5e0) (false 4 0.5e0) (true 3 1.0e0) (false 0 2.0e0)");
+        List<RdfTerm> orderedDoubles = List.of(new TypedLiteral("0.5e0", xsdDoubleIri),
+                new TypedLiteral("1", xsdIntegerIri), new TypedLiteral("2.0e0", xsdDoubleIri),
+                new TypedLiteral("3", xsdIntegerIri));
+
+        assertThat(execute("SELECT ?v WHERE { " + doubles + "} ORDER BY ?v"), contains(orderedDoubles.toArray()));
+        assertThat(execute("SELECT ?v WHERE { " + doubles + "} ORDER BY DESC(?v)"),
+                contains(orderedDoubles.reversed().toArray()));
+        assertThat(execute("SELECT (IF(?c, ?a, ?b) AS ?e) WHERE { " + doubles + "} ORDER BY IF(?c, ?a, ?b)"),
+                contains(orderedDoubles.toArray()));
+
+        String decimals = pattern.formatted("(true 1 2.5) (false 4 0.5) (true 3 1.0) (false 0 2.0)");
+        List<RdfTerm> orderedDecimals = List.of(new TypedLiteral("0.5", xsdDecimalIri),
+                new TypedLiteral("1", xsdIntegerIri), new TypedLiteral("2.0", xsdDecimalIri),
+                new TypedLiteral("3", xsdIntegerIri));
+
+        assertThat(execute("SELECT ?v WHERE { " + decimals + "} ORDER BY ?v"), contains(orderedDecimals.toArray()));
+        assertThat(execute("SELECT ?v WHERE { " + decimals + "} ORDER BY DESC(?v)"),
+                contains(orderedDecimals.reversed().toArray()));
+
+        String floats = pattern.formatted("(true '3.5'^^xsd:float 2.5e0) (false '0.5'^^xsd:float 1.5e0) "
+                + "(true '1'^^xsd:float 9.0e0) (false '7'^^xsd:float 4.5e0)");
+        List<RdfTerm> orderedFloats = List.of(new TypedLiteral("1", xsdFloatIri),
+                new TypedLiteral("1.5e0", xsdDoubleIri), new TypedLiteral("3.5", xsdFloatIri),
+                new TypedLiteral("4.5e0", xsdDoubleIri));
+
+        assertThat(execute("SELECT ?v WHERE { " + floats + "} ORDER BY ?v"), contains(orderedFloats.toArray()));
+        assertThat(execute("SELECT ?v WHERE { " + floats + "} ORDER BY DESC(?v)"),
+                contains(orderedFloats.reversed().toArray()));
+    }
+
+
+    @Test
+    @DisplayName("sums and averages are ordered by their values")
+    void aggregates() throws Exception
+    {
+        // the groups 1 to 4 have the sums 4.0, 0.5, 11.25 and 3.0 and the averages 2.0, 0.5, 5.625 and 3.0
+        List<RdfTerm> bySum = groups(2, 4, 1, 3);
+        List<RdfTerm> byAverage = groups(2, 1, 4, 3);
+
+        for(String values : List.of("VALUES (?g ?x) { (1 1.5) (1 2.5) (2 0.5) (3 10.25) (3 1.0) (4 3.0) } ",
+                "VALUES (?g ?x) { (1 1.5e0) (1 2.5e0) (2 0.5e0) (3 10.25e0) (3 1.0e0) (4 3.0e0) } ",
+                "VALUES (?g ?x) { (1 '1.5'^^xsd:float) (1 '2.5'^^xsd:float) (2 '0.5'^^xsd:float) "
+                        + "(3 '10.25'^^xsd:float) (3 '1'^^xsd:float) (4 '3'^^xsd:float) } "))
+        {
+            assertThat(execute("SELECT ?g (SUM(?x) AS ?v) WHERE { " + values + "} GROUP BY ?g ORDER BY ?v"),
+                    contains(bySum.toArray()));
+            assertThat(execute("SELECT ?g WHERE { " + values + "} GROUP BY ?g ORDER BY DESC(SUM(?x))"),
+                    contains(bySum.reversed().toArray()));
+            assertThat(execute("SELECT ?g (AVG(?x) AS ?v) WHERE { " + values + "} GROUP BY ?g ORDER BY ?v"),
+                    contains(byAverage.toArray()));
+            assertThat(execute("SELECT ?g WHERE { " + values + "} GROUP BY ?g ORDER BY DESC(AVG(?x))"),
+                    contains(byAverage.reversed().toArray()));
+        }
+
+        // the groups 1 to 4 have the averages 1.5, 5.0, 5.5 and 3.0, which are decimals
+        String integers = "VALUES (?g ?x) { (1 1) (1 2) (2 5) (3 10) (3 1) (4 3) } ";
+
+        assertThat(execute("SELECT ?g (AVG(?x) AS ?v) WHERE { " + integers + "} GROUP BY ?g ORDER BY ?v"),
+                contains(groups(1, 4, 2, 3).toArray()));
+        assertThat(execute("SELECT ?g WHERE { " + integers + "} GROUP BY ?g ORDER BY DESC(AVG(?x))"),
+                contains(groups(3, 2, 4, 1).toArray()));
     }
 
 

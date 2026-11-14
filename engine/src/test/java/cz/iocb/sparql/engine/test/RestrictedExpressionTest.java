@@ -110,7 +110,8 @@ public class RestrictedExpressionTest
             new Wrapper("sameTerm(%s, 3)", "3"), new Wrapper("sameTerm(%s, 3)", "'zz'"),
             new Wrapper("xsd:integer(%s)", "'7'"), new Wrapper("xsd:integer(%s)", ":k"),
             new Wrapper("CONCAT(%s, 'x')", "'zz'"), new Wrapper("CONCAT(%s, 'x')", "1"),
-            new Wrapper("REGEX(%s, 'a')", "'zz'"), new Wrapper("REGEX(%s, 'a')", "1"));
+            new Wrapper("REGEX(%s, 'a')", "'zz'"), new Wrapper("REGEX(%s, 'a')", "1"), new Wrapper("((%s) < 5)", "1"),
+            new Wrapper("((%s) < 5)", "'zz'"));
 
     /**
      * The first rows of the constant solutions.

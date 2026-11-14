@@ -942,7 +942,9 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
      * Numeric class in which the operands are compared: the least datatype every class of the operands is derived from
      * or promoted to, so that taking the operands in it is the function conversion of XPath (see
      * {@link cz.iocb.sparql.engine.mapping.datatypes.Datatype#isPromotableTo}); xsd:short, xsd:int and xsd:long keep
-     * the comparison of their own and their derived datatypes in their SQL types.
+     * the comparison of their own and their derived datatypes in their SQL types. A class of an operand may span
+     * several datatypes (the value of an IF whose branches are an integer and a double), so the datatypes are taken
+     * from the primitive classes the classes are built of.
      *
      * @param lset classes of the left operand
      * @param rset classes of the right operand
@@ -950,7 +952,7 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
      */
     private static ResourceClass determineNumericComparisonType(Set<ResourceClass> lset, Set<ResourceClass> rset)
     {
-        Set<ResourceClass> all = Stream.concat(lset.stream(), rset.stream()).collect(toSet());
+        Set<PrimitiveResourceClass> all = estimateAsUnion(Stream.concat(lset.stream(), rset.stream()).collect(toSet()));
 
         if(all.stream().anyMatch(c -> isDouble(c)))
             return xsdDouble;
