@@ -1943,22 +1943,22 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         {
                             Column col = argument.getStringLiteral(relations, resClasses);
 
+                            // the function of the extension takes any integers: a start or a length beyond the
+                            // range of an SQL integer and a negative length are no errors
                             SqlBuilder builder = new SqlBuilder();
 
-                            builder.append("substring(");
+                            builder.append("sparql.substr_string(");
                             builder.append(col);
-                            builder.append(", (");
+                            builder.append(", ");
                             builder.append(locationCol);
-                            builder.append(")::integer");
 
                             if(length != null)
                             {
-                                builder.append(", (");
+                                builder.append(", ");
                                 builder.append(lengthCol);
-                                builder.append(")::integer");
                             }
 
-                            builder.append(")::varchar");
+                            builder.append(")");
 
                             result = List.of(new ExpressionColumn(builder.toCode(), VARCHAR));
                         }
@@ -1970,20 +1970,18 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                             SqlBuilder builder = new SqlBuilder();
 
-                            builder.append("substring(");
+                            builder.append("sparql.substr_string(");
                             builder.append(cols.get(0));
-                            builder.append(", (");
+                            builder.append(", ");
                             builder.append(locationCol);
-                            builder.append(")::integer");
 
                             if(length != null)
                             {
-                                builder.append(", (");
+                                builder.append(", ");
                                 builder.append(lengthCol);
-                                builder.append(")::integer");
                             }
 
-                            builder.append(")::varchar");
+                            builder.append(")");
 
                             result = List.of(new ExpressionColumn(builder.toCode(), VARCHAR), cols.get(1));
                         }
