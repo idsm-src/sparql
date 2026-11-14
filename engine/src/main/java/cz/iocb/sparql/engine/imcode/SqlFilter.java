@@ -119,6 +119,9 @@ public final class SqlFilter extends SqlIntercode
         addAcceptedValues(request, accepted, conditions, child.getVariableBindings());
         childRestrictions.add(accepted);
 
+        // the other conditions leave the child as it is, but its joins are ordered with them in mind
+        addFilterConditions(request, childRestrictions, optCnds, child.getVariableBindings());
+
         while(true)
         {
             SqlIntercode newOptChild = optChild.optimize(request, scope, childRestrictions, childReduced, evalServices);
@@ -145,6 +148,7 @@ public final class SqlFilter extends SqlIntercode
             Restrictions newChildRestrictions = new Restrictions(restrictions);
             newOptCnds.forEach(c -> newChildRestrictions.add(c.getRequirements(relations)));
             newChildRestrictions.add(accepted);
+            addFilterConditions(request, newChildRestrictions, newOptCnds, child.getVariableBindings());
 
             if(newChildReduced == childReduced && newChildRestrictions.equals(childRestrictions))
                 break;

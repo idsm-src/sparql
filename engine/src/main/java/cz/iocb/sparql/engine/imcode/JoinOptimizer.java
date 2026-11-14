@@ -18,6 +18,7 @@ import cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical.LogicalOperator;
 import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.sparql.engine.imcode.expression.SqlInExpression;
 import cz.iocb.sparql.engine.imcode.expression.SqlUnary;
 import cz.iocb.sparql.engine.imcode.expression.SqlUnaryLogical;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -40,7 +41,9 @@ import cz.iocb.sparql.engine.translator.VariableBinding;
  * by an index nested loop instead, costing a lookup per outer row. The tree that minimises the sum of the costs and of
  * the sizes of the intermediate results is found by dynamic programming over the connected subsets of the children, up
  * to {@link #EXHAUSTIVE_LIMIT} of them, and greedily above that. The costs are in units of one row scanned or hashed,
- * calibrated on the NeXtProt queries over a single table of triples.
+ * calibrated on the NeXtProt queries over a single table of triples. A filter above the join counts as well: a
+ * condition that one variable decides alone reduces the child the join takes the variable from (see
+ * {@link SqlIntercode.Restrictions#getFilterConditions}), because the database evaluates it there.
  */
 final class JoinOptimizer
 {
@@ -180,20 +183,84 @@ final class JoinOptimizer
 
 
     /**
-     * Chooses the join tree of the children.
+     * Chooses the join tree of the children whose solutions the filters above the join keep by the given conditions.
+     * Such a condition is decided by one variable alone, so the database evaluates it where the variable is bound,
+     * before the joins: the child the join takes the variable from gives the joins only the fraction of its solutions
+     * the condition is estimated to keep (see {@link #selectivity}), and the tree is chosen for the children so
+     * reduced. The estimated rows of the plan are those of the join itself, as the filters are no part of it.
      *
      * @param request the current request
      * @param childs the children
+     * @param conditions per variable, the conditions the filters above keep the solutions of the join by
+     * @return the join tree with the estimated rows of the join
+     */
+    static Plan plan(Request request, List<SqlIntercode> childs, Map<Variable, Set<SqlExpressionIntercode>> conditions)
+    {
+        double[] unfiltered = new double[childs.size()];
+        double[] kept = new double[childs.size()];
+
+        Arrays.fill(unfiltered, 1);
+        Arrays.fill(kept, 1);
+
+        for(Map.Entry<Variable, Set<SqlExpressionIntercode>> entry : conditions.entrySet())
+        {
+            int child = getDecidingChild(childs, entry.getKey());
+
+            if(child != -1)
+                for(SqlExpressionIntercode condition : entry.getValue())
+                    kept[child] *= selectivity(condition);
+        }
+
+        Plan plan = plan(request, childs, kept);
+
+        return Arrays.equals(kept, unfiltered) ? plan : new Plan(plan.root(), plan(request, childs, unfiltered).rows());
+    }
+
+
+    /**
+     * The child the join takes the values of the variable from, so that a condition on the variable above the join is
+     * evaluated on the solutions of that child: the first child binding the variable always, or the first one binding
+     * it at all; -1 when no child binds the variable.
+     *
+     * @param childs the children
+     * @param variable the variable
+     * @return index of the child the join takes the values of the variable from, or -1
+     */
+    private static int getDecidingChild(List<SqlIntercode> childs, Variable variable)
+    {
+        int nullable = -1;
+
+        for(int i = 0; i < childs.size(); i++)
+        {
+            VariableBinding binding = childs.get(i).getVariable(variable);
+
+            if(binding != null && !binding.canBeNull())
+                return i;
+
+            if(binding != null && nullable == -1)
+                nullable = i;
+        }
+
+        return nullable;
+    }
+
+
+    /**
+     * Chooses the join tree of the children, each giving the joins the given fraction of its solutions.
+     *
+     * @param request the current request
+     * @param childs the children
+     * @param kept the fraction of its solutions each child gives the joins
      * @return the join tree with its estimated rows
      */
-    static Plan plan(Request request, List<SqlIntercode> childs)
+    private static Plan plan(Request request, List<SqlIntercode> childs, double[] kept)
     {
         int n = childs.size();
 
         double[] rows = new double[n];
 
         for(int i = 0; i < n; i++)
-            rows[i] = Math.max(estimateRows(request, childs.get(i)), 1);
+            rows[i] = Math.max(estimateRows(request, childs.get(i)) * kept[i], 1);
 
 
         Map<Variable, Integer> masks = new HashMap<>();
@@ -812,11 +879,32 @@ final class JoinOptimizer
 
 
     /**
+     * True if the selectivity of the condition is estimated by what the condition says (see {@link #selectivity}): it
+     * is a comparison, a call of a built-in function, a membership test, or it is made of such conditions by the
+     * logical operators. A test of a pattern is not, nor is any other condition nothing is known about.
+     *
+     * @param condition the condition
+     * @return true if the selectivity of the condition is estimated by what the condition says, false otherwise
+     */
+    static boolean isEstimated(SqlExpressionIntercode condition)
+    {
+        if(condition instanceof SqlBinaryLogical logical)
+            return isEstimated(logical.getLeft()) && isEstimated(logical.getRight());
+
+        if(condition instanceof SqlBinaryComparison || condition instanceof SqlBuiltinCall
+                || condition instanceof SqlInExpression)
+            return true;
+
+        return condition instanceof SqlUnary unary && isEstimated(unary.getOperand());
+    }
+
+
+    /**
      * Estimated fraction of the solutions a filter condition keeps, after the defaults of the planner: an equality
      * keeps {@link #EQUALITY_SELECTIVITY}, an inequality {@link #INEQUALITY_SELECTIVITY}, a conjunction the product and
      * a disjunction the complement of the product of the complements of the selectivities of its operands, a negation
-     * the complement, a test of the characters of a string what an equality does, and any other condition
-     * {@link #DEFAULT_SELECTIVITY}.
+     * the complement, a membership test what the disjunction of the equalities with its members does, a test of the
+     * characters of a string what an equality does, and any other condition {@link #DEFAULT_SELECTIVITY}.
      *
      * @param condition the condition
      * @return estimated fraction of the solutions the condition keeps
@@ -842,6 +930,13 @@ final class JoinOptimizer
                 case NOT_EQUAL -> 1 - EQUALITY_SELECTIVITY;
                 default -> INEQUALITY_SELECTIVITY;
             };
+        }
+
+        if(condition instanceof SqlInExpression in)
+        {
+            double others = Math.pow(1 - EQUALITY_SELECTIVITY, in.getRights().size());
+
+            return in.isNegated() ? others : 1 - others;
         }
 
         if(condition instanceof SqlBuiltinCall call)

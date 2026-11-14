@@ -365,6 +365,9 @@ public final class SqlAggregation extends SqlIntercode
 
             if(restrictions.getAcceptedValue(variable) != null)
                 childRestrictions.setAcceptedValue(variable, restrictions.getAcceptedValue(variable));
+
+            for(SqlExpressionIntercode condition : restrictions.getFilterConditions(variable))
+                childRestrictions.addFilterCondition(variable, condition);
         }
 
         // the variables of a needed aggregate stay bound even where none of their values is needed, as they give the

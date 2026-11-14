@@ -71,6 +71,12 @@ public final class SqlJoin extends SqlIntercode
     private final Map<Column, Column> columnMap;
 
     /**
+     * Per variable, the conditions the filters above keep the solutions of the join by (see
+     * {@link Restrictions#getFilterConditions}), which the optimizer chooses the join tree with.
+     */
+    private final Map<Variable, Set<SqlExpressionIntercode>> filterConditions;
+
+    /**
      * The join tree chosen by the optimizer (see {@link #getPlan}), once computed.
      */
     private JoinOptimizer.Plan plan;
@@ -83,15 +89,17 @@ public final class SqlJoin extends SqlIntercode
      * @param tables the tables
      * @param bindings the variable bindings
      * @param columnMap the column map
+     * @param filterConditions per variable, the conditions the filters above keep the solutions by
      */
     protected SqlJoin(List<SqlIntercode> childs, List<AliasTable> tables, VariableBindings bindings,
-            Map<Column, Column> columnMap)
+            Map<Column, Column> columnMap, Map<Variable, Set<SqlExpressionIntercode>> filterConditions)
     {
         super(bindings, childs.stream().allMatch(c -> c.isDeterministic()));
 
         this.childs = childs;
         this.columnMap = columnMap;
         this.tables = tables;
+        this.filterConditions = filterConditions;
     }
 
 
@@ -138,7 +146,32 @@ public final class SqlJoin extends SqlIntercode
         List<VariableBindings> allVars = childs.stream().map(c -> c.getVariableBindings()).toList();
         VariableBindings bindings = getJoinVariableBindings(request, allVars, tables, restrictions, columnMap);
 
-        return new SqlJoin(childs, tables, bindings, columnMap);
+        return new SqlJoin(childs, tables, bindings, columnMap, getFilterConditions(childs, restrictions));
+    }
+
+
+    /**
+     * The conditions the filters above keep the solutions of a join by, per variable the children bind (see
+     * {@link Restrictions#getFilterConditions}).
+     *
+     * @param childs the child nodes
+     * @param restrictions what the parent needs of the variables, or null
+     * @return per variable, the conditions the filters above keep the solutions of the join by
+     */
+    private static Map<Variable, Set<SqlExpressionIntercode>> getFilterConditions(List<SqlIntercode> childs,
+            Restrictions restrictions)
+    {
+        Map<Variable, Set<SqlExpressionIntercode>> conditions = new HashMap<>();
+
+        if(restrictions == null)
+            return conditions;
+
+        for(SqlIntercode child : childs)
+            for(Variable variable : child.getVariableBindings().getVariables())
+                if(!restrictions.getFilterConditions(variable).isEmpty())
+                    conditions.put(variable, restrictions.getFilterConditions(variable));
+
+        return conditions;
     }
 
 
@@ -340,7 +373,8 @@ public final class SqlJoin extends SqlIntercode
             return SqlNoSolution.get();
 
 
-        if(fullChilds.equals(childs) && restrictions.isOptimized(relations, bindings))
+        if(fullChilds.equals(childs) && restrictions.isOptimized(relations, bindings)
+                && filterConditions.equals(getFilterConditions(fullChilds, restrictions)))
             return this;
 
         return join(request, fullChilds, restrictions);
@@ -948,7 +982,7 @@ public final class SqlJoin extends SqlIntercode
     JoinOptimizer.Plan getPlan(Request request)
     {
         if(plan == null)
-            plan = JoinOptimizer.plan(request, childs);
+            plan = JoinOptimizer.plan(request, childs, filterConditions);
 
         return plan;
     }
@@ -1601,6 +1635,9 @@ public final class SqlJoin extends SqlIntercode
             return false;
 
         if(!Objects.equals(new Multiset<>(childs), new Multiset<>(imcode.childs)))
+            return false;
+
+        if(!filterConditions.equals(imcode.filterConditions))
             return false;
 
         return true;

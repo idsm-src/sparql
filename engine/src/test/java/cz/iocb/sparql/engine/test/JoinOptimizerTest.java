@@ -235,6 +235,45 @@ public class JoinOptimizerTest
 
 
     @Test
+    public void filterAboveJoin() throws Exception
+    {
+        // the labels and the links are many, so they are joined by hashing
+        assertThat(translate(optimized, "SELECT ?x ?y WHERE { ?x ex:label ?l . ?x ex:link ?y }"),
+                not(containsString("LATERAL")));
+
+        // a filter above the join leaves few of the labels, so the links are looked up for them
+        String query = "SELECT ?x ?y WHERE { ?x ex:label ?l . ?x ex:link ?y FILTER(regex(?l, '^node 1[0-9]$')) }";
+
+        String sql = translate(optimized, query);
+        assertThat(sql, containsString(" CROSS JOIN LATERAL (SELECT "));
+        assertThat(sql, containsString("\"join_optimizer_test\".\"links\" WHERE "));
+        assertThat(sql, not(containsString("\"join_optimizer_test\".\"nodes\" WHERE ")));
+
+        assertThat(check(query), hasSize(100));
+
+        // so does a filter above an OPTIONAL following the join, and a conjunct of a filter
+        query = "SELECT ?x ?y ?t WHERE { ?x ex:label ?l . ?x ex:link ?y OPTIONAL { ?x ex:tag ?t } "
+                + "FILTER(STRSTARTS(?l, 'node 19') && ?x != ?y) }";
+
+        assertThat(translate(optimized, query), containsString(" CROSS JOIN LATERAL (SELECT "));
+        assertThat(check(query), hasSize(110));
+
+        // and the filter of an OPTIONAL for the join inside it
+        query = "SELECT ?x ?y WHERE { ?x ex:tag ?t OPTIONAL { ?x ex:label ?l . ?x ex:link ?y "
+                + "FILTER(CONTAINS(?l, 'e 3')) } }";
+
+        assertThat(translate(optimized, query), containsString(" CROSS JOIN LATERAL (SELECT "));
+        assertThat(check(query), hasSize(14));
+
+        // a condition comparing two variables is decided by no child alone
+        query = "SELECT ?x ?y WHERE { ?x ex:label ?l . ?x ex:link ?y FILTER(?x != ?y) }";
+
+        assertThat(translate(optimized, query), not(containsString("LATERAL")));
+        check(query);
+    }
+
+
+    @Test
     public void values() throws Exception
     {
         String query = "SELECT ?x ?y WHERE { VALUES ?x { <http://example.org/n/1> <http://example.org/n/2> } "

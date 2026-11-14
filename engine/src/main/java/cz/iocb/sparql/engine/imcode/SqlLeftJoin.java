@@ -301,6 +301,10 @@ public final class SqlLeftJoin extends SqlIntercode
         rightRestrictions.retainAcceptedClasses(getNonNullVariables(optLeft.getVariableBindings()));
         rightRestrictions.add(accepted);
 
+        // the database evaluates the conditions of the join on the right side, but no condition of a filter above
+        rightRestrictions.removeFilterConditions();
+        addFilterConditions(request, rightRestrictions, optConditions, right.getVariableBindings());
+
 
         boolean offered = false;
 
@@ -374,6 +378,8 @@ public final class SqlLeftJoin extends SqlIntercode
                     Set.of(optLeft.getVariableBindings()), newCndRestrictions, true, settlement.getClasses());
             newRightRestrictions.retainAcceptedClasses(getNonNullVariables(optLeft.getVariableBindings()));
             newRightRestrictions.add(accepted);
+            newRightRestrictions.removeFilterConditions();
+            addFilterConditions(request, newRightRestrictions, optConditions, right.getVariableBindings());
 
 
             if(newOptReduced == optReduced && newLeftRestrictions.equals(leftRestrictions)

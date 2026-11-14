@@ -316,6 +316,28 @@ public final class SqlInExpression extends SqlExpressionIntercode
     }
 
 
+    /**
+     * True for NOT IN.
+     *
+     * @return true for NOT IN, false for IN
+     */
+    public boolean isNegated()
+    {
+        return negated;
+    }
+
+
+    /**
+     * Operands compared against.
+     *
+     * @return operands compared against
+     */
+    public List<SqlExpressionIntercode> getRights()
+    {
+        return rights;
+    }
+
+
     @Override
     public void generateExplanation(StringBuilder builder, String indent, int priority)
     {

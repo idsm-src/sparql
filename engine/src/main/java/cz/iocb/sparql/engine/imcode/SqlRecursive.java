@@ -883,6 +883,9 @@ public final class SqlRecursive extends SqlIntercode
         childRestrictions.removeAcceptedClasses(endVar);
         childRestrictions.removeAcceptedClasses(joinVar);
 
+        // the database evaluates no condition of a filter above the walk inside the recursion
+        childRestrictions.removeFilterConditions();
+
         // the recursion compares the node a step departs from with the nodes of the walk, so the step presents it as
         // they are held: a step whose branches bind the node in several classes of one class of the nodes is then
         // joined by a single equality instead of a disjunction over the pairs of the classes; these are the classes
