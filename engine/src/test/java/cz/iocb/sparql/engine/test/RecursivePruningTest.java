@@ -56,20 +56,21 @@ import cz.iocb.sparql.testing.Database;
  * variables, which enumerate every node of the graph. A FILTER accepts the classes in which its conditions can hold.
  * Where the parent keeps the solutions it cannot join (the left side of an OPTIONAL, a nullable sibling or left side),
  * computes an aggregate from them or picks them by a slice, the branches have to stay, and a walk whose end variable
- * keeps several classes then joins its step laterally, branch by branch, instead of by a disjunction. A walk between
- * two variables starts from the end the parent restricts more, and a sibling in a join that binds an end of the walk
- * always and distinct solutions over it (the labels, keyed by the node) seeds the walk: its solutions start the
- * recursion, which carries its variables along, so that it is evaluated once and the join needs it no more; read from a
- * source of the nodes, it replaces the zero-length paths altogether. A walk of which the parent needs only one end, and
- * not the multiplicities (a DISTINCT over the end, a MINUS, an EXISTS), reduces to its initial solutions, since a node
- * has a path iff it has a zero-length path or a first step. An OPTIONAL walk of zero or more steps from nodes the left
- * side binds always is a join, as the zero-length paths match every node, and the left side then seeds it. An EXISTS
- * compares the solutions of its pattern with the current solution instead of evaluating the pattern for every solution,
- * so that the database may turn the test into a semi-join, unless the pattern reads the current solution elsewhere: a
- * filter using its variable, or a walk from a node of the current solution, which starts from that node when no sibling
- * restricted by a constant seeds it from its other end. A node that binds the start of a walk without being distinct
- * over it, or the left side of an OPTIONAL or MINUS, is shared as a common table expression, so that its distinct
- * starts seed the walk while it is evaluated once.
+ * keeps several classes then joins its step laterally, branch by branch, instead of by a disjunction; a walk holding
+ * its nodes in a single class joins the step by one equality, although the branches of the step depart from nodes of
+ * several classes. A walk between two variables starts from the end the parent restricts more, and a sibling in a join
+ * that binds an end of the walk always and distinct solutions over it (the labels, keyed by the node) seeds the walk:
+ * its solutions start the recursion, which carries its variables along, so that it is evaluated once and the join needs
+ * it no more; read from a source of the nodes, it replaces the zero-length paths altogether. A walk of which the parent
+ * needs only one end, and not the multiplicities (a DISTINCT over the end, a MINUS, an EXISTS), reduces to its initial
+ * solutions, since a node has a path iff it has a zero-length path or a first step. An OPTIONAL walk of zero or more
+ * steps from nodes the left side binds always is a join, as the zero-length paths match every node, and the left side
+ * then seeds it. An EXISTS compares the solutions of its pattern with the current solution instead of evaluating the
+ * pattern for every solution, so that the database may turn the test into a semi-join, unless the pattern reads the
+ * current solution elsewhere: a filter using its variable, or a walk from a node of the current solution, which starts
+ * from that node when no sibling restricted by a constant seeds it from its other end. A node that binds the start of a
+ * walk without being distinct over it, or the left side of an OPTIONAL or MINUS, is shared as a common table
+ * expression, so that its distinct starts seed the walk while it is evaluated once.
  */
 public class RecursivePruningTest
 {
@@ -320,6 +321,30 @@ public class RecursivePruningTest
         // the end variable keeps two classes, so the step is joined laterally instead of by a disjunction
         assertThat(translate(query), containsString("CROSS JOIN LATERAL"));
         assertThat(translate(query), not(containsString(" OR ")));
+    }
+
+
+    @Test
+    @DisplayName("a walk holding its nodes in one class joins a step from several classes by one equality")
+    void stepFromSeveralClasses() throws Exception
+    {
+        // the zero-length paths start in every node of the graph, the whole IRIs of the links among them, so the walk
+        // holds its nodes as whole IRIs, whereas the branches of its step depart from the nodes and from the others
+        String walk = "SELECT ?x ?y WHERE { ?x ex:sub* ?y }";
+
+        assertThat(execute(walk), hasSize(29));
+        assertThat(translate(walk), not(containsString(" OR ")));
+        assertThat(translate(walk), not(containsString("LATERAL")));
+
+        String steps = "SELECT ?x ?y WHERE { ?x ex:sub*/ex:sub ?y }";
+
+        assertThat(execute(steps),
+                containsInAnyOrder(row(node(1), node(0)), row(node(2), node(1)), row(node(2), node(0)),
+                        row(node(3), node(0)), row(other(11), other(10)), row(other(11), node(1)),
+                        row(other(11), node(0)), row(other(12), other(11)), row(other(12), other(10)),
+                        row(other(12), node(1)), row(other(12), node(0)), row(other(10), node(1)),
+                        row(other(10), node(0)), row(other(20), node(1)), row(other(20), node(0))));
+        assertThat(translate(steps), not(containsString(" OR ")));
     }
 
 

@@ -854,13 +854,19 @@ public final class SqlRecursive extends SqlIntercode
         Restrictions childRestrictions = new Restrictions(restrictions);
 
         childRestrictions.add(endVar);
-        childRestrictions.add(joinVar); //TODO: set appropriate resource classes
+        childRestrictions.add(joinVar);
 
         // the children deliver the nodes of the walk, not only the values the parent sees: a node of a class the
         // parent does not accept may still lead to one it does, so the children have to keep every node (the step
         // branches that cannot lead to an accepted class are left out below)
         childRestrictions.removeAcceptedClasses(endVar);
         childRestrictions.removeAcceptedClasses(joinVar);
+
+        // the recursion compares the node a step departs from with the nodes of the walk, so the step presents it as
+        // they are held: a step whose branches bind the node in several classes of one class of the nodes is then
+        // joined by a single equality instead of a disjunction over the pairs of the classes; these are the classes
+        // of the nodes themselves, never those the parent accepts of the end
+        childRestrictions.addJoinClasses(joinVar, endBinding.getClasses());
 
         if(graphVar != null)
             childRestrictions.add(graphVar);
@@ -962,7 +968,9 @@ public final class SqlRecursive extends SqlIntercode
             if(childs.size() == union.getChilds().size())
                 break;
 
-            nextOpt = SqlUnion.union(request, childs);
+            // the union of the remaining branches keeps presenting the node a step departs from as the recursion
+            // compares it
+            nextOpt = SqlUnion.union(request, childs, nextRestrictions);
         }
 
         if(accepted != null && !(nextOpt instanceof SqlUnion) && !overlaps(relations, nextOpt, endVar, accepted))
@@ -1178,10 +1186,12 @@ public final class SqlRecursive extends SqlIntercode
         // branch by branch with a condition of its own: the condition of the union as a whole is a disjunction over the
         // class pairs, which the database can neither hash nor look up by an index, whereas it joins a single pair
         // through the index of the branch (the step of a single class stays a plain join, so that the database may
-        // still choose a hash join when the recursion grows large); a step of a walk carrying the graph in several
-        // classes keeps the equality of the node, which the database can hash, and only its condition on the graph is
-        // a disjunction over the class pairs, so it is joined laterally only when every branch can be looked up by an
-        // index (otherwise the database would scan the branch for every row of the recursion)
+        // still choose a hash join when the recursion grows large, and so does a union stepping from several classes
+        // when the walk holds its nodes in a single class: the union presents the node it departs from in that class,
+        // see optimize, so one equality joins it); a step of a walk carrying the graph in several classes keeps the
+        // equality of the node, which the database can hash, and only its condition on the graph is a disjunction over
+        // the class pairs, so it is joined laterally only when every branch can be looked up by an index (otherwise
+        // the database would scan the branch for every row of the recursion)
         VariableBinding carriedGraph = graphVar != null ? carried.get(graphVar) : null;
         boolean lateral = next instanceof SqlUnion union
                 && (endBinding.getClasses().size() > 1 || (carriedGraph != null && carriedGraph.getClasses().size() > 1
