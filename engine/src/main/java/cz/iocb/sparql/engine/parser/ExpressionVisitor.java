@@ -479,7 +479,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
     private FunctionCallExpression parseFunctionCall(IriNode iri, ArgListContext ctx)
     {
         ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(config, prologue, graphs, services, scopes,
-                usedBlankNodes, messages, false);
+                usedBlankNodes, messages, allowAggregates);
 
         List<Expression> arguments = argumentsVisitor.visit(ctx);
 
