@@ -15,10 +15,11 @@ import org.junit.jupiter.api.Test;
 /**
  * Disjunction and conjunction of {@link Conditions}: false and true are their neutral elements and true and false their
  * absorbing ones, also for any number of operands; the sufficient test of an implication between disjunctions; the
- * columns equal to a column in every disjunct; and the resolution of disjuncts on complementary null tests. A disjunct
- * is compared with every other one, so {@link Condition#contains} looks at their columns before it conjoins them, which
- * must not change what is absorbed and implied: random conditions and disjunctions are compared also by the
- * conjunctions alone.
+ * columns equal to a column in every disjunct; and the resolution of disjuncts on complementary null tests. A
+ * contradictory disjunct is not kept, so the conjunction of two disjunctions has no disjunct for two disjuncts that
+ * contradict each other. A disjunct is compared with every other one, so {@link Condition#contains} looks at their
+ * columns before it conjoins them, which must not change what is absorbed and implied: random conditions and
+ * disjunctions are compared also by the conjunctions alone.
  */
 public class ConditionsTest
 {
@@ -28,11 +29,16 @@ public class ConditionsTest
 
     private static final Column c = new TableColumn("c", INT4);
 
+    private static final Column one = new ValueColumn("1", INT4);
+
+    private static final Column two = new ValueColumn("2", INT4);
+
+    private static final Column three = new ValueColumn("3", INT4);
+
     /**
      * The columns of the random conditions: the table columns, two constants and the NULL constant.
      */
-    private static final List<Column> columns = List.of(a, b, c, new ValueColumn("1", INT4), new ValueColumn("2", INT4),
-            new NullColumn(INT4));
+    private static final List<Column> columns = List.of(a, b, c, one, two, new NullColumn(INT4));
 
 
     /**
@@ -87,6 +93,9 @@ public class ConditionsTest
      */
     private static void add(Set<Condition> conditions, Condition condition)
     {
+        if(condition.isFalse())
+            return;
+
         for(Condition other : conditions)
             if(contains(condition, other))
                 return;
@@ -310,6 +319,7 @@ public class ConditionsTest
     void randomDisjunctions()
     {
         Random random = new Random(2);
+        int contradictory = 0;
         int absorbed = 0;
         int implied = 0;
 
@@ -320,9 +330,9 @@ public class ConditionsTest
         {
             Conditions conditions = new Conditions(false);
             Set<Condition> expected = new HashSet<>();
-            int added = 1 + random.nextInt(8);
+            int consistent = 0;
 
-            for(int j = 0; j < added; j++)
+            for(int j = random.nextInt(8); j >= 0; j--)
             {
                 Condition condition = randomCondition(random);
 
@@ -330,6 +340,12 @@ public class ConditionsTest
                 add(expected, condition);
 
                 assertEquals(expected, conditions.getConditions());
+                assertEquals(expected.isEmpty(), conditions.isFalse());
+
+                if(condition.isFalse())
+                    contradictory++;
+                else
+                    consistent++;
             }
 
             Set<Condition> implying = expectedPrevious;
@@ -337,7 +353,7 @@ public class ConditionsTest
 
             assertEquals(implies, previous.implies(conditions));
 
-            if(expected.size() < added)
+            if(expected.size() < consistent)
                 absorbed++;
 
             if(implies)
@@ -347,8 +363,43 @@ public class ConditionsTest
             expectedPrevious = expected;
         }
 
-        // the test is no good unless many of the disjunctions absorb or resolve a disjunct and imply the next one
+        // the test is no good unless many of the disjuncts are contradictory and many of the disjunctions absorb or
+        // resolve a disjunct and imply the next one
+        assertTrue(contradictory > 10000);
         assertTrue(absorbed > 10000);
         assertTrue(implied > 1000);
+    }
+
+
+    @Test
+    void contradictoryDisjuncts()
+    {
+        Condition contradiction = new Condition();
+        contradiction.addIsNull(a);
+        contradiction.addIsNotNull(a);
+
+        assertTrue(new Conditions(contradiction).isFalse());
+        assertEquals(new Conditions(false), new Conditions(contradiction));
+        assertEquals(equal(a, one), Conditions.or(equal(a, one), new Conditions(contradiction)));
+
+        Conditions copy = new Conditions(equal(a, one));
+        copy.add(contradiction);
+
+        assertEquals(equal(a, one), copy);
+
+        // a column equal to a constant is not equal to another one
+        assertTrue(Conditions.and(equal(a, one), equal(a, two)).isFalse());
+        assertEquals(Set.of(), Conditions.and(equal(a, one), equal(a, two)).getConditions());
+
+        // so the conjunction of two lists of the values of a column is the list of their common values
+        Conditions oneOrTwo = Conditions.or(equal(a, one), equal(a, two));
+        Conditions twoOrThree = Conditions.or(equal(a, two), equal(a, three));
+
+        assertEquals(equal(a, two), Conditions.and(oneOrTwo, twoOrThree));
+        assertEquals(equal(a, two), Conditions.and(oneOrTwo, equal(a, two).getConditions().iterator().next()));
+        assertTrue(Conditions.and(oneOrTwo, equal(a, three)).isFalse());
+
+        // whereas the lists of the values of two columns give a disjunct for every pair of the values
+        assertEquals(4, Conditions.and(oneOrTwo, Conditions.or(equal(b, two), equal(b, three))).getConditions().size());
     }
 }

@@ -48,7 +48,9 @@ import cz.iocb.sparql.testing.Database;
  * VALUES joined with a table access. A short list is merged into the access, whose conditions get a disjunct for every
  * row of the list; a long list stays a list the access is joined with, and so does a list whose rows would multiply the
  * disjuncts the access has got from another list, because the time of handling the conditions grows with the square of
- * the number of their disjuncts. A single row adds no disjunct, so it is merged always.
+ * the number of their disjuncts. A single row adds no disjunct, so it is merged always. Two accesses that have taken in
+ * lists of one variable are merged into an access of the values the lists have in common, as two different values
+ * contradict each other.
  *
  * The table {@code item} holds the items 1 to 300, the item i with the number 10 * i and the label {@code l<i>}.
  */
@@ -154,14 +156,15 @@ public class ValuesMergeTest
 
 
     /**
-     * The items 1 to the given one, as a VALUES clause writes them.
+     * The items of a range, as a VALUES clause writes them.
      *
-     * @param count the number of the items
+     * @param first the first item
+     * @param last the last item
      * @return the items separated by spaces
      */
-    private static String items(int count)
+    private static String items(int first, int last)
     {
-        return IntStream.rangeClosed(1, count).mapToObj(i -> "item:" + i).collect(joining(" "));
+        return IntStream.rangeClosed(first, last).mapToObj(i -> "item:" + i).collect(joining(" "));
     }
 
 
@@ -178,15 +181,16 @@ public class ValuesMergeTest
 
 
     /**
-     * Expected rows of the items 1 to the given one, each with a term of its own.
+     * Expected rows of the items of a range, each with a term of its own.
      *
-     * @param count the number of the items
+     * @param first the first item
+     * @param last the last item
      * @param term gives the term of an item
      * @return the rows of the items and their terms
      */
-    private static Object[] rows(int count, IntFunction<RdfTerm> term)
+    private static Object[] rows(int first, int last, IntFunction<RdfTerm> term)
     {
-        return IntStream.rangeClosed(1, count)
+        return IntStream.rangeClosed(first, last)
                 .mapToObj(i -> Arrays.asList(new Iri("http://example.org/item/" + i), term.apply(i))).toArray();
     }
 
@@ -216,6 +220,19 @@ public class ValuesMergeTest
 
 
     /**
+     * How many times the SQL holds the text.
+     *
+     * @param sql the SQL
+     * @param text the text
+     * @return number of the occurrences of the text in the SQL
+     */
+    private static int count(String sql, String text)
+    {
+        return (sql.length() - sql.replace(text, "").length()) / text.length();
+    }
+
+
+    /**
      * How many lists of values the SQL holds.
      *
      * @param sql the SQL
@@ -223,7 +240,7 @@ public class ValuesMergeTest
      */
     private static int lists(String sql)
     {
-        return (sql.length() - sql.replace("(VALUES ", "").length()) / "(VALUES ".length();
+        return count(sql, "(VALUES ");
     }
 
 
@@ -231,9 +248,9 @@ public class ValuesMergeTest
     @DisplayName("a short list is merged into the access")
     void shortList() throws Exception
     {
-        String query = "SELECT ?s ?n WHERE { VALUES ?s { " + items(8) + " } ?s ex:num ?n }";
+        String query = "SELECT ?s ?n WHERE { VALUES ?s { " + items(1, 8) + " } ?s ex:num ?n }";
 
-        assertThat(execute(query), containsInAnyOrder(rows(8, ValuesMergeTest::number)));
+        assertThat(execute(query), containsInAnyOrder(rows(1, 8, ValuesMergeTest::number)));
         assertThat(lists(translate(query)), is(0));
     }
 
@@ -242,9 +259,9 @@ public class ValuesMergeTest
     @DisplayName("a long list stays a list joined with the access")
     void longList() throws Exception
     {
-        String query = "SELECT ?s ?n WHERE { VALUES ?s { " + items(200) + " } ?s ex:num ?n }";
+        String query = "SELECT ?s ?n WHERE { VALUES ?s { " + items(1, 200) + " } ?s ex:num ?n }";
 
-        assertThat(execute(query), containsInAnyOrder(rows(200, ValuesMergeTest::number)));
+        assertThat(execute(query), containsInAnyOrder(rows(1, 200, ValuesMergeTest::number)));
         assertThat(lists(translate(query)), is(1));
     }
 
@@ -253,10 +270,10 @@ public class ValuesMergeTest
     @DisplayName("short lists of two variables are merged while they give few disjuncts together")
     void fewDisjuncts() throws Exception
     {
-        String query = "SELECT ?s ?l WHERE { VALUES ?s { " + items(5) + " } VALUES ?l { " + labels(5)
+        String query = "SELECT ?s ?l WHERE { VALUES ?s { " + items(1, 5) + " } VALUES ?l { " + labels(5)
                 + " } ?s ex:label ?l }";
 
-        assertThat(execute(query), containsInAnyOrder(rows(5, ValuesMergeTest::label)));
+        assertThat(execute(query), containsInAnyOrder(rows(1, 5, ValuesMergeTest::label)));
         assertThat(lists(translate(query)), is(0));
     }
 
@@ -265,11 +282,28 @@ public class ValuesMergeTest
     @DisplayName("a list that would multiply the disjuncts of a merged list stays a list")
     void multipliedDisjuncts() throws Exception
     {
-        String query = "SELECT ?s ?l WHERE { VALUES ?s { " + items(20) + " } VALUES ?l { " + labels(20)
+        String query = "SELECT ?s ?l WHERE { VALUES ?s { " + items(1, 20) + " } VALUES ?l { " + labels(20)
                 + " } ?s ex:label ?l }";
 
-        assertThat(execute(query), containsInAnyOrder(rows(20, ValuesMergeTest::label)));
+        assertThat(execute(query), containsInAnyOrder(rows(1, 20, ValuesMergeTest::label)));
         assertThat(lists(translate(query)), is(1));
+    }
+
+
+    @Test
+    @DisplayName("two accesses with lists of one variable are merged into an access of their common values")
+    void commonValues() throws Exception
+    {
+        String query = "SELECT ?s ?n WHERE { { VALUES ?s { " + items(1, 20) + " } ?s ex:num ?n } { VALUES ?s { "
+                + items(11, 30) + " } ?s ex:label ?l } }";
+
+        assertThat(execute(query), containsInAnyOrder(rows(11, 20, ValuesMergeTest::number)));
+
+        String sql = translate(query);
+
+        // one access with an equality for each common item, and no comparison of two different items
+        assertThat(count(sql, "\"values_merge_test\".\"item\""), is(1));
+        assertThat(count(sql, "::int4"), is(10));
     }
 
 

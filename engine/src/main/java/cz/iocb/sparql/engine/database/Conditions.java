@@ -11,9 +11,12 @@ import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
 
 /**
  * Disjunction of {@link Condition}s, i.e. a condition in disjunctive normal form. No disjunct means false, a disjunct
- * without predicates means true. Two disjuncts differing only in a null test of a column, one requiring the column to
- * be null and the other to be not null, are replaced by their resolvent, the disjunct without the test (see
- * {@link Condition#resolve}), so a disjunction of complementary null tests is true also syntactically.
+ * without predicates means true. A disjunct found contradictory (see {@link Condition#isFalse}) is not kept, because it
+ * adds nothing to a disjunction; in particular, a conjunction of two disjunctions has no disjunct for two disjuncts
+ * that contradict each other, like those requiring a column to be equal to different constants. Two disjuncts differing
+ * only in a null test of a column, one requiring the column to be null and the other to be not null, are replaced by
+ * their resolvent, the disjunct without the test (see {@link Condition#resolve}), so a disjunction of complementary
+ * null tests is true also syntactically.
  */
 public class Conditions
 {
@@ -47,25 +50,29 @@ public class Conditions
 
 
     /**
-     * Creates the disjunction of a single condition.
+     * Creates the disjunction of a single condition, which is false when the condition is contradictory.
      *
      * @param condition the disjunct
      */
     public Conditions(Condition condition)
     {
-        conditions.add(condition);
+        add(condition);
     }
 
 
     /**
-     * Adds a disjunct: nothing when it implies a present disjunct (contains all its predicates, see
-     * {@link Condition#contains}), since it is absorbed by it; otherwise the present disjuncts implying the new one are
-     * absorbed and removed, and the disjunct is resolved on null tests with the present disjuncts as long as possible.
+     * Adds a disjunct: nothing when it is contradictory, or when it implies a present disjunct (contains all its
+     * predicates, see {@link Condition#contains}), since it is absorbed by it; otherwise the present disjuncts implying
+     * the new one are absorbed and removed, and the disjunct is resolved on null tests with the present disjuncts as
+     * long as possible.
      *
      * @param condition the disjunct
      */
     public void add(Condition condition)
     {
+        if(condition.isFalse())
+            return;
+
         for(Condition other : conditions)
             if(condition.contains(other))
                 return;
@@ -204,13 +211,13 @@ public class Conditions
 
 
     /**
-     * True if every disjunct is contradictory.
+     * True if there is no disjunct, which is the only form false takes, as a contradictory disjunct is not kept.
      *
-     * @return true if every disjunct is contradictory, false otherwise
+     * @return true if there is no disjunct, false otherwise
      */
     public boolean isFalse()
     {
-        return conditions.stream().allMatch(c -> c.isFalse());
+        return conditions.isEmpty();
     }
 
 
