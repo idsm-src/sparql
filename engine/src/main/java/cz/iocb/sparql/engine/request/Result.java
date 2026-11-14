@@ -95,6 +95,7 @@ import cz.iocb.sparql.engine.mapping.classes.UnsignedShortClass;
 import cz.iocb.sparql.engine.mapping.classes.UnsupportedLiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeClass;
+import cz.iocb.sparql.engine.mapping.datatypes.DayTimeDurationDatatype;
 import cz.iocb.sparql.engine.rdf.DirLangStringLiteral;
 import cz.iocb.sparql.engine.rdf.IntBlankNode;
 import cz.iocb.sparql.engine.rdf.Iri;
@@ -147,26 +148,6 @@ public class Result implements AutoCloseable
      * Logger of result processing.
      */
     private static final Logger logger = LoggerFactory.getLogger(Request.class);
-
-    /**
-     * Microseconds in a day.
-     */
-    private static final long USECS_PER_DAY = 86400000000l;
-
-    /**
-     * Microseconds in an hour.
-     */
-    private static final long USECS_PER_HOUR = 3600000000l;
-
-    /**
-     * Microseconds in a minute.
-     */
-    private static final long USECS_PER_MINUTE = 60000000l;
-
-    /**
-     * Microseconds in a second.
-     */
-    private static final long USECS_PER_SEC = 1000000l;
 
     /**
      * Form of the query.
@@ -589,13 +570,13 @@ public class Result implements AutoCloseable
 
             case DayTimeDurationClass _ ->
             {
-                yield new TypedLiteral(durationToString((Long) value), xsdDayTimeDurationIri);
+                yield new TypedLiteral(DayTimeDurationDatatype.getLexicalForm((Long) value), xsdDayTimeDurationIri);
             }
 
             case DayTimeDurationBaseClass _ ->
             {
                 String lexical = rs.getString(column++);
-                String str = lexical.isEmpty() ? durationToString((Long) value) : lexical;
+                String str = lexical.isEmpty() ? DayTimeDurationDatatype.getLexicalForm((Long) value) : lexical;
                 yield new TypedLiteral(str, xsdDayTimeDurationIri);
             }
 
@@ -773,80 +754,6 @@ public class Result implements AutoCloseable
         BigDecimal number = value.stripTrailingZeros();
 
         return (number.scale() < 1 ? number.setScale(1) : number).toPlainString();
-    }
-
-
-    /**
-     * Canonical xsd:dayTimeDuration lexical form of a duration in microseconds.
-     *
-     * @param value duration in microseconds
-     * @return canonical xsd:dayTimeDuration lexical form of a duration in microseconds
-     */
-    private static String durationToString(long value)
-    {
-        if(value == 0)
-            return "PT0S";
-
-        if(value == Long.MAX_VALUE)
-            return "-P106751991DT4H54.775808S";
-
-        StringBuilder builder = new StringBuilder();
-
-        if(value < 0)
-            builder.append('-');
-
-        value = Math.abs(value);
-
-        long days = value / USECS_PER_DAY;
-        long hours = value % USECS_PER_DAY / USECS_PER_HOUR;
-        long minutes = value % USECS_PER_HOUR / USECS_PER_MINUTE;
-        long seconds = value % USECS_PER_MINUTE / USECS_PER_SEC;
-        long useconds = value % USECS_PER_SEC;
-
-        builder.append('P');
-
-        if(days > 0)
-        {
-            builder.append(days);
-            builder.append('D');
-        }
-
-        if(hours > 0 || minutes > 0 || seconds > 0 || useconds > 0)
-            builder.append('T');
-
-        if(hours > 0)
-        {
-            builder.append(hours);
-            builder.append('H');
-        }
-
-        if(minutes > 0)
-        {
-            builder.append(minutes);
-            builder.append('M');
-        }
-
-        if(seconds > 0)
-        {
-            builder.append(seconds);
-
-            if(useconds == 0)
-                builder.append('S');
-        }
-
-        if(useconds > 0)
-        {
-            if(seconds == 0)
-                builder.append('0');
-
-            String str = Long.toString(useconds);
-
-            builder.append('.');
-            builder.append("000000".substring(str.length(), 6) + str.replaceFirst("0+$", ""));
-            builder.append('S');
-        }
-
-        return builder.toString();
     }
 
 

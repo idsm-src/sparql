@@ -23,22 +23,22 @@ public final class DayTimeDurationDatatype extends Datatype
     /**
      * Microseconds in a day.
      */
-    static private final BigDecimal DAY_USEC = new BigDecimal(24 * 60 * 60 * 1000000l);
+    static private final long DAY_USEC = 24 * 60 * 60 * 1000000l;
 
     /**
      * Microseconds in an hour.
      */
-    static private final BigDecimal HOUR_USEC = new BigDecimal(60 * 60 * 1000000l);
+    static private final long HOUR_USEC = 60 * 60 * 1000000l;
 
     /**
      * Microseconds in a minute.
      */
-    static private final BigDecimal MIN_USEC = new BigDecimal(60 * 1000000l);
+    static private final long MIN_USEC = 60 * 1000000l;
 
     /**
      * Microseconds in a second.
      */
-    static private final BigDecimal SEC_USEC = new BigDecimal(1000000l);
+    static private final long SEC_USEC = 1000000l;
 
     /**
      * Lexical form of xsd:dayTimeDuration with at most microsecond precision.
@@ -137,39 +137,69 @@ public final class DayTimeDurationDatatype extends Datatype
     {
         assert isValidForm(value);
 
-        BigDecimal num = parseValue(value);
+        return getLexicalForm(parseValue(value).longValueExact());
+    }
 
-        if(num.equals(BigDecimal.ZERO))
+
+    /**
+     * The canonical lexical form of the duration of the given length, as the extension prints it: the parts that are
+     * not zero, the seconds with their fraction without trailing zeros, as in {@code -P1DT2H0.5S}, and {@code PT0S} for
+     * the zero duration.
+     *
+     * @param value length of the duration in microseconds (negative for a negative duration)
+     * @return the canonical lexical form of the duration
+     */
+    public static String getLexicalForm(long value)
+    {
+        if(value == 0)
             return "PT0S";
 
         StringBuilder builder = new StringBuilder();
 
-        if(num.compareTo(BigDecimal.ZERO) < 0)
-            builder.append("-1");
+        if(value < 0)
+            builder.append('-');
 
-        builder.append("P");
+        builder.append('P');
 
-        num = num.abs();
+        // the parts are taken from the negative length, because the least duration has no positive counterpart
+        long length = value > 0 ? -value : value;
 
-        BigDecimal days = num.divideToIntegralValue(DAY_USEC);
-        BigDecimal hours = num.remainder(DAY_USEC).divideToIntegralValue(HOUR_USEC);
-        BigDecimal mins = num.remainder(HOUR_USEC).divideToIntegralValue(MIN_USEC);
-        BigDecimal secs = num.remainder(MIN_USEC).divide(SEC_USEC).stripTrailingZeros();
+        long days = -(length / DAY_USEC);
+        long hours = -(length % DAY_USEC / HOUR_USEC);
+        long mins = -(length % HOUR_USEC / MIN_USEC);
+        long secs = -(length % MIN_USEC / SEC_USEC);
+        long usecs = -(length % SEC_USEC);
 
-        if(!days.equals(BigDecimal.ZERO))
-            builder.append(days).append("D");
+        if(days > 0)
+            builder.append(days).append('D');
 
-        if(!hours.equals(BigDecimal.ZERO) || !mins.equals(BigDecimal.ZERO) || !secs.equals(BigDecimal.ZERO))
-            builder.append("T");
+        if(hours > 0 || mins > 0 || secs > 0 || usecs > 0)
+            builder.append('T');
 
-        if(!hours.equals(BigDecimal.ZERO))
-            builder.append(hours).append("H");
+        if(hours > 0)
+            builder.append(hours).append('H');
 
-        if(!mins.equals(BigDecimal.ZERO))
-            builder.append(mins).append("M");
+        if(mins > 0)
+            builder.append(mins).append('M');
 
-        if(!secs.equals(BigDecimal.ZERO))
-            builder.append(secs).append("S");
+        if(secs > 0 || usecs > 0)
+        {
+            builder.append(secs);
+
+            if(usecs > 0)
+            {
+                // the six digits of the fraction, with the leading zeros and without the trailing ones
+                String digits = Long.toString(SEC_USEC + usecs).substring(1);
+                int end = digits.length();
+
+                while(digits.charAt(end - 1) == '0')
+                    end--;
+
+                builder.append('.').append(digits, 0, end);
+            }
+
+            builder.append('S');
+        }
 
         return builder.toString();
     }
@@ -191,16 +221,16 @@ public final class DayTimeDurationDatatype extends Datatype
         BigDecimal result = BigDecimal.ZERO;
 
         if(match.group("days") != null && !match.group("days").isEmpty())
-            result = result.add(new BigDecimal(match.group("days")).multiply(DAY_USEC));
+            result = result.add(new BigDecimal(match.group("days")).multiply(BigDecimal.valueOf(DAY_USEC)));
 
         if(match.group("hours") != null && !match.group("hours").isEmpty())
-            result = result.add(new BigDecimal(match.group("hours")).multiply(HOUR_USEC));
+            result = result.add(new BigDecimal(match.group("hours")).multiply(BigDecimal.valueOf(HOUR_USEC)));
 
         if(match.group("mins") != null && !match.group("mins").isEmpty())
-            result = result.add(new BigDecimal(match.group("mins")).multiply(MIN_USEC));
+            result = result.add(new BigDecimal(match.group("mins")).multiply(BigDecimal.valueOf(MIN_USEC)));
 
         if(match.group("secs") != null && !match.group("secs").isEmpty())
-            result = result.add(new BigDecimal(match.group("secs")).multiply(SEC_USEC));
+            result = result.add(new BigDecimal(match.group("secs")).multiply(BigDecimal.valueOf(SEC_USEC)));
 
         if(match.group("sign") != null && !match.group("sign").isEmpty())
             result = result.negate();
