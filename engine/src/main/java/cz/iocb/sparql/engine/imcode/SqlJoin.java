@@ -4,7 +4,6 @@ import static java.util.stream.Collectors.toSet;
 import java.sql.SQLException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
@@ -45,8 +44,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * variable with another child being turned into one first, see {@link SqlLeftJoin#toUnion}), seeds the walks of
  * property paths with the siblings that bind their start (see {@link SqlRecursive#seed}; a walk binding the start
  * without being distinct over it is shared, so that its distinct values seed the other walk, see {@link SqlShared}),
- * evaluates nondeterministic children last, and decides the evaluation of SERVICE stubs by row estimates when service
- * reordering is enabled.
+ * evaluates nondeterministic children last, and evaluates the SERVICE calls that have no context of their own (see
+ * {@link SqlServiceStub#isEvaluatedByJoin}) for the solutions of their siblings, deciding by row estimates which of the
+ * shared variables the calls are asked about.
  */
 public final class SqlJoin extends SqlIntercode
 {
@@ -181,9 +181,11 @@ public final class SqlJoin extends SqlIntercode
     {
         ClassRelations relations = request.getConfiguration();
 
-        // a reordered SERVICE call is evaluated for the solutions of its siblings, which a statement of its own reads,
-        // so they must not take in the values of a current solution of an EXISTS pattern
-        if(request.isServiceReorderEnabled() && childs.stream().anyMatch(SqlIntercode::hasServiceSubpattern))
+        // a SERVICE call evaluated by its join (see SqlServiceStub.isEvaluatedByJoin) is evaluated for the solutions of
+        // its siblings, which a statement of its own reads, so they must not take in the values of a current solution
+        // of an EXISTS pattern
+        if(request.isServiceReorderEnabled() && childs.stream().anyMatch(SqlIntercode::hasServiceSubpattern)
+                || flatChilds(childs).stream().anyMatch(c -> isEvaluatedByJoin(request, c)))
         {
             restrictions = new Restrictions(restrictions);
             restrictions.removeCurrentValues();
@@ -199,13 +201,13 @@ public final class SqlJoin extends SqlIntercode
 
             for(SqlIntercode l : flatChilds)
             {
-                if(l.hasServiceSubpattern() && !(request.isServiceReorderEnabled() && l instanceof SqlServiceStub))
+                if(l.hasServiceSubpattern() && !isEvaluatedByJoin(request, l))
                     tmp.add(l.optimize(request, scope, getRestrictions(relations, l, flatChilds, restrictions), reduced,
                             true));
                 else
                     tmp.add(l);
 
-                if(request.isServiceReorderEnabled() && l instanceof SqlServiceStub)
+                if(isEvaluatedByJoin(request, l))
                     hasService = true;
             }
 
@@ -287,24 +289,37 @@ public final class SqlJoin extends SqlIntercode
 
             Map<SqlServiceStub, Stats> stats = new HashMap<>();
 
+            // the siblings a statement of its own can read: a sibling referring to the current solution of an EXISTS
+            // pattern the join lies in has a meaning only at its place, so the calls are not evaluated for it
+            List<SqlIntercode> readable = optChilds.stream()
+                    .filter(c -> !scope.refersToEnclosingInput(c.translate(request, scope))).toList();
+
 
             for(SqlIntercode item : nondeterministic)
             {
-                if(!(item instanceof SqlServiceStub service))
+                if(!(item instanceof SqlServiceStub service) || !service.isEvaluatedByJoin(request))
                     continue;
 
-                Collection<Variable> vars = service.getServiceVariables().values();
+                Variable endpoint = service.getEndpointVariable();
+
+                Set<Variable> vars = new HashSet<>(service.getServiceVariables().values());
+
+                if(endpoint != null)
+                    vars.add(endpoint);
 
                 Restrictions serviceRestrictions = new Restrictions(vars);
 
-                SqlIntercode join = join(request, optChilds).optimize(request, scope, serviceRestrictions, false,
-                        false);
+                SqlIntercode join = join(request, readable).optimize(request, scope, serviceRestrictions, false, false);
+
+                // a call whose endpoint no sibling names waits for the calls whose solutions may name it
+                if(endpoint != null && join.getVariable(endpoint) == null)
+                    continue;
 
                 Map<Variable, Long> basic = new HashMap<>();
 
                 for(Variable var : vars)
                 {
-                    if(join.bindings.getVariables().contains(var))
+                    if(!var.equals(endpoint) && join.bindings.getVariables().contains(var))
                     {
                         try
                         {
@@ -322,10 +337,15 @@ public final class SqlJoin extends SqlIntercode
                         .sorted(Map.Entry.<Variable, Long> comparingByValue(Comparator.reverseOrder()))
                         .map(Map.Entry::getKey).toList());
 
+                // every context solution has to name the endpoint, so the variable naming it is never left out
                 Set<Variable> set = new HashSet<>(order);
+
+                if(endpoint != null)
+                    set.add(endpoint);
+
                 long count = estimator.estimateDistinct(request, scope, join, set);
 
-                while(count > 20000l) //TODO: export limit
+                while(count > 20000l && !order.isEmpty()) //TODO: export limit
                 {
                     set.remove(order.pop());
                     count = estimator.estimateDistinct(request, scope, join, set);
@@ -333,6 +353,10 @@ public final class SqlJoin extends SqlIntercode
 
                 stats.put(service, new Stats(set, count, vars.size() - set.size()));
             }
+
+            // no sibling names the endpoint of any call left, so none of them is asked
+            if(stats.isEmpty())
+                return SqlNoSolution.get();
 
             Entry<SqlServiceStub, Stats> entry = stats
                     .entrySet().stream().sorted(Map.Entry.<SqlServiceStub, Stats> comparingByValue((a,
@@ -342,7 +366,7 @@ public final class SqlJoin extends SqlIntercode
             SqlServiceStub service = entry.getKey();
 
             Set<Variable> vars = entry.getValue().vars;
-            SqlIntercode context = SqlDistinct.create(request, join(request, optChilds), vars).optimize(request, scope,
+            SqlIntercode context = SqlDistinct.create(request, join(request, readable), vars).optimize(request, scope,
                     new Restrictions(vars), false, false);
 
             SqlIntercode evaluated = service.eval(request, scope, context,
@@ -383,10 +407,12 @@ public final class SqlJoin extends SqlIntercode
 
     /**
      * The join with the condition taken in by every child holding a SERVICE call whose solutions give the deciding
-     * variables of the condition the values the solutions of the join give them. A reordered call that is a child of
-     * the join is evaluated for the solutions of its deterministic siblings (see {@link #optimize}), so with such a
-     * call the siblings are filtered by the condition together, as the context the call is going to get, when they bind
-     * a deciding variable and give all of them their values.
+     * variables of the condition the values the solutions of the join give them. A call that is a child of the join and
+     * is evaluated by it (see {@link SqlServiceStub#isEvaluatedByJoin}) is evaluated for the solutions of its
+     * deterministic siblings (see {@link #optimize}), so with such a call the siblings are filtered by the condition
+     * together, as the context the call is going to get, when they bind a deciding variable and give all of them their
+     * values. They are not inside the pattern of an expression, where the call is evaluated only for the siblings that
+     * do not refer to the current solution of the pattern, which filtering them together would hide.
      */
     @Override
     protected SqlIntercode sink(Request request, Scope scope, SqlExpressionIntercode condition,
@@ -419,7 +445,7 @@ public final class SqlJoin extends SqlIntercode
 
         List<SqlIntercode> siblings = members.stream().filter(c -> c.isDeterministic()).toList();
 
-        if(request.isServiceReorderEnabled() && childs.stream().anyMatch(c -> c instanceof SqlServiceStub)
+        if(!scope.isWithinExpression() && childs.stream().anyMatch(c -> isEvaluatedByJoin(request, c))
                 && !siblings.isEmpty())
         {
             List<SqlIntercode> rest = members.stream().filter(c -> !c.isDeterministic()).toList();
@@ -440,6 +466,20 @@ public final class SqlJoin extends SqlIntercode
         }
 
         return taken ? join(request, members) : null;
+    }
+
+
+    /**
+     * True if the node is a SERVICE call that the join holding it evaluates for the solutions of its siblings (see
+     * {@link SqlServiceStub#isEvaluatedByJoin}).
+     *
+     * @param request the current request
+     * @param node the node
+     * @return true if the node is a SERVICE call evaluated by the join holding it, false otherwise
+     */
+    private static boolean isEvaluatedByJoin(Request request, SqlIntercode node)
+    {
+        return node instanceof SqlServiceStub stub && stub.isEvaluatedByJoin(request);
     }
 
 

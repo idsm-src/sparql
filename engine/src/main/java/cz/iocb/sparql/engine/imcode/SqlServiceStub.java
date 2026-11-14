@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.imcode;
 
 import static cz.iocb.sparql.engine.database.Table.toTableColumns;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLtrLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfRtlLangString;
@@ -82,7 +83,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * the received solutions. It cannot be translated to SQL itself. The endpoint is asked about every solution of the
  * context of the call, which a statement of its own reads beforehand, so the conditions of the filters above the call
  * that the context solutions decide by themselves are evaluated on the context during the first pass (see
- * {@link #sink}).
+ * {@link #sink}). A call that has no context of its own is evaluated by the join it lies in, for the solutions of its
+ * siblings (see {@link #isEvaluatedByJoin}).
  */
 public final class SqlServiceStub extends SqlIntercode
 {
@@ -727,7 +729,8 @@ public final class SqlServiceStub extends SqlIntercode
      * Stub with the given shared state, exposing only what the parent needs. The stub binds every variable of the
      * context, also one a context solution may leave unbound, which keeps it unbound in the received solutions merged
      * with that solution: a variable only the context binds in the classes of the context, and a variable of the
-     * pattern in any class the received values may take.
+     * pattern in any class the received values may take. It binds the variable naming its endpoint as well, to an IRI
+     * of any class, when the context does not bind it.
      *
      * @param request the current request
      * @param name the endpoint IRI
@@ -792,6 +795,20 @@ public final class SqlServiceStub extends SqlIntercode
             }
         }
 
+        // a call whose endpoint is named by a variable that the context does not bind gets the endpoint from its
+        // siblings (see isEvaluatedByJoin), which it joins by the variable: every solution of the call has an endpoint,
+        // named by an IRI
+        if(name instanceof Variable variable && !bindings.getVariables().contains(variable))
+        {
+            VariableBinding binding = new VariableBinding(variable, false);
+
+            for(ResourceClass c : classes)
+                if(isIri(c))
+                    binding.addMapping(c, c.createColumns(request.getColumnMap(), variable));
+
+            bindings.add(binding);
+        }
+
         return new SqlServiceStub(bindings.restrict(relations, restrictions), name, serviceCode, serviceVariables,
                 context, blankNodeClass, silent, enclosures, state);
     }
@@ -815,11 +832,13 @@ public final class SqlServiceStub extends SqlIntercode
         if(optContext.equals(SqlNoSolution.get()))
             return SqlNoSolution.get();
 
+        // a context binding the variable that names the endpoint to no IRI asks no endpoint; a context that does not
+        // bind the variable leaves its value to the siblings of the call (see isEvaluatedByJoin)
         if(name instanceof Variable variable)
         {
-            VariableBinding binding = optContext.getVariableBindings().get(new Variable(variable.getName()));
+            VariableBinding binding = optContext.getVariable(variable);
 
-            if(binding == null || binding.getCompatibleClasses(relations, iri).isEmpty())
+            if(binding != null && binding.getCompatibleClasses(relations, iri).isEmpty())
                 return SqlNoSolution.get();
         }
 
@@ -1054,9 +1073,10 @@ public final class SqlServiceStub extends SqlIntercode
         {
             String endpoint = null;
 
+            // a context solution giving the variable that names the endpoint no IRI asks no endpoint
             if(name instanceof Iri iri)
                 endpoint = iri.getValue();
-            else if(row[varIndexes.get(name)] instanceof Iri iri)
+            else if(varIndexes.get(name) instanceof Integer index && row[index] instanceof Iri iri)
                 endpoint = iri.getValue();
             else
                 continue;
@@ -1374,6 +1394,36 @@ public final class SqlServiceStub extends SqlIntercode
     public Map<String, Variable> getServiceVariables()
     {
         return serviceVariables;
+    }
+
+
+    /**
+     * The variable naming the endpoint of the call, whose value every context solution has to supply.
+     *
+     * @return the variable naming the endpoint, or null when the call names its endpoint by an IRI
+     */
+    public Variable getEndpointVariable()
+    {
+        return name instanceof Variable variable ? variable : null;
+    }
+
+
+    /**
+     * True if the call is evaluated by the join it lies in, for the solutions of its siblings (see
+     * {@link SqlJoin#optimize}), and not for a context of its own: with the reordering of calls, which leaves the calls
+     * without contexts, and when the endpoint is named by a variable that the context does not bind, because only a
+     * sibling can supply its value then (a call inside an EXISTS pattern, which has no context either, or a call
+     * standing before the member that binds the variable). Such a call that has no sibling binding the variable, like
+     * one whose endpoint only the left side of an OPTIONAL or the current solution of an EXISTS names, asks no endpoint
+     * and has no solution.
+     *
+     * @param request the current request
+     * @return true if the call is evaluated by the join it lies in, false otherwise
+     */
+    protected boolean isEvaluatedByJoin(Request request)
+    {
+        return request.isServiceReorderEnabled()
+                || name instanceof Variable variable && context.getVariable(variable) == null;
     }
 
 

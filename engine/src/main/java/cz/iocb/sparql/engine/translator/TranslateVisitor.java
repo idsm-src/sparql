@@ -2054,9 +2054,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         /* NOTE: The members of an EXISTS pattern may refer to the current solution the pattern is evaluated for, which
          * is known only at their place, so a call cannot be evaluated for a context holding them; the call is evaluated
          * by itself and joined afterwards. With the reordering of calls, the join evaluates the call for the solutions
-         * of its other members, which may refer to the graph of an evaluation per graph too.
+         * of its other members, which may refer to the graph of an evaluation per graph too, and so it does for a call
+         * whose endpoint is named by a variable that the context does not bind, because only another member of the join
+         * can name the endpoint then (see SqlServiceStub.isEvaluatedByJoin).
          */
-        if(request.isServiceReorderEnabled() || scope.getCurrentSolution() != null)
+        if(request.isServiceReorderEnabled() || scope.getCurrentSolution() != null
+                || name instanceof Variable variable && context.getVariable(variable) == null)
         {
             SqlIntercode call = SqlServiceStub.create(request, name, serviceCode, serviceVariables,
                     SqlEmptySolution.get(), new StrBlankNodeInSegmentClass(--serviceId), service.isSilent(),
