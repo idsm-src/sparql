@@ -42,6 +42,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloatPoint;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isStringLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isUnsupportedLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
@@ -75,6 +76,7 @@ import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.ValueColumn;
 import cz.iocb.sparql.engine.imcode.Scope;
+import cz.iocb.sparql.engine.mapping.classes.CanonicalLiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
 import cz.iocb.sparql.engine.mapping.classes.DateInZoneClass;
@@ -83,6 +85,9 @@ import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.TripleTermClass;
 import cz.iocb.sparql.engine.mapping.classes.TripleTermClass.Component;
+import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
+import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBindings;
 
@@ -577,6 +582,80 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             return ComparisonType.DIFFERENT;
 
         return ComparisonType.NOT_NULL;
+    }
+
+
+    /**
+     * The only term a value of the given classes can be for the value to be equal to the literal, or null when the
+     * equality singles no term out. A string, a language-tagged string and a literal of the unsupported class are equal
+     * to themselves only, whatever the classes are. An exact number and a boolean are equal to the literals of their
+     * value in every datatype they are compared with, of which a canonical class holds one at most, the literal of the
+     * canonical lexical form: the value has to be that term when the classes that can hold an equal value at all are
+     * canonical and their literals of the value are one and the same term. No term is singled out when a class holds
+     * the value in several terms (in other lexical forms, or in a box), by a floating-point number on either side (the
+     * zeros of both signs are equal), nor by the other literals compared by value (dates, date-times and durations).
+     *
+     * @param request the current request
+     * @param classes the classes of the value
+     * @param literal the literal
+     * @return the only term a value of the classes can be to be equal to the literal, or null
+     */
+    public static Literal getOnlyEqualTerm(Request request, Set<ResourceClass> classes, Literal literal)
+    {
+        ClassRelations relations = request.getConfiguration();
+        ResourceClass literalClass = request.getLiteralClass(literal);
+
+        if(isStringLiteral(literalClass) || isUnsupportedLiteral(literalClass))
+            return literal;
+
+        boolean number = isNumeric(literalClass) && !isFloatPoint(literalClass);
+
+        if(!number && !isBoolean(literalClass))
+            return null;
+
+        // the lexical form of the value that every datatype holding the value takes: a number without a fractional
+        // part is written as an integer
+        String form = request.getConfiguration().getDatatype(literal.getType())
+                .getCanonicalLexicalForm(literal.getValue());
+
+        if(number)
+        {
+            BigDecimal value = new BigDecimal(form);
+            form = value.stripTrailingZeros().scale() > 0 ? value.toPlainString() :
+                    value.toBigIntegerExact().toString();
+        }
+
+        Literal term = null;
+
+        for(ResourceClass resClass : classes)
+        {
+            ComparisonType type = areComparable(relations, EQUAL, resClass, literalClass);
+
+            // no value of the class is equal to the literal
+            if(type == ComparisonType.DIFFERENT || type == ComparisonType.NULL)
+                continue;
+
+            if(!(resClass instanceof CanonicalLiteralClass canonical) || isFloatPoint(resClass))
+                return null;
+
+            Datatype datatype = canonical.getDatatype();
+
+            if(!datatype.isValidForm(form))
+                continue;
+
+            Literal equal = new TypedLiteral(datatype.getCanonicalLexicalForm(form), datatype.getTypeIri());
+
+            // a class narrowed by a deployment need not hold the literal
+            if(!canonical.match(request, equal))
+                continue;
+
+            if(term != null && !term.equals(equal))
+                return null;
+
+            term = equal;
+        }
+
+        return term;
     }
 
 

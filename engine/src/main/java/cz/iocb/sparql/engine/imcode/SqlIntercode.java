@@ -43,6 +43,7 @@ import cz.iocb.sparql.engine.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBinding;
@@ -2042,24 +2043,28 @@ public abstract class SqlIntercode extends SqlBaseClass
     /**
      * The term the condition requires of a variable, or null when it requires none. A condition requires a term when it
      * holds only for the solutions binding the variable to that term: {@code sameTerm} of the variable and a constant
-     * says so, and so does an equality of the variable and a constant IRI, which is equal to no other term (an equality
-     * with a literal holds for the other literals of its value too).
+     * says so, and so does an equality of the variable and a constant IRI, which is equal to no other term. An equality
+     * with a literal may hold for the other literals of its value too, so it requires a term only where the classes the
+     * variable takes single one out (see {@link SqlBinaryComparison#getOnlyEqualTerm}): the literal itself when it is a
+     * string, or the literal of its value in the datatype of the column when the variable is a number of one datatype.
      *
      * @param request the current request
      * @param condition the condition
+     * @param bindings the variable bindings giving the classes the variables of the condition take
      * @return the term the condition requires of a variable, or null when it requires none
      */
-    protected static RequiredTerm getRequiredTerm(Request request, SqlExpressionIntercode condition)
+    protected static RequiredTerm getRequiredTerm(Request request, SqlExpressionIntercode condition,
+            VariableBindings bindings)
     {
         // the effective boolean value of a comparison is the comparison itself
         if(condition instanceof SqlEffectiveBooleanValue value)
-            return getRequiredTerm(request, value.getOperand());
+            return getRequiredTerm(request, value.getOperand(), bindings);
 
         if(condition instanceof SqlBuiltinCall call && call.getFunction().equals("sameterm"))
-            return getRequiredTerm(request, call.getArguments().get(0), call.getArguments().get(1), true);
+            return getRequiredTerm(request, call.getArguments().get(0), call.getArguments().get(1), true, bindings);
 
         if(condition instanceof SqlBinaryComparison comparison && comparison.getOperator() == ComparisonOperator.EQUAL)
-            return getRequiredTerm(request, comparison.getLeft(), comparison.getRight(), false);
+            return getRequiredTerm(request, comparison.getLeft(), comparison.getRight(), false, bindings);
 
         return null;
     }
@@ -2067,27 +2072,36 @@ public abstract class SqlIntercode extends SqlBaseClass
 
     /**
      * The term a comparison of two operands requires of a variable, or null when it requires none: one of the operands
-     * is a variable and the other one a constant IRI, or any constant when the comparison is the identity of terms.
+     * is a variable and the other one a constant IRI, or any constant when the comparison is the identity of terms, or
+     * a literal that only one term the variable can be is equal to.
      *
      * @param request the current request
      * @param left one operand
      * @param right the other operand
      * @param identity true for the identity of terms ({@code sameTerm}), false for the equality of values
+     * @param bindings the variable bindings giving the classes the variable takes
      * @return the term the comparison requires of a variable, or null when it requires none
      */
     private static RequiredTerm getRequiredTerm(Request request, SqlExpressionIntercode left,
-            SqlExpressionIntercode right, boolean identity)
+            SqlExpressionIntercode right, boolean identity, VariableBindings bindings)
     {
         if(!(left instanceof SqlVariable variable))
-            return right instanceof SqlVariable ? getRequiredTerm(request, right, left, identity) : null;
+            return right instanceof SqlVariable ? getRequiredTerm(request, right, left, identity, bindings) : null;
 
         if(right instanceof SqlIri iri)
             return new RequiredTerm(variable.getVariable(), SqlIri.create(request, iri.getIri()));
 
-        if(identity && right instanceof SqlLiteral literal)
+        if(!(right instanceof SqlLiteral literal))
+            return null;
+
+        if(identity)
             return new RequiredTerm(variable.getVariable(), SqlLiteral.create(request, literal.getLiteral()));
 
-        return null;
+        VariableBinding binding = bindings.get(variable.getVariable());
+        Literal term = SqlBinaryComparison.getOnlyEqualTerm(request, binding == null ? Set.of() : binding.getClasses(),
+                literal.getLiteral());
+
+        return term == null ? null : new RequiredTerm(variable.getVariable(), SqlLiteral.create(request, term));
     }
 
 
@@ -2096,14 +2110,17 @@ public abstract class SqlIntercode extends SqlBaseClass
      * the variables (see {@link Restrictions#getAcceptedValue}): a solution binding a variable to another term than the
      * one a condition requires of it never satisfies the conditions, so the node holding the solutions may leave it
      * out, and a table access binding the variable takes the term into its conditions (see {@link SqlTableAccess}). The
-     * conjuncts of a conjunction count by themselves, as all of them have to hold.
+     * conjuncts of a conjunction count by themselves, as all of them have to hold. The classes of the variables are
+     * read from the bindings of the node as built, which still carry every class, like the accepted classes are (see
+     * {@link #addAcceptedClasses}).
      *
      * @param request the current request
      * @param restrictions the restrictions to extend
      * @param conditions the conditions, all of which have to hold
+     * @param bindings the variable bindings of the node holding the solutions, as built
      */
     protected static void addAcceptedValues(Request request, Restrictions restrictions,
-            Collection<SqlExpressionIntercode> conditions)
+            Collection<SqlExpressionIntercode> conditions, VariableBindings bindings)
     {
         for(SqlExpressionIntercode condition : conditions)
         {
@@ -2113,11 +2130,11 @@ public abstract class SqlIntercode extends SqlBaseClass
 
             if(operand instanceof SqlBinaryLogical logical && logical.getOperator() == LogicalOperator.AND)
             {
-                addAcceptedValues(request, restrictions, List.of(logical.getLeft(), logical.getRight()));
+                addAcceptedValues(request, restrictions, List.of(logical.getLeft(), logical.getRight()), bindings);
                 continue;
             }
 
-            RequiredTerm term = getRequiredTerm(request, condition);
+            RequiredTerm term = getRequiredTerm(request, condition, bindings);
 
             if(term != null)
                 restrictions.setAcceptedValue(term.variable(), term.value());
@@ -2145,7 +2162,7 @@ public abstract class SqlIntercode extends SqlBaseClass
 
         for(SqlExpressionIntercode conjunct : conjuncts)
         {
-            RequiredTerm term = getRequiredTerm(request, conjunct);
+            RequiredTerm term = getRequiredTerm(request, conjunct, node.getVariableBindings());
 
             if(term == null || !node.isRestricted(term.variable(), term.value()))
                 kept.add(conjunct);

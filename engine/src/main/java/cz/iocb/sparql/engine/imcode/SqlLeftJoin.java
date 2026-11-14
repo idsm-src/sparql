@@ -292,7 +292,7 @@ public final class SqlLeftJoin extends SqlIntercode
         Restrictions accepted = new Restrictions();
         addAcceptedClasses(request, scope, accepted, conditions,
                 getExpressionVariableBindings(request, scope, left.getVariableBindings(), right.getVariableBindings()));
-        addAcceptedValues(request, accepted, conditions);
+        addAcceptedValues(request, accepted, conditions, right.getVariableBindings());
 
         Restrictions leftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
                 optRight.getVariableBindings(), cndRestrictions, false);

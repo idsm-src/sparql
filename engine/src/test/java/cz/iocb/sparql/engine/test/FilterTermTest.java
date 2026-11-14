@@ -49,9 +49,10 @@ import cz.iocb.sparql.testing.Database;
  * variable and a constant IRI, hold only when the variable is that term, so the table accesses binding the variable
  * take the term into their own conditions, as they take a constant of a pattern, and the filter is left out once the
  * solutions are restricted for good; a walk of a property path starts from the term, or from its other end when the
- * term is required of that one. A condition other terms satisfy as well (an equality with a literal, an inequality, a
- * disjunction) stays a filter, and so does every condition where the solutions are not restricted for good: above a
- * walk, which may be turned later, above a slice, and for a variable that may be unbound.
+ * term is required of that one. A condition other terms satisfy as well (an inequality, a disjunction) stays a filter,
+ * and so does every condition where the solutions are not restricted for good: above a walk, which may be turned later,
+ * above a slice, and for a variable that may be unbound. An equality with a literal requires a term where only one term
+ * can be equal to the literal (see {@link FilterLiteralTest}).
  *
  * The table {@code item} holds the items 1 to 6 with the values 10 to 60, the kinds {@code a} (odd items) and {@code b}
  * and the note {@code x} of the item 1; the table {@code link} the links 1-2, 2-3, 3-4 and 5-6 between the items; the
@@ -290,10 +291,8 @@ public class FilterTermTest
     @DisplayName("a condition that other terms satisfy as well stays a filter")
     void otherConditions() throws Exception
     {
-        String sql = translate("SELECT ?s WHERE { ?s ex:value ?v FILTER(?v = 50) }");
-
-        assertThat(sql, containsString(filtered));
-        assertThat(execute("SELECT ?s WHERE { ?s ex:value ?v FILTER(?v = 50) }"), contains(row(item(5))));
+        assertThat(translate("SELECT ?s WHERE { ?s ex:value ?v FILTER(?v >= 50) }"), containsString(filtered));
+        assertThat(execute("SELECT ?s WHERE { ?s ex:value ?v FILTER(?v > 50) }"), contains(row(item(6))));
 
         assertThat(translate("SELECT ?v WHERE { ?s ex:value ?v FILTER(?s != item:5) }"), containsString(filtered));
         assertThat(translate("SELECT ?v WHERE { ?s ex:value ?v FILTER(!(?s = item:5)) }"), containsString(filtered));
