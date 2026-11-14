@@ -1292,14 +1292,20 @@ public final class SqlJoin extends SqlIntercode
             if(seeds.isEmpty())
                 continue;
 
+            SqlIntercode seeded = walk.seed(request, scope, seeds.stream().map(j -> childs.get(j)).toList(), fromEnd,
+                    walkRestrictions);
+
+            // the seeds would make the walk take its end in a class it could not tell the delivered nodes of apart
+            if(seeded == null)
+                continue;
+
             List<SqlIntercode> result = new ArrayList<>();
 
             for(int j = 0; j < childs.size(); j++)
                 if(j != i && !seeds.contains(j))
                     result.add(childs.get(j));
 
-            result.add(walk.seed(request, scope, seeds.stream().map(j -> childs.get(j)).toList(), fromEnd,
-                    walkRestrictions));
+            result.add(seeded);
 
             return result;
         }

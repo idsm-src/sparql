@@ -403,6 +403,18 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
         /**
+         * Removes the join classes of the variable, see {@link #getJoinClasses(Variable)}: a child is then free to
+         * present the variable in the classes it takes.
+         *
+         * @param var the variable
+         */
+        public void removeJoinClasses(Variable var)
+        {
+            joinClasses.remove(var);
+        }
+
+
+        /**
          * Adds accepted classes of the variable, see {@link #getAcceptedClasses(Variable)}. The sets of several joins
          * are united, so that a value is still accepted when it overlaps the classes of any of them, which is weaker
          * than what the joins require but never leaves out a solution they keep.
