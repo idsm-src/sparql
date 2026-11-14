@@ -626,8 +626,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     SqlBuilder builder = new SqlBuilder();
                     builder.append("CASE ");
                     builder.append(condition.get(relations, xsdBoolean).get(0));
-                    builder.append(" WHEN true THEN ").append(left.get(relations, unionClass).get(0));
-                    builder.append(" WHEN false THEN ").append(right.get(relations, unionClass).get(0));
+                    // a branch takes also classes the parent does not need, whose values are left out
+                    builder.append(" WHEN true THEN ").append(left.get(relations, unionClass, restriction).get(0));
+                    builder.append(" WHEN false THEN ").append(right.get(relations, unionClass, restriction).get(0));
                     builder.append(" END");
 
                     Column col = new ExpressionColumn(builder.toCode(), unionClass.getSqlTypes().get(0),
@@ -2476,6 +2477,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 if(flags != null && flags.getResourceClasses().stream().noneMatch(r -> hasString(r)))
                     return SqlNull.get();
 
+                if(!restriction.contains(relations, xsdBoolean))
+                    return new SqlBuiltinCall(function, distinct, arguments, singletonMap(xsdBoolean, null), true);
+
                 //TODO: group based on string vs rdfbox mode
 
                 Set<List<ResourceClass>> rawVariants = new HashSet<>();
@@ -3337,7 +3341,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     case "if" ->
                     {
-                        //TODO: can be improved
+                        // the value of a branch is the value of IF, so the branches get the restriction of the parent;
+                        // their classes outside it have no columns and IF reads them as NULL
                         yield List.of(
                                 arguments.get(0).optimize(request, scope, bindings, new Restriction(xsdBoolean),
                                         evalServices),

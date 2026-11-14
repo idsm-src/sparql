@@ -27,12 +27,15 @@ import cz.iocb.sparql.testing.Database;
 /**
  * IF and COALESCE whose arguments take classes the parent does not need, run against an empty configuration: the
  * functions are built for the needed classes only, and COALESCE still stops at an argument bound in a class the parent
- * does not need.
+ * does not need. A branch of IF is then built under the restriction of the parent of the IF, also when the branch is a
+ * test or a logical operation, whose boolean value the parent does not need, and when the other branch is held in a
+ * box, whose class overlaps the classes the branch is left without.
  */
 public class IfCoalesceUnneededClassTest
 {
     private static final String values = "VALUES (?c ?x ?y) { (true 2 \"a\") (false \"b\" 1) (true UNDEF 3) "
             + "(false UNDEF \"c\") }";
+    private static final String union = "{ { VALUES ?v { \"a\" } } UNION { VALUES ?c { false } } }";
     private static final List<RdfTerm> unbound = row((RdfTerm) null);
 
     private static Engine engine = null;
@@ -118,6 +121,55 @@ public class IfCoalesceUnneededClassTest
         assertThat(execute(
                 "SELECT ?x WHERE { VALUES (?x ?y) { (2 \"a\") } " + "FILTER(STRSTARTS(COALESCE(?x, ?y), \"a\")) }"),
                 containsInAnyOrder());
+    }
+
+
+    @Test
+    @DisplayName("a test in a branch of IF whose boolean value the parent does not need")
+    void testInBranch() throws Exception
+    {
+        assertThat(execute("SELECT (STRLEN(IF(?c, REGEX(?v, \"a\"), \"zz\")) AS ?x) WHERE " + union),
+                containsInAnyOrder(unbound, integer("2")));
+        assertThat(execute("SELECT (IF(?c, REGEX(?v, \"a\"), 1) + 1 AS ?x) WHERE " + union),
+                containsInAnyOrder(unbound, integer("2")));
+        assertThat(execute("SELECT (STRLEN(IF(?c, !REGEX(?v, \"a\"), \"zz\")) AS ?x) WHERE " + union),
+                containsInAnyOrder(unbound, integer("2")));
+        assertThat(
+                execute("SELECT ?w WHERE { { VALUES ?v { \"a\" } } UNION { VALUES ?w { 1 } } "
+                        + "FILTER(BOUND(?w) || STRLEN(IF(BOUND(?w), \"a\", REGEX(?v, \"a\"))) > 0) }"),
+                containsInAnyOrder(integer("1")));
+    }
+
+
+    @Test
+    @DisplayName("a logical operation in a branch of IF whose boolean value the parent does not need")
+    void logicalOperationInBranch() throws Exception
+    {
+        assertThat(execute("SELECT (STRLEN(IF(?c, !?v, \"zz\")) AS ?x) WHERE " + union),
+                containsInAnyOrder(unbound, integer("2")));
+        assertThat(execute("SELECT (STRLEN(IF(?c, ?v && true, \"zz\")) AS ?x) WHERE " + union),
+                containsInAnyOrder(unbound, integer("2")));
+    }
+
+
+    @Test
+    @DisplayName("a branch of IF left without a class beside a branch held in a box")
+    void branchBesideBox() throws Exception
+    {
+        assertThat(
+                execute("SELECT (STRLEN(IF(?c, ?x, COALESCE(?y, 1))) AS ?l) WHERE { VALUES (?c ?x ?y) "
+                        + "{ (true 2 \"a\") (false 3 \"b\") (false 4 UNDEF) } }"),
+                containsInAnyOrder(unbound, integer("1"), unbound));
+        assertThat(
+                execute("SELECT (-IF(?c, ?y, COALESCE(?x, \"z\")) AS ?l) WHERE { VALUES (?c ?x ?y) "
+                        + "{ (true 2 \"a\") (false 3 \"b\") (false UNDEF 4) } }"),
+                containsInAnyOrder(unbound, integer("-3"), unbound));
+
+        // the binary operation takes the IF in the box, with the class of the other branch left out
+        assertThat(
+                execute("SELECT (IF(?c, STRDT(\"5\", <http://www.w3.org/2001/XMLSchema#integer>), \"zz\") + 1 AS ?l) "
+                        + "WHERE { VALUES ?c { true false } }"),
+                containsInAnyOrder(integer("6"), unbound));
     }
 
 

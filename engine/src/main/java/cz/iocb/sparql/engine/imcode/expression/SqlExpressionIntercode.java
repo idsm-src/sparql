@@ -807,6 +807,34 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
 
     /**
+     * Columns of the value converted to the class, the value being taken only in the classes the restriction contains.
+     * A class outside the restriction has no columns, because no parent needs its values, so it is left out and its
+     * values read as NULL, whereas {@link #get(ClassRelations, ResourceClass)} gives up on such a class when it
+     * overlaps the class to convert to (as a class held in a box does). A class the restriction contains has to have
+     * its columns.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param resClass the resource class
+     * @param restriction the classes of the value the parent needs
+     * @return columns of the needed values converted to the class, or null when a needed class has no materialised
+     *         columns
+     */
+    public List<Column> get(ClassRelations relations, ResourceClass resClass, Restriction restriction)
+    {
+        Map<ResourceClass, List<Column>> needed = new HashMap<>();
+
+        for(Entry<ResourceClass, List<Column>> e : getMappings().entrySet())
+            if(e.getValue() != null || restriction.contains(relations, e.getKey()))
+                needed.put(e.getKey(), e.getValue());
+
+        // a value of a class that is left out is missing in the columns
+        boolean canBeNull = canBeNull() || needed.size() < getMappings().size();
+
+        return new VariableBinding(needed, canBeNull).deriveMapping(relations, resClass);
+    }
+
+
+    /**
      * Class of the terms an extension function or a procedure takes a value of the given class from, in the columns of
      * the class (see {@link #getValue}), as SPARQL takes the arguments of its own functions: for a canonical literal
      * class, the literals of its datatype in every valid lexical form (its base class) and, for a numeric class, the

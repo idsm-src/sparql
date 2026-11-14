@@ -15,6 +15,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLtrLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfRtlLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -635,8 +636,12 @@ public class VariableBinding
         ResourceClass base = Stream.concat(numericBaseClasses.stream(), Stream.of(box))
                 .filter(r -> source.isSubclassOf(r)).findFirst().orElseThrow(IllegalArgumentException::new);
 
-        // the base class is built-in, so the declarations about user IRI classes cannot matter
-        Column value = deriveMapping(ClassRelations.NONE, base).get(0);
+        // the value is taken in the source class: in a box, the other classes of the variable are left out, because a
+        // class no parent needs has no columns to put into the box
+        ResourceClass taken = base.equals(box) ? unionize(Set.of(source), box) : base;
+
+        // a numeric value belongs to no user IRI class, so the declarations about them cannot matter
+        Column value = deriveMapping(ClassRelations.NONE, taken).get(0);
 
         if(base.equals(box))
             return new ExpressionColumn(

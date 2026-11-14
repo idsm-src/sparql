@@ -135,7 +135,7 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
         if(optOperand == operand)
             return this;
 
-        return create(relations, optOperand);
+        return create(relations, optOperand, restriction);
     }
 
 
