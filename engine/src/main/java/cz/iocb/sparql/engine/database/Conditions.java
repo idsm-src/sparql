@@ -58,19 +58,19 @@ public class Conditions
 
 
     /**
-     * Adds a disjunct: nothing when it implies a present disjunct (contains all its predicates), since it is absorbed
-     * by it; otherwise the present disjuncts implying the new one are absorbed and removed, and the disjunct is
-     * resolved on null tests with the present disjuncts as long as possible.
+     * Adds a disjunct: nothing when it implies a present disjunct (contains all its predicates, see
+     * {@link Condition#contains}), since it is absorbed by it; otherwise the present disjuncts implying the new one are
+     * absorbed and removed, and the disjunct is resolved on null tests with the present disjuncts as long as possible.
      *
      * @param condition the disjunct
      */
     public void add(Condition condition)
     {
         for(Condition other : conditions)
-            if(Condition.and(condition, other).equals(condition))
+            if(condition.contains(other))
                 return;
 
-        conditions.removeIf(other -> Condition.and(other, condition).equals(other));
+        conditions.removeIf(other -> other.contains(condition));
 
         Condition resolvent = null;
 
@@ -225,7 +225,7 @@ public class Conditions
     public boolean implies(Conditions other)
     {
         for(Condition condition : conditions)
-            if(other.conditions.stream().noneMatch(c -> Condition.and(condition, c).equals(condition)))
+            if(other.conditions.stream().noneMatch(c -> condition.contains(c)))
                 return false;
 
         return true;

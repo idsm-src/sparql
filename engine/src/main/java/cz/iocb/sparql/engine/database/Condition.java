@@ -643,6 +643,90 @@ public class Condition
 
 
     /**
+     * True if the condition contains all predicates of the other one, i.e. conjoining the other one changes nothing in
+     * it, so that the condition implies the other one. The conjunction that tells it is built only for a condition that
+     * references all columns of the other one: a predicate conjoined to a condition leaves its columns referenced
+     * there, whatever the normalisation does with it, so a condition that does not reference a column of the other one
+     * cannot contain it.
+     *
+     * @param other the other condition
+     * @return true if the condition contains all predicates of the other one, false otherwise
+     */
+    public boolean contains(Condition other)
+    {
+        return referencesColumnsOf(other) && and(this, other).equals(this);
+    }
+
+
+    /**
+     * True if the predicates reference every column the predicates of the other condition reference, constants
+     * included.
+     *
+     * @param other the other condition
+     * @return true if the predicates reference every column of the other condition, false otherwise
+     */
+    private boolean referencesColumnsOf(Condition other)
+    {
+        for(Column column : other.isNotNull)
+            if(!references(column))
+                return false;
+
+        for(Column column : other.isNull)
+            if(!references(column))
+                return false;
+
+        return referencesColumnsOf(other.areNotEqual) && referencesColumnsOf(other.areEqual)
+                && referencesColumnsOf(other.areNotDistinct);
+    }
+
+
+    /**
+     * True if the predicates reference every column of the comparisons.
+     *
+     * @param pairs the comparisons
+     * @return true if the predicates reference every column of the comparisons, false otherwise
+     */
+    private boolean referencesColumnsOf(Set<ColumnComparison> pairs)
+    {
+        for(ColumnComparison pair : pairs)
+            if(!references(pair.getLeft()) || !references(pair.getRight()))
+                return false;
+
+        return true;
+    }
+
+
+    /**
+     * True if some predicate references the column.
+     *
+     * @param column the column
+     * @return true if some predicate references the column, false otherwise
+     */
+    private boolean references(Column column)
+    {
+        return isNotNull.contains(column) || isNull.contains(column) || isCompared(areNotEqual, column)
+                || isCompared(areEqual, column) || isCompared(areNotDistinct, column);
+    }
+
+
+    /**
+     * True if some of the comparisons compares the column.
+     *
+     * @param pairs the comparisons
+     * @param column the column
+     * @return true if some of the comparisons compares the column, false otherwise
+     */
+    private static boolean isCompared(Set<ColumnComparison> pairs, Column column)
+    {
+        for(ColumnComparison pair : pairs)
+            if(pair.contains(column))
+                return true;
+
+        return false;
+    }
+
+
+    /**
      * All non-constant columns referenced by the predicates.
      *
      * @return all non-constant columns referenced by the predicates

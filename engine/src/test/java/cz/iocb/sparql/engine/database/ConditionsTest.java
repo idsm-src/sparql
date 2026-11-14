@@ -4,6 +4,9 @@ import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -12,7 +15,10 @@ import org.junit.jupiter.api.Test;
 /**
  * Disjunction and conjunction of {@link Conditions}: false and true are their neutral elements and true and false their
  * absorbing ones, also for any number of operands; the sufficient test of an implication between disjunctions; the
- * columns equal to a column in every disjunct; and the resolution of disjuncts on complementary null tests.
+ * columns equal to a column in every disjunct; and the resolution of disjuncts on complementary null tests. A disjunct
+ * is compared with every other one, so {@link Condition#contains} looks at their columns before it conjoins them, which
+ * must not change what is absorbed and implied: random conditions and disjunctions are compared also by the
+ * conjunctions alone.
  */
 public class ConditionsTest
 {
@@ -21,6 +27,86 @@ public class ConditionsTest
     private static final Column b = new TableColumn("b", INT4);
 
     private static final Column c = new TableColumn("c", INT4);
+
+    /**
+     * The columns of the random conditions: the table columns, two constants and the NULL constant.
+     */
+    private static final List<Column> columns = List.of(a, b, c, new ValueColumn("1", INT4), new ValueColumn("2", INT4),
+            new NullColumn(INT4));
+
+
+    /**
+     * A condition of up to three random predicates over the columns, of which there are few enough for one condition to
+     * contain all predicates of another one often.
+     *
+     * @param random the source of randomness
+     * @return the condition
+     */
+    private static Condition randomCondition(Random random)
+    {
+        Condition condition = new Condition();
+
+        for(int i = random.nextInt(4); i > 0; i--)
+        {
+            Column first = columns.get(random.nextInt(columns.size()));
+            Column second = columns.get(random.nextInt(columns.size()));
+
+            switch(random.nextInt(5))
+            {
+                case 0 -> condition.addIsNull(first);
+                case 1 -> condition.addIsNotNull(first);
+                case 2 -> condition.addAreEqual(first, second);
+                case 3 -> condition.addAreNotDistinct(first, second);
+                default -> condition.addAreNotEqual(first, second);
+            }
+        }
+
+        return condition;
+    }
+
+
+    /**
+     * True if conjoining the second condition changes nothing in the first one, which is what
+     * {@link Condition#contains} has to tell.
+     *
+     * @param first the first condition
+     * @param second the second condition
+     * @return true if the first condition contains all predicates of the second one, false otherwise
+     */
+    private static boolean contains(Condition first, Condition second)
+    {
+        return Condition.and(first, second).equals(first);
+    }
+
+
+    /**
+     * Adds the disjunct as {@link Conditions#add(Condition)} does, comparing the disjuncts by their conjunctions alone.
+     *
+     * @param conditions the disjuncts
+     * @param condition the disjunct to add
+     */
+    private static void add(Set<Condition> conditions, Condition condition)
+    {
+        for(Condition other : conditions)
+            if(contains(condition, other))
+                return;
+
+        conditions.removeIf(other -> contains(other, condition));
+
+        Condition resolvent = null;
+
+        for(Condition other : conditions)
+            if((resolvent = condition.resolve(other)) != null)
+            {
+                conditions.remove(other);
+                break;
+            }
+
+        if(resolvent != null)
+            add(conditions, resolvent);
+        else
+            conditions.add(condition);
+    }
 
 
     private static Conditions notEqual(Column l, Column r)
@@ -195,5 +281,74 @@ public class ConditionsTest
 
         assertTrue(copy.isTrue());
         assertEquals(1, copy.getConditions().size());
+    }
+
+
+    @Test
+    void containmentOfRandomConditions()
+    {
+        Random random = new Random(1);
+        int contained = 0;
+
+        for(int i = 0; i < 200000; i++)
+        {
+            Condition first = randomCondition(random);
+            Condition second = randomCondition(random);
+
+            assertEquals(contains(first, second), first.contains(second));
+
+            if(first.contains(second))
+                contained++;
+        }
+
+        // the test is no good unless many of the conditions contain the other one
+        assertTrue(contained > 10000);
+    }
+
+
+    @Test
+    void randomDisjunctions()
+    {
+        Random random = new Random(2);
+        int absorbed = 0;
+        int implied = 0;
+
+        Conditions previous = new Conditions(false);
+        Set<Condition> expectedPrevious = new HashSet<>();
+
+        for(int i = 0; i < 50000; i++)
+        {
+            Conditions conditions = new Conditions(false);
+            Set<Condition> expected = new HashSet<>();
+            int added = 1 + random.nextInt(8);
+
+            for(int j = 0; j < added; j++)
+            {
+                Condition condition = randomCondition(random);
+
+                conditions.add(condition);
+                add(expected, condition);
+
+                assertEquals(expected, conditions.getConditions());
+            }
+
+            Set<Condition> implying = expectedPrevious;
+            boolean implies = implying.stream().allMatch(l -> expected.stream().anyMatch(r -> contains(l, r)));
+
+            assertEquals(implies, previous.implies(conditions));
+
+            if(expected.size() < added)
+                absorbed++;
+
+            if(implies)
+                implied++;
+
+            previous = conditions;
+            expectedPrevious = expected;
+        }
+
+        // the test is no good unless many of the disjunctions absorb or resolve a disjunct and imply the next one
+        assertTrue(absorbed > 10000);
+        assertTrue(implied > 1000);
     }
 }
