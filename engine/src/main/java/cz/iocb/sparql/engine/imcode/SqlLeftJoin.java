@@ -39,7 +39,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * {@link #toUnion}), and an OPTIONAL walk of zero or more steps from nodes the left side binds always, which has a
  * solution for every solution of the left side, is a join (see {@link SqlRecursive#matchesEverySolutionOf}). Another
  * walk on the right side whose start the left side binds always is seeded with the distinct values of the start read
- * from the left side, shared so that the statement evaluates it once (see {@link SqlShared}).
+ * from the left side, shared so that the statement evaluates it once (see {@link SqlShared}). A condition that the
+ * solutions of the right side decide by themselves filters that side, so it is handed down to the contexts of the
+ * SERVICE calls of the right side when the side can take it in (see {@link SqlIntercode#sink}).
  */
 public final class SqlLeftJoin extends SqlIntercode
 {
@@ -385,6 +387,36 @@ public final class SqlLeftJoin extends SqlIntercode
                 || !isJoinable(relations, optLeft, optRight, optConditions))
             return optLeft.optimize(request, scope, restrictions, optReduced, evalServices);
 
+        // the conditions (their conjuncts) that the solutions of the right side decide by themselves filter that side,
+        // so the ones it can take in restrict the contexts of its SERVICE calls, which a join condition does not reach
+        if(!evalServices && optRight.hasServiceSubpattern())
+        {
+            List<VariableBindings> others = List.of(optLeft.getVariableBindings());
+            VariableBindings known = getExpressionVariableBindings(request, scope, optLeft.getVariableBindings(),
+                    optRight.getVariableBindings());
+
+            SqlIntercode sunk = optRight;
+            List<SqlExpressionIntercode> kept = new ArrayList<>();
+
+            for(SqlExpressionIntercode condition : getConjuncts(optConditions))
+            {
+                SqlIntercode taken = null;
+
+                if(isSinkable(request, scope, condition) && keepsValues(getDecidingVariables(relations, condition),
+                        optRight.getVariableBindings(), others))
+                    taken = sunk.sink(request, scope, condition, known);
+
+                if(taken != null)
+                    sunk = taken;
+                else
+                    kept.add(condition);
+            }
+
+            if(sunk != optRight)
+                return leftJoin(request, scope, optLeft, sunk, kept, restrictions).optimize(request, scope,
+                        restrictions, optReduced, evalServices);
+        }
+
         if(optLeft instanceof SqlLeftJoin join && join.isLeadingOptional() && !Collections
                 .disjoint(optLeft.getVariableBindings().getVariables(), optRight.getVariableBindings().getVariables()))
             optLeft = join.toUnion(request, scope, evalServices);
@@ -441,6 +473,31 @@ public final class SqlLeftJoin extends SqlIntercode
             return this;
 
         return leftJoin(request, scope, optLeft, optRight, optConditions, restrictions);
+    }
+
+
+    /**
+     * The left join whose left side has taken the condition in: every solution of the join is made of a solution of the
+     * left side, which gives a deciding variable of the condition its value unless the left side may leave the variable
+     * unbound and the right side binds it. The right side takes no condition from above in, because a solution of the
+     * left side it does not extend is kept.
+     */
+    @Override
+    protected SqlIntercode sink(Request request, Scope scope, SqlExpressionIntercode condition,
+            VariableBindings bindings)
+    {
+        Set<Variable> variables = getDecidingVariables(request.getConfiguration(), condition);
+
+        if(!keepsValues(variables, left.getVariableBindings(), List.of(right.getVariableBindings())))
+            return null;
+
+        SqlIntercode sunk = left.sink(request, scope, condition, bindings);
+
+        if(sunk == null)
+            return null;
+
+        return leftJoin(request, scope, sunk, right instanceof SqlStripConstantColumns strip ? strip.getChild() : right,
+                conditions);
     }
 
 

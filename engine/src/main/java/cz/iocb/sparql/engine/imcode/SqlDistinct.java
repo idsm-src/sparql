@@ -187,6 +187,25 @@ public final class SqlDistinct extends SqlIntercode
     }
 
 
+    /**
+     * The deduplication of its child that has taken the condition in: the solutions keep the variables the
+     * deduplication applies to, so a condition decided by another variable the child binds, which is unbound above the
+     * deduplication, stays above.
+     */
+    @Override
+    protected SqlIntercode sink(Request request, Scope scope, SqlExpressionIntercode condition,
+            VariableBindings bindings)
+    {
+        for(Variable variable : getDecidingVariables(request.getConfiguration(), condition))
+            if(!distinctVariables.contains(variable) && child.getVariable(variable) != null)
+                return null;
+
+        SqlIntercode sunk = child.sink(request, scope, condition, bindings);
+
+        return sunk == null ? null : create(request, sunk, distinctVariables);
+    }
+
+
     @Override
     public SqlCode translate(Request request, Scope scope)
     {

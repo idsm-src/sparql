@@ -79,7 +79,10 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 /**
  * Placeholder of a federated SERVICE call. During the first optimisation pass it only tracks its bindings; in the
  * second pass ({@code evalServices}) {@link #eval} sends the pattern to the remote endpoint and the stub is replaced by
- * the received solutions. It cannot be translated to SQL itself.
+ * the received solutions. It cannot be translated to SQL itself. The endpoint is asked about every solution of the
+ * context of the call, which a statement of its own reads beforehand, so the conditions of the filters above the call
+ * that the context solutions decide by themselves are evaluated on the context during the first pass (see
+ * {@link #sink}).
  */
 public final class SqlServiceStub extends SqlIntercode
 {
@@ -844,6 +847,43 @@ public final class SqlServiceStub extends SqlIntercode
     public SqlCode translate(Request request, Scope scope)
     {
         throw new RuntimeException();
+    }
+
+
+    /**
+     * The call evaluated for the solutions of its context that satisfy the condition. Every solution of the call is a
+     * context solution merged with a received solution, so it gives a variable the value of the context solution unless
+     * the pattern of the call may bind the variable and the context may leave it unbound: a condition deciding by such
+     * a variable has to wait for the received solutions. The context takes the condition in itself when it can, so that
+     * the condition restricts the contexts of the calls the context holds as well; otherwise the context is filtered by
+     * the condition. A call without a context has nothing to restrict (and a call reordered in a join is evaluated for
+     * a context the join gives it, see {@link SqlJoin}).
+     */
+    @Override
+    protected SqlIntercode sink(Request request, Scope scope, SqlExpressionIntercode condition,
+            VariableBindings bindings)
+    {
+        if(context.equals(SqlEmptySolution.get()))
+            return null;
+
+        for(Variable variable : getDecidingVariables(request.getConfiguration(), condition))
+        {
+            VariableBinding binding = context.getVariable(variable);
+
+            if((binding == null || binding.canBeNull()) && serviceVariables.containsValue(variable))
+                return null;
+        }
+
+        SqlIntercode restricted = context.sink(request, scope, condition, bindings);
+
+        if(restricted == null)
+            restricted = filterBy(request, scope, condition, bindings, context);
+
+        if(restricted == null)
+            return null;
+
+        return create(request, name, serviceCode, serviceVariables, restricted, blankNodeClass, silent, enclosures,
+                null, state);
     }
 
 

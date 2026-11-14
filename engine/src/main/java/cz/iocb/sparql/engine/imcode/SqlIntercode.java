@@ -28,6 +28,8 @@ import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
+import cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical;
+import cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical.LogicalOperator;
 import cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
@@ -738,6 +740,169 @@ public abstract class SqlIntercode extends SqlBaseClass
      * @return true if the subtree contains a SERVICE stub that has not been evaluated yet, false otherwise
      */
     public abstract boolean hasServiceSubpattern();
+
+
+    /**
+     * The node filtered by the condition, with the condition evaluated on the solutions that the SERVICE calls of the
+     * node are evaluated for (their contexts, see {@link SqlServiceStub}), so that the endpoints are not asked about
+     * solutions the condition drops anyway; null when the node cannot take the condition in. A filter standing above a
+     * call does not restrict its context, which a statement of its own reads before the call is made. A node takes the
+     * condition in by handing it down to a part its solutions are made of, when the condition holds for a solution of
+     * the node exactly when it holds for the solution of the part it is made of (see {@link #keepsValues}), until the
+     * condition gets to a context; the condition is then rebuilt over the bindings of the context, when they allow it
+     * (see {@link #filterBy}). A node that is no such composition (a slice, a node evaluated for a current solution)
+     * takes no condition in.
+     *
+     * @param request the current request
+     * @param scope the scope of the node
+     * @param condition the condition, which gives the same value whenever it is evaluated for the same solution (see
+     *            {@link #isSinkable})
+     * @param bindings the bindings the condition is optimised for, those of a node above
+     * @return the node filtered by the condition, with the condition evaluated on the contexts of its SERVICE calls, or
+     *         null when the node cannot take the condition in
+     */
+    protected SqlIntercode sink(Request request, Scope scope, SqlExpressionIntercode condition,
+            VariableBindings bindings)
+    {
+        return null;
+    }
+
+
+    /**
+     * Filter of the node by the condition rebuilt over the bindings of the node, or null when the condition cannot be
+     * rebuilt over them. An expression decides what it reads of an operand by the classes the operand had when the
+     * expression was optimised last, so it can be rebuilt over bindings whose classes it knows: every class the node
+     * gives a deciding variable of the condition has to be a class the variable has in the bindings the condition is
+     * optimised for, or a subclass of one, as the classes of a node narrowed by an optimisation are. The bindings of a
+     * node below may hold another class as well, of values that never get to the node above (a variable a SERVICE call
+     * shares with its context is bound there in any class a received value may take).
+     *
+     * @param request the current request
+     * @param scope the scope of the node
+     * @param condition the condition
+     * @param bindings the bindings the condition is optimised for
+     * @param node the node to filter
+     * @return filter of the node by the condition rebuilt over the bindings of the node, or null when the condition
+     *         cannot be rebuilt over them
+     */
+    protected static SqlIntercode filterBy(Request request, Scope scope, SqlExpressionIntercode condition,
+            VariableBindings bindings, SqlIntercode node)
+    {
+        for(Variable variable : getDecidingVariables(request.getConfiguration(), condition))
+        {
+            VariableBinding binding = node.getVariable(variable);
+
+            if(binding == null)
+                continue;
+
+            VariableBinding known = bindings.get(variable);
+
+            if(known == null)
+                return null;
+
+            for(ResourceClass resClass : binding.getClasses())
+                if(known.getClasses().stream().noneMatch(c -> resClass.isSubclassOf(c)))
+                    return null;
+        }
+
+        SqlExpressionIntercode rebuilt = condition.optimize(request, scope, node.getVariableBindings(),
+                new Restriction(xsdBoolean), false);
+
+        return SqlFilter.filter(request, List.of(rebuilt), node);
+    }
+
+
+    /**
+     * True if the condition may be handed down to the context of a SERVICE call (see {@link #sink}): it gives the same
+     * value whenever it is evaluated for the same solution, so it is deterministic, which a condition holding a call
+     * that is not evaluated yet is not, and it does not refer to a current solution (see
+     * {@link Scope#refersToCurrentSolution}), which the statement reading a context does not know.
+     *
+     * @param request the current request
+     * @param scope the scope of the node holding the condition
+     * @param condition the condition, with its boolean value materialised
+     * @return true if the condition may be handed down to the context of a SERVICE call, false otherwise
+     */
+    protected static boolean isSinkable(Request request, Scope scope, SqlExpressionIntercode condition)
+    {
+        if(!condition.isDeterministic())
+            return false;
+
+        return !scope.refersToCurrentSolution(translateConditions(request.getConfiguration(), List.of(condition)));
+    }
+
+
+    /**
+     * The conditions with every conjunction replaced by its operands: the conditions of a node have to hold all, and a
+     * conjunction is true only when both its operands are, so the result holds for the same solutions. It lets a part
+     * of a condition be handed down by itself (see {@link #sink}).
+     *
+     * @param conditions the conditions, all of which have to hold
+     * @return the conditions with every conjunction replaced by its operands
+     */
+    protected static List<SqlExpressionIntercode> getConjuncts(List<SqlExpressionIntercode> conditions)
+    {
+        List<SqlExpressionIntercode> conjuncts = new ArrayList<>();
+
+        for(SqlExpressionIntercode condition : conditions)
+        {
+            if(condition instanceof SqlBinaryLogical logical && logical.getOperator() == LogicalOperator.AND)
+                conjuncts.addAll(getConjuncts(List.of(logical.getLeft(), logical.getRight())));
+            else
+                conjuncts.add(condition);
+        }
+
+        return conjuncts;
+    }
+
+
+    /**
+     * The variables whose values decide the value of the condition: the variables its expression refers to and the
+     * variables it needs of the solutions it is evaluated for, among them every variable of those solutions that a
+     * pattern of its EXISTS expressions may read.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param condition the condition
+     * @return the variables whose values decide the value of the condition
+     */
+    protected static Set<Variable> getDecidingVariables(ClassRelations relations, SqlExpressionIntercode condition)
+    {
+        Set<Variable> variables = new HashSet<>(condition.getReferencedVariables());
+        variables.addAll(condition.getRequirements(relations).getNames());
+
+        return variables;
+    }
+
+
+    /**
+     * True if every solution a node makes of a solution of one of its parts gives each of the variables the value the
+     * solution of the part gives it, a variable the part leaves unbound staying unbound: the part binds the variable
+     * always, or none of the other parts the solution is made of binds it. A condition decided by such variables (see
+     * {@link #getDecidingVariables}) holds for a solution of the node exactly when it holds for the solution of the
+     * part, so filtering the part by it is the same as filtering the node.
+     *
+     * @param variables the variables
+     * @param part bindings of the part
+     * @param others bindings of the other parts the solutions of the node are made of
+     * @return true if every solution the node makes of a solution of the part gives each of the variables the value the
+     *         solution of the part gives it, false otherwise
+     */
+    protected static boolean keepsValues(Set<Variable> variables, VariableBindings part,
+            Collection<VariableBindings> others)
+    {
+        for(Variable variable : variables)
+        {
+            VariableBinding binding = part.get(variable);
+
+            if(binding != null && !binding.canBeNull())
+                continue;
+
+            if(others.stream().anyMatch(o -> o.get(variable) != null))
+                return false;
+        }
+
+        return true;
+    }
 
 
     /**

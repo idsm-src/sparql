@@ -221,6 +221,23 @@ public final class SqlBind extends SqlIntercode
     }
 
 
+    /**
+     * The binding over its child that has taken the condition in: a solution gives every variable but the bound one the
+     * value the solution of the child gives it, so a condition the bound variable decides stays above.
+     */
+    @Override
+    protected SqlIntercode sink(Request request, Scope scope, SqlExpressionIntercode condition,
+            VariableBindings bindings)
+    {
+        if(getDecidingVariables(request.getConfiguration(), condition).contains(variable))
+            return null;
+
+        SqlIntercode sunk = child.sink(request, scope, condition, bindings);
+
+        return sunk == null ? null : bind(request, variable, expression, sunk);
+    }
+
+
     @Override
     public SqlCode translate(Request request, Scope scope)
     {

@@ -348,6 +348,68 @@ public final class SqlJoin extends SqlIntercode
 
 
     /**
+     * The join with the condition taken in by every child holding a SERVICE call whose solutions give the deciding
+     * variables of the condition the values the solutions of the join give them. A reordered call that is a child of
+     * the join is evaluated for the solutions of its deterministic siblings (see {@link #optimize}), so with such a
+     * call the siblings are filtered by the condition together, as the context the call is going to get, when they bind
+     * a deciding variable and give all of them their values.
+     */
+    @Override
+    protected SqlIntercode sink(Request request, Scope scope, SqlExpressionIntercode condition,
+            VariableBindings bindings)
+    {
+        Set<Variable> variables = getDecidingVariables(request.getConfiguration(), condition);
+
+        List<SqlIntercode> members = new ArrayList<>(childs);
+        boolean taken = false;
+
+        for(int i = 0; i < childs.size(); i++)
+        {
+            int index = i;
+            SqlIntercode child = childs.get(i);
+
+            List<VariableBindings> others = IntStream.range(0, childs.size()).filter(j -> j != index)
+                    .mapToObj(j -> childs.get(j).getVariableBindings()).toList();
+
+            if(!child.hasServiceSubpattern() || !keepsValues(variables, child.getVariableBindings(), others))
+                continue;
+
+            SqlIntercode sunk = child.sink(request, scope, condition, bindings);
+
+            if(sunk != null)
+            {
+                members.set(i, sunk);
+                taken = true;
+            }
+        }
+
+        List<SqlIntercode> siblings = members.stream().filter(c -> c.isDeterministic()).toList();
+
+        if(request.isServiceReorderEnabled() && childs.stream().anyMatch(c -> c instanceof SqlServiceStub)
+                && !siblings.isEmpty())
+        {
+            List<SqlIntercode> rest = members.stream().filter(c -> !c.isDeterministic()).toList();
+            SqlIntercode context = siblings.size() == 1 ? siblings.get(0) : join(request, siblings);
+
+            SqlIntercode restricted = null;
+
+            if(variables.stream().anyMatch(v -> context.getVariable(v) != null) && keepsValues(variables,
+                    context.getVariableBindings(), rest.stream().map(c -> c.getVariableBindings()).toList()))
+                restricted = filterBy(request, scope, condition, bindings, context);
+
+            if(restricted != null)
+            {
+                members = new ArrayList<>(rest);
+                members.add(restricted);
+                taken = true;
+            }
+        }
+
+        return taken ? join(request, members) : null;
+    }
+
+
+    /**
      * Flattens nested joins into their children.
      *
      * @param input child columns

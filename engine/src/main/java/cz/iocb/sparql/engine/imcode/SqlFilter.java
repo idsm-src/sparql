@@ -26,7 +26,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 /**
- * Keeps the solutions of the child for which every condition evaluates to true (FILTER).
+ * Keeps the solutions of the child for which every condition evaluates to true (FILTER). Optimisation distributes the
+ * filter over the branches of a union, and the conditions the child can take in are handed down to the contexts of its
+ * SERVICE calls (see {@link SqlIntercode#sink}), which a filter standing above a call does not restrict.
  */
 public final class SqlFilter extends SqlIntercode
 {
@@ -179,11 +181,48 @@ public final class SqlFilter extends SqlIntercode
             return SqlUnion.union(request, childs).optimize(request, scope, restrictions, reduced, evalServices);
         }
 
+        // the conditions (their conjuncts) the child can take in restrict the contexts of its SERVICE calls, which the
+        // filter itself does not reach: a context is read before its call is made
+        if(!evalServices && optChild.hasServiceSubpattern())
+        {
+            SqlIntercode sunk = optChild;
+            List<SqlExpressionIntercode> kept = new ArrayList<>();
+
+            for(SqlExpressionIntercode cnd : getConjuncts(optCnds))
+            {
+                SqlIntercode taken = !isSinkable(request, scope, cnd) ? null :
+                        sunk.sink(request, scope, cnd, optChild.getVariableBindings());
+
+                if(taken != null)
+                    sunk = taken;
+                else
+                    kept.add(cnd);
+            }
+
+            if(sunk != optChild)
+                return (kept.isEmpty() ? sunk : filter(request, kept, sunk)).optimize(request, scope, restrictions,
+                        reduced, evalServices);
+        }
+
 
         if(optCnds.equals(conditions) && optChild == child && restrictions.isOptimized(relations, bindings))
             return this;
 
         return filter(request, optCnds, optChild, restrictions);
+    }
+
+
+    /**
+     * The filter over its child that has taken the condition in: a filter gives the variables the values its child
+     * gives them.
+     */
+    @Override
+    protected SqlIntercode sink(Request request, Scope scope, SqlExpressionIntercode condition,
+            VariableBindings bindings)
+    {
+        SqlIntercode sunk = child.sink(request, scope, condition, bindings);
+
+        return sunk == null ? null : filter(request, conditions, sunk);
     }
 
 

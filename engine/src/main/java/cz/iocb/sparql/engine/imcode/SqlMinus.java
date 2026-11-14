@@ -298,6 +298,20 @@ public final class SqlMinus extends SqlIntercode
     }
 
 
+    /**
+     * The difference whose left side has taken the condition in: every solution of the difference is a solution of the
+     * left side.
+     */
+    @Override
+    protected SqlIntercode sink(Request request, Scope scope, SqlExpressionIntercode condition,
+            VariableBindings bindings)
+    {
+        SqlIntercode sunk = left.sink(request, scope, condition, bindings);
+
+        return sunk == null ? null : minus(request, sunk, right, graph, solutionBound);
+    }
+
+
     @Override
     public SqlCode translate(Request request, Scope scope)
     {

@@ -379,6 +379,31 @@ public final class SqlAggregation extends SqlIntercode
     }
 
 
+    /**
+     * The aggregation of its child that has taken the condition in: the solutions of a group agree on the grouping
+     * variables, so a condition they decide holds for a group exactly when it holds for the solutions the group is made
+     * of, whereas an aggregate and a variable of the child that is not grouped by are no variables of those solutions.
+     * Without grouping variables the solutions form one group even when there is none of them, which a filter of the
+     * child would not drop.
+     */
+    @Override
+    protected SqlIntercode sink(Request request, Scope scope, SqlExpressionIntercode condition,
+            VariableBindings bindings)
+    {
+        if(groupVariables.isEmpty())
+            return null;
+
+        for(Variable variable : getDecidingVariables(request.getConfiguration(), condition))
+            if(!groupVariables.contains(variable)
+                    && (aggregations.containsKey(variable) || child.getVariable(variable) != null))
+                return null;
+
+        SqlIntercode sunk = child.sink(request, scope, condition, bindings);
+
+        return sunk == null ? null : aggregate(request, groupVariables, aggregations, sunk);
+    }
+
+
     @Override
     public SqlCode translate(Request request, Scope scope)
     {

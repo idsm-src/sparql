@@ -1527,7 +1527,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     /**
      * Translates the patterns of a group starting from {@code base}: joins them left to right, applies OPTIONAL as a
      * left join (with its filters as join conditions), MINUS, BIND, SERVICE and procedure calls in place, and the
-     * group's FILTERs at the end.
+     * group's FILTERs at the end. A filter is applied at the end also when a remote SERVICE call of the group could be
+     * asked about fewer solutions with it: which of its conditions may restrict the context of a call is decided when
+     * the intermediate code is optimised (see {@link SqlIntercode#sink}), where the bindings tell whether a condition
+     * holds for a solution of the context exactly when it holds for the solutions the call makes of it.
      *
      * @param patterns the patterns
      * @param base the code the patterns are joined to
@@ -1593,10 +1596,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
             else if(pattern instanceof Service service)
             {
-                //FIXME: This optimization is valid only if it preserves the correct result.
-                //translatedGroupPattern = translateFilters(filters, translatedGroupPattern);
-                //filters.clear();
-
                 translatedGroupPattern = translateService(service, translatedGroupPattern);
             }
             else

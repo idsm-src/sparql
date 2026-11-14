@@ -309,6 +309,37 @@ public final class SqlUnion extends SqlIntercode
     }
 
 
+    /**
+     * The union whose branches are filtered by the condition, each as it allows: a branch that can take the condition
+     * in does, and the others are filtered as they are. Every solution of the union is a solution of a branch, so the
+     * condition is distributed over the branches, when it gets into one of them.
+     */
+    @Override
+    protected SqlIntercode sink(Request request, Scope scope, SqlExpressionIntercode condition,
+            VariableBindings bindings)
+    {
+        List<SqlIntercode> branches = new ArrayList<>(childs.size());
+        boolean taken = false;
+
+        for(SqlIntercode child : childs)
+        {
+            SqlIntercode sunk = child.hasServiceSubpattern() ? child.sink(request, scope, condition, bindings) : null;
+
+            if(sunk != null)
+                taken = true;
+            else
+                sunk = filterBy(request, scope, condition, bindings, child);
+
+            if(sunk == null)
+                return null;
+
+            branches.add(sunk);
+        }
+
+        return taken ? union(request, branches) : null;
+    }
+
+
     @Override
     public SqlCode translate(Request request, Scope scope)
     {
