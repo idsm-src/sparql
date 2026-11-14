@@ -879,6 +879,12 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                 if(code != null)
                     yield code;
 
+                // two operands stored in integer types of SQL are compared as they are stored
+                code = translateStoredIntegers(operator, lset, rset, left, right);
+
+                if(code != null)
+                    yield code;
+
                 ResourceClass cmp = determineNumericComparisonType(lset, rset);
                 Column cl = left.promoteNumericAs(lset, cmp);
                 Column cr = right.promoteNumericAs(rset, cmp);
@@ -1099,6 +1105,48 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
 
 
     /**
+     * SQL of an exact numeric comparison of two operands whose values are both stored in integer types of SQL, or null
+     * when the comparison is no such one. A value stored in int2, int4 or int8 is the number itself, whatever its
+     * datatype is (xsd:int and xsd:long, xsd:unsignedShort and xsd:int), and the database compares integers of
+     * different types by their values, so the operands are compared as they are stored. Promoting them to the datatype
+     * they are compared in (see {@link #determineNumericComparisonType}) would wrap a column of another type in a
+     * conversion function, and then the database can neither look the rows up by an index of the column nor estimate
+     * them by its statistics.
+     *
+     * @param operator the operator
+     * @param lset exact numeric classes of the left operand
+     * @param rset exact numeric classes of the right operand
+     * @param left the left operand
+     * @param right the right operand
+     * @return SQL of the comparison of the operands as they are stored, or null
+     */
+    private static SqlCode translateStoredIntegers(ComparisonOperator operator, Set<ResourceClass> lset,
+            Set<ResourceClass> rset, SqlExpressionIntercode left, SqlExpressionIntercode right)
+    {
+        Column lvalue = left.getBinding().getStoredNumeric(lset);
+        Column rvalue = right.getBinding().getStoredNumeric(rset);
+
+        if(lvalue == null || rvalue == null || getIntegerBits(lvalue.getType()) == 0
+                || getIntegerBits(rvalue.getType()) == 0)
+            return null;
+
+        return SqlCode.of("(", lvalue, " ", operator.getText(), " ", rvalue, ")");
+    }
+
+
+    /**
+     * The number of bits of an integer type of SQL (int2, int4, int8), or zero for any other type.
+     *
+     * @param type the SQL type
+     * @return the number of bits of the integer type, or zero when the type is no integer type
+     */
+    private static int getIntegerBits(SqlType type)
+    {
+        return type.equals(INT2) ? 16 : type.equals(INT4) ? 32 : type.equals(INT8) ? 64 : 0;
+    }
+
+
+    /**
      * SQL comparing a stored value with an exact constant on its right side in the type of the value, or null when that
      * is no integer type of SQL. A constant the type holds is written in the type. Any other constant decides the
      * comparison by its position among the values of the type: a value is equal to no constant that is not an integer
@@ -1114,7 +1162,7 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     private static SqlCode translateWithConstant(ComparisonOperator operator, Column value, BigDecimal constant)
     {
         SqlType type = value.getType();
-        int bits = type.equals(INT2) ? 16 : type.equals(INT4) ? 32 : type.equals(INT8) ? 64 : 0;
+        int bits = getIntegerBits(type);
 
         if(bits == 0)
             return null;

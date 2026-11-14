@@ -59,7 +59,8 @@ import cz.iocb.sparql.testing.Database;
  * and an xsd:integer are compared as integers, which are stored as numerics), so that the database can look the rows up
  * by an index of the column and estimate them by its statistics. A constant the type does not hold decides the
  * comparison by its position among the values of the type. A value that is, as it is stored, a value of the datatype it
- * is promoted to is taken without a conversion as well.
+ * is promoted to is taken without a conversion as well, and so are two values stored in integer types of SQL, which the
+ * database compares by their values whatever the types are.
  *
  * The values of every datatype {@code xsd:<name>} are held by the column {@code v} of a table of their own (named
  * {@code t_<name>} in lower case) and mapped by the predicate {@code ex:<name>}; the row of a value has its position
@@ -396,14 +397,65 @@ public class NumericConstantComparisonTest
 
 
     @Test
-    @DisplayName("an operand that is no exact constant is compared in the common datatype")
-    void commonDatatype() throws Exception
+    @DisplayName("two values stored in integer types of SQL are compared as they are stored")
+    void storedIntegers() throws Exception
     {
-        // two columns of different types
+        String wider = translate("?s ex:int ?a . ?s ex:long ?b FILTER(?a > ?b)");
+        String unsigned = translate("?s ex:unsignedShort ?a . ?s ex:short ?b FILTER(?a = ?b)");
+        String same = translate("?s ex:unsignedShort ?a . ?s ex:int ?b FILTER(?a <= ?b)");
+
+        // the columns themselves are the operands
+        assertThat(wider, containsString("#int_par0\" > \"b"));
+        assertThat(unsigned, containsString("#unsignedshort_par0\" = \"b"));
+        assertThat(same, containsString("#unsignedshort_par0\" <= \"b"));
+
+        for(String sql : List.of(wider, unsigned, same))
+            assertThat(sql, not(containsString("sparql.cast_as_")));
+
         assertThat(subjects("?s ex:int ?a . ?s ex:long ?b FILTER(?a > ?b)"), contains(1, 2, 3));
         assertThat(subjects("?s ex:int ?a . ?s ex:long ?b FILTER(?a < ?b)"), contains(4, 5, 6, 7, 8, 9));
         assertThat(subjects("?s ex:unsignedShort ?a . ?s ex:short ?b FILTER(?a = ?b)"), is(empty()));
         assertThat(subjects("?s ex:unsignedShort ?a . ?s ex:short ?b FILTER(?a > ?b)"), contains(1, 2, 3, 4, 5, 6, 7));
+
+        // every value of such a datatype with every value of another one
+        List<Numeric> integers = numerics.stream().filter(n -> n.type().startsWith("int")).toList();
+
+        for(Numeric left : integers)
+        {
+            for(Numeric right : integers)
+            {
+                String query = """
+                        SELECT ?a ?b (?a = ?b AS ?e) (?a != ?b AS ?n) (?a < ?b AS ?l) (?a <= ?b AS ?m) \
+                        (?a > ?b AS ?g) (?a >= ?b AS ?h) WHERE { ?s ex:%1$s ?a . ?t ex:%2$s ?b }""";
+
+                List<List<RdfTerm>> rows = execute(query.formatted(left.name(), right.name()));
+
+                assertThat(rows.size(), is(left.values().size() * right.values().size()));
+
+                for(List<RdfTerm> row : rows)
+                {
+                    int order = new BigDecimal(((Literal) row.get(0)).getValue())
+                            .compareTo(new BigDecimal(((Literal) row.get(1)).getValue()));
+
+                    assertThat(row.get(0) + " compared with " + row.get(1), row.subList(2, 8),
+                            contains(bool(order == 0), bool(order != 0), bool(order < 0), bool(order <= 0),
+                                    bool(order > 0), bool(order >= 0)));
+                }
+            }
+        }
+    }
+
+
+    @Test
+    @DisplayName("an operand that is no exact constant is compared in the common datatype")
+    void commonDatatype() throws Exception
+    {
+        // a column stored in an integer type of SQL and a column stored as a numeric
+        assertThat(translate("?s ex:int ?a . ?s ex:integer ?b FILTER(?a > ?b)"),
+                containsString("sparql.cast_as_integer_from_int("));
+        assertThat(subjects("?s ex:int ?a . ?s ex:integer ?b FILTER(?a > ?b)"), contains(1));
+        assertThat(subjects("?s ex:int ?a . ?s ex:integer ?b FILTER(?a < ?b)"), contains(2, 3, 4, 5));
+        assertThat(subjects("?s ex:int ?a . ?s ex:integer ?b FILTER(?a = ?b)"), is(empty()));
 
         // a constant of a floating-point datatype
         assertThat(subjects("?s ex:int ?v FILTER(?v = 3.0e0)"), contains(6));
