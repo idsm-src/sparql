@@ -75,6 +75,15 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
+     * The greatest number of disjuncts the conditions of an access may get by taking in the rows of VALUES. The
+     * conditions are kept in disjunctive normal form, so they get a disjunct for every row of the VALUES and every
+     * disjunct they have, and building them, like every later operation on them, compares every two disjuncts: the time
+     * grows with the square of their number, whereas the database joins the access with a list left in VALUES as fast
+     * as it evaluates the disjunction.
+     */
+    private static final int valuesMergeLimit = 30;
+
+    /**
      * Database schema the table belongs to; null for constants only.
      */
     private final DatabaseSchema schema;
@@ -702,7 +711,8 @@ public final class SqlTableAccess extends SqlIntercode
 
     /**
      * True if the VALUES can be merged into the access: distinct rows, every variable bound in one class also bound in
-     * the access and never null on either side.
+     * the access and never null on either side, and few enough rows to keep the conditions of the access small (see
+     * {@link #valuesMergeLimit}; a single row adds no disjunct, so it is always few enough).
      *
      * @param schema the database schema
      * @param left the left access
@@ -711,6 +721,10 @@ public final class SqlTableAccess extends SqlIntercode
      */
     private static boolean canBeJoinedWithValues(DatabaseSchema schema, SqlTableAccess left, SqlValues right)
     {
+        // asked first, because the test of distinct rows compares every two of them
+        if(right.getSize() > 1 && (long) left.conditions.getConditions().size() * right.getSize() > valuesMergeLimit)
+            return false;
+
         if(!right.isDistinct())
             return false;
 
@@ -1471,8 +1485,8 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * Merges a VALUES node into the access as conditions when its rows are distinct and bound in a single class, or
-     * returns null.
+     * Merges a VALUES node into the access as conditions when its rows are distinct, bound in a single class and few
+     * enough (see {@link #valuesMergeLimit}), or returns null.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param schema the database schema
