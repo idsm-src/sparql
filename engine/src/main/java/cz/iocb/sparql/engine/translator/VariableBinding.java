@@ -34,6 +34,7 @@ import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
+import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 
@@ -623,7 +624,9 @@ public class VariableBinding
 
     /**
      * Expression yielding the numeric value of the variable, taken in class {@code source}, promoted to the numeric
-     * class {@code target} by the {@code sparql.cast_as_*_from_*} or {@code sparql.rdfbox_promote_to_*} functions.
+     * class {@code target} by the {@code sparql.cast_as_*_from_*} or {@code sparql.rdfbox_promote_to_*} functions. A
+     * value that is a value of the target class as it is stored (see {@link #isStoredAs}) is taken without any
+     * function, so that the database can still look it up by an index of its column and estimate it by the statistics.
      *
      * @param source the class the value is taken in
      * @param target the numeric class to promote to
@@ -647,11 +650,60 @@ public class VariableBinding
             return new ExpressionColumn(
                     SqlCode.of("sparql.rdfbox_promote_to_", getLiteralClassName(target), "(", value, ")"),
                     target.getSqlTypes().get(0));
-        else if(target.isSubclassOf(base))
+        else if(target.isSubclassOf(base) || isStoredAs(base, target))
             return value;
         else
             return new ExpressionColumn(SqlCode.of("sparql.cast_as_", target.getResourceName(), "_from_",
                     getLiteralClassName(base), "(", value, ")"), target.getSqlTypes().get(0));
+    }
+
+
+    /**
+     * True if a value of the numeric base class is, as it is stored, a value of the target class: the datatype of the
+     * base class is derived from the datatype of the target class, so the value itself is a value of that datatype (the
+     * subtype substitution of XPath), and both classes store their values in the same SQL type, as xsd:integer and the
+     * datatypes derived from it do within xsd:decimal, or xsd:byte within xsd:short. The function of the extension
+     * casting between such classes returns its argument.
+     *
+     * @param base the numeric base class the value is taken in
+     * @param target the numeric class the value is promoted to
+     * @return true if a value of the base class is, as it is stored, a value of the target class, false otherwise
+     */
+    private static boolean isStoredAs(ResourceClass base, ResourceClass target)
+    {
+        return base instanceof LiteralClass from && target instanceof LiteralClass to
+                && from.getDatatype().isDerivedFrom(to.getDatatype())
+                && from.getSqlTypes().get(0).equals(to.getSqlTypes().get(0));
+    }
+
+
+    /**
+     * Expression yielding the numeric value of the variable, taken in the given classes, as its columns store it, or
+     * null when the classes do not store their values in columns of one SQL type (or the value is held in a box).
+     *
+     * @param classes the numeric classes the value is taken in
+     * @return expression yielding the numeric value of the variable as its columns store it, or null
+     */
+    public Column getStoredNumeric(Set<ResourceClass> classes)
+    {
+        Set<Column> values = new HashSet<>();
+
+        for(ResourceClass source : classes)
+        {
+            ResourceClass base = numericBaseClasses.stream().filter(r -> source.isSubclassOf(r)).findFirst()
+                    .orElse(null);
+
+            if(base == null)
+                return null;
+
+            // a numeric value belongs to no user IRI class, so the declarations about them cannot matter
+            values.add(deriveMapping(ClassRelations.NONE, base).get(0));
+        }
+
+        if(values.stream().map(Column::getType).distinct().count() != 1)
+            return null;
+
+        return coalesce(values);
     }
 
 

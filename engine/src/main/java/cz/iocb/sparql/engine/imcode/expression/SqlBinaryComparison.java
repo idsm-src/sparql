@@ -1,6 +1,9 @@
 package cz.iocb.sparql.engine.imcode.expression;
 
 import static cz.iocb.sparql.engine.database.SqlType.BOOL;
+import static cz.iocb.sparql.engine.database.SqlType.INT2;
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.INT8;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.EQUAL;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.GREATER_THAN;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.GREATER_THAN_OR_EQUAL;
@@ -53,6 +56,9 @@ import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getExpressionClass;
 import static java.util.stream.Collectors.toSet;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -66,6 +72,8 @@ import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.SqlCode;
+import cz.iocb.sparql.engine.database.SqlType;
+import cz.iocb.sparql.engine.database.ValueColumn;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
@@ -86,7 +94,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * compared by their components, literals of different handled datatypes are different values, and a literal of an
  * unknown datatype or an ill-typed one equals the same term only and is an error otherwise; ordering comparisons of
  * incompatible types are errors. Dates and date-times of different timezones are compared through their common
- * representation.
+ * representation. An exact numeric stored in an integer type of SQL is compared with a constant in that type, so that
+ * the database can look the comparison up by an index of the column.
  */
 public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanExpression
 {
@@ -167,6 +176,24 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
         public String getName()
         {
             return code;
+        }
+
+
+        /**
+         * The operator that gives the same result when the operands are swapped.
+         *
+         * @return the operator that gives the same result when the operands are swapped
+         */
+        public ComparisonOperator getSwapped()
+        {
+            return switch(this)
+            {
+                case LESS_THAN -> GREATER_THAN;
+                case GREATER_THAN -> LESS_THAN;
+                case LESS_THAN_OR_EQUAL -> GREATER_THAN_OR_EQUAL;
+                case GREATER_THAN_OR_EQUAL -> LESS_THAN_OR_EQUAL;
+                default -> this;
+            };
         }
     }
 
@@ -767,6 +794,12 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
 
             case DECIMAL ->
             {
+                // an operand stored in an integer type of SQL is compared with a constant in that type
+                SqlCode code = translateWithConstant(operator, lset, rset, left, right);
+
+                if(code != null)
+                    yield code;
+
                 ResourceClass cmp = determineNumericComparisonType(lset, rset);
                 Column cl = left.promoteNumericAs(lset, cmp);
                 Column cr = right.promoteNumericAs(rset, cmp);
@@ -944,6 +977,114 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                 throw new IllegalArgumentException();
             }
         };
+    }
+
+
+    /**
+     * SQL of an exact numeric comparison of a constant with an operand whose values are stored in an integer type of
+     * SQL other than the type the two are compared in (see {@link #determineNumericComparisonType}), or null when the
+     * comparison is no such one. Promoting the operand to the comparison type, as the operator mapping of SPARQL says,
+     * wraps its column in a conversion function, so the database can neither look the rows up by an index of the column
+     * nor estimate them by its statistics. But the promotion keeps the values and their order, so the comparison has
+     * the same result in the type of the stored values, with the constant converted to that type instead (see
+     * {@link #translateWithConstant(ComparisonOperator, Column, BigDecimal)}).
+     *
+     * @param operator the operator
+     * @param lset exact numeric classes of the left operand
+     * @param rset exact numeric classes of the right operand
+     * @param left the left operand
+     * @param right the right operand
+     * @return SQL of the comparison in the type the operand that is no constant is stored in, or null
+     */
+    private static SqlCode translateWithConstant(ComparisonOperator operator, Set<ResourceClass> lset,
+            Set<ResourceClass> rset, SqlExpressionIntercode left, SqlExpressionIntercode right)
+    {
+        SqlType type = determineNumericComparisonType(lset, rset).getSqlTypes().get(0);
+        Column lvalue = left.getBinding().getStoredNumeric(lset);
+        Column rvalue = right.getBinding().getStoredNumeric(rset);
+
+        if(lvalue == null || rvalue == null)
+            return null;
+
+        BigDecimal lconstant = getExactConstant(left, lset, lvalue);
+        BigDecimal rconstant = getExactConstant(right, rset, rvalue);
+
+        if(rconstant != null && !lvalue.getType().equals(type))
+            return translateWithConstant(operator, lvalue, rconstant);
+
+        if(lconstant != null && !rvalue.getType().equals(type))
+            return translateWithConstant(operator.getSwapped(), rvalue, lconstant);
+
+        return null;
+    }
+
+
+    /**
+     * SQL comparing a stored value with an exact constant on its right side in the type of the value, or null when that
+     * is no integer type of SQL. A constant the type holds is written in the type. Any other constant decides the
+     * comparison by its position among the values of the type: a value is equal to no constant that is not an integer
+     * of the type, and it is less than a constant when it is less than the least integer that is not less than the
+     * constant, whatever lies beyond the range of the type being greater, or less, than every value. The constant is
+     * never left to a cast of SQL, which fails for a value out of the range.
+     *
+     * @param operator the operator
+     * @param value the left operand as it is stored
+     * @param constant the right operand
+     * @return SQL comparing the value with the constant in the type of the value, or null
+     */
+    private static SqlCode translateWithConstant(ComparisonOperator operator, Column value, BigDecimal constant)
+    {
+        SqlType type = value.getType();
+        int bits = type.equals(INT2) ? 16 : type.equals(INT4) ? 32 : type.equals(INT8) ? 64 : 0;
+
+        if(bits == 0)
+            return null;
+
+        BigInteger max = BigInteger.ONE.shiftLeft(bits - 1).subtract(BigInteger.ONE);
+        BigInteger min = max.not();
+
+        // the integers the constant lies between; they are the same when the constant is an integer
+        BigInteger floor = constant.setScale(0, RoundingMode.FLOOR).toBigIntegerExact();
+        BigInteger ceiling = constant.setScale(0, RoundingMode.CEILING).toBigIntegerExact();
+
+        // the integer the value is compared with instead of the constant
+        BigInteger bound = operator == LESS_THAN || operator == GREATER_THAN_OR_EQUAL ? ceiling : floor;
+        boolean equality = operator == EQUAL || operator == NOT_EQUAL;
+
+        // the result for every value of the type when the constant is no integer of the type
+        Boolean result = null;
+
+        if(bound.compareTo(max) > 0)
+            result = equality ? operator == NOT_EQUAL : operator == LESS_THAN || operator == LESS_THAN_OR_EQUAL;
+        else if(bound.compareTo(min) < 0)
+            result = equality ? operator == NOT_EQUAL : operator == GREATER_THAN || operator == GREATER_THAN_OR_EQUAL;
+        else if(equality && !floor.equals(ceiling))
+            result = operator == NOT_EQUAL;
+
+        // decided for the values the operand has in the classes compared here only, as the other variants cover the
+        // other classes
+        if(result != null)
+            return SqlCode.of("CASE WHEN ", value, " IS NOT NULL THEN ", result.toString(), " END");
+
+        return SqlCode.of("(", value, " ", operator.getText(), " ", new ValueColumn(bound.toString(), type), ")");
+    }
+
+
+    /**
+     * The value of an operand that is the same exact number in every solution: the operand is never unbound, it takes
+     * the given exact numeric classes only and its value in them is a constant. Null for any other operand.
+     *
+     * @param operand the operand
+     * @param classes exact numeric classes the operand is compared in
+     * @param value the operand taken in the classes as it is stored
+     * @return the value of an operand that is the same exact number in every solution, or null
+     */
+    private static BigDecimal getExactConstant(SqlExpressionIntercode operand, Set<ResourceClass> classes, Column value)
+    {
+        if(operand.canBeNull() || !classes.containsAll(operand.getMappings().keySet()))
+            return null;
+
+        return value instanceof ValueColumn constant ? new BigDecimal(constant.getValue()) : null;
     }
 
 
