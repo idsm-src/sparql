@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.database;
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.HashSet;
 import java.util.List;
@@ -17,9 +18,10 @@ import org.junit.jupiter.api.Test;
  * absorbing ones, also for any number of operands; the sufficient test of an implication between disjunctions; the
  * columns equal to a column in every disjunct; and the resolution of disjuncts on complementary null tests. A
  * contradictory disjunct is not kept, so the conjunction of two disjunctions has no disjunct for two disjuncts that
- * contradict each other. A disjunct is compared with every other one, so {@link Condition#contains} looks at their
- * columns before it conjoins them, which must not change what is absorbed and implied: random conditions and
- * disjunctions are compared also by the conjunctions alone.
+ * contradict each other, and a conjunction can be asked not to take more conjunctions of two disjuncts than a limit. A
+ * disjunct is compared with every other one, so {@link Condition#contains} looks at their columns before it conjoins
+ * them, which must not change what is absorbed and implied: random conditions and disjunctions are compared also by the
+ * conjunctions alone.
  */
 public class ConditionsTest
 {
@@ -401,5 +403,77 @@ public class ConditionsTest
 
         // whereas the lists of the values of two columns give a disjunct for every pair of the values
         assertEquals(4, Conditions.and(oneOrTwo, Conditions.or(equal(b, two), equal(b, three))).getConditions().size());
+    }
+
+
+    @Test
+    void conjunctionWithLimit()
+    {
+        Conditions oneOrTwo = Conditions.or(equal(a, one), equal(a, two));
+        Conditions twoOrThree = Conditions.or(equal(a, two), equal(a, three));
+        Conditions others = Conditions.or(equal(b, two), equal(b, three));
+
+        // the disjuncts that contradict each other do not count
+        assertEquals(equal(a, two), Conditions.and(oneOrTwo, twoOrThree, 1));
+        assertNull(Conditions.and(oneOrTwo, twoOrThree, 0));
+        assertEquals(new Conditions(false), Conditions.and(oneOrTwo, equal(a, three), 0));
+
+        // the disjuncts over different columns combine each with each
+        assertEquals(Conditions.and(oneOrTwo, others), Conditions.and(oneOrTwo, others, 4));
+        assertNull(Conditions.and(oneOrTwo, others, 3));
+
+        // equal conjunctions count once, also when one of them is absorbed in the end
+        Conditions notNull = Conditions.or(isNotNull(a), isNotNull(b));
+
+        assertEquals(notNull, Conditions.and(notNull, notNull, 3));
+        assertNull(Conditions.and(notNull, notNull, 2));
+
+        assertEquals(oneOrTwo, Conditions.and(oneOrTwo, new Conditions(true), 2));
+        assertEquals(new Conditions(false), Conditions.and(oneOrTwo, new Conditions(false), 0));
+    }
+
+
+    @Test
+    void randomConjunctionsWithLimit()
+    {
+        Random random = new Random(3);
+        int exceeded = 0;
+        int taken = 0;
+
+        for(int i = 0; i < 50000; i++)
+        {
+            Conditions left = new Conditions(false);
+            Conditions right = new Conditions(false);
+
+            for(int j = random.nextInt(6); j >= 0; j--)
+                left.add(randomCondition(random));
+
+            for(int j = random.nextInt(6); j >= 0; j--)
+                right.add(randomCondition(random));
+
+            Set<Condition> conjunctions = new HashSet<>();
+
+            for(Condition l : left.getConditions())
+                for(Condition r : right.getConditions())
+                    if(!Condition.and(l, r).isFalse())
+                        conjunctions.add(Condition.and(l, r));
+
+            int limit = random.nextInt(6);
+
+            if(conjunctions.size() > limit)
+            {
+                assertNull(Conditions.and(left, right, limit));
+                exceeded++;
+            }
+            else
+            {
+                assertEquals(Conditions.and(left, right), Conditions.and(left, right, limit));
+                taken++;
+            }
+        }
+
+        // the test is no good unless the limit is exceeded often and kept often
+        assertTrue(exceeded > 5000);
+        assertTrue(taken > 5000);
     }
 }

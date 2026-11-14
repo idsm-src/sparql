@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.database;
 import static java.util.stream.Collectors.toSet;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.function.Function;
 import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
@@ -139,6 +140,43 @@ public class Conditions
         for(Condition l : left.conditions)
             for(Condition r : right.conditions)
                 result.add(Condition.and(l, r));
+
+        return result;
+    }
+
+
+    /**
+     * Conjunction, distributed over the disjuncts, unless it takes more conjunctions of a disjunct with a disjunct than
+     * the limit; then null. A pair of disjuncts that contradict each other gives no conjunction, and equal conjunctions
+     * count once. The conjunction is given up as soon as the limit is exceeded, before the conjunctions are compared
+     * with one another as the disjuncts of the result, so that two long disjunctions over different columns, whose
+     * conjunction has a disjunct for every pair of their disjuncts, cost no more than their number of pairs up to the
+     * limit.
+     *
+     * @param left the left condition
+     * @param right the right condition
+     * @param limit the greatest number of different conjunctions of two disjuncts that do not contradict each other
+     * @return conjunction, distributed over the disjuncts, or null when it takes more conjunctions than the limit
+     */
+    public static Conditions and(Conditions left, Conditions right, int limit)
+    {
+        Set<Condition> conjunctions = new LinkedHashSet<>();
+
+        for(Condition l : left.conditions)
+        {
+            for(Condition r : right.conditions)
+            {
+                Condition conjunction = Condition.and(l, r);
+
+                if(!conjunction.isFalse() && conjunctions.add(conjunction) && conjunctions.size() > limit)
+                    return null;
+            }
+        }
+
+        Conditions result = new Conditions(false);
+
+        for(Condition conjunction : conjunctions)
+            result.add(conjunction);
 
         return result;
     }

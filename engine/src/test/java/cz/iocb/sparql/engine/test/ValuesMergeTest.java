@@ -50,9 +50,11 @@ import cz.iocb.sparql.testing.Database;
  * disjuncts the access has got from another list, because the time of handling the conditions grows with the square of
  * the number of their disjuncts. A single row adds no disjunct, so it is merged always. Two accesses that have taken in
  * lists of one variable are merged into an access of the values the lists have in common, as two different values
- * contradict each other.
+ * contradict each other; two accesses that have taken in lists of different variables are merged, along a key or a
+ * foreign key, only while the lists give few disjuncts together, and stay apart otherwise.
  *
- * The table {@code item} holds the items 1 to 300, the item i with the number 10 * i and the label {@code l<i>}.
+ * The table {@code item} holds the items 1 to 300, the item i with the number 10 * i and the label {@code l<i>}; the
+ * table {@code ref} holds the references 1 to 300, the reference i referring to the item i.
  */
 public class ValuesMergeTest
 {
@@ -60,7 +62,7 @@ public class ValuesMergeTest
      * Prefix declarations prepended to every query.
      */
     private static final String prefix = "PREFIX ex: <http://example.org/> "
-            + "PREFIX item: <http://example.org/item/> ";
+            + "PREFIX item: <http://example.org/item/> PREFIX ref: <http://example.org/ref/> ";
 
     /**
      * Configuration mapping the table.
@@ -69,8 +71,8 @@ public class ValuesMergeTest
 
 
     /**
-     * Creates the {@code values_merge_test} schema with the table {@code item} and maps the numbers of the items by
-     * ex:num and their labels by ex:label.
+     * Creates the {@code values_merge_test} schema with the tables {@code item} and {@code ref} and maps the numbers of
+     * the items by ex:num, their labels by ex:label and their type ex:Item, and the items of the references by ex:ref.
      *
      * @throws SQLException on database errors
      */
@@ -86,21 +88,31 @@ public class ValuesMergeTest
                     + "label varchar not null)");
             statement.execute("insert into values_merge_test.item select i, 10 * i, 'l' || i "
                     + "from generate_series(1, 300) as i");
+            statement.execute("create table values_merge_test.ref (id int primary key, "
+                    + "item int not null references values_merge_test.item(id))");
+            statement.execute("insert into values_merge_test.ref select i, i from generate_series(1, 300) as i");
         }
 
         DatabaseSchema schema = new DatabaseSchema(connectionPool);
 
         config = new SparqlDatabaseConfiguration(null, connectionPool, schema, true);
         config.addPrefix("ex", "http://example.org/");
+        config.addPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
         config.addIriClass(new IntegerUserIriClass("item", INT4, "http://example.org/item/"));
+        config.addIriClass(new IntegerUserIriClass("ref", INT4, "http://example.org/ref/"));
 
         DatabaseTable table = new DatabaseTable("values_merge_test", "item");
+        DatabaseTable ref = new DatabaseTable("values_merge_test", "ref");
         ConstantIriMapping graph = config.createIriMapping("<http://example.org/graph>");
 
         config.addQuadMapping(table, graph, config.createIriMapping("item", "id"), config.createIriMapping("ex:num"),
                 config.createLiteralMapping(xsdInt, "num"));
         config.addQuadMapping(table, graph, config.createIriMapping("item", "id"), config.createIriMapping("ex:label"),
                 config.createLiteralMapping(xsdString, "label"));
+        config.addQuadMapping(table, graph, config.createIriMapping("item", "id"), config.createIriMapping("rdf:type"),
+                config.createIriMapping("ex:Item"));
+        config.addQuadMapping(ref, graph, config.createIriMapping("ref", "id"), config.createIriMapping("ex:ref"),
+                config.createIriMapping("item", "item"));
     }
 
 
@@ -169,6 +181,19 @@ public class ValuesMergeTest
 
 
     /**
+     * The references of a range, as a VALUES clause writes them.
+     *
+     * @param first the first reference
+     * @param last the last reference
+     * @return the references separated by spaces
+     */
+    private static String refs(int first, int last)
+    {
+        return IntStream.rangeClosed(first, last).mapToObj(i -> "ref:" + i).collect(joining(" "));
+    }
+
+
+    /**
      * The labels of the items 1 to the given one, as a VALUES clause writes them.
      *
      * @param count the number of the items
@@ -190,8 +215,31 @@ public class ValuesMergeTest
      */
     private static Object[] rows(int first, int last, IntFunction<RdfTerm> term)
     {
-        return IntStream.rangeClosed(first, last)
-                .mapToObj(i -> Arrays.asList(new Iri("http://example.org/item/" + i), term.apply(i))).toArray();
+        return IntStream.rangeClosed(first, last).mapToObj(i -> Arrays.asList(item(i), term.apply(i))).toArray();
+    }
+
+
+    /**
+     * An item as its IRI.
+     *
+     * @param item the item
+     * @return the IRI of the item
+     */
+    private static RdfTerm item(int item)
+    {
+        return new Iri("http://example.org/item/" + item);
+    }
+
+
+    /**
+     * A reference as its IRI.
+     *
+     * @param ref the reference
+     * @return the IRI of the reference
+     */
+    private static RdfTerm ref(int ref)
+    {
+        return new Iri("http://example.org/ref/" + ref);
     }
 
 
@@ -229,6 +277,19 @@ public class ValuesMergeTest
     private static int count(String sql, String text)
     {
         return (sql.length() - sql.replace(text, "").length()) / text.length();
+    }
+
+
+    /**
+     * How many times the SQL reads the table.
+     *
+     * @param sql the SQL
+     * @param table the name of a table of the test schema
+     * @return number of the accesses to the table in the SQL
+     */
+    private static int reads(String sql, String table)
+    {
+        return count(sql, "\"values_merge_test\".\"" + table + "\"");
     }
 
 
@@ -302,8 +363,80 @@ public class ValuesMergeTest
         String sql = translate(query);
 
         // one access with an equality for each common item, and no comparison of two different items
-        assertThat(count(sql, "\"values_merge_test\".\"item\""), is(1));
+        assertThat(reads(sql, "item"), is(1));
         assertThat(count(sql, "::int4"), is(10));
+    }
+
+
+    @Test
+    @DisplayName("two accesses with short lists of two variables are merged while the lists give few disjuncts together")
+    void fewDisjunctsOfTwoAccesses() throws Exception
+    {
+        String query = "SELECT ?s ?l WHERE { VALUES ?s { " + items(1, 5) + " } VALUES ?l { " + labels(5)
+                + " } ?s ex:num ?n . ?s ex:label ?l }";
+
+        assertThat(execute(query), containsInAnyOrder(rows(1, 5, ValuesMergeTest::label)));
+
+        String sql = translate(query);
+
+        assertThat(reads(sql, "item"), is(1));
+        assertThat(lists(sql), is(0));
+    }
+
+
+    @Test
+    @DisplayName("two accesses with lists of two variables stay apart when the lists would be multiplied")
+    void multipliedDisjunctsOfTwoAccesses() throws Exception
+    {
+        String query = "SELECT ?s ?l WHERE { VALUES ?s { " + items(1, 20) + " } VALUES ?l { " + labels(20)
+                + " } ?s ex:num ?n . ?s ex:label ?l }";
+
+        assertThat(execute(query), containsInAnyOrder(rows(1, 20, ValuesMergeTest::label)));
+
+        String sql = translate(query);
+
+        // each access with the list of its own variable, an equality for each item
+        assertThat(reads(sql, "item"), is(2));
+        assertThat(lists(sql), is(0));
+        assertThat(count(sql, "::int4"), is(20));
+    }
+
+
+    @Test
+    @DisplayName("a referenced access is merged into the referencing one while their lists give few disjuncts together")
+    void fewDisjunctsAlongForeignKey() throws Exception
+    {
+        String query = "SELECT ?r ?s WHERE { VALUES ?r { " + refs(1, 5) + " } VALUES ?s { " + items(1, 5)
+                + " } ?r ex:ref ?s . ?s a ex:Item }";
+
+        assertThat(execute(query), containsInAnyOrder(
+                IntStream.rangeClosed(1, 5).mapToObj(i -> Arrays.asList(ref(i), item(i))).toArray()));
+
+        String sql = translate(query);
+
+        assertThat(reads(sql, "ref"), is(1));
+        assertThat(reads(sql, "item"), is(0));
+        assertThat(lists(sql), is(0));
+    }
+
+
+    @Test
+    @DisplayName("a referenced access stays apart from the referencing one when their lists would be multiplied")
+    void multipliedDisjunctsAlongForeignKey() throws Exception
+    {
+        String query = "SELECT ?r ?s WHERE { VALUES ?r { " + refs(1, 20) + " } VALUES ?s { " + items(1, 20)
+                + " } ?r ex:ref ?s . ?s a ex:Item }";
+
+        assertThat(execute(query), containsInAnyOrder(
+                IntStream.rangeClosed(1, 20).mapToObj(i -> Arrays.asList(ref(i), item(i))).toArray()));
+
+        String sql = translate(query);
+
+        // each access with the list of its own variable, an equality for each reference and for each item
+        assertThat(reads(sql, "ref"), is(1));
+        assertThat(reads(sql, "item"), is(1));
+        assertThat(lists(sql), is(0));
+        assertThat(count(sql, "::int4"), is(40));
     }
 
 
