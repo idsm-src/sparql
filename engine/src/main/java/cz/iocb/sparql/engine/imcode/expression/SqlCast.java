@@ -98,6 +98,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.imcode.Scope;
+import cz.iocb.sparql.engine.mapping.classes.CanonicalLiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
 import cz.iocb.sparql.engine.mapping.classes.DateInZoneClass;
@@ -113,7 +114,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 /**
  * Cast of a value to an XSD datatype by its constructor function ({@code xsd:integer(...)} etc.), implemented by the
- * {@code sparql.cast_as_*_from_*} functions of the extension; a source class that cannot be cast is an error.
+ * {@code sparql.cast_as_*_from_*} functions of the extension; a source class that cannot be cast is an error. The
+ * result is the literal of the cast value in the canonical form, also for a literal that has the datatype already.
  */
 public final class SqlCast extends SqlUnary
 {
@@ -208,22 +210,20 @@ public final class SqlCast extends SqlUnary
             {
                 if(isCastable(e.getKey(), castClass))
                 {
-                    Integer zone = extractConstantZone(e.getKey());
+                    int zone = extractConstantZone(e.getKey());
                     LiteralClass resultClass = createConstantZoneResultClass(castClass, zone);
-                    Column column = translate(relations, e.getValue(), e.getKey(), resultClass, partCanBeNull);
-                    variants.computeIfAbsent(resultClass, _ -> new HashSet<>()).add(column);
+                    Set<Column> columns = variants.computeIfAbsent(resultClass, _ -> new HashSet<>());
+
+                    // the columns of the operand are materialised only for a result class the parent needs
+                    if(restriction.contains(relations, resultClass))
+                        columns.add(translate(relations, e.getValue(), e.getKey(), resultClass, partCanBeNull));
                 }
             }
 
             Map<ResourceClass, List<Column>> mappings = new HashMap<>();
 
             for(Entry<ResourceClass, Set<Column>> e : variants.entrySet())
-            {
-                if(!restriction.contains(relations, e.getKey()))
-                    mappings.put(e.getKey(), null);
-                else
-                    mappings.put(e.getKey(), List.of(coalesce(e.getValue())));
-            }
+                mappings.put(e.getKey(), e.getValue().isEmpty() ? null : List.of(coalesce(e.getValue())));
 
             return new SqlCast(castClass, operand, mappings, canBeNull);
         }
@@ -434,11 +434,17 @@ public final class SqlCast extends SqlUnary
         SqlBuilder builder = new SqlBuilder();
 
 
-        /* identity cats */
+        /* identity casts */
 
         if(effClass.isSubclassOf(castClass))
         {
             builder.append(effClass.toGeneralClass(castClass, columns, partCanBeNull).get(0));
+        }
+        else if(castClass instanceof CanonicalLiteralClass canonicalClass
+                && effClass.equals(canonicalClass.getBaseClass()))
+        {
+            // the base class keeps the value in the leading columns, which are those of the canonical class
+            builder.append(columns.get(0));
         }
 
 
@@ -468,9 +474,9 @@ public final class SqlCast extends SqlUnary
         {
             builder.append("sparql.zoneddate_create(");
             builder.append(columns.get(0));
-            builder.append(", '");
+            builder.append(", ");
             builder.append(columns.get(1));
-            builder.append("'::int4)");
+            builder.append(")");
         }
         else if(castClass.equals(xsdScalarDate) && effClass instanceof DateInZone dateClass)
         {
@@ -504,9 +510,9 @@ public final class SqlCast extends SqlUnary
         {
             builder.append("sparql.zoneddatetime_create(");
             builder.append(columns.get(0));
-            builder.append(", '");
+            builder.append(", ");
             builder.append(columns.get(1));
-            builder.append("'::int4)");
+            builder.append(")");
         }
         else if(castClass.equals(xsdScalarDateTime) && effClass instanceof DateTimeInZone dateTimeClass)
         {
@@ -578,20 +584,13 @@ public final class SqlCast extends SqlUnary
 
         else if(supportedClasses.contains(effClass))
         {
-            if(effClass instanceof LiteralClass litClass && castClass.getDatatype().equals(litClass.getDatatype()))
-            {
-                builder.append(columns.get(0));
-            }
-            else
-            {
-                builder.append("sparql.cast_as_");
-                builder.append(getLiteralClassName(castClass));
-                builder.append("_from_");
-                builder.append(getLiteralClassName(effClass));
-                builder.append("(");
-                builder.append(columns.get(0));
-                builder.append(")");
-            }
+            builder.append("sparql.cast_as_");
+            builder.append(getLiteralClassName(castClass));
+            builder.append("_from_");
+            builder.append(getLiteralClassName(effClass));
+            builder.append("(");
+            builder.append(columns.get(0));
+            builder.append(")");
         }
         else
         {
