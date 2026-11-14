@@ -289,7 +289,7 @@ final class JoinOptimizer
 
         Set<Column> bound = new HashSet<>();
 
-        for(ColumnComparison comparison : access.getConditions().getAreEqual())
+        for(ColumnComparison comparison : access.getConstantConditions(request.getConfiguration()).getAreEqual())
         {
             if(comparison.getLeft() instanceof TableColumn column && !(comparison.getRight() instanceof TableColumn))
                 bound.add(column);
@@ -641,7 +641,8 @@ final class JoinOptimizer
 
             TableStatistics statistics = request.getConfiguration().getTableStatistics(access.getTable());
 
-            return Math.max(statistics.estimateRows(request, access.getConditions()), 0);
+            return Math.max(statistics.estimateRows(request, access.getConstantConditions(request.getConfiguration())),
+                    0);
         }
 
         if(node instanceof SqlValues values)
@@ -752,7 +753,8 @@ final class JoinOptimizer
             Column column = columns.stream().sorted().findFirst().get();
             TableStatistics statistics = request.getConfiguration().getTableStatistics(access.getTable());
 
-            distinct = statistics.estimateDistinct(request, column, access.getConditions());
+            distinct = statistics.estimateDistinct(request, column,
+                    access.getConstantConditions(request.getConfiguration()));
         }
         else if(node instanceof SqlJoin join)
         {

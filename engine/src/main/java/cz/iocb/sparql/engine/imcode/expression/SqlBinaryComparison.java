@@ -70,6 +70,7 @@ import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
 import cz.iocb.sparql.engine.mapping.classes.DateInZoneClass;
+import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.TripleTermClass;
@@ -353,6 +354,14 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             else if(operator == NOT_EQUAL)
                 return a.getIri().equals(b.getIri()) ? falseValue : trueValue;
         }
+
+        // an operand always bound to a constant IRI, like a variable its pattern binds to one, compares like the IRI
+        // (a literal equal to itself is another matter: a NaN is not)
+        boolean iris = left.getMappings().keySet().stream().allMatch(c -> c instanceof IriClass);
+        Boolean same = iris && (operator == EQUAL || operator == NOT_EQUAL) ? isSameConstantTerm(left, right) : null;
+
+        if(same != null)
+            return same == (operator == EQUAL) ? trueValue : falseValue;
 
         //TODO: add compile-time evaluation for literals
 

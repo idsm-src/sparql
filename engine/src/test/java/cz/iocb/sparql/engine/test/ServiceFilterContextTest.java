@@ -518,6 +518,10 @@ public class ServiceFilterContextTest
         assertThat(execute("SELECT ?s WHERE { " + pattern + " ?s :n ?n FILTER(?n = 'y') }"), contains(row(item(3))));
         assertThat(asked(), contains(1, 2, 3, 4, 5));
 
+        // a term required of a variable restricts the context although the member that follows keeps the term as well
+        assertThat(execute("SELECT ?s WHERE { " + pattern + " ?s :n ?n FILTER(?s = item:3) }"), contains(row(item(3))));
+        assertThat(asked(), contains(3));
+
         assertThat(execute("SELECT ?s ?n WHERE { " + pattern + " OPTIONAL { ?s :n ?n } FILTER(?v > 2) }"),
                 containsInAnyOrder(row(item(3), string("y")), row(item(4), null), row(item(5), null)));
         assertThat(asked(), contains(3, 4, 5));

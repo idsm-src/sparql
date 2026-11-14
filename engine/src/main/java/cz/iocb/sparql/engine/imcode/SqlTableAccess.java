@@ -50,25 +50,31 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * those columns (see {@link cz.iocb.sparql.engine.mapping.SingleTableQuadMapping}). Inside a pattern evaluated for a
  * current solution (an EXISTS pattern, or a pattern evaluated per graph, whose current solution gives the graph), an
  * access whose variable the nodes above merge with its value in the current solution takes the value into its own
- * conditions, compared in the class of its columns like a constant (see {@link ValueCondition}).
+ * conditions, compared in the class of its columns like a constant (see {@link ValueCondition}); so does an access
+ * whose variable a filter above requires to be a constant term, which makes the filter needless (see
+ * {@link SqlIntercode#addAcceptedValues}).
  */
 public final class SqlTableAccess extends SqlIntercode
 {
     /**
-     * Restriction of the rows of an access to those holding a value of the current solution that the pattern the access
-     * lies in is evaluated for (see {@link SqlExpressionIntercode#isCurrentValue}): the term held by the columns is the
-     * value of the expression. The value is converted to the class of the columns, so that the database can look the
-     * rows up by an index of the table, whereas the node merging the variable with the value compares them in their
-     * common class. The condition is kept apart from the conditions on the rows, because the columns of a current
-     * solution change whenever the node providing it is optimised (the node holding the EXISTS expression, the
-     * enumeration of the graphs a pattern is evaluated in): the expression is read again on every optimisation of the
-     * access (see {@link cz.iocb.sparql.engine.imcode.expression.SqlOuterVariable} and
+     * Restriction of the rows of an access to those holding a value the parent accepts of a variable (see
+     * {@link Restrictions#getAcceptedValue}): a value of the current solution that the pattern the access lies in is
+     * evaluated for (see {@link SqlExpressionIntercode#isCurrentValue}), or a constant term a filter requires of the
+     * variable (see {@link SqlIntercode#addAcceptedValues}). The term held by the columns is the value of the
+     * expression. The value is converted to the class of the columns, so that the database can look the rows up by an
+     * index of the table, whereas the node merging the variable with the value, or filtering by it, compares them in
+     * their common class. The condition is kept apart from the conditions on the rows: it leaves the variable bound to
+     * the columns, so that the nodes above conclude nothing from it by themselves (they ask {@link #isRestricted}), and
+     * the columns of a current solution change whenever the node providing it is optimised (the node holding the EXISTS
+     * expression, the enumeration of the graphs a pattern is evaluated in), so the expression is read again on every
+     * optimisation of the access (see {@link cz.iocb.sparql.engine.imcode.expression.SqlOuterVariable} and
      * {@link cz.iocb.sparql.engine.imcode.expression.SqlLateralVariable}).
      *
      * @param resourceClass class of the term held by the columns
      * @param columns the columns of the table holding the term, as the internal bindings give them
-     * @param value expression giving the value, which refers to the current solution only; it is never unbound when the
-     *            access takes it in, and should the current solution leave it unbound later, every row passes
+     * @param value expression giving the value, which refers to the current solution only or to nothing; it is never
+     *            unbound when the access takes it in, and should the current solution leave it unbound later, every row
+     *            passes
      */
     record ValueCondition(ResourceClass resourceClass, List<Column> columns, SqlExpressionIntercode value)
     {
@@ -117,8 +123,9 @@ public final class SqlTableAccess extends SqlIntercode
     private final boolean reduced;
 
     /**
-     * Values of the current solution of the enclosing pattern the rows are restricted to, in conjunction with the
-     * conditions (see {@link ValueCondition}); empty outside a pattern evaluated for a current solution.
+     * Values the rows are restricted to, in conjunction with the conditions (see {@link ValueCondition}): values of the
+     * current solution of the enclosing pattern and the constant terms the filters above require; empty when the parent
+     * has accepted no value.
      */
     private final List<ValueCondition> values;
 
@@ -133,7 +140,7 @@ public final class SqlTableAccess extends SqlIntercode
      * @param internal bindings in terms of the table's own columns
      * @param reduced whether duplicate solutions may be dropped
      * @param distinctColumns columns over which deduplication is requested
-     * @param values values of the current solution the rows are restricted to
+     * @param values values the rows are restricted to
      */
     protected SqlTableAccess(DatabaseSchema schema, SourceTable table, Conditions conditions, VariableBindings internal,
             boolean reduced, Set<Column> distinctColumns, List<ValueCondition> values)
@@ -913,14 +920,14 @@ public final class SqlTableAccess extends SqlIntercode
 
     /**
      * Foreign key allowing the parent access to be merged into the child access (no expressions, no deduplication
-     * request, parent columns covered), or null.
+     * request, parent columns covered, the values the parent is restricted to restricting the child as well), or null.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param schema the database schema
      * @param parent access to the referenced table
      * @param child access to the referencing table
      * @return foreign key allowing the parent access to be merged into the child access (no expressions, no
-     *         deduplication request, parent columns covered), or null
+     *         deduplication request, parent columns covered, the values of the parent restricting the child), or null
      */
     private static Set<ColumnPair> canBeJoinedByForeignKey(ClassRelations relations, DatabaseSchema schema,
             SqlTableAccess parent, SqlTableAccess child)
@@ -929,11 +936,6 @@ public final class SqlTableAccess extends SqlIntercode
             return null;
 
         if(parent.hasExpression())
-            return null;
-
-        // the parent is dropped, so a value of the current solution it is restricted to would have to be moved onto the
-        // child columns
-        if(parent.hasValues())
             return null;
 
         // the parent is dropped, which is exact only when its rows are unique with respect to the key columns
@@ -947,8 +949,41 @@ public final class SqlTableAccess extends SqlIntercode
         Set<Column> parentColumns = new HashSet<>();
         parentColumns.addAll(parent.conditions.getNonConstantColumns());
         parentColumns.addAll(parent.getInternalVariableBindings().getNonConstantColumns());
+        parentColumns.addAll(parent.getValueColumns(false));
 
-        return schema.getCompatibleForeignKey(parent.table, child.table, columns, parentColumns);
+        Set<ColumnPair> key = schema.getCompatibleForeignKey(parent.table, child.table, columns, parentColumns);
+
+        // the parent is dropped, and a value it is restricted to is not moved onto the child columns: the child has to
+        // be restricted to the value itself, through the columns of the key, as both accesses are when the value is
+        // accepted for the variable they are joined on
+        if(key != null && !child.holdsValuesOf(parent, key))
+            return null;
+
+        return key;
+    }
+
+
+    /**
+     * True if the access restricts its rows to every value the parent access restricts its rows to (see
+     * {@link #values}), in its columns referencing the restricted columns of the parent by the foreign key: a row of
+     * the access then references a parent row passing those restrictions.
+     *
+     * @param parent access to the referenced table, whose restricted columns the key covers
+     * @param key the foreign key
+     * @return true if the access restricts its rows to every value the parent access restricts its rows to, false
+     *         otherwise
+     */
+    private boolean holdsValuesOf(SqlTableAccess parent, Set<ColumnPair> key)
+    {
+        Map<Column, Column> map = new HashMap<>();
+
+        for(ColumnPair pair : key)
+            map.put(pair.getLeft(), pair.getRight());
+
+        List<ValueCondition> referenced = parent.values.stream()
+                .map(v -> new ValueCondition(v.resourceClass(), remap(map, v.columns()), v.value())).toList();
+
+        return containsAll(values, referenced);
     }
 
 
@@ -1801,7 +1836,7 @@ public final class SqlTableAccess extends SqlIntercode
         if(conditions.isFalse())
             return SqlNoSolution.get();
 
-        // the values of the current solution the parent accepts for the variables restrict the rows by themselves
+        // the values the parent accepts for the variables restrict the rows by themselves
         List<ValueCondition> optimizedValues = optimizeValues(request, scope, restrictions, evalServices);
 
         if(optimizedValues == null)
@@ -1896,6 +1931,36 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
+     * The conditions on the rows together with the equalities of the columns with the constants the rows are restricted
+     * to (see {@link #values}), which are conditions on the rows as well; a value of a current solution, known only
+     * when the statement runs, adds nothing. The join optimizer estimates the rows of the access by them.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @return the conditions on the rows together with the equalities of the columns with the constants the rows are
+     *         restricted to
+     */
+    Conditions getConstantConditions(ClassRelations relations)
+    {
+        Condition constants = new Condition();
+
+        for(ValueCondition condition : values)
+        {
+            SqlExpressionIntercode value = condition.value();
+
+            if(value.isCurrentValue() || !isComparedInClass(relations, condition.resourceClass(), value))
+                continue;
+
+            List<Column> derived = value.getBinding().deriveMapping(relations, condition.resourceClass());
+
+            if(derived.stream().allMatch(c -> c instanceof ConstantColumn))
+                constants.addAreEqual(condition.columns(), derived, condition.resourceClass()::isOptionalColumn);
+        }
+
+        return constants.isTrue() ? conditions : Conditions.and(conditions, constants);
+    }
+
+
+    /**
      * True if the value can be compared with columns of the class in that class: it is never unbound and it can be
      * converted to the class with the check of its representability (see {@link VariableBinding#canDeriveMapping}).
      *
@@ -1946,14 +2011,14 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * SQL condition restricting the rows to the values of the current solution (see {@link #values}): the columns equal
+     * SQL condition restricting the rows to the values the access has taken (see {@link #values}): the columns equal
      * the value converted to their class, which yields nulls for a value outside the class, so that the database can
      * look the rows up by an index. A value that cannot be compared so (which it could when it was taken in) is
      * compared as a join would compare it: in the common class, any row being compatible with an unbound value. Null
      * when there is nothing to compare.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
-     * @return SQL condition restricting the rows to the values of the current solution, or null
+     * @return SQL condition restricting the rows to the values the access has taken, or null
      */
     private SqlCode translateValues(ClassRelations relations)
     {

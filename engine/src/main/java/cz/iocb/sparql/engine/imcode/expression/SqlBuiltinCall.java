@@ -715,6 +715,13 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 if(left.equals(right) && !canBeNull)
                     return trueValue;
 
+                // operands always bound to constants of one class are the same term when their constants are, and
+                // different IRIs when they are not
+                Boolean same = isSameConstantTerm(left, right);
+
+                if(same != null)
+                    return same ? trueValue : falseValue;
+
                 Set<List<ResourceClass>> set = new HashSet<>();
                 Map<ResourceClass, Set<List<ResourceClass>>> map = Map.of(xsdBoolean, set);
 

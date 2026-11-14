@@ -292,6 +292,7 @@ public final class SqlLeftJoin extends SqlIntercode
         Restrictions accepted = new Restrictions();
         addAcceptedClasses(request, scope, accepted, conditions,
                 getExpressionVariableBindings(request, scope, left.getVariableBindings(), right.getVariableBindings()));
+        addAcceptedValues(request, accepted, conditions);
 
         Restrictions leftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
                 optRight.getVariableBindings(), cndRestrictions, false);
@@ -349,6 +350,15 @@ public final class SqlLeftJoin extends SqlIntercode
                             optRight.getVariableBindings(), evalServices);
                 }
             }
+
+            // a condition requiring a term of a variable holds for every solution of a right side that binds the
+            // variable to the term for good, whatever solution of the left side it extends
+            List<SqlExpressionIntercode> unsatisfied = new ArrayList<>();
+
+            for(SqlExpressionIntercode condition : optConditions)
+                unsatisfied.addAll(getUnsatisfied(request, condition, optRight));
+
+            optConditions = unsatisfied;
 
 
             boolean newOptReduced = optReduced & optConditions.stream().allMatch(r -> r.isDeterministic());

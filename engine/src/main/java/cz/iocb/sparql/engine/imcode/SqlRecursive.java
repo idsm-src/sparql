@@ -763,16 +763,25 @@ public final class SqlRecursive extends SqlIntercode
 
 
     /**
-     * True if the walk should start from its end variable: the parent accepts the end in narrower classes than the
-     * start (every accepted class of the end is a subclass of an accepted class of the start, but not the other way
-     * round), or restricts the end alone. Walked from the end, the recursion enumerates only the pairs ending in nodes
-     * the parent accepts, instead of every pair starting anywhere, of which the parent keeps the same ones.
+     * True if the walk should start from its end variable: the parent accepts a single constant term for the end, as a
+     * filter requiring one does (see {@link SqlIntercode#addAcceptedValues}), and none for the start; or it accepts the
+     * end in narrower classes than the start (every accepted class of the end is a subclass of an accepted class of the
+     * start, but not the other way round), or restricts the end alone. Walked from the end, the recursion enumerates
+     * only the pairs ending in nodes the parent accepts, instead of every pair starting anywhere, of which the parent
+     * keeps the same ones.
      *
      * @param restrictions what the parent needs of the variables
      * @return true if the walk should start from its end variable, false otherwise
      */
     private boolean startsBetterFromEnd(Restrictions restrictions)
     {
+        // a value of a current solution starts a walk by itself (see #start); a constant restricts the end the most
+        if(isConstant(restrictions.getAcceptedValue(beginVar)))
+            return false;
+
+        if(isConstant(restrictions.getAcceptedValue(endBinding.getVariable())))
+            return true;
+
         Set<ResourceClass> end = restrictions.getAcceptedClasses(endBinding.getVariable());
         Set<ResourceClass> begin = restrictions.getAcceptedClasses(beginVar);
 
@@ -783,6 +792,18 @@ public final class SqlRecursive extends SqlIntercode
             return true;
 
         return isNarrower(end, begin) && !isNarrower(begin, end);
+    }
+
+
+    /**
+     * True if the accepted value is a constant: a term the parent requires, and no value of a current solution.
+     *
+     * @param value expression giving an accepted value, or null
+     * @return true if the accepted value is a constant, false otherwise
+     */
+    private static boolean isConstant(SqlExpressionIntercode value)
+    {
+        return value != null && !value.isCurrentValue();
     }
 
 

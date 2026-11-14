@@ -28,12 +28,19 @@ import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
+import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison;
+import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical.LogicalOperator;
 import cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression;
+import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
+import cz.iocb.sparql.engine.imcode.expression.SqlEffectiveBooleanValue;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
+import cz.iocb.sparql.engine.imcode.expression.SqlIri;
+import cz.iocb.sparql.engine.imcode.expression.SqlLiteral;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
+import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -64,9 +71,9 @@ public abstract class SqlIntercode extends SqlBaseClass
      * solution binding the variable to a value of a class disjoint with all of them never reaches the result, so a
      * child may leave such solutions out. Inside a pattern evaluated for a current solution (an EXISTS pattern, or a
      * pattern evaluated per graph), a variable merged with its value in the current solution has that value as its
-     * accepted value (see {@link #getAcceptedValue}): a solution binding the variable to another term never reaches the
-     * result either, and a table access binding the variable takes the value into its conditions (see
-     * {@link SqlTableAccess}).
+     * accepted value (see {@link #getAcceptedValue}), and so has a variable the term a filter requires of it (see
+     * {@link SqlIntercode#addAcceptedValues}): a solution binding the variable to another term never reaches the result
+     * either, and a table access binding the variable takes the value into its conditions (see {@link SqlTableAccess}).
      */
     public static class Restrictions
     {
@@ -89,7 +96,7 @@ public abstract class SqlIntercode extends SqlBaseClass
         /**
          * Accepted value per variable: the term a bound value of the variable has to be for its solution to reach the
          * result, given by an expression that has the same value for all the solutions (a value of the current solution
-         * the pattern is evaluated for); a variable without an entry is accepted with any value.
+         * the pattern is evaluated for, or a constant); a variable without an entry is accepted with any value.
          */
         private final Map<Variable, SqlExpressionIntercode> acceptedValues = new HashMap<>();
 
@@ -475,9 +482,10 @@ public abstract class SqlIntercode extends SqlBaseClass
 
         /**
          * Accepted value of the variable: the term a bound value of the variable has to be for its solution to reach
-         * the result, because a node above merges the variable with the value. It is given by an expression that has
-         * the same value for all the solutions: a value of the current solution the pattern being optimised is
-         * evaluated for (see {@link SqlExpressionIntercode#isCurrentValue}). A solution leaving the variable unbound is
+         * the result, because a node above merges the variable with the value or filters the solutions by a condition
+         * requiring the term. It is given by an expression that has the same value for all the solutions: a value of
+         * the current solution the pattern being optimised is evaluated for (see
+         * {@link SqlExpressionIntercode#isCurrentValue}), or a constant. A solution leaving the variable unbound is
          * accepted. Null when the variable is accepted with any value.
          *
          * @param var the variable
@@ -501,12 +509,14 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
         /**
-         * Accepts every variable with any value. A node whose children are evaluated by a statement of their own (the
-         * context of a SERVICE call) calls it, because the values of a current solution are not known there.
+         * Accepts every variable with any value of a current solution. A node whose children are evaluated by a
+         * statement of their own (the context of a SERVICE call) calls it, because the values of a current solution are
+         * not known there; a constant, which a filter requires of a variable, is known everywhere and stays accepted
+         * alone.
          */
-        public void removeAcceptedValues()
+        public void removeCurrentValues()
         {
-            acceptedValues.clear();
+            acceptedValues.values().removeIf(v -> v.isCurrentValue());
         }
 
 
@@ -1771,12 +1781,13 @@ public abstract class SqlIntercode extends SqlBaseClass
 
     /**
      * True if every solution of the node binds the variable to the value of the expression, which is the same for all
-     * the solutions (a value of the current solution the pattern is evaluated for), and the node keeps doing so however
-     * it is optimised later: a table access restricted to the value by its conditions (see {@link SqlTableAccess}), or
-     * a node that takes the variable over from such a node. Merging the variable with the value then changes nothing,
-     * so the merge is left out for good (see {@link SqlMerge}). A walk does not qualify, although it may start from the
-     * value: it gives the start up when its siblings seed it from its other end or when it reduces to its initial
-     * solutions (see {@link SqlRecursive}).
+     * the solutions (a value of the current solution the pattern is evaluated for, or a constant), and the node keeps
+     * doing so however it is optimised later: a table access restricted to the value by its conditions (see
+     * {@link SqlTableAccess}), or a node that takes the variable over from such a node. Merging the variable with the
+     * value then changes nothing, so the merge is left out for good (see {@link SqlMerge}), and so is a condition of a
+     * filter requiring the value (see {@link #getUnsatisfied}). A walk does not qualify, although it may start from the
+     * value: it gives the start up when it is turned, when its siblings seed it from its other end or when it reduces
+     * to its initial solutions (see {@link SqlRecursive}).
      *
      * @param variable the variable
      * @param value expression giving the value
@@ -2014,6 +2025,133 @@ public abstract class SqlIntercode extends SqlBaseClass
                     restrictions.addAcceptedClasses(variable, accepted);
             }
         }
+    }
+
+
+    /**
+     * A term a condition requires of a variable (see {@link #getRequiredTerm}).
+     *
+     * @param variable the variable
+     * @param value constant expression giving the term, with the columns of all its classes
+     */
+    protected record RequiredTerm(Variable variable, SqlExpressionIntercode value)
+    {
+    }
+
+
+    /**
+     * The term the condition requires of a variable, or null when it requires none. A condition requires a term when it
+     * holds only for the solutions binding the variable to that term: {@code sameTerm} of the variable and a constant
+     * says so, and so does an equality of the variable and a constant IRI, which is equal to no other term (an equality
+     * with a literal holds for the other literals of its value too).
+     *
+     * @param request the current request
+     * @param condition the condition
+     * @return the term the condition requires of a variable, or null when it requires none
+     */
+    protected static RequiredTerm getRequiredTerm(Request request, SqlExpressionIntercode condition)
+    {
+        // the effective boolean value of a comparison is the comparison itself
+        if(condition instanceof SqlEffectiveBooleanValue value)
+            return getRequiredTerm(request, value.getOperand());
+
+        if(condition instanceof SqlBuiltinCall call && call.getFunction().equals("sameterm"))
+            return getRequiredTerm(request, call.getArguments().get(0), call.getArguments().get(1), true);
+
+        if(condition instanceof SqlBinaryComparison comparison && comparison.getOperator() == ComparisonOperator.EQUAL)
+            return getRequiredTerm(request, comparison.getLeft(), comparison.getRight(), false);
+
+        return null;
+    }
+
+
+    /**
+     * The term a comparison of two operands requires of a variable, or null when it requires none: one of the operands
+     * is a variable and the other one a constant IRI, or any constant when the comparison is the identity of terms.
+     *
+     * @param request the current request
+     * @param left one operand
+     * @param right the other operand
+     * @param identity true for the identity of terms ({@code sameTerm}), false for the equality of values
+     * @return the term the comparison requires of a variable, or null when it requires none
+     */
+    private static RequiredTerm getRequiredTerm(Request request, SqlExpressionIntercode left,
+            SqlExpressionIntercode right, boolean identity)
+    {
+        if(!(left instanceof SqlVariable variable))
+            return right instanceof SqlVariable ? getRequiredTerm(request, right, left, identity) : null;
+
+        if(right instanceof SqlIri iri)
+            return new RequiredTerm(variable.getVariable(), SqlIri.create(request, iri.getIri()));
+
+        if(identity && right instanceof SqlLiteral literal)
+            return new RequiredTerm(variable.getVariable(), SqlLiteral.create(request, literal.getLiteral()));
+
+        return null;
+    }
+
+
+    /**
+     * Adds the terms the conditions require of their variables (see {@link #getRequiredTerm}) as the accepted values of
+     * the variables (see {@link Restrictions#getAcceptedValue}): a solution binding a variable to another term than the
+     * one a condition requires of it never satisfies the conditions, so the node holding the solutions may leave it
+     * out, and a table access binding the variable takes the term into its conditions (see {@link SqlTableAccess}). The
+     * conjuncts of a conjunction count by themselves, as all of them have to hold.
+     *
+     * @param request the current request
+     * @param restrictions the restrictions to extend
+     * @param conditions the conditions, all of which have to hold
+     */
+    protected static void addAcceptedValues(Request request, Restrictions restrictions,
+            Collection<SqlExpressionIntercode> conditions)
+    {
+        for(SqlExpressionIntercode condition : conditions)
+        {
+            // the effective boolean value of a conjunction is the conjunction itself
+            SqlExpressionIntercode operand = condition instanceof SqlEffectiveBooleanValue value ? value.getOperand() :
+                    condition;
+
+            if(operand instanceof SqlBinaryLogical logical && logical.getOperator() == LogicalOperator.AND)
+            {
+                addAcceptedValues(request, restrictions, List.of(logical.getLeft(), logical.getRight()));
+                continue;
+            }
+
+            RequiredTerm term = getRequiredTerm(request, condition);
+
+            if(term != null)
+                restrictions.setAcceptedValue(term.variable(), term.value());
+        }
+    }
+
+
+    /**
+     * The condition without the conjuncts the node satisfies by itself: a conjunct requiring a term of a variable (see
+     * {@link #getRequiredTerm}) holds for every solution of a node that binds the variable to the term for good (see
+     * {@link #isRestricted}), because its table accesses have taken the term into their conditions (see
+     * {@link #addAcceptedValues}). The condition itself when the node satisfies no conjunct of it; otherwise the
+     * conjuncts left, all of which have to hold.
+     *
+     * @param request the current request
+     * @param condition the condition
+     * @param node the node whose solutions the condition is evaluated for
+     * @return the condition without the conjuncts the node satisfies by itself
+     */
+    protected static List<SqlExpressionIntercode> getUnsatisfied(Request request, SqlExpressionIntercode condition,
+            SqlIntercode node)
+    {
+        List<SqlExpressionIntercode> conjuncts = getConjuncts(List.of(condition));
+        List<SqlExpressionIntercode> kept = new ArrayList<>();
+
+        for(SqlExpressionIntercode conjunct : conjuncts)
+        {
+            RequiredTerm term = getRequiredTerm(request, conjunct);
+
+            if(term == null || !node.isRestricted(term.variable(), term.value()))
+                kept.add(conjunct);
+        }
+
+        return kept.size() == conjuncts.size() ? List.of(condition) : kept;
     }
 
 

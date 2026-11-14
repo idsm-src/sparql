@@ -344,8 +344,8 @@ public final class SqlAggregation extends SqlIntercode
 
     /**
      * Restrictions for the child: the grouping variables plus the requirements of the needed aggregates. A grouping
-     * variable keeps the classes the parent accepts: the groups keyed by values of other classes are dropped above as a
-     * whole, so the child may leave their solutions out, whereas the solutions behind an aggregate have to stay.
+     * variable keeps the classes and the value the parent accepts: the groups keyed by other values are dropped above
+     * as a whole, so the child may leave their solutions out, whereas the solutions behind an aggregate have to stay.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param groupVariables the grouping variables
@@ -359,8 +359,13 @@ public final class SqlAggregation extends SqlIntercode
         Restrictions childRestrictions = new Restrictions(groupVariables);
 
         for(Variable variable : groupVariables)
+        {
             if(restrictions.getAcceptedClasses(variable) != null)
                 childRestrictions.addAcceptedClasses(variable, restrictions.getAcceptedClasses(variable));
+
+            if(restrictions.getAcceptedValue(variable) != null)
+                childRestrictions.setAcceptedValue(variable, restrictions.getAcceptedValue(variable));
+        }
 
         // the variables of a needed aggregate stay bound even where none of their values is needed, as they give the
         // classes of the aggregate
@@ -477,6 +482,14 @@ public final class SqlAggregation extends SqlIntercode
 
 
         return builder.toCode();
+    }
+
+
+    @Override
+    protected boolean isRestricted(Variable variable, SqlExpressionIntercode value)
+    {
+        //NOTE: a group binds a grouping variable to the value its solutions bind it to
+        return groupVariables.contains(variable) && child.isRestricted(variable, value);
     }
 
 

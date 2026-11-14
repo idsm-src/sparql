@@ -153,7 +153,7 @@ public final class SqlJoin extends SqlIntercode
         if(request.isServiceReorderEnabled() && childs.stream().anyMatch(SqlIntercode::hasServiceSubpattern))
         {
             restrictions = new Restrictions(restrictions);
-            restrictions.removeAcceptedValues();
+            restrictions.removeCurrentValues();
         }
 
         List<SqlIntercode> flatChilds = flatChilds(optimize(request, scope, flatChilds(childs), restrictions, reduced));

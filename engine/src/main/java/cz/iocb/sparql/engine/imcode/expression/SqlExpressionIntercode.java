@@ -27,6 +27,7 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.common.UnionFind;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SqlCode;
@@ -60,6 +61,7 @@ import cz.iocb.sparql.engine.mapping.classes.IntBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.IntClass;
 import cz.iocb.sparql.engine.mapping.classes.IntegerBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.IntegerClass;
+import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.LongBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.LongClass;
 import cz.iocb.sparql.engine.mapping.classes.NegativeIntegerBaseClass;
@@ -992,6 +994,42 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     public boolean hasSameValue(SqlExpressionIntercode other)
     {
         return equals(other);
+    }
+
+
+    /**
+     * Tells whether two expressions are the same term in every solution (true) or in none (false), as far as their
+     * constants tell: both are never unbound and are given by constants in one and the same class, like a constant of
+     * the query and a variable its pattern binds to one. The same constants give the same term. Different constants are
+     * known to give different terms in an IRI class, which represents an IRI by its columns in a single way; in another
+     * class they tell nothing (two representations may be one term to the comparison of the database, like the zeros of
+     * a floating-point type). Null when the constants do not tell: an operand may be unbound, takes several classes or
+     * another class than the other one, or reads a column.
+     *
+     * @param left one expression
+     * @param right the other expression
+     * @return true if the expressions are the same term in every solution, false if in none, or null when the constants
+     *         do not tell
+     */
+    protected static Boolean isSameConstantTerm(SqlExpressionIntercode left, SqlExpressionIntercode right)
+    {
+        if(left.canBeNull() || right.canBeNull() || left.getMappings().size() != 1 || right.getMappings().size() != 1)
+            return null;
+
+        Entry<ResourceClass, List<Column>> l = left.getMappings().entrySet().iterator().next();
+        Entry<ResourceClass, List<Column>> r = right.getMappings().entrySet().iterator().next();
+
+        if(!l.getKey().equals(r.getKey()) || l.getValue() == null || r.getValue() == null)
+            return null;
+
+        if(!l.getValue().stream().allMatch(c -> c instanceof ConstantColumn)
+                || !r.getValue().stream().allMatch(c -> c instanceof ConstantColumn))
+            return null;
+
+        if(l.getValue().equals(r.getValue()))
+            return true;
+
+        return l.getKey() instanceof IriClass ? false : null;
     }
 
 

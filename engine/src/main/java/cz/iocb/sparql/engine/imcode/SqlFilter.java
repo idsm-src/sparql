@@ -28,7 +28,10 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 /**
  * Keeps the solutions of the child for which every condition evaluates to true (FILTER). Optimisation distributes the
  * filter over the branches of a union, and the conditions the child can take in are handed down to the contexts of its
- * SERVICE calls (see {@link SqlIntercode#sink}), which a filter standing above a call does not restrict.
+ * SERVICE calls (see {@link SqlIntercode#sink}), which a filter standing above a call does not restrict. A condition
+ * requiring a constant term of a variable ({@code sameTerm}, an equality with an IRI) makes the table accesses of the
+ * child take the term into their own conditions (see {@link SqlIntercode#addAcceptedValues}), and it is left out once
+ * the child is restricted to the term for good (see {@link SqlIntercode#getUnsatisfied}).
  */
 public final class SqlFilter extends SqlIntercode
 {
@@ -108,9 +111,11 @@ public final class SqlFilter extends SqlIntercode
             childRestrictions.add(cnd.getRequirements(relations));
 
         // the classes of a variable in which no condition can hold never pass the filter, so the child may leave their
-        // solutions out; they are read once from the child as built, whose bindings still carry every class
+        // solutions out; they are read once from the child as built, whose bindings still carry every class; nor does
+        // a solution binding a variable to another term than the one a condition requires of it pass
         Restrictions accepted = new Restrictions();
         addAcceptedClasses(request, scope, accepted, conditions, child.getVariableBindings());
+        addAcceptedValues(request, accepted, conditions);
         childRestrictions.add(accepted);
 
         while(true)
@@ -129,7 +134,7 @@ public final class SqlFilter extends SqlIntercode
                 else if(expression instanceof SqlBooleanExpression expr && expr.isFalseOrError())
                     return SqlNoSolution.get();
                 else if(!expression.equals(trueValue))
-                    newOptCnds.add(expression);
+                    newOptCnds.addAll(getUnsatisfied(request, expression, newOptChild));
             }
 
             optChild = newOptChild;
