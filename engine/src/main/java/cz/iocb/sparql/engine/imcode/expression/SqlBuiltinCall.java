@@ -744,6 +744,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         restriction);
 
                 Set<SqlCode> variants = new HashSet<>();
+                boolean decisive = resMap.get(xsdBoolean).size() == 1;
 
                 for(List<Set<ResourceClass>> v : resMap.get(xsdBoolean))
                 {
@@ -752,8 +753,6 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     classes.addAll(v.get(1));
 
                     ResourceClass unionClass = unionize(classes);
-
-                    //TODO: optimize for special combinations
 
                     //NOTE: to ensure that the expression column is not used more than once during conversion
                     if(left.hasExpressionColumn(relations, v.get(0)) || right.hasExpressionColumn(relations, v.get(1)))
@@ -766,7 +765,29 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     variants.add(getIdentityConditions(unionClass, lcols, rcols).stream()
                             .collect(SqlCode.joining(" AND ", "(", ")")));
+
+                    // a variant taking every class of both operands compares every two bound terms, and it is no
+                    // null for them unless a column of the common class is optional, which may be null in a term
+                    ResourceClass common = unionClass;
+                    boolean optional = IntStream.range(0, common.getColumnCount()).anyMatch(common::isOptionalColumn);
+
+                    decisive &= !optional && v.get(0).containsAll(left.getMappings().keySet())
+                            && v.get(1).containsAll(right.getMappings().keySet());
                 }
+
+                // the only variant, when it decides the identity of every two bound terms, is the result by itself: a
+                // plain comparison, which the database can use as a condition of an index or of a join
+                if(decisive)
+                {
+                    List<Column> result = List.of(new ExpressionColumn(variants.iterator().next(), BOOL, canBeNull));
+
+                    return new SqlBuiltinCall(function, distinct, arguments, singletonMap(xsdBoolean, result),
+                            canBeNull);
+                }
+
+                //TODO: operands bound in several classes get a variant for every pair of the classes (unless a column
+                // computed by an expression joins the pairs), so they keep the fallback below, which hides the
+                // comparisons from the planner of the database
 
                 List<Column> result = List.of(new ExpressionColumn(SqlCode.of("COALESCE((",
                         variants.stream().collect(SqlCode.joining(" OR ")), "), ", absent, ")"), BOOL, canBeNull));
