@@ -4,6 +4,7 @@ import java.util.List;
 import cz.iocb.sparql.engine.model.GroupCondition;
 import cz.iocb.sparql.engine.model.IriNode;
 import cz.iocb.sparql.engine.model.OrderCondition;
+import cz.iocb.sparql.engine.model.OrderCondition.Direction;
 import cz.iocb.sparql.engine.model.Projection;
 import cz.iocb.sparql.engine.model.Select;
 import cz.iocb.sparql.engine.model.VariableNode;
@@ -121,6 +122,12 @@ public class ServiceTranslateVisitor extends ElementVisitor<Void>
             builder.append(select.getLimit());
         }
 
+        if(select.getOffset() != null)
+        {
+            builder.append(" offset ");
+            builder.append(select.getOffset());
+        }
+
         visitElement(select.getValues());
 
         if(select.isSubSelect())
@@ -133,15 +140,16 @@ public class ServiceTranslateVisitor extends ElementVisitor<Void>
     @Override
     public Void visit(Projection projection)
     {
-        if(projection.getExpression() != null)
-            builder.append("(");
-
-        visitElement(projection.getVariable());
-
-        if(projection.getExpression() != null)
+        if(projection.getExpression() == null)
         {
-            builder.append(" as ");
+            visitElement(projection.getVariable());
+        }
+        else
+        {
+            builder.append("(");
             visitElement(projection.getExpression());
+            builder.append(" as ");
+            visitElement(projection.getVariable());
             builder.append(")");
         }
 
@@ -171,7 +179,10 @@ public class ServiceTranslateVisitor extends ElementVisitor<Void>
     @Override
     public Void visit(OrderCondition orderCondition)
     {
-        builder.append(orderCondition.getDirection().getText());
+        // a condition without a direction is written in brackets, as the grammar takes any expression so
+        if(orderCondition.getDirection() != Direction.Unspecified)
+            builder.append(orderCondition.getDirection().getText());
+
         builder.append("(");
         visitElement(orderCondition.getExpression());
         builder.append(")");
@@ -270,7 +281,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<Void>
     @Override
     public Void visit(Service service)
     {
-        builder.append(" service");
+        builder.append(" service ");
 
         if(service.isSilent())
             builder.append("silent ");
@@ -344,6 +355,9 @@ public class ServiceTranslateVisitor extends ElementVisitor<Void>
     public Void visit(InExpression inExpression)
     {
         visitElement(inExpression.getLeft());
+
+        if(inExpression.isNegated())
+            builder.append(" not");
 
         builder.append(" in (");
 
@@ -440,6 +454,9 @@ public class ServiceTranslateVisitor extends ElementVisitor<Void>
         visitElement(functionCallExpression.getFunction());
 
         builder.append('(');
+
+        if(functionCallExpression.isDistinct())
+            builder.append(" distinct ");
 
         for(int i = 0; i < functionCallExpression.getArguments().size(); i++)
         {
