@@ -985,15 +985,18 @@ public final class SqlJoin extends SqlIntercode
         }
         else
         {
-            // neither expressions nor values of a current solution are moved onto the columns of the other table
-            if(distinct.hasExpression() || distinct.hasValues())
+            // expressions are not moved onto the columns of the other table
+            if(distinct.hasExpression())
                 return null;
 
             Set<ColumnPair> columns = SqlTableAccess.getJoinColumnPairs(relations, distinct, candidate);
 
+            // the conditions and the values the distinct part is restricted to are moved onto the columns of the
+            // candidate that reference theirs
             Set<Column> parentColumns = new HashSet<>();
             parentColumns.addAll(distinct.getConditions().getNonConstantColumns());
             parentColumns.addAll(distinct.getInternalVariableBindings().getNonConstantColumns());
+            parentColumns.addAll(distinct.getValueColumns(false));
 
             if(!columns.stream().map(p -> p.getLeft()).collect(toSet()).containsAll(parentColumns))
                 return null;

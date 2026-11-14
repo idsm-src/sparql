@@ -389,8 +389,8 @@ public final class SqlUnion extends SqlIntercode
                 if(partner >= 0)
                 {
                     merged[partner] = true;
-                    builder.append(SqlTableAccess.translateUnion(access, (SqlTableAccess) childs.get(partner),
-                            columnMapping, columnMappings.get(partner), columns));
+                    builder.append(SqlTableAccess.translateUnion(request.getConfiguration(), access,
+                            (SqlTableAccess) childs.get(partner), columnMapping, columnMappings.get(partner), columns));
                     continue;
                 }
             }

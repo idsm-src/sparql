@@ -498,7 +498,7 @@ public final class SqlTableAccess extends SqlIntercode
      *            value in every row; a row passes any value that is unbound
      * @return the table columns restricted to a value of the current solution
      */
-    private Set<Column> getValueColumns(boolean bound)
+    Set<Column> getValueColumns(boolean bound)
     {
         Set<Column> columns = new HashSet<>();
 
@@ -581,6 +581,21 @@ public final class SqlTableAccess extends SqlIntercode
      * @return the access with the given conditions and internal bindings
      */
     SqlTableAccess with(Conditions conditions, VariableBindings internal)
+    {
+        return with(conditions, internal, reduced);
+    }
+
+
+    /**
+     * The access with other conditions and internal bindings, for a parent that tolerates duplicate rows or not as
+     * given; it keeps its table, its deduplication and the values of the current solution its rows are restricted to.
+     *
+     * @param conditions the conditions
+     * @param internal bindings in terms of the table's own columns
+     * @param reduced whether the parent tolerates duplicate rows
+     * @return the access with the given conditions and internal bindings
+     */
+    SqlTableAccess with(Conditions conditions, VariableBindings internal, boolean reduced)
     {
         return new SqlTableAccess(schema, table, conditions, internal, reduced, distinctColumns, values);
     }
@@ -920,14 +935,15 @@ public final class SqlTableAccess extends SqlIntercode
 
     /**
      * Foreign key allowing the parent access to be merged into the child access (no expressions, no deduplication
-     * request, parent columns covered, the values the parent is restricted to restricting the child as well), or null.
+     * request, the parent columns covered, also those restricted to values, which restrict the child columns
+     * referencing them instead, see {@link #joinByForeignKey}), or null.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param schema the database schema
      * @param parent access to the referenced table
      * @param child access to the referencing table
      * @return foreign key allowing the parent access to be merged into the child access (no expressions, no
-     *         deduplication request, parent columns covered, the values of the parent restricting the child), or null
+     *         deduplication request, the parent columns covered), or null
      */
     private static Set<ColumnPair> canBeJoinedByForeignKey(ClassRelations relations, DatabaseSchema schema,
             SqlTableAccess parent, SqlTableAccess child)
@@ -946,44 +962,35 @@ public final class SqlTableAccess extends SqlIntercode
         Set<ColumnPair> columns = getJoinColumnPairs(relations, parent, child).stream()
                 .filter(p -> child.isKnownNotNull(schema, p.getRight())).collect(toSet());
 
+        // the parent is dropped, so whatever refers to its columns is moved onto the child columns referencing them:
+        // the bindings, the conditions and the values the rows are restricted to
         Set<Column> parentColumns = new HashSet<>();
         parentColumns.addAll(parent.conditions.getNonConstantColumns());
         parentColumns.addAll(parent.getInternalVariableBindings().getNonConstantColumns());
         parentColumns.addAll(parent.getValueColumns(false));
 
-        Set<ColumnPair> key = schema.getCompatibleForeignKey(parent.table, child.table, columns, parentColumns);
-
-        // the parent is dropped, and a value it is restricted to is not moved onto the child columns: the child has to
-        // be restricted to the value itself, through the columns of the key, as both accesses are when the value is
-        // accepted for the variable they are joined on
-        if(key != null && !child.holdsValuesOf(parent, key))
-            return null;
-
-        return key;
+        return schema.getCompatibleForeignKey(parent.table, child.table, columns, parentColumns);
     }
 
 
     /**
-     * True if the access restricts its rows to every value the parent access restricts its rows to (see
-     * {@link #values}), in its columns referencing the restricted columns of the parent by the foreign key: a row of
-     * the access then references a parent row passing those restrictions.
+     * The values the parent access restricts its rows to (see {@link #values}) as restrictions of the columns of a
+     * child access that reference the restricted columns by the foreign key: a child row passes them exactly when the
+     * parent row it references passes those of the parent.
      *
      * @param parent access to the referenced table, whose restricted columns the key covers
-     * @param key the foreign key
-     * @return true if the access restricts its rows to every value the parent access restricts its rows to, false
-     *         otherwise
+     * @param key the foreign key, or the pairs of it that cover the restricted columns
+     * @return the values the parent access restricts its rows to as restrictions of the child columns of the key
      */
-    private boolean holdsValuesOf(SqlTableAccess parent, Set<ColumnPair> key)
+    private static List<ValueCondition> getReferencedValues(SqlTableAccess parent, Set<ColumnPair> key)
     {
         Map<Column, Column> map = new HashMap<>();
 
         for(ColumnPair pair : key)
             map.put(pair.getLeft(), pair.getRight());
 
-        List<ValueCondition> referenced = parent.values.stream()
+        return parent.values.stream()
                 .map(v -> new ValueCondition(v.resourceClass(), remap(map, v.columns()), v.value())).toList();
-
-        return containsAll(values, referenced);
     }
 
 
@@ -1026,7 +1033,9 @@ public final class SqlTableAccess extends SqlIntercode
      * yields the values of all such child rows when it takes every parent row or when the condition of the child
      * implies its condition. Otherwise the parent access misses the child rows that reference parent rows failing its
      * condition, and widening its condition by that of the child is not exact either: a parent row that meets only the
-     * condition of the child need not be referenced by any child row.
+     * condition of the child need not be referenced by any child row. The same goes for the values the accesses are
+     * restricted to (see {@link #values}): the child has to be restricted to every value the parent is, in its columns
+     * referencing the restricted ones.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param schema the database schema
@@ -1043,10 +1052,6 @@ public final class SqlTableAccess extends SqlIntercode
 
         // because we cannot rewrite expressions
         if(child.hasExpression())
-            return false;
-
-        // nor are the values of the current solution moved between the tables
-        if(parent.hasValues() || child.hasValues())
             return false;
 
         // the sets of variables (and their resource classes) have to be the same
@@ -1086,6 +1091,13 @@ public final class SqlTableAccess extends SqlIntercode
         // the child is dropped, which requires that each child row references a parent row; a foreign key matched
         // simply guarantees that only for the rows with no null in the key columns
         if(key == null || !key.stream().allMatch(p -> child.isKnownNotNull(schema, p.getRight())))
+            return false;
+
+        // the referenced parent row has to pass the values the parent is restricted to as well, which it does when
+        // the key covers the restricted columns and the child is restricted to the same values in its columns
+        // referencing them; a value restricting the child alone only leaves some of its rows out
+        if(!key.stream().map(ColumnPair::getLeft).collect(toSet()).containsAll(parent.getValueColumns(false))
+                || !containsAll(child.values, getReferencedValues(parent, key)))
             return false;
 
         if(parent.conditions.isTrue())
@@ -1380,7 +1392,9 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * Merges the parent access into the child access along the foreign key, so the parent table is not accessed at all.
+     * Merges the parent access into the child access along the foreign key, so the parent table is not accessed at all:
+     * the bindings and the conditions of the parent and the values its rows are restricted to (see {@link #values}) are
+     * moved onto the child columns of the key, which hold the values of the parent columns they reference.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param parent access to the referenced table
@@ -1441,9 +1455,10 @@ public final class SqlTableAccess extends SqlIntercode
         if(conditions.isFalse())
             return SqlNoSolution.get();
 
-        // each child row has exactly one parent row, so only the deduplication of the child remains
+        // each child row has exactly one parent row, so only the deduplication of the child remains; a value the
+        // parent is restricted to restricts the child column referencing the restricted one
         return new SqlTableAccess(child.schema, child.table, conditions, bindings, child.reduced && parent.reduced,
-                child.distinctColumns, child.values);
+                child.distinctColumns, mergeValues(child.values, getReferencedValues(parent, key)));
     }
 
 
@@ -2207,18 +2222,6 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * Appends the WHERE clause of the conditions, nothing when they always hold.
-     *
-     * @param builder the SQL code being built
-     * @param conditions the conditions
-     */
-    private static void appendConditions(SqlBuilder builder, Conditions conditions)
-    {
-        appendConditions(builder, conditions, null);
-    }
-
-
-    /**
      * Appends the WHERE clause of the conditions and of the extra condition, nothing when the conditions always hold
      * and there is no extra one.
      *
@@ -2311,9 +2314,10 @@ public final class SqlTableAccess extends SqlIntercode
 
     /**
      * True if the union of the two accesses can be translated as a single scan of their table (see
-     * {@link #translateUnion}): both read the same table without deduplication and project some column, and their
-     * conditions differ only in the null test of one column, which one access requires to be null and the other to be
-     * non-null, so that every row satisfying the common part of the conditions belongs to exactly one of them.
+     * {@link #translateUnion}): both read the same table without deduplication and project some column, their rows are
+     * restricted to the same values (see {@link #values}), and their conditions differ only in the null test of one
+     * column, which one access requires to be null and the other to be non-null, so that every row satisfying the
+     * common part of the conditions belongs to exactly one of them.
      *
      * @param left the left access
      * @param right the right access
@@ -2327,7 +2331,8 @@ public final class SqlTableAccess extends SqlIntercode
         if(!left.distinctColumns.isEmpty() || !right.distinctColumns.isEmpty())
             return false;
 
-        if(left.hasValues() || right.hasValues())
+        // the values restricting both accesses alike restrict the single scan
+        if(!left.hasSameValues(right))
             return false;
 
         if(left.bindings.getNonConstantColumns().isEmpty() || right.bindings.getNonConstantColumns().isEmpty())
@@ -2369,12 +2374,13 @@ public final class SqlTableAccess extends SqlIntercode
 
     /**
      * Translates the union of two accesses satisfying {@link #canBeUnionized} as a single scan of their table: the rows
-     * are restricted by the common part of the conditions, and a column the accesses expose differently is computed by
-     * a CASE over the null test telling their rows apart, so that each row yields the columns of the access it belongs
-     * to and nulls for the other one. Unlike a UNION ALL of two filtered scans, the single scan can be pulled up by the
-     * database into the surrounding query, looked up by an index when it is joined, and its join selectivity is
-     * estimated from the statistics of the columns.
+     * are restricted by the common part of the conditions and by the values both accesses are restricted to, and a
+     * column the accesses expose differently is computed by a CASE over the null test telling their rows apart, so that
+     * each row yields the columns of the access it belongs to and nulls for the other one. Unlike a UNION ALL of two
+     * filtered scans, the single scan can be pulled up by the database into the surrounding query, looked up by an
+     * index when it is joined, and its join selectivity is estimated from the statistics of the columns.
      *
+     * @param relations declarations which unrelated user IRI classes may overlap
      * @param left the left access
      * @param right the right access
      * @param leftColumns the exposed column of the left access behind each column of the union (missing or a null
@@ -2383,8 +2389,8 @@ public final class SqlTableAccess extends SqlIntercode
      * @param columns the columns of the union in the order of the projection
      * @return SQL code of the union of the two accesses as a single scan of their table
      */
-    static SqlCode translateUnion(SqlTableAccess left, SqlTableAccess right, Map<Column, Column> leftColumns,
-            Map<Column, Column> rightColumns, Collection<Column> columns)
+    static SqlCode translateUnion(ClassRelations relations, SqlTableAccess left, SqlTableAccess right,
+            Map<Column, Column> leftColumns, Map<Column, Column> rightColumns, Collection<Column> columns)
     {
         Condition l = left.conditions.getConditions().iterator().next();
         Condition r = right.conditions.getConditions().iterator().next();
@@ -2442,7 +2448,7 @@ public final class SqlTableAccess extends SqlIntercode
         builder.append(" FROM ");
         builder.append(left.table);
 
-        appendConditions(builder, new Conditions(l.resolve(r)));
+        appendConditions(builder, new Conditions(l.resolve(r)), left.translateValues(relations));
 
         return builder.toCode();
     }

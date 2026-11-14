@@ -501,7 +501,7 @@ public final class SqlConstruct extends SqlIntercode
             return SqlUnion.union(request, childs).optimize(request, scope, restrictions, reduced, evalServices);
         }
 
-        if(optTemplates.size() == 1 && optChild instanceof SqlTableAccess acc && !acc.hasValues()
+        if(optTemplates.size() == 1 && optChild instanceof SqlTableAccess acc
                 && !hasVariableInTripleTerm(optTemplates.get(0)))
         {
             Template template = optTemplates.get(0);
@@ -528,8 +528,8 @@ public final class SqlConstruct extends SqlIntercode
                 }
             }
 
-            return SqlTableAccess.create(request, acc.getTable(), conditions, internal, true, acc.getDistinctColumns())
-                    .optimize(request, scope, restrictions, reduced, evalServices);
+            // the access keeps the values its rows are restricted to
+            return acc.with(conditions, internal, true).optimize(request, scope, restrictions, reduced, evalServices);
         }
 
 
