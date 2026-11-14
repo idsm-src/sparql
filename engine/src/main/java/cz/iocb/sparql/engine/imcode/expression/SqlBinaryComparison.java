@@ -1,9 +1,12 @@
 package cz.iocb.sparql.engine.imcode.expression;
 
 import static cz.iocb.sparql.engine.database.SqlType.BOOL;
+import static cz.iocb.sparql.engine.database.SqlType.FLOAT4;
+import static cz.iocb.sparql.engine.database.SqlType.FLOAT8;
 import static cz.iocb.sparql.engine.database.SqlType.INT2;
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.database.SqlType.INT8;
+import static cz.iocb.sparql.engine.database.SqlType.NUMERIC;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.EQUAL;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.GREATER_THAN;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.GREATER_THAN_OR_EQUAL;
@@ -92,6 +95,7 @@ import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBindings;
+import info.adams.ryu.RyuFloat;
 
 
 
@@ -893,6 +897,12 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
 
             case FLOAT ->
             {
+                // an operand stored in another type than the comparison takes is compared with a constant in that type
+                SqlCode code = translateWithFloatingConstant(operator, lset, rset, left, right);
+
+                if(code != null)
+                    yield code;
+
                 ResourceClass cmp = determineNumericComparisonType(lset, rset);
                 Column cl = left.promoteNumericAs(lset, cmp);
                 Column cr = right.promoteNumericAs(rset, cmp);
@@ -1162,38 +1172,396 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     private static SqlCode translateWithConstant(ComparisonOperator operator, Column value, BigDecimal constant)
     {
         SqlType type = value.getType();
-        int bits = getIntegerBits(type);
 
-        if(bits == 0)
+        if(getIntegerBits(type) == 0)
             return null;
-
-        BigInteger max = BigInteger.ONE.shiftLeft(bits - 1).subtract(BigInteger.ONE);
-        BigInteger min = max.not();
 
         // the integers the constant lies between; they are the same when the constant is an integer
         BigInteger floor = constant.setScale(0, RoundingMode.FLOOR).toBigIntegerExact();
         BigInteger ceiling = constant.setScale(0, RoundingMode.CEILING).toBigIntegerExact();
 
-        // the integer the value is compared with instead of the constant
-        BigInteger bound = operator == LESS_THAN || operator == GREATER_THAN_OR_EQUAL ? ceiling : floor;
-        boolean equality = operator == EQUAL || operator == NOT_EQUAL;
+        return translateWithLimits(operator, value, getLowerLimit(type, ceiling), getUpperLimit(type, floor),
+                floor.equals(ceiling), false);
+    }
 
-        // the result for every value of the type when the constant is no integer of the type
-        Boolean result = null;
 
-        if(bound.compareTo(max) > 0)
-            result = equality ? operator == NOT_EQUAL : operator == LESS_THAN || operator == LESS_THAN_OR_EQUAL;
-        else if(bound.compareTo(min) < 0)
-            result = equality ? operator == NOT_EQUAL : operator == GREATER_THAN || operator == GREATER_THAN_OR_EQUAL;
-        else if(equality && !floor.equals(ceiling))
-            result = operator == NOT_EQUAL;
+    /**
+     * SQL of a numeric comparison of a floating-point constant with an operand whose values are stored in another type
+     * of SQL than the datatype the two are compared in takes (see {@link #determineNumericComparisonType}): an integer
+     * or a decimal compared with an xsd:float or an xsd:double, an xsd:float compared with an xsd:double. Null when the
+     * comparison is no such one. As with an exact constant (see
+     * {@link #translateWithConstant(ComparisonOperator, Set, Set, SqlExpressionIntercode, SqlExpressionIntercode)}),
+     * promoting the operand wraps its column in a conversion function, which hides the column from the indexes and the
+     * statistics of the database, whereas the constant can be replaced by the values of the stored type it lies between
+     * (see {@link #translateWithFloatingConstant(ComparisonOperator, Column, double, boolean)}).
+     *
+     * @param operator the operator
+     * @param lset numeric classes of the left operand
+     * @param rset numeric classes of the right operand
+     * @param left the left operand
+     * @param right the right operand
+     * @return SQL of the comparison in the type the operand that is no constant is stored in, or null
+     */
+    private static SqlCode translateWithFloatingConstant(ComparisonOperator operator, Set<ResourceClass> lset,
+            Set<ResourceClass> rset, SqlExpressionIntercode left, SqlExpressionIntercode right)
+    {
+        boolean single = determineNumericComparisonType(lset, rset).equals(xsdFloat);
+        Column lvalue = left.getBinding().getStoredNumeric(lset);
+        Column rvalue = right.getBinding().getStoredNumeric(rset);
 
-        // decided for the values the operand has in the classes compared here only, as the other variants cover the
-        // other classes
-        if(result != null)
-            return SqlCode.of("CASE WHEN ", value, " IS NOT NULL THEN ", result.toString(), " END");
+        if(lvalue == null || rvalue == null)
+            return null;
 
-        return SqlCode.of("(", value, " ", operator.getText(), " ", new ValueColumn(bound.toString(), type), ")");
+        Double lconstant = getFloatingConstant(left, lset, lvalue);
+        Double rconstant = getFloatingConstant(right, rset, rvalue);
+
+        if(rconstant != null && lconstant == null)
+            return translateWithFloatingConstant(operator, lvalue, rconstant, single);
+
+        if(lconstant != null && rconstant == null)
+            return translateWithFloatingConstant(operator.getSwapped(), rvalue, lconstant, single);
+
+        return null;
+    }
+
+
+    /**
+     * SQL comparing a stored value with a floating-point constant on its right side in the type of the value, or null
+     * when the value is stored in the type the comparison takes (or in a type that is not handled). The comparison
+     * converts the value to the floating-point datatype, and the conversion never reverses the order of two values, so
+     * the values not less than the constant, and those not greater than it, are the values from, or up to, a limit that
+     * the constant sets in the stored type:
+     * <ul>
+     * <li>an xsd:float is an xsd:double as it is, so the limits are the values of xsd:float nearest to the constant
+     * from both sides, the same value when the constant is one of them;
+     * <li>an integer or a decimal is rounded to the nearest value of the datatype, to the one whose last bit is zero
+     * when it lies in the middle of two (the conversions of the extension are those of the C compiler and of
+     * {@code strtod}), so the values rounded to the constant are those between its middles with its neighbours (see
+     * {@link Rounded}): a comparison of an xsd:decimal with {@code 1.0e-1} holds for every decimal that is rounded to
+     * that double, not for {@code 0.1} alone, and beyond the integers a datatype holds exactly, several integers are
+     * equal to one constant.
+     * </ul>
+     * NaN is comparable with no value.
+     *
+     * @param operator the operator
+     * @param value the left operand as it is stored
+     * @param constant the right operand, a value of xsd:float when the comparison takes that datatype
+     * @param single true when the operands are compared as values of xsd:float, false for xsd:double
+     * @return SQL comparing the value with the constant in the type of the value, or null
+     */
+    private static SqlCode translateWithFloatingConstant(ComparisonOperator operator, Column value, double constant,
+            boolean single)
+    {
+        SqlType type = value.getType();
+        boolean integer = getIntegerBits(type) != 0;
+        boolean decimal = type.equals(NUMERIC);
+
+        if(!integer && !decimal && !(type.equals(FLOAT4) && !single))
+            return null;
+
+        if(Double.isNaN(constant))
+            return decide(value, operator == NOT_EQUAL);
+
+        if(!integer && !decimal)
+        {
+            float nearest = (float) constant;
+            float least = nearest >= constant ? nearest : Math.nextUp(nearest);
+            float greatest = nearest <= constant ? nearest : Math.nextDown(nearest);
+
+            return translateWithLimits(operator, value, new Limit(getFloatConstant(least), true, false),
+                    new Limit(getFloatConstant(greatest), true, false), least == greatest, true);
+        }
+
+        if(Double.isInfinite(constant))
+        {
+            // no integer type reaches the numbers rounded to an infinity, which start in the middle of the greatest
+            // finite value and the value that would follow it
+            BigDecimal start = Rounded.to(single ? Float.MAX_VALUE : Double.MAX_VALUE, single).upper();
+            Limit reached = integer ? Limit.NONE :
+                    new Limit(getDecimalConstant(constant > 0 ? start : start.negate()), true, false);
+
+            return constant > 0 ? translateWithLimits(operator, value, reached, Limit.EVERY, decimal, false) :
+                    translateWithLimits(operator, value, Limit.EVERY, reached, decimal, false);
+        }
+
+        Rounded rounded = Rounded.to(constant, single);
+
+        if(decimal)
+            return translateWithLimits(operator, value,
+                    new Limit(getDecimalConstant(rounded.lower()), rounded.inclusive(), false),
+                    new Limit(getDecimalConstant(rounded.upper()), rounded.inclusive(), false), true, false);
+
+        // the least and the greatest integer rounded to the constant
+        BigInteger floor = rounded.lower().setScale(0, RoundingMode.FLOOR).toBigIntegerExact();
+        BigInteger ceiling = rounded.upper().setScale(0, RoundingMode.CEILING).toBigIntegerExact();
+        BigInteger least = rounded.inclusive() ? rounded.lower().setScale(0, RoundingMode.CEILING).toBigIntegerExact() :
+                floor.add(BigInteger.ONE);
+        BigInteger greatest = rounded.inclusive() ?
+                rounded.upper().setScale(0, RoundingMode.FLOOR).toBigIntegerExact() : ceiling.subtract(BigInteger.ONE);
+
+        return translateWithLimits(operator, value, getLowerLimit(type, least), getUpperLimit(type, greatest),
+                least.compareTo(greatest) <= 0, false);
+    }
+
+
+    /**
+     * The numbers that a conversion to a floating-point datatype rounds to one value of the datatype: those between the
+     * middle of the value and its predecessor and the middle of the value and its successor, the middles themselves
+     * when the last bit of the value is zero, as a number in the middle of two values is rounded to the even one. Past
+     * the greatest finite value, the neighbour is taken as if the values went on at the same distance: the numbers from
+     * that middle on are rounded to the infinity.
+     *
+     * @param lower the middle of the value and its predecessor
+     * @param upper the middle of the value and its successor
+     * @param inclusive whether the middles are rounded to the value
+     */
+    private record Rounded(BigDecimal lower, BigDecimal upper, boolean inclusive)
+    {
+        /**
+         * The numbers rounded to the given finite value.
+         *
+         * @param value the value, a value of xsd:float when the datatype is xsd:float
+         * @param single true for the values of xsd:float, false for those of xsd:double
+         * @return the numbers that the conversion to the datatype rounds to the value
+         */
+        private static Rounded to(double value, boolean single)
+        {
+            BigDecimal exact = new BigDecimal(value);
+            BigDecimal ulp = new BigDecimal(single ? Math.ulp((float) value) : Math.ulp(value));
+            double below = single ? Math.nextDown((float) value) : Math.nextDown(value);
+            double above = single ? Math.nextUp((float) value) : Math.nextUp(value);
+
+            BigDecimal down = Double.isInfinite(below) ? ulp : exact.subtract(new BigDecimal(below));
+            BigDecimal up = Double.isInfinite(above) ? ulp : new BigDecimal(above).subtract(exact);
+            long bits = single ? Float.floatToIntBits((float) value) : Double.doubleToLongBits(value);
+
+            return new Rounded(exact.subtract(down.divide(BigDecimal.TWO)), exact.add(up.divide(BigDecimal.TWO)),
+                    (bits & 1) == 0);
+        }
+    }
+
+
+    /**
+     * A limit that a constant sets to the values of a stored type it is compared with: the values not less than the
+     * constant are those from their limit up, and the values not greater than it are those up to their limit, the limit
+     * itself being one of them when it is inclusive. When there is no limit, either every value of the type is among
+     * them, or none is.
+     *
+     * @param value the limit as a constant of the stored type, or null when there is none
+     * @param inclusive whether the limit itself is one of the values
+     * @param every whether every value of the type is one of the values when there is no limit
+     */
+    private record Limit(Column value, boolean inclusive, boolean every)
+    {
+        /**
+         * No limit, every value of the type being one of the values.
+         */
+        private static final Limit EVERY = new Limit(null, false, true);
+
+        /**
+         * No limit, no value of the type being one of the values.
+         */
+        private static final Limit NONE = new Limit(null, false, false);
+    }
+
+
+    /**
+     * The limit of the values of an integer type of SQL that are not less than the given integer: the integer itself,
+     * unless it lies beyond the range of the type.
+     *
+     * @param type the integer type of SQL
+     * @param least the least integer the values are not less than
+     * @return the limit of the values of the type that are not less than the integer
+     */
+    private static Limit getLowerLimit(SqlType type, BigInteger least)
+    {
+        BigInteger max = BigInteger.ONE.shiftLeft(getIntegerBits(type) - 1).subtract(BigInteger.ONE);
+
+        if(least.compareTo(max) > 0)
+            return Limit.NONE;
+
+        if(least.compareTo(max.not()) < 0)
+            return Limit.EVERY;
+
+        return new Limit(new ValueColumn(least.toString(), type), true, false);
+    }
+
+
+    /**
+     * The limit of the values of an integer type of SQL that are not greater than the given integer: the integer
+     * itself, unless it lies beyond the range of the type.
+     *
+     * @param type the integer type of SQL
+     * @param greatest the greatest integer the values are not greater than
+     * @return the limit of the values of the type that are not greater than the integer
+     */
+    private static Limit getUpperLimit(SqlType type, BigInteger greatest)
+    {
+        BigInteger max = BigInteger.ONE.shiftLeft(getIntegerBits(type) - 1).subtract(BigInteger.ONE);
+
+        if(greatest.compareTo(max.not()) < 0)
+            return Limit.NONE;
+
+        if(greatest.compareTo(max) > 0)
+            return Limit.EVERY;
+
+        return new Limit(new ValueColumn(greatest.toString(), type), true, false);
+    }
+
+
+    /**
+     * The number as a constant of the numeric type of SQL.
+     *
+     * @param number the number
+     * @return the number as a constant of the numeric type
+     */
+    private static Column getDecimalConstant(BigDecimal number)
+    {
+        return new ValueColumn(number.stripTrailingZeros().toPlainString(), NUMERIC);
+    }
+
+
+    /**
+     * The value of xsd:float as a constant of the type of SQL storing the datatype, written in the canonical lexical
+     * form, which the database reads back as the same value.
+     *
+     * @param number the value
+     * @return the value as a constant of the type float4
+     */
+    private static Column getFloatConstant(float number)
+    {
+        String form = Float.isInfinite(number) ? number > 0 ? "INF" : "-INF" : RyuFloat.floatToString(number);
+
+        return new ValueColumn(form, FLOAT4);
+    }
+
+
+    /**
+     * SQL comparing a stored value with a constant on its right side, given the limits the constant sets to the values
+     * of the stored type (see {@link Limit}): a value is less than the constant when it is not among the values that
+     * are not less than it, and equal to it when it is neither less nor greater. The limits are constants of the stored
+     * type, so the database looks the rows up by an index of the column and estimates them by its statistics. A
+     * comparison no limit decides has the same result for every value.
+     *
+     * @param operator the operator
+     * @param value the left operand as it is stored
+     * @param lower the limit of the values that are not less than the constant
+     * @param upper the limit of the values that are not greater than the constant
+     * @param equal whether a value of the stored type can be equal to the constant
+     * @param floating whether the value is a floating-point number, compared by the operators of the extension
+     * @return SQL comparing the value with the constant
+     */
+    private static SqlCode translateWithLimits(ComparisonOperator operator, Column value, Limit lower, Limit upper,
+            boolean equal, boolean floating)
+    {
+        return switch(operator)
+        {
+            case GREATER_THAN_OR_EQUAL -> translateLower(value, lower, false, floating);
+            case LESS_THAN -> translateLower(value, lower, true, floating);
+            case LESS_THAN_OR_EQUAL -> translateUpper(value, upper, false, floating);
+            case GREATER_THAN -> translateUpper(value, upper, true, floating);
+
+            case EQUAL, NOT_EQUAL ->
+            {
+                boolean negated = operator == NOT_EQUAL;
+
+                if(!equal || lower.equals(Limit.NONE) || upper.equals(Limit.NONE))
+                    yield decide(value, negated);
+
+                if(lower.value() == null)
+                    yield translateUpper(value, upper, negated, floating);
+
+                if(upper.value() == null)
+                    yield translateLower(value, lower, negated, floating);
+
+                if(lower.inclusive() && upper.inclusive() && lower.value().equals(upper.value()))
+                    yield compare(value, operator, lower.value(), floating);
+
+                // a floating-point value has one limit, or is equal to no constant; the complements would not hold
+                // for NaN
+                assert !floating;
+
+                yield SqlCode.of("(", translateLower(value, lower, negated, false), negated ? " OR " : " AND ",
+                        translateUpper(value, upper, negated, false), ")");
+            }
+        };
+    }
+
+
+    /**
+     * SQL testing that a stored value is not less than a constant, or that it is less than it, by the limit of the
+     * values that are not less than the constant.
+     *
+     * @param value the value as it is stored
+     * @param lower the limit of the values that are not less than the constant
+     * @param negated true to test that the value is less than the constant
+     * @param floating whether the value is a floating-point number, compared by the operators of the extension
+     * @return SQL of the test
+     */
+    private static SqlCode translateLower(Column value, Limit lower, boolean negated, boolean floating)
+    {
+        if(lower.value() == null)
+            return decide(value, lower.every() != negated);
+
+        if(negated)
+            return compare(value, lower.inclusive() ? LESS_THAN : LESS_THAN_OR_EQUAL, lower.value(), floating);
+
+        return compare(value, lower.inclusive() ? GREATER_THAN_OR_EQUAL : GREATER_THAN, lower.value(), floating);
+    }
+
+
+    /**
+     * SQL testing that a stored value is not greater than a constant, or that it is greater than it, by the limit of
+     * the values that are not greater than the constant.
+     *
+     * @param value the value as it is stored
+     * @param upper the limit of the values that are not greater than the constant
+     * @param negated true to test that the value is greater than the constant
+     * @param floating whether the value is a floating-point number, compared by the operators of the extension
+     * @return SQL of the test
+     */
+    private static SqlCode translateUpper(Column value, Limit upper, boolean negated, boolean floating)
+    {
+        if(upper.value() == null)
+            return decide(value, upper.every() != negated);
+
+        if(negated)
+            return compare(value, upper.inclusive() ? GREATER_THAN : GREATER_THAN_OR_EQUAL, upper.value(), floating);
+
+        return compare(value, upper.inclusive() ? LESS_THAN_OR_EQUAL : LESS_THAN, upper.value(), floating);
+    }
+
+
+    /**
+     * SQL comparing a stored value with a limit of its type: by the operator of SQL, or, for floating-point numbers, by
+     * the operator of the extension, for which NaN is comparable with nothing.
+     *
+     * @param value the value as it is stored
+     * @param operator the operator
+     * @param limit the limit, a constant of the type of the value
+     * @param floating whether the value is a floating-point number
+     * @return SQL comparing the value with the limit
+     */
+    private static SqlCode compare(Column value, ComparisonOperator operator, Column limit, boolean floating)
+    {
+        if(floating)
+            return SqlCode.of("(", value, " operator(sparql.", operator.getText(), ") ", limit, ")");
+
+        return SqlCode.of("(", value, " ", operator.getText(), " ", limit, ")");
+    }
+
+
+    /**
+     * SQL of a comparison that has the same result for every value of an operand: the result is decided for the values
+     * the operand has in the classes compared only, as the other variants of the comparison cover the other classes.
+     *
+     * @param value the operand as it is stored
+     * @param result the result
+     * @return SQL giving the result for the values the operand has
+     */
+    private static SqlCode decide(Column value, boolean result)
+    {
+        return SqlCode.of("CASE WHEN ", value, " IS NOT NULL THEN ", Boolean.toString(result), " END");
     }
 
 
@@ -1212,6 +1580,37 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             return null;
 
         return value instanceof ValueColumn constant ? new BigDecimal(constant.getValue()) : null;
+    }
+
+
+    /**
+     * The value of an operand that is the same floating-point number in every solution: the operand is never unbound,
+     * it takes the given classes only and its value in them is a constant of xsd:float or of xsd:double. Null for any
+     * other operand.
+     *
+     * @param operand the operand
+     * @param classes numeric classes the operand is compared in
+     * @param value the operand taken in the classes as it is stored
+     * @return the value of an operand that is the same floating-point number in every solution, or null
+     */
+    private static Double getFloatingConstant(SqlExpressionIntercode operand, Set<ResourceClass> classes, Column value)
+    {
+        if(operand.canBeNull() || !classes.containsAll(operand.getMappings().keySet())
+                || !(value instanceof ValueColumn constant))
+            return null;
+
+        boolean single = value.getType().equals(FLOAT4);
+
+        if(!single && !value.getType().equals(FLOAT8))
+            return null;
+
+        // the constant is written in the canonical lexical form of its datatype
+        return switch(constant.getValue())
+        {
+            case "INF" -> Double.POSITIVE_INFINITY;
+            case "-INF" -> Double.NEGATIVE_INFINITY;
+            default -> single ? Float.parseFloat(constant.getValue()) : Double.parseDouble(constant.getValue());
+        };
     }
 
 

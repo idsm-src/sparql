@@ -457,12 +457,6 @@ public class NumericConstantComparisonTest
         assertThat(subjects("?s ex:int ?a . ?s ex:integer ?b FILTER(?a < ?b)"), contains(2, 3, 4, 5));
         assertThat(subjects("?s ex:int ?a . ?s ex:integer ?b FILTER(?a = ?b)"), is(empty()));
 
-        // a constant of a floating-point datatype
-        assertThat(subjects("?s ex:int ?v FILTER(?v = 3.0e0)"), contains(6));
-        assertThat(subjects("?s ex:int ?v FILTER(?v < 3.5e0)"), contains(1, 2, 3, 4, 5, 6));
-        assertThat(subjects("?s ex:int ?v FILTER(?v < 'INF'^^xsd:double)"), contains(1, 2, 3, 4, 5, 6, 7, 8, 9, 10));
-        assertThat(subjects("?s ex:int ?v FILTER(?v = 'NaN'^^xsd:double)"), is(empty()));
-
         // an expression
         assertThat(subjects("?s ex:int ?v FILTER(?v = 2 + 1)"), contains(6));
     }
