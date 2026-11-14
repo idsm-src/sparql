@@ -175,6 +175,7 @@ import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeClass;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.rdf.DirLangStringLiteral.Direction;
+import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBindings;
@@ -1252,15 +1253,27 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             case "datatype":
             {
                 //TODO: if possible, specify the return class more specifically than just iri
-                //TODO: if possible, return constant expression
 
                 SqlExpressionIntercode argument = arguments.get(0);
 
                 if(argument.getResourceClasses().stream().noneMatch(r -> hasLiteral(r)))
                     return SqlNull.get();
 
+                // the datatype of a constant is a constant
+                if(argument instanceof SqlLiteral literal)
+                    return SqlIri.create(request, literal.getLiteral().getType());
+
                 boolean canBeNull = argument.canBeNull()
                         || argument.getResourceClasses().stream().anyMatch(r -> !isLiteral(r));
+
+                // and so is the datatype of a value that is always a literal of one datatype, when its classes tell it;
+                // as a constant IRI it is compared with another IRI at once and it has the class of that IRI
+                Set<Iri> datatypes = argument.getResourceClasses().stream()
+                        .map(r -> r.getEffectiveClass() instanceof LiteralClass l ? l.getTypeIri() : null)
+                        .collect(toSet());
+
+                if(!canBeNull && datatypes.size() == 1 && !datatypes.contains(null))
+                    return SqlIri.create(request, datatypes.iterator().next());
 
 
                 if(!restriction.contains(relations, iri))
