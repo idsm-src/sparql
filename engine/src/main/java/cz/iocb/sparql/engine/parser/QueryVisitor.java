@@ -230,6 +230,7 @@ public class QueryVisitor extends BaseVisitor<Query>
     public Query visitQuery(QueryContext ctx)
     {
         final Set<String> patternBlankNodes = new HashSet<>();
+        final Set<String> templateBlankNodes = new HashSet<>();
 
         new BaseVisitor<Void>()
         {
@@ -238,7 +239,8 @@ public class QueryVisitor extends BaseVisitor<Query>
             {
                 if(ctx.BLANK_NODE_LABEL() != null)
                 {
-                    String name = ctx.getText().replaceFirst("^:_", "");
+                    // the label as its node keeps it, because the generated labels have to differ from the used ones
+                    String name = new BlankNode(ctx.getText()).getName();
 
                     if(usedBlankNodes.contains(name))
                         messages.add(
@@ -297,9 +299,25 @@ public class QueryVisitor extends BaseVisitor<Query>
             @Override
             public Void visitConstructTemplate(ConstructTemplateContext ctx)
             {
+                // the labels of a template are no labels of a basic graph pattern, but no generated label may be one
+                // of them either
+                new BaseVisitor<Void>()
+                {
+                    @Override
+                    public Void visitBlankNode(BlankNodeContext ctx)
+                    {
+                        if(ctx.BLANK_NODE_LABEL() != null)
+                            templateBlankNodes.add(new BlankNode(ctx.getText()).getName());
+
+                        return null;
+                    }
+                }.visitChildren(ctx);
+
                 return null;
             }
         }.visit(ctx);
+
+        usedBlankNodes.addAll(templateBlankNodes);
 
 
         if(ctx.prologue() != null)
