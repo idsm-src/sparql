@@ -27,7 +27,8 @@ import cz.iocb.sparql.engine.request.Request;
 
 /**
  * Canonical xsd:date values of one fixed timezone offset, stored as a {@code date} only; instances are cached per
- * offset.
+ * offset. The class is a subclass of the base class of its offset, which holds these values with an empty lexical form
+ * (see {@link DateInZoneBaseClass}).
  */
 public final class DateInZoneClass extends CanonicalLiteralClass implements DateInZone
 {
@@ -54,7 +55,8 @@ public final class DateInZoneClass extends CanonicalLiteralClass implements Date
      */
     private DateInZoneClass(int zone)
     {
-        super("date$" + zone, xsdDateType, List.of(DATE), Set.of(box, genScalarDate, genDate, xsdScalarDate, xsdDate));
+        super("date$" + zone, xsdDateType, List.of(DATE),
+                Set.of(box, genScalarDate, genDate, xsdScalarDate, xsdDate, DateInZoneBaseClass.get(zone)));
 
         this.base = DateInZoneBaseClass.get(zone);
         this.zone = zone;

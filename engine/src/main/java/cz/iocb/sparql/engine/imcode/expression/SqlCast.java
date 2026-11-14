@@ -452,7 +452,7 @@ public final class SqlCast extends SqlUnary
             builder.append(resultClass.getZone());
             builder.append("'::int4)");
         }
-        else if(castClass instanceof DateInZoneClass resultClass && resClass instanceof DateTimeInZone)
+        else if(castClass instanceof DateInZoneClass resultClass && effClass instanceof DateTimeInZone)
         {
             builder.append("sparql.cast_as_plain_date_from_datetime(");
             builder.append(columns.get(0));
@@ -472,7 +472,7 @@ public final class SqlCast extends SqlUnary
             builder.append(columns.get(1));
             builder.append("'::int4)");
         }
-        else if(castClass.equals(xsdScalarDate) && resClass instanceof DateInZone dateClass)
+        else if(castClass.equals(xsdScalarDate) && effClass instanceof DateInZone dateClass)
         {
             builder.append("sparql.zoneddate_create(");
             builder.append(columns.get(0));
@@ -508,7 +508,7 @@ public final class SqlCast extends SqlUnary
             builder.append(columns.get(1));
             builder.append("'::int4)");
         }
-        else if(castClass.equals(xsdScalarDateTime) && resClass instanceof DateTimeInZone dateTimeClass)
+        else if(castClass.equals(xsdScalarDateTime) && effClass instanceof DateTimeInZone dateTimeClass)
         {
             builder.append("sparql.zoneddatetime_create(");
             builder.append(columns.get(0));

@@ -672,8 +672,7 @@ public final class DerivedClass extends ResourceClass
     /**
      * True if two signed classes exclude each other: the same class with opposite signs, a positive subclass with its
      * negated superclass, or two positive unrelated classes that are disjoint (which unrelated primitive classes are,
-     * except for two triple term classes with overlapping components and two user IRI classes the declarations let
-     * overlap).
+     * except for those {@link PrimitiveResourceClass#isDisjunctWith} lets overlap).
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param a one signed class

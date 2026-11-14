@@ -107,8 +107,10 @@ public final class DateTimeDatatype extends TemporalDatatype
         if(!isValidForm(literal.getValue()))
             return unsupportedType;
 
+        // the values of the offset in other than the canonical form: the base class of the offset overlaps every
+        // canonical class not bound to another offset, so it is taken without the canonical class of all offsets
         if(!isCanonicalForm(literal.getValue()))
-            return subtract(DateTimeInZoneBaseClass.get(getZone(literal)), DateTimeInZoneClass.get(getZone(literal))); //TODO use cache
+            return subtract(DateTimeInZoneBaseClass.get(getZone(literal)), getCanonicalLiteralClass()); //TODO use cache
 
         return DateTimeInZoneClass.get(getZone(literal));
     }

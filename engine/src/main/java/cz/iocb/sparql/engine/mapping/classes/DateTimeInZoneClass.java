@@ -27,7 +27,8 @@ import cz.iocb.sparql.engine.request.Request;
 
 /**
  * Canonical xsd:dateTime values of one fixed timezone offset, stored as a {@code timestamptz} only; instances are
- * cached per offset.
+ * cached per offset. The class is a subclass of the base class of its offset, which holds these values with an empty
+ * lexical form (see {@link DateTimeInZoneBaseClass}).
  */
 public final class DateTimeInZoneClass extends CanonicalLiteralClass implements DateTimeInZone
 {
@@ -54,8 +55,8 @@ public final class DateTimeInZoneClass extends CanonicalLiteralClass implements 
      */
     private DateTimeInZoneClass(int zone)
     {
-        super("datetime$" + zone, xsdDateTimeType, List.of(TIMESTAMPTZ),
-                Set.of(box, genScalarDateTime, genDateTime, xsdScalarDateTime, xsdDateTime));
+        super("datetime$" + zone, xsdDateTimeType, List.of(TIMESTAMPTZ), Set.of(box, genScalarDateTime, genDateTime,
+                xsdScalarDateTime, xsdDateTime, DateTimeInZoneBaseClass.get(zone)));
 
         this.base = DateTimeInZoneBaseClass.get(zone);
         this.zone = zone;

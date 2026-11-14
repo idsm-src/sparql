@@ -16,6 +16,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.datatypes.DateDatatype;
 import cz.iocb.sparql.engine.rdf.Literal;
@@ -25,7 +26,8 @@ import cz.iocb.sparql.engine.request.Request;
 
 /**
  * Any valid xsd:date value of one fixed timezone offset, stored as a {@code date} plus its lexical form; instances are
- * cached per offset.
+ * cached per offset. The canonical values of the offset, which have an empty lexical form, belong to the class as well,
+ * so the canonical class of the offset is its subclass (see {@link DateInZoneClass}).
  */
 public final class DateInZoneBaseClass extends BaseLiteralClass implements DateInZone
 {
@@ -125,22 +127,40 @@ public final class DateInZoneBaseClass extends BaseLiteralClass implements DateI
 
         if(sourceClass.equals(box))
             return List.of(
-                    expression(DATE, "sparql.rdfbox_get_date_value_of_zone(%s, '%d'::int4, true)", columns.get(0),
-                            zone),
+                    expression(DATE, "sparql.rdfbox_get_date_value_of_zone(%s, '%d'::int4)", columns.get(0), zone),
                     expression(VARCHAR, "sparql.rdfbox_get_date_lexical_of_zone(%s, '%d'::int4)", columns.get(0),
                             zone));
 
         if(sourceClass.equals(genScalarDate))
-            return List.of(
-                    expression(DATE, "CASE WHEN %s != '' THEN sparql.zoneddate_get_value_of_zone(%s, '%d'::int4) END",
-                            columns.get(1), columns.get(0), zone),
-                    columns.get(1));
+            return List.of(expression(DATE, "sparql.zoneddate_get_value_of_zone(%s, '%d'::int4)", columns.get(0), zone),
+                    expression(VARCHAR, "CASE WHEN sparql.zoneddate_get_zone(%s) = '%d'::int4 THEN %s END",
+                            columns.get(0), zone, columns.get(1)));
 
         if(sourceClass.equals(genDate))
-            return List.of(expression(DATE, "CASE WHEN %s != '' AND %s = '%d'::int4 THEN %s END", columns.get(2),
-                    columns.get(1), zone, columns.get(0)), columns.get(2));
+            return List.of(
+                    expression(DATE, "CASE WHEN %s = '%d'::int4 THEN %s END", columns.get(1), zone, columns.get(0)),
+                    expression(VARCHAR, "CASE WHEN %s = '%d'::int4 THEN %s END", columns.get(1), zone, columns.get(2)));
 
         throw new IllegalArgumentException();
+    }
+
+
+    /**
+     * True if no term belongs to both classes. The canonical values of the offset belong to the canonical classes of
+     * the dates of all offsets as well and may belong to their subsets, so the class overlaps a canonical class of
+     * xsd:date it is not related to, unless that class is bound to an offset, which is then another one.
+     */
+    @Override
+    protected boolean isDisjunctWith(ClassRelations relations, PrimitiveResourceClass resClass)
+    {
+        if(!super.isDisjunctWith(relations, resClass))
+            return false;
+
+        if(!(resClass instanceof CanonicalLiteralClass canonical) || !datatype.equals(canonical.getDatatype()))
+            return true;
+
+        return Stream.concat(Stream.of(resClass), resClass.getSuperClasses().stream())
+                .anyMatch(c -> c instanceof DateInZoneClass);
     }
 
 

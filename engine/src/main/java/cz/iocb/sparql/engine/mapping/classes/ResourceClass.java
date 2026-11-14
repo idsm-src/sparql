@@ -293,9 +293,10 @@ public sealed abstract class ResourceClass permits PrimitiveResourceClass, Deriv
     /**
      * True if no term belongs to both classes: two primitive classes decide by
      * {@link PrimitiveResourceClass#isDisjunctWith} (unrelated classes are disjoint, except for two triple term classes
-     * with overlapping components and two user IRI classes the declarations let overlap), derived classes by their
-     * normal forms. The declarations of the configuration have to be supplied, as the classes do not keep them; when
-     * user IRI classes occur in at most one operand, the result does not depend on them and
+     * with overlapping components, two user IRI classes the declarations let overlap and the base class of the dates or
+     * of the date-times of one timezone offset with a canonical class that is not bound to an offset), derived classes
+     * by their normal forms. The declarations of the configuration have to be supplied, as the classes do not keep
+     * them; when user IRI classes occur in at most one operand, the result does not depend on them and
      * {@link #areDisjunct(ResourceClass, ResourceClass)} serves.
      *
      * @param relations declarations which unrelated user IRI classes may overlap

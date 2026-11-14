@@ -153,7 +153,8 @@ public abstract class AbstractResourceClassTest
 
 
     /**
-     * Converting the columns to the superclass and back gives the original values when evaluated by the database.
+     * Converting the columns to the superclass and back gives the original values when evaluated by the database; the
+     * columns are named by their positions, so that every column of the class is compared.
      */
     @ParameterizedTest(name = "{0}({1},{2},{3})")
     @MethodSource("toGeneralArguments")
@@ -164,11 +165,11 @@ public abstract class AbstractResourceClassTest
         List<Column> res1 = literalClass.toGeneralClass(superClass, cols, canBeNull);
         List<Column> res2 = literalClass.fromGeneralClass(superClass, res1, checkOptional);
 
-        ITable t1 = conn.createQueryTable(null,
-                cols.stream().map(c -> c.toString() + " AS c").collect(Collectors.joining(", ", "SELECT ", "")));
+        String original = select(cols);
+        String converted = select(res2);
 
-        ITable t2 = conn.createQueryTable(null,
-                res2.stream().map(c -> c.toString() + " AS c").collect(Collectors.joining(", ", "SELECT ", "")));
+        ITable t1 = conn.createQueryTable(null, original);
+        ITable t2 = conn.createQueryTable(null, converted);
 
         try
         {
@@ -176,15 +177,21 @@ public abstract class AbstractResourceClassTest
         }
         catch(Throwable e)
         {
-            System.err.println(
-                    cols.stream().map(c -> c.toString() + " AS c").collect(Collectors.joining(", ", "SELECT ", "")));
-
-            System.err.println(
-                    res2.stream().map(c -> c.toString() + " AS c").collect(Collectors.joining(", ", "SELECT ", "")));
-
+            System.err.println(original);
+            System.err.println(converted);
             System.err.println();
 
             throw e;
         }
+    }
+
+
+    /**
+     * Query selecting the columns under the names {@code c0}, {@code c1}, ...
+     */
+    private static String select(List<Column> columns)
+    {
+        return IntStream.range(0, columns.size()).mapToObj(i -> columns.get(i).toString() + " AS c" + i)
+                .collect(Collectors.joining(", ", "SELECT ", ""));
     }
 }

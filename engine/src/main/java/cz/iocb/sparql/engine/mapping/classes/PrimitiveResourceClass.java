@@ -78,8 +78,10 @@ public sealed abstract class PrimitiveResourceClass extends ResourceClass
     /**
      * True if no term belongs to both this class and the given one. Two primitive classes are disjoint when neither is
      * a subclass of the other, unless a class refines the test: two triple term classes may overlap through their
-     * components ({@link TripleTermClass}), and two user IRI classes may overlap when the declarations of the
-     * configuration say so ({@link UserIriClass}). The test is symmetric.
+     * components ({@link TripleTermClass}), two user IRI classes may overlap when the declarations of the configuration
+     * say so ({@link UserIriClass}), and the base class of the dates or of the date-times of one timezone offset
+     * overlaps the canonical classes of its datatype that are not bound to an offset, which hold the canonical values
+     * of the offset as well ({@link DateInZoneBaseClass}, {@link DateTimeInZoneBaseClass}). The test is symmetric.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param resClass the resource class

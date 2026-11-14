@@ -66,6 +66,21 @@ public sealed abstract class CanonicalLiteralClass extends LiteralClass
 
 
     /**
+     * True if no term belongs to both classes. The base class of the dates or of the date-times of one timezone offset
+     * overlaps the canonical classes that are not bound to an offset without being related to them, which that class
+     * decides (see {@link DateInZoneBaseClass} and {@link DateTimeInZoneBaseClass}).
+     */
+    @Override
+    protected boolean isDisjunctWith(ClassRelations relations, PrimitiveResourceClass resClass)
+    {
+        if(resClass instanceof DateInZoneBaseClass || resClass instanceof DateTimeInZoneBaseClass)
+            return resClass.isDisjunctWith(relations, this);
+
+        return super.isDisjunctWith(relations, resClass);
+    }
+
+
+    /**
      * Base class of this class: the class holding the literals of the datatype of this class in every valid lexical
      * form, keeping the value in the same leading columns as this class, followed by the lexical column (see
      * {@link BaseLiteralClass}); this class itself when a value of the datatype has a single lexical form, as for the
