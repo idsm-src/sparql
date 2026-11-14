@@ -2,7 +2,6 @@ package cz.iocb.sparql.engine.translator;
 
 import static cz.iocb.sparql.engine.imcode.SqlConstruct.ConstructColumn.PREDICATE;
 import static cz.iocb.sparql.engine.imcode.SqlConstruct.ConstructColumn.SUBJECT;
-import static cz.iocb.sparql.engine.imcode.SqlIntercode.mergeOverlappingClasses;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.translator.TermGenerator.getIri;
 import static cz.iocb.sparql.engine.translator.TermGenerator.getLiteral;
@@ -16,7 +15,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +28,6 @@ import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.LateralTable;
-import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.imcode.Scope;
@@ -1469,7 +1466,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             lines.add(line);
         }
 
-        return translateValues(values.getVariables().stream().map(v -> getVariable(v)).toList(), lines);
+        return SqlValues.create(request, values.getVariables().stream().map(v -> getVariable(v)).toList(), lines);
     }
 
 
@@ -1724,126 +1721,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
         return SqlFilter.filter(request, filterExpressions, groupPattern);
-    }
-
-
-    /**
-     * Translates inline data into a VALUES node, materialising each variable in the classes of the terms it takes.
-     *
-     * @param variableNames variables of the VALUES clause
-     * @param lines the rows of terms
-     * @return the resulting intermediate code
-     */
-    private SqlIntercode translateValues(List<Variable> variableNames, List<List<RdfTerm>> lines)
-    {
-        if(lines.size() == 0)
-            return SqlNoSolution.get();
-
-
-        Map<Variable, List<ResourceClass>> resourceClasses = new HashMap<>();
-        LinkedHashMap<Column, List<Column>> data = new LinkedHashMap<>();
-        Map<List<Column>, Column> revData = new HashMap<>();
-        VariableBindings bindings = new VariableBindings();
-
-        for(int i = 0; i < variableNames.size(); i++)
-        {
-            if(bindings.get(variableNames.get(i)) != null)
-                continue; // ignore repeated occurrences of the variable
-
-            LinkedHashSet<ResourceClass> resClasses = new LinkedHashSet<>();
-            boolean canBeNull = false;
-
-            List<ResourceClass> nodeResourceClasses = new ArrayList<>();
-
-            for(List<RdfTerm> line : lines)
-            {
-                RdfTerm term = line.get(i);
-
-                if(term != null)
-                {
-                    ResourceClass resClass = request.getResourceClass(term);
-
-                    nodeResourceClasses.add(resClass);
-                    resClasses.add(resClass);
-                }
-                else
-                {
-                    nodeResourceClasses.add(null);
-                    canBeNull = true;
-                }
-            }
-
-            if(resClasses.size() == 0)
-                continue;
-
-            // the terms are classified one by one, so their classes may overlap (e.g. the IRIs of a class and of its
-            // subclass), but the classes of a variable have to be disjoint: the overlapping ones are merged into their
-            // union, which stores the terms of all of them
-            Map<ResourceClass, ResourceClass> merged = mergeOverlappingClasses(request.getConfiguration(), resClasses);
-            nodeResourceClasses.replaceAll(c -> c == null ? null : merged.get(c));
-            resClasses = new LinkedHashSet<>(merged.values());
-
-            resourceClasses.put(variableNames.get(i), nodeResourceClasses);
-
-            VariableBinding binding = new VariableBinding(variableNames.get(i), canBeNull);
-
-            for(ResourceClass resClass : resClasses)
-            {
-                List<List<Column>> classColumns = new ArrayList<>(resClass.getColumnCount());
-
-                for(int j = 0; j < resClass.getColumnCount(); j++)
-                    classColumns.add(new ArrayList<>(lines.size()));
-
-                for(int k = 0; k < lines.size(); k++)
-                {
-                    if(resClass.equals(nodeResourceClasses.get(k)))
-                    {
-                        List<Column> cols = request.getColumns(resClass, lines.get(k).get(i));
-
-                        for(int j = 0; j < resClass.getColumnCount(); j++)
-                            classColumns.get(j).add(cols.get(j));
-                    }
-                    else
-                    {
-                        for(int j = 0; j < resClass.getColumnCount(); j++)
-                            classColumns.get(j).add(new NullColumn(resClass.getSqlTypes().get(j)));
-                    }
-                }
-
-
-                List<Column> tableColumns = resClass.createColumns(request.getColumnMap(), variableNames.get(i));
-                List<Column> mapping = new ArrayList<>(resClass.getColumnCount());
-
-                for(int j = 0; j < resClass.getColumnCount(); j++)
-                {
-                    List<Column> columns = classColumns.get(j);
-
-                    if(columns.stream().allMatch(c -> c.equals(columns.get(0))))
-                    {
-                        mapping.add(columns.get(0));
-                    }
-                    else
-                    {
-                        Column tableColumn = revData.get(columns);
-
-                        if(tableColumn == null)
-                        {
-                            tableColumn = tableColumns.get(j);
-                            revData.put(columns, tableColumn);
-                            data.put(tableColumn, columns);
-                        }
-
-                        mapping.add(tableColumn);
-                    }
-                }
-
-                binding.addMapping(resClass, mapping);
-            }
-
-            bindings.add(binding);
-        }
-
-        return SqlValues.create(bindings, resourceClasses, data, lines.size());
     }
 
 

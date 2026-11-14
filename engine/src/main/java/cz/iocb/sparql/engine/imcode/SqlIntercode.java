@@ -10,9 +10,11 @@ import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -37,13 +39,16 @@ import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
 import cz.iocb.sparql.engine.imcode.expression.SqlEffectiveBooleanValue;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
+import cz.iocb.sparql.engine.imcode.expression.SqlInExpression;
 import cz.iocb.sparql.engine.imcode.expression.SqlIri;
 import cz.iocb.sparql.engine.imcode.expression.SqlLiteral;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBinding;
@@ -75,9 +80,11 @@ public abstract class SqlIntercode extends SqlBaseClass
      * accepted value (see {@link #getAcceptedValue}), and so has a variable the term a filter requires of it (see
      * {@link SqlIntercode#addAcceptedValues}): a solution binding the variable to another term never reaches the result
      * either, and a table access binding the variable takes the value into its conditions (see {@link SqlTableAccess}).
-     * The other conditions of the filters above that a variable decides alone are its filter conditions (see
-     * {@link #getFilterConditions}): they require nothing of a child, but the join optimizer counts with the solutions
-     * they leave (see {@link JoinOptimizer}).
+     * A filter that holds for several terms of a variable and for no other makes them the accepted terms of the
+     * variable (see {@link #getAcceptedTerms}), from which a walk between two variables starts (see
+     * {@link SqlRecursive}). The other conditions of the filters above that a variable decides alone are its filter
+     * conditions (see {@link #getFilterConditions}): they require nothing of a child, but the join optimizer counts
+     * with the solutions they leave (see {@link JoinOptimizer}).
      */
     public static class Restrictions
     {
@@ -105,6 +112,12 @@ public abstract class SqlIntercode extends SqlBaseClass
         private final Map<Variable, SqlExpressionIntercode> acceptedValues = new HashMap<>();
 
         /**
+         * Accepted terms per variable: the constant terms one of which a bound value of the variable has to be for its
+         * solution to reach the result; a variable without an entry is accepted with any term.
+         */
+        private final Map<Variable, Set<RdfTerm>> acceptedTerms = new HashMap<>();
+
+        /**
          * Filter conditions per variable: the conditions the nodes above keep the solutions by that the variable alone
          * decides; a variable without an entry is filtered by none.
          */
@@ -129,6 +142,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             addJoinClasses(restrictions.joinClasses);
             addAcceptedClasses(restrictions.acceptedClasses);
             addAcceptedValues(restrictions.acceptedValues);
+            addAcceptedTerms(restrictions.acceptedTerms);
             addFilterConditions(restrictions.filterConditions);
         }
 
@@ -185,6 +199,8 @@ public abstract class SqlIntercode extends SqlBaseClass
             addAcceptedClasses(b.acceptedClasses);
             addAcceptedValues(a.acceptedValues);
             addAcceptedValues(b.acceptedValues);
+            addAcceptedTerms(a.acceptedTerms);
+            addAcceptedTerms(b.acceptedTerms);
             addFilterConditions(a.filterConditions);
             addFilterConditions(b.filterConditions);
         }
@@ -360,6 +376,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             addJoinClasses(restrictions.joinClasses);
             addAcceptedClasses(restrictions.acceptedClasses);
             addAcceptedValues(restrictions.acceptedValues);
+            addAcceptedTerms(restrictions.acceptedTerms);
             addFilterConditions(restrictions.filterConditions);
         }
 
@@ -457,21 +474,22 @@ public abstract class SqlIntercode extends SqlBaseClass
         /**
          * Accepts the given variables in any class, keeping the accepted classes of the others. A node whose solutions
          * are not all dropped above (a slice, the left side of a left join) calls it for the variables it passes on
-         * without that guarantee. The accepted values and the filter conditions are kept and dropped along with the
-         * accepted classes.
+         * without that guarantee. The accepted values and terms and the filter conditions are kept and dropped along
+         * with the accepted classes.
          *
-         * @param vars the variables that keep their accepted classes and values and their filter conditions
+         * @param vars the variables that keep their accepted classes, values and terms and their filter conditions
          */
         public void retainAcceptedClasses(Collection<Variable> vars)
         {
             acceptedClasses.keySet().retainAll(vars);
             acceptedValues.keySet().retainAll(vars);
+            acceptedTerms.keySet().retainAll(vars);
             filterConditions.keySet().retainAll(vars);
         }
 
 
         /**
-         * Accepts the variable in any class and with any value, filtered by no condition.
+         * Accepts the variable in any class and with any value or term, filtered by no condition.
          *
          * @param var the variable
          */
@@ -479,6 +497,7 @@ public abstract class SqlIntercode extends SqlBaseClass
         {
             acceptedClasses.remove(var);
             acceptedValues.remove(var);
+            acceptedTerms.remove(var);
             filterConditions.remove(var);
         }
 
@@ -527,13 +546,62 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
         /**
-         * Accepts the variable with any value, keeping its accepted classes.
+         * Accepts the variable with any value or term, keeping its accepted classes.
          *
          * @param var the variable
          */
         public void removeAcceptedValue(Variable var)
         {
             acceptedValues.remove(var);
+            acceptedTerms.remove(var);
+        }
+
+
+        /**
+         * Adds accepted terms of the variable, see {@link #getAcceptedTerms(Variable)}. A variable that has accepted
+         * terms already keeps the fewer ones: both are requirements of the nodes above, so either of them holds. They
+         * are not intersected, because two terms the engine stores alike, like the lexical forms of one number, are
+         * different terms here.
+         *
+         * @param var the variable
+         * @param terms the constant terms one of which a bound value of the variable has to be
+         */
+        public void addAcceptedTerms(Variable var, Set<RdfTerm> terms)
+        {
+            Set<RdfTerm> present = acceptedTerms.get(var);
+
+            if(present == null || terms.size() < present.size())
+                acceptedTerms.put(var, Collections.unmodifiableSet(new LinkedHashSet<>(terms)));
+        }
+
+
+        /**
+         * Adds accepted terms of several variables, as other restrictions keep them, see
+         * {@link #getAcceptedTerms(Variable)}. The kept sets are never modified, so the restrictions share them.
+         *
+         * @param terms accepted terms per variable
+         */
+        private void addAcceptedTerms(Map<Variable, Set<RdfTerm>> terms)
+        {
+            for(Entry<Variable, Set<RdfTerm>> entry : terms.entrySet())
+                acceptedTerms.merge(entry.getKey(), entry.getValue(), (a, b) -> b.size() < a.size() ? b : a);
+        }
+
+
+        /**
+         * Accepted terms of the variable: the constant terms one of which a bound value of the variable has to be for
+         * its solution to reach the result, because a node above filters the solutions by a condition that holds for no
+         * other term (see {@link SqlIntercode#getAcceptedTerms}); a single such term is the accepted value of the
+         * variable instead (see {@link #getAcceptedValue(Variable)}). A solution leaving the variable unbound is
+         * accepted. Null when the variable is accepted with any term.
+         *
+         * @param var the variable
+         * @return accepted terms of the variable in the order of the condition, or null when it is accepted with any
+         *         term
+         */
+        public Set<RdfTerm> getAcceptedTerms(Variable var)
+        {
+            return acceptedTerms.get(var);
         }
 
 
@@ -624,6 +692,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             return map.equals(((Restrictions) other).map) && joinClasses.equals(((Restrictions) other).joinClasses)
                     && acceptedClasses.equals(((Restrictions) other).acceptedClasses)
                     && acceptedValues.equals(((Restrictions) other).acceptedValues)
+                    && acceptedTerms.equals(((Restrictions) other).acceptedTerms)
                     && filterConditions.equals(((Restrictions) other).filterConditions);
         }
 
@@ -2122,12 +2191,20 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
     /**
+     * The terms a condition accepts of a variable (see {@link #getAcceptedTerms}).
+     *
+     * @param variable the variable
+     * @param terms the terms, at least one
+     */
+    protected record AcceptedTerms(Variable variable, Set<RdfTerm> terms)
+    {
+    }
+
+
+    /**
      * The term the condition requires of a variable, or null when it requires none. A condition requires a term when it
-     * holds only for the solutions binding the variable to that term: {@code sameTerm} of the variable and a constant
-     * says so, and so does an equality of the variable and a constant IRI, which is equal to no other term. An equality
-     * with a literal may hold for the other literals of its value too, so it requires a term only where the classes the
-     * variable takes single one out (see {@link SqlBinaryComparison#getOnlyEqualTerm}): the literal itself when it is a
-     * string, or the literal of its value in the datatype of the column when the variable is a number of one datatype.
+     * holds exactly for the solutions binding the variable to that term, which is when the term is the only one the
+     * condition accepts of the variable (see {@link #getAcceptedTerms}).
      *
      * @param request the current request
      * @param condition the condition
@@ -2137,63 +2214,149 @@ public abstract class SqlIntercode extends SqlBaseClass
     protected static RequiredTerm getRequiredTerm(Request request, SqlExpressionIntercode condition,
             VariableBindings bindings)
     {
+        AcceptedTerms accepted = getAcceptedTerms(request, condition, bindings);
+
+        if(accepted == null || accepted.terms().size() != 1)
+            return null;
+
+        return new RequiredTerm(accepted.variable(), getConstant(request, accepted.terms().iterator().next()));
+    }
+
+
+    /**
+     * Constant expression giving the term a condition accepts of a variable, an IRI or a literal.
+     *
+     * @param request the current request
+     * @param term the term
+     * @return constant expression giving the term, with the columns of all its classes
+     */
+    private static SqlExpressionIntercode getConstant(Request request, RdfTerm term)
+    {
+        return term instanceof Iri iri ? SqlIri.create(request, iri) : SqlLiteral.create(request, (Literal) term);
+    }
+
+
+    /**
+     * The terms the condition accepts of a variable, or null when it singles none out. A condition accepts terms of a
+     * variable when it holds exactly for the solutions binding the variable to one of them: {@code sameTerm} of the
+     * variable and a constant accepts the constant, and so does an equality of the variable and a constant IRI, which
+     * is equal to no other term. An equality with a literal may hold for the other literals of its value too, so it
+     * accepts terms only where the classes the variable takes single them out (see
+     * {@link SqlBinaryComparison#getEqualTerms}): the literal itself when it is a string, or the literals of its value
+     * in the datatypes of the columns when the variable is a number, one term when the columns are of one datatype. A
+     * disjunction of conditions accepting terms of one variable accepts the terms of both, and so does {@code IN}, the
+     * disjunction of the equalities of its left operand with the members of its list.
+     *
+     * @param request the current request
+     * @param condition the condition
+     * @param bindings the variable bindings giving the classes the variables of the condition take
+     * @return the terms the condition accepts of a variable, or null when it singles none out
+     */
+    protected static AcceptedTerms getAcceptedTerms(Request request, SqlExpressionIntercode condition,
+            VariableBindings bindings)
+    {
         // the effective boolean value of a comparison is the comparison itself
         if(condition instanceof SqlEffectiveBooleanValue value)
-            return getRequiredTerm(request, value.getOperand(), bindings);
+            return getAcceptedTerms(request, value.getOperand(), bindings);
 
         if(condition instanceof SqlBuiltinCall call && call.getFunction().equals("sameterm"))
-            return getRequiredTerm(request, call.getArguments().get(0), call.getArguments().get(1), true, bindings);
+            return getComparedTerms(request, call.getArguments().get(0), call.getArguments().get(1), true, bindings);
 
         if(condition instanceof SqlBinaryComparison comparison && comparison.getOperator() == ComparisonOperator.EQUAL)
-            return getRequiredTerm(request, comparison.getLeft(), comparison.getRight(), false, bindings);
+            return getComparedTerms(request, comparison.getLeft(), comparison.getRight(), false, bindings);
+
+        if(condition instanceof SqlBinaryLogical logical && logical.getOperator() == LogicalOperator.OR)
+            return unite(getAcceptedTerms(request, logical.getLeft(), bindings),
+                    getAcceptedTerms(request, logical.getRight(), bindings));
+
+        if(condition instanceof SqlInExpression in && !in.isNegated())
+        {
+            Variable variable = null;
+            Set<RdfTerm> terms = new LinkedHashSet<>();
+
+            for(SqlExpressionIntercode member : in.getRights())
+            {
+                AcceptedTerms accepted = getComparedTerms(request, in.getLeft(), member, false, bindings);
+
+                if(accepted == null || variable != null && !variable.equals(accepted.variable()))
+                    return null;
+
+                variable = accepted.variable();
+                terms.addAll(accepted.terms());
+            }
+
+            return variable == null ? null : new AcceptedTerms(variable, terms);
+        }
 
         return null;
     }
 
 
     /**
-     * The term a comparison of two operands requires of a variable, or null when it requires none: one of the operands
-     * is a variable and the other one a constant IRI, or any constant when the comparison is the identity of terms, or
-     * a literal that only one term the variable can be is equal to.
+     * The terms a comparison of two operands accepts of a variable, or null when it singles none out: one of the
+     * operands is a variable and the other one a constant IRI, or any constant when the comparison is the identity of
+     * terms, or a literal, when the terms the variable can be to be equal to it are known.
      *
      * @param request the current request
      * @param left one operand
      * @param right the other operand
      * @param identity true for the identity of terms ({@code sameTerm}), false for the equality of values
      * @param bindings the variable bindings giving the classes the variable takes
-     * @return the term the comparison requires of a variable, or null when it requires none
+     * @return the terms the comparison accepts of a variable, or null when it singles none out
      */
-    private static RequiredTerm getRequiredTerm(Request request, SqlExpressionIntercode left,
+    private static AcceptedTerms getComparedTerms(Request request, SqlExpressionIntercode left,
             SqlExpressionIntercode right, boolean identity, VariableBindings bindings)
     {
         if(!(left instanceof SqlVariable variable))
-            return right instanceof SqlVariable ? getRequiredTerm(request, right, left, identity, bindings) : null;
+            return right instanceof SqlVariable ? getComparedTerms(request, right, left, identity, bindings) : null;
 
         if(right instanceof SqlIri iri)
-            return new RequiredTerm(variable.getVariable(), SqlIri.create(request, iri.getIri()));
+            return new AcceptedTerms(variable.getVariable(), Set.of(iri.getIri()));
 
         if(!(right instanceof SqlLiteral literal))
             return null;
 
         if(identity)
-            return new RequiredTerm(variable.getVariable(), SqlLiteral.create(request, literal.getLiteral()));
+            return new AcceptedTerms(variable.getVariable(), Set.of(literal.getLiteral()));
 
         VariableBinding binding = bindings.get(variable.getVariable());
-        Literal term = SqlBinaryComparison.getOnlyEqualTerm(request, binding == null ? Set.of() : binding.getClasses(),
-                literal.getLiteral());
+        Set<Literal> terms = SqlBinaryComparison.getEqualTerms(request,
+                binding == null ? Set.of() : binding.getClasses(), literal.getLiteral());
 
-        return term == null ? null : new RequiredTerm(variable.getVariable(), SqlLiteral.create(request, term));
+        return terms == null ? null : new AcceptedTerms(variable.getVariable(), Collections.unmodifiableSet(terms));
+    }
+
+
+    /**
+     * The terms that either of two conditions accepts of a variable, or null when one of them singles none out or they
+     * are about different variables.
+     *
+     * @param left the terms one condition accepts, or null
+     * @param right the terms the other condition accepts, or null
+     * @return the terms that either of the conditions accepts of a variable, or null
+     */
+    private static AcceptedTerms unite(AcceptedTerms left, AcceptedTerms right)
+    {
+        if(left == null || right == null || !left.variable().equals(right.variable()))
+            return null;
+
+        Set<RdfTerm> terms = new LinkedHashSet<>(left.terms());
+        terms.addAll(right.terms());
+
+        return new AcceptedTerms(left.variable(), terms);
     }
 
 
     /**
      * Adds the terms the conditions require of their variables (see {@link #getRequiredTerm}) as the accepted values of
-     * the variables (see {@link Restrictions#getAcceptedValue}): a solution binding a variable to another term than the
-     * one a condition requires of it never satisfies the conditions, so the node holding the solutions may leave it
-     * out, and a table access binding the variable takes the term into its conditions (see {@link SqlTableAccess}). The
-     * conjuncts of a conjunction count by themselves, as all of them have to hold. The classes of the variables are
-     * read from the bindings of the node as built, which still carry every class, like the accepted classes are (see
-     * {@link #addAcceptedClasses}).
+     * the variables (see {@link Restrictions#getAcceptedValue}), and the terms a condition accepts of its variable,
+     * when they are several (see {@link #getAcceptedTerms}), as the accepted terms of the variable (see
+     * {@link Restrictions#getAcceptedTerms}): a solution binding a variable to another term than those a condition
+     * accepts of it never satisfies the conditions, so the node holding the solutions may leave it out; a table access
+     * binding the variable takes a required term into its conditions (see {@link SqlTableAccess}), and a walk between
+     * two variables starts from the accepted terms (see {@link SqlRecursive}). The conjuncts of a conjunction count by
+     * themselves, as all of them have to hold. The classes of the variables are read from the bindings of the node as
+     * built, which still carry every class, like the accepted classes are (see {@link #addAcceptedClasses}).
      *
      * @param request the current request
      * @param restrictions the restrictions to extend
@@ -2215,10 +2378,16 @@ public abstract class SqlIntercode extends SqlBaseClass
                 continue;
             }
 
-            RequiredTerm term = getRequiredTerm(request, condition, bindings);
+            AcceptedTerms accepted = getAcceptedTerms(request, condition, bindings);
 
-            if(term != null)
-                restrictions.setAcceptedValue(term.variable(), term.value());
+            if(accepted == null)
+                continue;
+
+            if(accepted.terms().size() == 1)
+                restrictions.setAcceptedValue(accepted.variable(),
+                        getConstant(request, accepted.terms().iterator().next()));
+            else
+                restrictions.addAcceptedTerms(accepted.variable(), accepted.terms());
         }
     }
 

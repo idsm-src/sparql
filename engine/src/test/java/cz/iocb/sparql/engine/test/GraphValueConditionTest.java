@@ -381,7 +381,9 @@ public class GraphValueConditionTest
         String sql = translate(query);
         int start = sql.indexOf("WITH RECURSIVE");
         int step = sql.indexOf(" UNION SELECT ", start);
-        assertThat(sql.substring(start, step), containsString(access("link", graphColumn)));
+
+        // the initial solutions are the links of the graph from the nodes the filter accepts
+        assertThat(sql.substring(start, step), containsString(" AND ((" + graphColumn + "))"));
         assertThat(sql.substring(step), containsString(access("link", graphColumn)));
     }
 }

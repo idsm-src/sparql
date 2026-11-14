@@ -29,6 +29,7 @@ import cz.iocb.sparql.engine.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBinding;
@@ -936,13 +937,14 @@ public final class SqlRecursive extends SqlIntercode
 
     /**
      * True if the walk should start from its end variable: the parent accepts a single constant term for the end, as a
-     * filter requiring one does (see {@link SqlIntercode#addAcceptedValues}), and none for the start; or it accepts the
-     * end in narrower classes than the start (every accepted class of the end is a subclass of an accepted class of the
-     * start, but not the other way round), or restricts the end alone. Walked from the end, the recursion enumerates
-     * only the pairs ending in nodes the parent accepts, instead of every pair starting anywhere, of which the parent
-     * keeps the same ones. The parent does not restrict the end alone when the initial solutions have been restricted
-     * to some classes of the start already (see {@link #startsInEveryClass}): having seen the bindings of the walk, it
-     * accepts the start in any class, because nothing is left for it to drop.
+     * filter requiring one does (see {@link SqlIntercode#addAcceptedValues}), and none for the start; or it accepts
+     * only some terms for the end, with which the turned walk is seeded (see {@link #seedWithAcceptedTerms}), and any
+     * term for the start; or it accepts the end in narrower classes than the start (every accepted class of the end is
+     * a subclass of an accepted class of the start, but not the other way round), or restricts the end alone. Walked
+     * from the end, the recursion enumerates only the pairs ending in nodes the parent accepts, instead of every pair
+     * starting anywhere, of which the parent keeps the same ones. The parent does not restrict the end alone when the
+     * initial solutions have been restricted to some classes of the start already (see {@link #startsInEveryClass}):
+     * having seen the bindings of the walk, it accepts the start in any class, because nothing is left for it to drop.
      *
      * @param restrictions what the parent needs of the variables
      * @return true if the walk should start from its end variable, false otherwise
@@ -956,6 +958,13 @@ public final class SqlRecursive extends SqlIntercode
         if(isConstant(restrictions.getAcceptedValue(endBinding.getVariable())))
             return true;
 
+        // the terms accepted of an end restrict it more than its classes do
+        if(restrictions.getAcceptedTerms(beginVar) != null)
+            return false;
+
+        if(restrictions.getAcceptedTerms(endBinding.getVariable()) != null)
+            return true;
+
         Set<ResourceClass> end = restrictions.getAcceptedClasses(endBinding.getVariable());
         Set<ResourceClass> begin = restrictions.getAcceptedClasses(beginVar);
 
@@ -966,6 +975,69 @@ public final class SqlRecursive extends SqlIntercode
             return startsInEveryClass();
 
         return isNarrower(end, begin) && !isNarrower(begin, end);
+    }
+
+
+    /**
+     * The walk seeded with the terms the parent accepts of its start variable (see
+     * {@link Restrictions#getAcceptedTerms}), as inline data binding the variable to those terms would seed it when
+     * joined with the walk (see {@link #seed}): the recursion then enumerates only the paths from those terms, all of
+     * which the filter accepting the terms keeps, instead of the paths from every node, of which it keeps the same
+     * ones. A walk the parent accepts only some terms at the end of is turned first (see {@link #startsBetterFromEnd}).
+     * A term the parent requires of the start (see {@link Restrictions#getAcceptedValue}) restricts the walk more, the
+     * initial solutions taking it into their conditions, so the walk is not seeded then.
+     *
+     * @param request the current request
+     * @param scope the scope of the walk
+     * @param restrictions what the parent needs of the variables
+     * @return the seeded walk; no solution when none of the accepted terms is of a class the walk binds its start in;
+     *         null when the parent accepts any term of the start, or the walk cannot be seeded
+     */
+    private SqlIntercode seedWithAcceptedTerms(Request request, Scope scope, Restrictions restrictions)
+    {
+        VariableBinding binding = init.getVariable(beginVar);
+        Set<RdfTerm> terms = restrictions.getAcceptedTerms(beginVar);
+
+        if(terms == null || binding == null || isConstant(restrictions.getAcceptedValue(beginVar)))
+            return null;
+
+        SqlIntercode seed = getTermSeed(request, scope, binding, terms);
+
+        if(seed.equals(SqlNoSolution.get()))
+            return seed;
+
+        return seed(request, scope, List.of(seed), false, restrictions);
+    }
+
+
+    /**
+     * Inline data binding a variable to the given terms, to seed a walk with (see {@link #seedWithAcceptedTerms}): one
+     * row per term, the terms that are stored alike, like the lexical forms of one number, making one row, as a seed
+     * has to be distinct over the variable; the terms of the classes the walk never binds the variable in are left out.
+     *
+     * @param request the current request
+     * @param scope the scope of the walk
+     * @param binding the binding of the variable in the walk
+     * @param terms the terms
+     * @return inline data binding the variable to the terms, or no solution when the walk binds the variable in the
+     *         class of none of them
+     */
+    private static SqlIntercode getTermSeed(Request request, Scope scope, VariableBinding binding, Set<RdfTerm> terms)
+    {
+        Map<List<Object>, List<RdfTerm>> lines = new LinkedHashMap<>();
+
+        for(RdfTerm term : terms)
+        {
+            ResourceClass resClass = request.getResourceClass(term);
+
+            lines.putIfAbsent(List.of(resClass, request.getColumns(resClass, term)), List.of(term));
+        }
+
+        Restrictions restrictions = new Restrictions(List.of(binding.getVariable()));
+        restrictions.addAcceptedClasses(binding.getVariable(), binding.getClasses());
+
+        return SqlValues.create(request, List.of(binding.getVariable()), new ArrayList<>(lines.values()))
+                .optimize(request, scope, restrictions, false, false);
     }
 
 
@@ -1105,6 +1177,17 @@ public final class SqlRecursive extends SqlIntercode
             SqlIntercode walk = turned == null ? null :
                     create(request, turned.init(), reverseNext, endVar, reverseJoinVar, beginVar, graphVar,
                             restrictions, next, joinVar, reverseInit, null, seeded, Map.of(), turned.delivered());
+
+            if(walk != null)
+                return walk.optimize(request, scope, restrictions, reduced, evalServices);
+        }
+
+        // a walk between two variables of whose start the parent accepts only some terms starts from those terms,
+        // seeded with them as inline data joined with the walk would seed it; a walk starting from the values of
+        // expressions starts from a single node already
+        if(beginVar != null && !seeded && start.isEmpty())
+        {
+            SqlIntercode walk = seedWithAcceptedTerms(request, scope, restrictions);
 
             if(walk != null)
                 return walk.optimize(request, scope, restrictions, reduced, evalServices);

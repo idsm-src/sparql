@@ -63,11 +63,13 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
@@ -586,27 +588,28 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
 
 
     /**
-     * The only term a value of the given classes can be for the value to be equal to the literal, or null when the
-     * equality singles no term out. A string, a language-tagged string and a literal of the unsupported class are equal
-     * to themselves only, whatever the classes are. An exact number and a boolean are equal to the literals of their
-     * value in every datatype they are compared with, of which a canonical class holds one at most, the literal of the
-     * canonical lexical form: the value has to be that term when the classes that can hold an equal value at all are
-     * canonical and their literals of the value are one and the same term. No term is singled out when a class holds
+     * The terms a value of the given classes can be for the value to be equal to the literal, or null when the equality
+     * singles no terms out. A string, a language-tagged string and a literal of the unsupported class are equal to
+     * themselves only, whatever the classes are. An exact number and a boolean are equal to the literals of their value
+     * in every datatype they are compared with, of which a canonical class holds one at most, the literal of the
+     * canonical lexical form: the value has to be one of those terms when the classes that can hold an equal value at
+     * all are canonical, and that very term when they are of one datatype. No terms are singled out when a class holds
      * the value in several terms (in other lexical forms, or in a box), by a floating-point number on either side (the
      * zeros of both signs are equal), nor by the other literals compared by value (dates, date-times and durations).
      *
      * @param request the current request
      * @param classes the classes of the value
      * @param literal the literal
-     * @return the only term a value of the classes can be to be equal to the literal, or null
+     * @return the terms a value of the classes can be to be equal to the literal, in the order of their datatypes, or
+     *         null when the equality singles none out
      */
-    public static Literal getOnlyEqualTerm(Request request, Set<ResourceClass> classes, Literal literal)
+    public static Set<Literal> getEqualTerms(Request request, Set<ResourceClass> classes, Literal literal)
     {
         ClassRelations relations = request.getConfiguration();
         ResourceClass literalClass = request.getLiteralClass(literal);
 
         if(isStringLiteral(literalClass) || isUnsupportedLiteral(literalClass))
-            return literal;
+            return Set.of(literal);
 
         boolean number = isNumeric(literalClass) && !isFloatPoint(literalClass);
 
@@ -625,7 +628,9 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                     value.toBigIntegerExact().toString();
         }
 
-        Literal term = null;
+        // the term of each datatype, kept by the IRI of the datatype, so that the terms do not come in the order the
+        // classes happen to have
+        Map<String, Literal> terms = new TreeMap<>();
 
         for(ResourceClass resClass : classes)
         {
@@ -646,16 +651,11 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             Literal equal = new TypedLiteral(datatype.getCanonicalLexicalForm(form), datatype.getTypeIri());
 
             // a class narrowed by a deployment need not hold the literal
-            if(!canonical.match(request, equal))
-                continue;
-
-            if(term != null && !term.equals(equal))
-                return null;
-
-            term = equal;
+            if(canonical.match(request, equal))
+                terms.put(datatype.getTypeIri().getValue(), equal);
         }
 
-        return term;
+        return terms.isEmpty() ? null : new LinkedHashSet<>(terms.values());
     }
 
 

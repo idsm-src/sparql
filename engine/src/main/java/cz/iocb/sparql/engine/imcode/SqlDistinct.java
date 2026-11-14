@@ -111,6 +111,9 @@ public final class SqlDistinct extends SqlIntercode
             if(restrictions.getAcceptedValue(variable) != null)
                 childRestrictions.setAcceptedValue(variable, restrictions.getAcceptedValue(variable));
 
+            if(restrictions.getAcceptedTerms(variable) != null)
+                childRestrictions.addAcceptedTerms(variable, restrictions.getAcceptedTerms(variable));
+
             for(SqlExpressionIntercode condition : restrictions.getFilterConditions(variable))
                 childRestrictions.addFilterCondition(variable, condition);
         }

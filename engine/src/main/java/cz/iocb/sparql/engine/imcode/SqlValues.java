@@ -7,6 +7,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -18,10 +19,12 @@ import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBinding;
@@ -87,6 +90,128 @@ public final class SqlValues extends SqlIntercode
             LinkedHashMap<Column, List<Column>> data, int size)
     {
         return new SqlValues(bindings, resourceClasses, data, size);
+    }
+
+
+    /**
+     * Values node of the given rows of terms, each variable materialised in the classes of the terms it takes; no
+     * solution when there is no row.
+     *
+     * @param request the current request
+     * @param variables the variables
+     * @param lines the rows of terms: a term for each variable, or null where the row leaves the variable unbound
+     * @return values node of the given rows of terms
+     */
+    public static SqlIntercode create(Request request, List<Variable> variables, List<List<RdfTerm>> lines)
+    {
+        if(lines.size() == 0)
+            return SqlNoSolution.get();
+
+
+        Map<Variable, List<ResourceClass>> resourceClasses = new HashMap<>();
+        LinkedHashMap<Column, List<Column>> data = new LinkedHashMap<>();
+        Map<List<Column>, Column> revData = new HashMap<>();
+        VariableBindings bindings = new VariableBindings();
+
+        for(int i = 0; i < variables.size(); i++)
+        {
+            if(bindings.get(variables.get(i)) != null)
+                continue; // ignore repeated occurrences of the variable
+
+            LinkedHashSet<ResourceClass> resClasses = new LinkedHashSet<>();
+            boolean canBeNull = false;
+
+            List<ResourceClass> nodeResourceClasses = new ArrayList<>();
+
+            for(List<RdfTerm> line : lines)
+            {
+                RdfTerm term = line.get(i);
+
+                if(term != null)
+                {
+                    ResourceClass resClass = request.getResourceClass(term);
+
+                    nodeResourceClasses.add(resClass);
+                    resClasses.add(resClass);
+                }
+                else
+                {
+                    nodeResourceClasses.add(null);
+                    canBeNull = true;
+                }
+            }
+
+            if(resClasses.size() == 0)
+                continue;
+
+            // the terms are classified one by one, so their classes may overlap (e.g. the IRIs of a class and of its
+            // subclass), but the classes of a variable have to be disjoint: the overlapping ones are merged into their
+            // union, which stores the terms of all of them
+            Map<ResourceClass, ResourceClass> merged = mergeOverlappingClasses(request.getConfiguration(), resClasses);
+            nodeResourceClasses.replaceAll(c -> c == null ? null : merged.get(c));
+            resClasses = new LinkedHashSet<>(merged.values());
+
+            resourceClasses.put(variables.get(i), nodeResourceClasses);
+
+            VariableBinding binding = new VariableBinding(variables.get(i), canBeNull);
+
+            for(ResourceClass resClass : resClasses)
+            {
+                List<List<Column>> classColumns = new ArrayList<>(resClass.getColumnCount());
+
+                for(int j = 0; j < resClass.getColumnCount(); j++)
+                    classColumns.add(new ArrayList<>(lines.size()));
+
+                for(int k = 0; k < lines.size(); k++)
+                {
+                    if(resClass.equals(nodeResourceClasses.get(k)))
+                    {
+                        List<Column> cols = request.getColumns(resClass, lines.get(k).get(i));
+
+                        for(int j = 0; j < resClass.getColumnCount(); j++)
+                            classColumns.get(j).add(cols.get(j));
+                    }
+                    else
+                    {
+                        for(int j = 0; j < resClass.getColumnCount(); j++)
+                            classColumns.get(j).add(new NullColumn(resClass.getSqlTypes().get(j)));
+                    }
+                }
+
+
+                List<Column> tableColumns = resClass.createColumns(request.getColumnMap(), variables.get(i));
+                List<Column> mapping = new ArrayList<>(resClass.getColumnCount());
+
+                for(int j = 0; j < resClass.getColumnCount(); j++)
+                {
+                    List<Column> columns = classColumns.get(j);
+
+                    if(columns.stream().allMatch(c -> c.equals(columns.get(0))))
+                    {
+                        mapping.add(columns.get(0));
+                    }
+                    else
+                    {
+                        Column tableColumn = revData.get(columns);
+
+                        if(tableColumn == null)
+                        {
+                            tableColumn = tableColumns.get(j);
+                            revData.put(columns, tableColumn);
+                            data.put(tableColumn, columns);
+                        }
+
+                        mapping.add(tableColumn);
+                    }
+                }
+
+                binding.addMapping(resClass, mapping);
+            }
+
+            bindings.add(binding);
+        }
+
+        return create(bindings, resourceClasses, data, lines.size());
     }
 
 
