@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.test;
 
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -57,9 +58,10 @@ public class JoinOptimizerTest
 
 
     /**
-     * Creates the {@code join_optimizer_test} schema: the nodes 1 to 1000 with labels, 2000 links among the nodes 1 to
-     * 200 (every node links to ten), and five nodes tagged, all indexed and analysed; and the two configurations
-     * mapping {@code ex:label}, {@code ex:link} and {@code ex:tag} over them.
+     * Creates the {@code join_optimizer_test} schema: the nodes 1 to 1000 with labels and with scores equal to their
+     * numbers, 2000 links among the nodes 1 to 200 (every node links to ten), and five nodes tagged, all indexed and
+     * analysed; and the two configurations mapping {@code ex:label}, {@code ex:score}, {@code ex:link} and
+     * {@code ex:tag} over them.
      */
     @BeforeAll
     static void init() throws SQLException
@@ -82,7 +84,12 @@ public class JoinOptimizerTest
             statement.execute(
                     "insert into join_optimizer_test.few select i, 'tag ' || i from generate_series(1, 5) " + "as i");
             statement.execute("create index on join_optimizer_test.few (id)");
-            statement.execute("analyze join_optimizer_test.nodes, join_optimizer_test.links, join_optimizer_test.few");
+            statement.execute(
+                    "create table join_optimizer_test.scores (id integer primary key, score integer not null)");
+            statement.execute("insert into join_optimizer_test.scores select i, i from generate_series(1, 1000) as i");
+            statement.execute("create index on join_optimizer_test.scores (score)");
+            statement.execute("analyze join_optimizer_test.nodes, join_optimizer_test.links, join_optimizer_test.few, "
+                    + "join_optimizer_test.scores");
         }
 
         DatabaseSchema schema = new DatabaseSchema(connectionPool);
@@ -109,6 +116,7 @@ public class JoinOptimizerTest
         DatabaseTable nodes = new DatabaseTable("join_optimizer_test", "nodes");
         DatabaseTable links = new DatabaseTable("join_optimizer_test", "links");
         DatabaseTable few = new DatabaseTable("join_optimizer_test", "few");
+        DatabaseTable scores = new DatabaseTable("join_optimizer_test", "scores");
 
         config.addQuadMapping(nodes, graph, config.createIriMapping("node", "id"), config.createIriMapping("ex:label"),
                 config.createLiteralMapping(xsdString, "label"));
@@ -116,6 +124,8 @@ public class JoinOptimizerTest
                 config.createIriMapping("node", "dst"));
         config.addQuadMapping(few, graph, config.createIriMapping("node", "id"), config.createIriMapping("ex:tag"),
                 config.createLiteralMapping(xsdString, "tag"));
+        config.addQuadMapping(scores, graph, config.createIriMapping("node", "id"), config.createIriMapping("ex:score"),
+                config.createLiteralMapping(xsdInt, "score"));
 
         return config;
     }
@@ -270,6 +280,38 @@ public class JoinOptimizerTest
 
         assertThat(translate(optimized, query), not(containsString("LATERAL")));
         check(query);
+    }
+
+
+    @Test
+    public void rangeFilter() throws Exception
+    {
+        // the scores and the links are many, so they are joined by hashing
+        assertThat(translate(optimized, "SELECT ?x ?y WHERE { ?x ex:score ?s . ?x ex:link ?y }"),
+                not(containsString("LATERAL")));
+
+        // the statistics of the column tell that a narrow range leaves few of the scores to look the links up for
+        String query = "SELECT ?x ?y WHERE { ?x ex:score ?s . ?x ex:link ?y FILTER(?s < 5) }";
+
+        assertThat(translate(optimized, query), containsString(" CROSS JOIN LATERAL (SELECT "));
+        assertThat(check(query), hasSize(40));
+
+        // and that a wide range leaves most of them, however many bounds it has
+        query = "SELECT ?x ?y WHERE { ?x ex:score ?s . ?x ex:link ?y FILTER(?s >= 5 && ?s < 900 && ?s != 7) }";
+
+        assertThat(translate(optimized, query), not(containsString("LATERAL")));
+        assertThat(check(query), hasSize(1950));
+
+        // so they tell of a filter that is a member of the join
+        query = "SELECT ?x ?y WHERE { { ?x ex:score ?s FILTER(?s IN (3, 4)) } ?x ex:link ?y }";
+
+        assertThat(translate(optimized, query), containsString(" CROSS JOIN LATERAL (SELECT "));
+        assertThat(check(query), hasSize(20));
+
+        query = "SELECT ?x ?y WHERE { { ?x ex:score ?s FILTER(?s > 100) } ?x ex:link ?y }";
+
+        assertThat(translate(optimized, query), not(containsString("LATERAL")));
+        assertThat(check(query), hasSize(1000));
     }
 
 

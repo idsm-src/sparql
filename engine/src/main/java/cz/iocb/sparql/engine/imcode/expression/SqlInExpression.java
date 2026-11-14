@@ -317,6 +317,17 @@ public final class SqlInExpression extends SqlExpressionIntercode
 
 
     /**
+     * Tested operand.
+     *
+     * @return tested operand
+     */
+    public SqlExpressionIntercode getLeft()
+    {
+        return left;
+    }
+
+
+    /**
      * True for NOT IN.
      *
      * @return true for NOT IN, false for IN

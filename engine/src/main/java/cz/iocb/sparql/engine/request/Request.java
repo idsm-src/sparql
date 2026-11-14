@@ -253,6 +253,12 @@ public class Request implements AutoCloseable
     private final Map<String, CommonTable> commonTableExpressions = new HashMap<>();
 
     /**
+     * Row counts the planner of the database has estimated for statements during the request, by the texts of the
+     * statements (see {@link #getRowEstimates}).
+     */
+    private final Map<String, Long> rowEstimates = new HashMap<>();
+
+    /**
      * Start of the execution in {@link System#nanoTime} units.
      */
     private long begin;
@@ -876,6 +882,19 @@ public class Request implements AutoCloseable
     public LateralTable createLateralTable()
     {
         return new LateralTable(lateralId++);
+    }
+
+
+    /**
+     * Row counts the planner of the database has estimated for statements during the request, by the texts of the
+     * statements: an estimate asked for again is taken from here (see
+     * {@link cz.iocb.sparql.engine.translator.Estimator}).
+     *
+     * @return row counts the planner has estimated during the request, by the texts of the statements
+     */
+    public Map<String, Long> getRowEstimates()
+    {
+        return rowEstimates;
     }
 
 

@@ -17,13 +17,21 @@ import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical.LogicalOperator;
 import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
+import cz.iocb.sparql.engine.imcode.expression.SqlEffectiveBooleanValue;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlInExpression;
+import cz.iocb.sparql.engine.imcode.expression.SqlIri;
+import cz.iocb.sparql.engine.imcode.expression.SqlLiteral;
+import cz.iocb.sparql.engine.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.imcode.expression.SqlUnary;
 import cz.iocb.sparql.engine.imcode.expression.SqlUnaryLogical;
+import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.translator.Estimator;
 import cz.iocb.sparql.engine.translator.VariableBinding;
+import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
@@ -186,8 +194,9 @@ final class JoinOptimizer
      * Chooses the join tree of the children whose solutions the filters above the join keep by the given conditions.
      * Such a condition is decided by one variable alone, so the database evaluates it where the variable is bound,
      * before the joins: the child the join takes the variable from gives the joins only the fraction of its solutions
-     * the condition is estimated to keep (see {@link #selectivity}), and the tree is chosen for the children so
-     * reduced. The estimated rows of the plan are those of the join itself, as the filters are no part of it.
+     * the conditions are estimated to keep (see {@link #selectivity(Request, SqlIntercode, List)}), and the tree is
+     * chosen for the children so reduced. The estimated rows of the plan are those of the join itself, as the filters
+     * are no part of it.
      *
      * @param request the current request
      * @param childs the children
@@ -202,14 +211,19 @@ final class JoinOptimizer
         Arrays.fill(unfiltered, 1);
         Arrays.fill(kept, 1);
 
+        // the conditions each child decides, taken together, so that the bounds of a range are estimated as a range
+        Map<Integer, List<SqlExpressionIntercode>> decided = new HashMap<>();
+
         for(Map.Entry<Variable, Set<SqlExpressionIntercode>> entry : conditions.entrySet())
         {
             int child = getDecidingChild(childs, entry.getKey());
 
             if(child != -1)
-                for(SqlExpressionIntercode condition : entry.getValue())
-                    kept[child] *= selectivity(condition);
+                decided.computeIfAbsent(child, _ -> new ArrayList<>()).addAll(entry.getValue());
         }
+
+        for(Map.Entry<Integer, List<SqlExpressionIntercode>> entry : decided.entrySet())
+            kept[entry.getKey()] = selectivity(request, childs.get(entry.getKey()), entry.getValue());
 
         Plan plan = plan(request, childs, kept);
 
@@ -729,14 +743,8 @@ final class JoinOptimizer
         }
 
         if(node instanceof SqlFilter filter)
-        {
-            double rows = estimateRows(request, filter.getChild());
-
-            for(SqlExpressionIntercode condition : filter.getConditions())
-                rows *= selectivity(condition);
-
-            return rows;
-        }
+            return estimateRows(request, filter.getChild())
+                    * selectivity(request, filter.getChild(), SqlIntercode.getConjuncts(filter.getConditions()));
 
         if(node instanceof SqlDistinct distinct)
         {
@@ -875,6 +883,143 @@ final class JoinOptimizer
         }
 
         return Math.max(Math.min(distinct, rows), 1);
+    }
+
+
+    /**
+     * Estimated fraction of the solutions of a node that the conditions keep, all of which have to hold. The conditions
+     * that only compare a variable with constants (see {@link #getComparison}) are estimated by the planner of the
+     * database when the node is an access to a table (see {@link Estimator#estimateSelectivity}): the planner knows how
+     * the values of a column are distributed, so it tells a range holding a few rows from one holding nearly all of
+     * them, and it is asked about the conditions together, so that it sees both bounds of a range. The other
+     * conditions, and all of them when the planner cannot be asked, are estimated by what they say (see
+     * {@link #selectivity(SqlExpressionIntercode)}).
+     *
+     * @param request the current request
+     * @param node the node
+     * @param conditions the conditions, over variables the node binds
+     * @return estimated fraction of the solutions of the node that the conditions keep
+     */
+    static double selectivity(Request request, SqlIntercode node, List<SqlExpressionIntercode> conditions)
+    {
+        boolean table = node instanceof SqlTableAccess access && access.getTable() != null;
+
+        List<SqlExpressionIntercode> comparisons = new ArrayList<>();
+        double compared = 1;
+        double others = 1;
+
+        for(SqlExpressionIntercode condition : conditions)
+        {
+            SqlExpressionIntercode comparison = !table ? null :
+                    getComparison(request.getConfiguration(), condition, node.getVariableBindings());
+
+            // a comparison that the classes of the node decide tells the planner nothing
+            if(comparison == null || comparison instanceof SqlLiteral || comparison instanceof SqlNull)
+            {
+                others *= selectivity(condition);
+                continue;
+            }
+
+            comparisons.add(comparison);
+            compared *= selectivity(condition);
+        }
+
+        if(comparisons.isEmpty())
+            return others;
+
+        double estimated = new Estimator(request).estimateSelectivity(request, Scope.TOP, node, comparisons);
+
+        return others * (Double.isNaN(estimated) ? compared : estimated);
+    }
+
+
+    /**
+     * The condition rebuilt over the bindings when it only compares a variable with constants: a comparison of a
+     * variable and a constant, a membership test of a variable among constants, or such conditions put together by the
+     * logical operators; null for any other condition. The condition is made anew of the variable as the bindings give
+     * it, because a condition reads its operands by the classes they had where it was optimised last.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param condition the condition
+     * @param bindings the variable bindings
+     * @return the condition rebuilt over the bindings when it only compares a variable with constants, or null
+     */
+    private static SqlExpressionIntercode getComparison(ClassRelations relations, SqlExpressionIntercode condition,
+            VariableBindings bindings)
+    {
+        if(condition instanceof SqlEffectiveBooleanValue value)
+        {
+            SqlExpressionIntercode operand = getComparison(relations, value.getOperand(), bindings);
+
+            return operand == null ? null : SqlEffectiveBooleanValue.create(relations, operand);
+        }
+
+        if(condition instanceof SqlUnaryLogical negation)
+        {
+            SqlExpressionIntercode operand = getComparison(relations, negation.getOperand(), bindings);
+
+            return operand == null ? null : SqlUnaryLogical.create(relations, operand);
+        }
+
+        if(condition instanceof SqlBinaryLogical logical)
+        {
+            SqlExpressionIntercode left = getComparison(relations, logical.getLeft(), bindings);
+            SqlExpressionIntercode right = getComparison(relations, logical.getRight(), bindings);
+
+            return left == null || right == null ? null :
+                    SqlBinaryLogical.create(relations, logical.getOperator(), left, right);
+        }
+
+        if(condition instanceof SqlBinaryComparison comparison)
+        {
+            SqlExpressionIntercode left = getComparedOperand(relations, comparison.getLeft(), bindings);
+            SqlExpressionIntercode right = getComparedOperand(relations, comparison.getRight(), bindings);
+
+            // one operand is the variable and the other one a constant
+            if(left == null || right == null || left instanceof SqlVariable == right instanceof SqlVariable)
+                return null;
+
+            return SqlBinaryComparison.create(relations, comparison.getOperator(), left, right);
+        }
+
+        if(condition instanceof SqlInExpression in)
+        {
+            SqlExpressionIntercode left = getComparedOperand(relations, in.getLeft(), bindings);
+
+            if(!(left instanceof SqlVariable))
+                return null;
+
+            if(!in.getRights().stream().allMatch(r -> r instanceof SqlLiteral || r instanceof SqlIri))
+                return null;
+
+            return SqlInExpression.create(relations, in.isNegated(), left, in.getRights());
+        }
+
+        return null;
+    }
+
+
+    /**
+     * An operand of a comparison of a variable with a constant rebuilt over the bindings (see {@link #getComparison}):
+     * the variable as the bindings give it, or the constant itself; null for any other operand and for a variable the
+     * bindings do not bind.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param operand the operand
+     * @param bindings the variable bindings
+     * @return the variable as the bindings give it, the constant itself, or null
+     */
+    private static SqlExpressionIntercode getComparedOperand(ClassRelations relations, SqlExpressionIntercode operand,
+            VariableBindings bindings)
+    {
+        if(operand instanceof SqlVariable variable)
+        {
+            VariableBinding binding = bindings.get(variable.getVariable());
+
+            return binding == null ? null : SqlVariable.create(relations, binding);
+        }
+
+        return operand instanceof SqlLiteral || operand instanceof SqlIri ? operand : null;
     }
 
 

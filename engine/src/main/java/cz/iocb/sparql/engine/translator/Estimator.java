@@ -3,15 +3,18 @@ package cz.iocb.sparql.engine.translator;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import java.util.Set;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlDistinct;
+import cz.iocb.sparql.engine.imcode.SqlFilter;
 import cz.iocb.sparql.engine.imcode.SqlIntercode;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.imcode.SqlSelect;
+import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 
@@ -91,6 +94,70 @@ public class Estimator
             e.printStackTrace();
             return Long.MAX_VALUE;
         }
+    }
+
+
+    /**
+     * Fraction of the solutions of the intermediate code that the conditions are estimated to keep: the rows the
+     * planner of the database estimates for the code filtered by the conditions, over the rows it estimates for the
+     * code itself, so that what the planner misses about the code itself cancels out. The planner estimates a
+     * comparison of a column with a constant from the statistics of the column, which the engine keeps no like of.
+     * {@link Double#NaN} when the planner cannot be asked, because the code refers to a solution it is evaluated for,
+     * or when an estimate fails.
+     *
+     * @param request the current request
+     * @param scope the scope of the intermediate code
+     * @param imcode the intermediate code
+     * @param conditions conditions over the variable bindings of the intermediate code
+     * @return fraction of the solutions of the intermediate code that the conditions are estimated to keep, or
+     *         {@link Double#NaN}
+     */
+    public double estimateSelectivity(Request request, Scope scope, SqlIntercode imcode,
+            List<SqlExpressionIntercode> conditions)
+    {
+        try
+        {
+            long all = estimateRowCount(scope, imcode);
+            long kept = all <= 0 ? -1 : estimateRowCount(scope, SqlFilter.filter(request, conditions, imcode));
+
+            return kept < 0 ? Double.NaN : Math.min((double) kept / all, 1);
+        }
+        catch(SQLException e)
+        {
+            return Double.NaN;
+        }
+    }
+
+
+    /**
+     * Row count estimated by the PostgreSQL planner for the intermediate code, asked for once in a request (see
+     * {@link Request#getRowEstimates}); -1 when the code refers to a solution it is evaluated for, so that it is no
+     * statement by itself.
+     *
+     * @param scope the scope of the intermediate code
+     * @param imcode the intermediate code
+     * @return row count estimated by the PostgreSQL planner for the intermediate code, or -1
+     * @throws SQLException on database errors
+     */
+    private long estimateRowCount(Scope scope, SqlIntercode imcode) throws SQLException
+    {
+        SqlCode code = imcode.translate(request, scope);
+
+        if(!code.getOuterTables().isEmpty())
+            return -1;
+
+        String with = SqlSelect.translateWithClause(request, code);
+        String sql = with.isEmpty() ? code.getText() : with + "SELECT * FROM (" + code.getText() + ") AS tab";
+
+        Long rows = request.getRowEstimates().get(sql);
+
+        if(rows == null)
+        {
+            rows = estimateRowCount(sql);
+            request.getRowEstimates().put(sql, rows);
+        }
+
+        return rows;
     }
 
 
