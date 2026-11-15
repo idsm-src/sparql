@@ -202,6 +202,25 @@ public class Request implements AutoCloseable
 
 
     /**
+     * Reader of the result of a lookup query (see {@link #lookup}).
+     *
+     * @param <T> type of what is read
+     */
+    @FunctionalInterface
+    public interface ResultReader<T>
+    {
+        /**
+         * Reads the result of the query.
+         *
+         * @param result the result set, positioned before its first row
+         * @return what has been read
+         * @throws SQLException on database errors
+         */
+        T read(ResultSet result) throws SQLException;
+    }
+
+
+    /**
      * Logger of the request processing.
      */
     private static final Logger logger = LoggerFactory.getLogger(Request.class);
@@ -536,10 +555,8 @@ public class Request implements AutoCloseable
                 // the order of the explicit joins and hash them (a merge join would sort the values, which is slow for
                 // boxes), the index lookups being forced by lateral subqueries (see JoinOptimizer); the settings last
                 // until the end of the transaction of the request
-                Statement statement = getStatement();
-                statement.execute("SET LOCAL join_collapse_limit = 1");
-                statement.execute("SET LOCAL enable_nestloop = off");
-                statement.execute("SET LOCAL enable_mergejoin = off");
+                getStatement().execute("SET LOCAL join_collapse_limit = 1; SET LOCAL enable_nestloop = off; "
+                        + "SET LOCAL enable_mergejoin = off");
             }
 
             return new Result(type, imcode.getResultDescription(), getStatement(fetchSize).executeQuery(code), begin,
@@ -849,6 +866,61 @@ public class Request implements AutoCloseable
     public synchronized Statement getStatement()
     {
         return getStatement(0);
+    }
+
+
+    /**
+     * Runs queries whose failure must not abort the transaction of the request: the lookups of statistics and the
+     * requests for plans, which the translation of a query is only improved by. The queries are sent between a
+     * savepoint and its release in a single call, so they cost one round trip to the database, however many they are;
+     * when one of them fails, the transaction is rolled back to the savepoint and none of them has a result.
+     *
+     * @param <T> type of what is read from the result of a query
+     * @param queries SQL of the queries, each a single statement
+     * @param reader reader of the result of each query
+     * @return what the reader has read from the results of the queries, in their order
+     * @throws SQLException when a query fails
+     */
+    public <T> List<T> lookup(List<String> queries, ResultReader<T> reader) throws SQLException
+    {
+        List<T> values = new ArrayList<>(queries.size());
+
+        if(queries.isEmpty())
+            return values;
+
+        Statement statement = getStatement();
+
+        try
+        {
+            statement.execute("SAVEPOINT lookup; " + String.join("; ", queries) + "; RELEASE SAVEPOINT lookup");
+        }
+        catch(SQLException e)
+        {
+            try
+            {
+                statement.execute("ROLLBACK TO SAVEPOINT lookup");
+            }
+            catch(SQLException rollback)
+            {
+                e.addSuppressed(rollback);
+            }
+
+            throw e;
+        }
+
+        // the results follow that of the savepoint, in the order of the queries
+        for(int i = 0; i < queries.size(); i++)
+        {
+            if(!statement.getMoreResults())
+                throw new SQLException("a lookup query has no result");
+
+            try(ResultSet result = statement.getResultSet())
+            {
+                values.add(reader.read(result));
+            }
+        }
+
+        return values;
     }
 
 

@@ -1,13 +1,13 @@
 package cz.iocb.sparql.engine.database;
 
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.request.Request.ResultReader;
 
 
 
@@ -29,25 +29,6 @@ public abstract class TableStatisticsBase implements TableStatistics
      * Rows of a group when nothing is known about it.
      */
     protected static final double DEFAULT_ROWS = 1000;
-
-
-    /**
-     * Reads the result of a lookup query.
-     *
-     * @param <T> type of the result
-     */
-    @FunctionalInterface
-    protected interface ResultReader<T>
-    {
-        /**
-         * Reads the result from the result set.
-         *
-         * @param result the result set, positioned before its first row
-         * @return the result
-         * @throws SQLException on database errors
-         */
-        T read(ResultSet result) throws SQLException;
-    }
 
 
     /**
@@ -273,8 +254,8 @@ public abstract class TableStatisticsBase implements TableStatistics
 
 
     /**
-     * Runs a lookup query on the connection of the request, under a savepoint so that a failure does not abort the
-     * transaction of the request.
+     * Runs a lookup query on the connection of the request, so that a failure does not abort the transaction of the
+     * request (see {@link Request#lookup}).
      *
      * @param <T> type of the result
      * @param request the current request
@@ -287,21 +268,7 @@ public abstract class TableStatisticsBase implements TableStatistics
     {
         try
         {
-            Statement statement = request.getStatement();
-
-            statement.execute("SAVEPOINT statistics");
-
-            try(ResultSet result = statement.executeQuery(sql))
-            {
-                T value = reader.read(result);
-                statement.execute("RELEASE SAVEPOINT statistics");
-                return value;
-            }
-            catch(SQLException e)
-            {
-                statement.execute("ROLLBACK TO SAVEPOINT statistics");
-                throw e;
-            }
+            return request.lookup(List.of(sql), reader).get(0);
         }
         catch(SQLException e)
         {
