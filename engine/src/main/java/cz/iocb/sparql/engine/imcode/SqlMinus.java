@@ -5,13 +5,16 @@ import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
+import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
@@ -31,6 +34,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * solution the pattern is evaluated for, so the sides share its variables without binding them (see
  * {@link #solutionBound}). A walk on the right side whose start the left side binds always is seeded with the distinct
  * values of the start read from the left side, shared so that the statement evaluates it once (see {@link SqlShared}).
+ * With the join optimizer on, the engine chooses whether the right side is evaluated once or for every solution of the
+ * left side (see {@link #translate}).
  */
 public final class SqlMinus extends SqlIntercode
 {
@@ -69,6 +74,14 @@ public final class SqlMinus extends SqlIntercode
      */
     private final SqlExpressionIntercode solutionBound;
 
+    /**
+     * Per variable of the left side, the conditions the filters above keep the solutions of the difference by (see
+     * {@link Restrictions#getFilterConditions}): every solution of the difference is a solution of the left side, so
+     * the database evaluates a condition that one such variable decides alone on the left side, and the optimizer
+     * chooses the way the right side is tested for the solutions of the left side the conditions leave.
+     */
+    private final Map<Variable, Set<SqlExpressionIntercode>> filterConditions;
+
 
     /**
      * Creates the node.
@@ -79,9 +92,10 @@ public final class SqlMinus extends SqlIntercode
      * @param graph variable of the enclosing GRAPH clause bound by the triples of both sides, or null
      * @param solutionBound condition that the current solution of the enclosing EXISTS pattern binds a variable, or
      *            null
+     * @param filterConditions per variable of the left side, the conditions the filters above keep the solutions by
      */
     protected SqlMinus(VariableBindings bindings, SqlIntercode left, SqlIntercode right, Variable graph,
-            SqlExpressionIntercode solutionBound)
+            SqlExpressionIntercode solutionBound, Map<Variable, Set<SqlExpressionIntercode>> filterConditions)
     {
         super(bindings, left.isDeterministic() && right.isDeterministic());
 
@@ -89,6 +103,7 @@ public final class SqlMinus extends SqlIntercode
         this.right = right;
         this.graph = graph;
         this.solutionBound = solutionBound;
+        this.filterConditions = filterConditions;
     }
 
 
@@ -158,7 +173,31 @@ public final class SqlMinus extends SqlIntercode
             SqlExpressionIntercode solutionBound, Restrictions restrictions)
     {
         return new SqlMinus(left.getVariableBindings().restrict(request.getConfiguration(), restrictions), left, right,
-                graph, solutionBound);
+                graph, solutionBound, getFilterConditions(left, restrictions));
+    }
+
+
+    /**
+     * The conditions the filters above keep the solutions of a difference by, per variable of its left side (see
+     * {@link Restrictions#getFilterConditions}).
+     *
+     * @param left the left side
+     * @param restrictions what the parent needs of the variables, or null
+     * @return per variable of the left side, the conditions the filters above keep the solutions by
+     */
+    private static Map<Variable, Set<SqlExpressionIntercode>> getFilterConditions(SqlIntercode left,
+            Restrictions restrictions)
+    {
+        Map<Variable, Set<SqlExpressionIntercode>> conditions = new HashMap<>();
+
+        if(restrictions == null)
+            return conditions;
+
+        for(Variable variable : left.getVariableBindings().getVariables())
+            if(!restrictions.getFilterConditions(variable).isEmpty())
+                conditions.put(variable, restrictions.getFilterConditions(variable));
+
+        return conditions;
     }
 
 
@@ -291,7 +330,8 @@ public final class SqlMinus extends SqlIntercode
         }
 
         if(restrictions.isOptimized(relations, bindings) && optLeft == left && optRight == right
-                && Objects.equals(optSolutionBound, solutionBound))
+                && Objects.equals(optSolutionBound, solutionBound)
+                && filterConditions.equals(getFilterConditions(optLeft, restrictions)))
             return this;
 
         return minus(request, optLeft, optRight, graph, optSolutionBound, restrictions);
@@ -312,6 +352,17 @@ public final class SqlMinus extends SqlIntercode
     }
 
 
+    /**
+     * SQL code of the difference: the solutions of the left side for which no solution of the right side removing them
+     * exists. With the join optimizer on, the right side is written the way the optimizer chooses (see
+     * {@link JoinOptimizer#planTest}): as it is, for the database to evaluate it once and to hash the sides (an
+     * anti-join), or evaluated for every solution of the left side that the filters above keep (see
+     * {@link #filterConditions}), restricted to the solutions compatible with it (see
+     * {@link SqlIntercode#translateForRow}), so that the database looks them up. The left side is then named by the
+     * alias of the left side of a left join of the scope (see {@link Scope#getLeftInputTable}), through which the right
+     * side refers to its solutions: unlike the alias used otherwise, no node of the right side gives it to a subquery
+     * the solution is handed to.
+     */
     @Override
     public SqlCode translate(Request request, Scope scope)
     {
@@ -328,18 +379,27 @@ public final class SqlMinus extends SqlIntercode
         else
             builder.append("1");
 
+        // the solutions of the left side the right side is evaluated for one by one, when the optimizer chooses so
+        JoinOptimizer.Outer outer = !request.getConfiguration().isJoinOptimizerEnabled() ? null :
+                JoinOptimizer.planTest(request,
+                        JoinOptimizer.estimateRows(request, left)
+                                * JoinOptimizer.selectivity(request, left, filterConditions),
+                        left.getVariableBindings(), scope.getLeftInputTable(), right);
+
+        Table table = outer != null ? outer.table() : leftTable;
+
         builder.append(" FROM (");
         builder.append(left.translate(request, scope));
         builder.append(") AS ");
-        builder.append(leftTable);
+        builder.appendAlias(table);
 
         builder.append(" WHERE NOT EXISTS (SELECT 1 FROM (");
-        builder.append(right.translate(request, scope));
+        builder.append(outer != null ? right.translateForRow(request, scope, outer) : right.translate(request, scope));
         builder.append(") AS ");
         builder.append(rightTable);
 
-        SqlCode condition = generateCondition(relations, left.getVariableBindings(), right.getVariableBindings(),
-                leftTable, rightTable);
+        SqlCode condition = generateCondition(relations, left.getVariableBindings(), right.getVariableBindings(), table,
+                rightTable);
 
         if(condition != null)
         {
@@ -367,7 +427,7 @@ public final class SqlMinus extends SqlIntercode
      *         included) are compatible and at least one of them (the graph variable excluded) is bound on both sides
      */
     private SqlCode generateCondition(ClassRelations relations, VariableBindings left, VariableBindings right,
-            AliasTable leftTable, AliasTable rightTable)
+            Table leftTable, Table rightTable)
     {
         SqlCode joinCondition = generateJoinCondition(relations, left, right, leftTable, rightTable);
 
@@ -528,6 +588,9 @@ public final class SqlMinus extends SqlIntercode
             return false;
 
         if(!Objects.equals(solutionBound, imcode.solutionBound))
+            return false;
+
+        if(!filterConditions.equals(imcode.filterConditions))
             return false;
 
         return true;

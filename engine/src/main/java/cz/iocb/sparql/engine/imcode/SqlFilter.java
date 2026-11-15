@@ -10,9 +10,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.InputTable;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression;
+import cz.iocb.sparql.engine.imcode.expression.SqlExists;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
@@ -21,6 +23,7 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.Multiset;
+import cz.iocb.sparql.engine.translator.VariableBinding;
 import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
@@ -32,7 +35,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * requiring a constant term of a variable ({@code sameTerm}, an equality with an IRI, or with a literal that only one
  * term the variable can be is equal to) makes the table accesses of the child take the term into their own conditions
  * (see {@link SqlIntercode#addAcceptedValues}), and it is left out once the child is restricted to the term for good
- * (see {@link SqlIntercode#getUnsatisfied}).
+ * (see {@link SqlIntercode#getUnsatisfied}). With the join optimizer on, the engine chooses whether the pattern of a
+ * condition that is an existence test is evaluated once or for every solution of the child (see {@link #translate}).
  */
 public final class SqlFilter extends SqlIntercode
 {
@@ -281,9 +285,83 @@ public final class SqlFilter extends SqlIntercode
         builder.appendAlias(scope.getInputTable());
 
         builder.append(" WHERE ");
-        builder.append(translateConditions(request));
+        builder.append(translateConditions(request, scope, outer));
 
         return builder.toCode();
+    }
+
+
+    /**
+     * SQL code of the conjunction of the conditions as the filter itself evaluates them (see
+     * {@link #translateConditions(Request)}). With the join optimizer on, the pattern of a condition that is an
+     * existence test (see {@link SqlExists}) is written the way the optimizer chooses (see
+     * {@link JoinOptimizer#planTest}): as the test was rendered, for the database to evaluate the pattern once and to
+     * join it with the solutions of the child by hashing, or evaluated for every solution of the child that the other
+     * conditions keep, restricted to the solutions compatible with it (see {@link SqlIntercode#translateForRow}), so
+     * that the database looks them up.
+     *
+     * @param request the current request
+     * @param scope the scope of the filter
+     * @param outer the rows the filter is evaluated for one by one, or null when it is evaluated once
+     * @return SQL code of the conjunction of the conditions
+     */
+    private SqlCode translateConditions(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
+        ClassRelations relations = request.getConfiguration();
+
+        if(!request.getConfiguration().isJoinOptimizerEnabled()
+                || conditions.stream().noneMatch(c -> c instanceof SqlExists))
+            return translateConditions(request);
+
+        List<SqlExpressionIntercode> others = conditions.stream().filter(c -> !(c instanceof SqlExists)).toList();
+
+        double solutions = (outer == null ? JoinOptimizer.estimateRows(request, child) :
+                JoinOptimizer.estimateForRow(request, child, outer).rows())
+                * (others.isEmpty() ? 1 : JoinOptimizer.selectivity(request, child, getConjuncts(others)));
+
+        return conditions.stream().map(c -> c instanceof SqlExists test ?
+                translateTest(request, scope, test, solutions) : c.get(relations, xsdBoolean).get(0).getCode())
+                .collect(SqlCode.joining(" AND "));
+    }
+
+
+    /**
+     * SQL code of an existence test among the conditions: the code the test was rendered with, or the test of the
+     * pattern evaluated for every solution of the child anew when the optimizer chooses so (see
+     * {@link #translateConditions(Request, Scope, JoinOptimizer.Outer)}). The pattern is restricted only by the values
+     * that the solutions of the child give, which the test addresses through the alias of the input of the filter. A
+     * value of a current solution the filter itself lies in would make the pattern of that solution refer to it, and
+     * the database would then evaluate that pattern for every such solution as well.
+     *
+     * @param request the current request
+     * @param scope the scope of the filter
+     * @param test the existence test
+     * @param solutions estimated number of the solutions of the child the test is evaluated for
+     * @return SQL code of the test
+     */
+    private SqlCode translateTest(Request request, Scope scope, SqlExists test, double solutions)
+    {
+        SqlCode rendered = test.get(request.getConfiguration(), xsdBoolean).get(0).getCode();
+        VariableBindings solution = test.getSolution();
+
+        if(solution == null || test.hasServiceSubpattern())
+            return rendered;
+
+        InputTable input = scope.getInputTable();
+        VariableBindings own = new VariableBindings();
+
+        for(VariableBinding binding : solution.getValues())
+            if(binding.getMappings().values().stream().filter(Objects::nonNull).flatMap(List::stream)
+                    .allMatch(c -> c.getCode().getOuterTables().stream().allMatch(input::equals)))
+                own.add(binding);
+
+        SqlIntercode source = test.getSource(request, scope);
+        JoinOptimizer.Outer rows = JoinOptimizer.planTest(request, solutions, own, null, source);
+
+        if(rows == null)
+            return rendered;
+
+        return test.translate(request, scope, source.translateForRow(request, scope.enterPattern(solution), rows));
     }
 
 

@@ -53,7 +53,10 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * for the classes the node holding the test provides at the moment, as a join with them would optimise it. A test of a
  * pattern independent of the surrounding bindings has no current solution of its own. A pattern holding a SERVICE call
  * not evaluated yet has no SQL; the expression then carries a placeholder column until the second optimisation pass
- * evaluates the call and rebuilds the expression.
+ * evaluates the call and rebuilds the expression. With the join optimizer on, a filter whose condition the test is
+ * chooses, when it is translated, whether the database joins the pattern with the solutions of the filter or the
+ * pattern is evaluated for each of them, and writes the test anew in the latter case (see
+ * {@link #translate(Request, Scope, SqlCode)}).
  */
 public final class SqlExists extends SqlExpressionIntercode
 {
@@ -610,6 +613,52 @@ public final class SqlExists extends SqlExpressionIntercode
         builder.append(")");
 
         return builder.toCode();
+    }
+
+
+    /**
+     * Bindings of the current solution the pattern is evaluated for (see {@link #getCurrentSolution}).
+     *
+     * @return bindings of the current solution the pattern is evaluated for, or null for a pattern independent of the
+     *         surrounding bindings
+     */
+    public VariableBindings getSolution()
+    {
+        return solution;
+    }
+
+
+    /**
+     * The node whose solutions the test reads: the pattern as the test evaluates it, or the child of the filter at the
+     * top of the pattern when the test evaluates the filter in its own condition (see {@link #translate}). It lies in
+     * the scope of the pattern, which the scope of the node holding the test enters with the current solution (see
+     * {@link Scope#enterPattern}).
+     *
+     * @param request the current request
+     * @param scope the scope of the node holding the test
+     * @return the node whose solutions the test reads
+     */
+    public SqlIntercode getSource(Request request, Scope scope)
+    {
+        SqlFilter filter = getTopFilter(request, scope.enterPattern(solution), evaluated);
+
+        return filter != null ? filter.getChild() : evaluated;
+    }
+
+
+    /**
+     * SQL code of the test reading the given SQL code of its solutions (see {@link #getSource}) instead of the code the
+     * test was rendered with when it was built: the node holding the test writes the solutions another way when the
+     * join optimizer chooses so, evaluated for each of the solutions the test is evaluated for.
+     *
+     * @param request the current request
+     * @param scope the scope of the node holding the test
+     * @param sql SQL code of the solutions the test reads
+     * @return SQL code of the boolean expression testing the existence of a solution of the pattern
+     */
+    public SqlCode translate(Request request, Scope scope, SqlCode sql)
+    {
+        return translate(request, scope.enterPattern(solution), negated, evaluated, solution, sql);
     }
 
 

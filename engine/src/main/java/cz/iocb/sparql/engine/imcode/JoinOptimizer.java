@@ -1387,11 +1387,7 @@ final class JoinOptimizer
     static LeftJoinPlan planLeftJoin(Request request, SqlIntercode left, SqlIntercode right, Table leftTable,
             Map<Variable, Set<SqlExpressionIntercode>> conditions, Outer outer)
     {
-        // only a condition that one variable decides alone is estimated on a single node
-        List<SqlExpressionIntercode> filters = getFilters(request.getConfiguration(), conditions).entrySet().stream()
-                .filter(e -> e.getValue().size() == 1).map(Map.Entry::getKey).toList();
-
-        double kept = filters.isEmpty() ? 1 : selectivity(request, left, filters);
+        double kept = selectivity(request, left, conditions);
 
         double leftSolutions = outer == null ? estimateRows(request, left) :
                 estimateForRow(request, left, outer).rows();
@@ -1449,6 +1445,69 @@ final class JoinOptimizer
         }
 
         return plan;
+    }
+
+
+    /**
+     * Estimated fraction of the solutions of a node that the conditions of the filters above keep, as far as one
+     * variable of the node decides them alone (see {@link #getFilters}): only such a condition is estimated on a single
+     * node.
+     *
+     * @param request the current request
+     * @param node the node
+     * @param conditions per variable the node binds, the conditions the filters above keep the solutions by
+     * @return estimated fraction of the solutions of the node that the conditions keep
+     */
+    static double selectivity(Request request, SqlIntercode node, Map<Variable, Set<SqlExpressionIntercode>> conditions)
+    {
+        List<SqlExpressionIntercode> filters = getFilters(request.getConfiguration(), conditions).entrySet().stream()
+                .filter(e -> e.getValue().size() == 1).map(Map.Entry::getKey).toList();
+
+        return filters.isEmpty() ? 1 : selectivity(request, node, filters);
+    }
+
+
+    /**
+     * Chooses how a pattern is tested for the solutions of another node: the pattern of an EXISTS or a NOT EXISTS for
+     * the solutions of the node holding the test, the right side of a MINUS for the solutions of its left side. The
+     * pattern is evaluated once and the database joins it with the solutions by hashing (a semi-join or an anti-join,
+     * pairwise when no equality of theirs can be hashed), or the pattern is evaluated for every solution anew,
+     * restricted to its solutions compatible with it (see {@link #estimateForRow}), which the database then cannot make
+     * a join of; the test stops at the first of them, so that costs at most what the pattern costs for one row times
+     * the solutions. The costs are those of an OPTIONAL of the same sides (see {@link #planLeftJoin}), and so is the
+     * margin where the sides are compared pairwise otherwise (see {@link #PAIRWISE_MARGIN}). A pattern that is not
+     * deterministic is evaluated once.
+     *
+     * @param request the current request
+     * @param solutions estimated number of the solutions the pattern is tested for
+     * @param bindings bindings of the solutions the pattern is tested for
+     * @param table alias the columns of the solutions are addressed through, or null when the bindings address them
+     * @param pattern the tested pattern
+     * @return the solutions the pattern is evaluated for one by one, or null when it is evaluated once
+     */
+    static Outer planTest(Request request, double solutions, VariableBindings bindings, Table table,
+            SqlIntercode pattern)
+    {
+        Outer outer = Outer.of(bindings, pattern.getVariableBindings(), table);
+
+        if(!pattern.isDeterministic() || outer.bindings().getVariables().isEmpty())
+            return null;
+
+        double rows = Math.max(solutions, 1);
+        double patternRows = Math.max(estimateRows(request, pattern), 1);
+        boolean hashable = false;
+
+        for(VariableBinding binding : bindings.getValues())
+            hashable |= isHashable(binding) && isHashable(pattern.getVariable(binding.getVariable()));
+
+        Evaluation evaluation = estimateForRow(request, pattern, outer);
+        double evaluated = rows * evaluation.cost() * (hashable ? 1 : PAIRWISE_MARGIN);
+
+        // a pattern that no solution restricts would be evaluated whole for each of them
+        if(evaluation.restricted() && evaluated < hashCost(hashable, rows, patternRows, rows))
+            return outer;
+
+        return null;
     }
 
 
