@@ -404,6 +404,13 @@ public final class SqlInExpression extends SqlExpressionIntercode
 
 
     @Override
+    public boolean hasPattern()
+    {
+        return left.hasPattern() || rights.stream().anyMatch(r -> r.hasPattern());
+    }
+
+
+    @Override
     protected int getHashCode()
     {
         return Objects.hash(negated, left, new Multiset<>(rights));

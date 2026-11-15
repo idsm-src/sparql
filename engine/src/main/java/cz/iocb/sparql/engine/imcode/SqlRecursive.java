@@ -835,6 +835,23 @@ public final class SqlRecursive extends SqlIntercode
 
 
     /**
+     * True if the node is a walk between two variables that is not seeded yet, or a join holding one: such a walk may
+     * still be seeded from an end with the values of the other side of an OPTIONAL (see {@link #seedVariable}), which
+     * looks for it only there, so the node is not put under another node before that.
+     *
+     * @param node the node
+     * @return true if the node is a walk that may still be seeded or a join holding one, false otherwise
+     */
+    protected static boolean holdsSeedableWalk(SqlIntercode node)
+    {
+        if(node instanceof SqlJoin join)
+            return join.getChilds().stream().anyMatch(SqlRecursive::holdsSeedableWalk);
+
+        return node instanceof SqlRecursive walk && walk.beginVar != null && !walk.seeded;
+    }
+
+
+    /**
      * True if the node is a walk alone: a walk, or a join of a walk with empty solutions only, as a group pattern
      * holding nothing but a walk is translated. Such a walk is offered the values of the other side of an OPTIONAL or
      * MINUS once optimised, when it may still turn the OPTIONAL into a join (see {@link #matchesEverySolutionOf}),

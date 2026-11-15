@@ -88,6 +88,13 @@ public abstract class SqlBinary extends SqlExpressionIntercode
 
 
     @Override
+    public boolean hasPattern()
+    {
+        return left.hasPattern() || right.hasPattern();
+    }
+
+
+    @Override
     public boolean equals(Object object)
     {
         if(this == object)

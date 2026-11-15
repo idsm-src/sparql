@@ -733,6 +733,13 @@ public final class SqlExists extends SqlExpressionIntercode
 
 
     @Override
+    public boolean hasPattern()
+    {
+        return true;
+    }
+
+
+    @Override
     protected int getHashCode()
     {
         return Objects.hash(negated, pattern, variables, solution);

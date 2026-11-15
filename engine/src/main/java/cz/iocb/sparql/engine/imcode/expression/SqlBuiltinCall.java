@@ -3345,6 +3345,13 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
 
     @Override
+    public boolean hasPattern()
+    {
+        return arguments.stream().anyMatch(a -> a.hasPattern());
+    }
+
+
+    @Override
     protected int getHashCode()
     {
         return Objects.hash(distinct, function, arguments);

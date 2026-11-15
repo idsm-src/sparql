@@ -293,14 +293,42 @@ public class OptionalLookupTest
     @Test
     public void conditions() throws Exception
     {
-        // the filter of the OPTIONAL stays the condition of the join
-        String query = "SELECT ?x ?y WHERE { ?x ex:tag ?t OPTIONAL { ?x ex:link ?y FILTER(?y != ?x && ?t != 'tag 2') } }";
+        // the part of the filter of the OPTIONAL that the links decide by themselves filters the links looked up, the
+        // part testing a variable of the left side alone stays the condition of the join
+        String query = "SELECT ?x ?y WHERE { ?x ex:tag ?t "
+                + "OPTIONAL { ?x ex:link ?y FILTER(?y != ?x && ?t != 'tag 2') } }";
 
         String sql = translate(optimized, query);
         assertThat(sql, containsString(lookup + "SELECT "));
-        assertThat(sql, containsString(" OFFSET 0 ) AS \"right0\" ON "));
+        assertThat(sql, containsString(" OFFSET 0 ) AS \"outer0\" WHERE (\"dst\" != \"src\") ) AS \"right0\" ON "));
+        assertThat(sql, containsString(" AND (\"left0\".\"tag\" != 'tag 2'::varchar)"));
+
+        // so it is without the optimizer
+        sql = translate(plain, query);
+        assertThat(sql, containsString(" AS \"outer0\" WHERE (\"dst\" != \"src\") ) AS \"right0\" ON "));
+        assertThat(sql, containsString(" AND (\"left0\".\"tag\" != 'tag 2'::varchar)"));
 
         assertThat(check(query), hasSize(41));
+
+        // a walk the left side seeds keeps its condition in the join, as do the branches of a union
+        query = "SELECT ?x ?y WHERE { ?x ex:tag 'tag 1' OPTIONAL { ?x ex:link+ ?y FILTER(?y != ?x) } }";
+
+        check(query);
+
+        query = "SELECT ?x ?y WHERE { ?x ex:tag ?t "
+                + "OPTIONAL { { ?x ex:link ?y } UNION { ?y ex:link ?x } FILTER(?y != ?x) } }";
+
+        assertThat(translate(optimized, query),
+                containsString(" AND (\"right0\".\"y#node_par0\" != \"left0\".\"id\")"));
+        check(query);
+
+        // a condition that is not deterministic is evaluated for every pair of solutions the join compares
+        query = "SELECT ?x ?y WHERE { ?x ex:tag ?t OPTIONAL { ?x ex:link ?y FILTER(?y != ?x && RAND() < 2) } }";
+
+        sql = translate(plain, query);
+        assertThat(sql, containsString(" WHERE (\"dst\" != \"src\") ) AS \"right0\" ON "));
+        assertThat(sql, containsString("random()"));
+        assertThat(check(query), hasSize(50));
     }
 
 
@@ -342,13 +370,22 @@ public class OptionalLookupTest
         assertThat(translate(optimized, query), containsString(" CROSS JOIN LATERAL (SELECT "));
         assertThat(check(query), hasSize(1009));
 
-        // a variable the left side binds is taken from that side, so the database tests it only when it joins the
-        // sides, and the labels and the links are hashed whole
+        // a variable the left side binds too is tested on the right side, which binds it always, so the links are
+        // filtered before the sides are joined, and the labels are looked up for the few links the filter leaves
         query = "SELECT ?x ?y ?l WHERE { ?x ex:score ?s OPTIONAL { ?x ex:label ?l . ?x ex:link ?y "
                 + "FILTER(STRENDS(STR(?x), '/77')) } }";
 
-        assertThat(translate(optimized, query), not(containsString("LATERAL")));
+        String sql = translate(optimized, query);
+        assertThat(sql, not(containsString(lookup)));
+        assertThat(sql, containsString(" AS \"outer0\" WHERE sparql.strends_string_string("));
+        assertThat(sql, containsString(" ) AS \"right0\" ON (((\"left0\".\"id\" = \"right0\".\"x#node_par0\"))))"));
         assertThat(check(query), hasSize(1009));
+
+        // a variable the left side binds alone is tested where the sides are joined
+        query = "SELECT ?x ?y WHERE { ?x ex:score ?s OPTIONAL { ?x ex:link ?y FILTER(?s > 100) } }";
+
+        assertThat(translate(optimized, query), containsString(" AND (\"left0\".\"score\" > '100'::int4)"));
+        assertThat(check(query), hasSize(1900));
     }
 
 

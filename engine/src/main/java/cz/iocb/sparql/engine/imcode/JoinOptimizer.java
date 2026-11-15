@@ -1347,42 +1347,41 @@ final class JoinOptimizer
 
 
     /**
-     * Estimated number of the rows that the groupings and the deduplications of the node read beyond the solutions the
-     * node has, when the node is evaluated whole: such a node has to read all the solutions of its child, however few
-     * it makes of them, whereas the cost of joining a node counts only its solutions (see {@link #hashCost}). The nodes
-     * passing the solutions of a child on are looked through; any other node counts by its solutions, which no index
-     * may spare a grouping.
+     * Estimated number of the rows that the node reads beyond the solutions it has, when it is evaluated whole: a
+     * grouping, a deduplication and a filter have to read all the solutions of their child, however few they make or
+     * keep of them, whereas the cost of joining a node counts only its solutions (see {@link #hashCost}). An index may
+     * spare a filter the rows, but nothing tells so, and the rows not counted would make a side that is cheap only by
+     * its filter look cheap to evaluate. The nodes passing the solutions of a child on are looked through (a slice of a
+     * sub-select among them, which need not read the rows it leaves out); any other node counts by its solutions.
      *
      * @param request the current request
      * @param node the node
      * @return estimated number of the rows read beyond the solutions of the node
      */
-    private static double estimateGrouped(Request request, SqlIntercode node)
+    private static double estimateRead(Request request, SqlIntercode node)
     {
-        SqlIntercode child = node;
+        if(node instanceof SqlBind bind)
+            return estimateRead(request, bind.getChild());
 
-        while(true)
-        {
-            if(child instanceof SqlFilter filter)
-                child = filter.getChild();
-            else if(child instanceof SqlBind bind)
-                child = bind.getChild();
-            else if(child instanceof SqlStripConstantColumns strip)
-                child = strip.getChild();
-            else if(child instanceof SqlSelect select)
-                child = select.getChild();
-            else
-                break;
-        }
+        if(node instanceof SqlStripConstantColumns strip)
+            return estimateRead(request, strip.getChild());
 
-        SqlIntercode grouped = child instanceof SqlAggregation aggregation ? aggregation.getChild() :
-                child instanceof SqlDistinct distinct ? distinct.getChild() : null;
+        if(node instanceof SqlSelect select)
+            return estimateRead(request, select.getChild());
 
-        if(grouped == null)
+        SqlIntercode child = null;
+
+        if(node instanceof SqlAggregation aggregation)
+            child = aggregation.getChild();
+        else if(node instanceof SqlDistinct distinct)
+            child = distinct.getChild();
+        else if(node instanceof SqlFilter filter)
+            child = filter.getChild();
+
+        if(child == null)
             return 0;
 
-        return Math.max(
-                estimateRows(request, grouped) + estimateGrouped(request, grouped) - estimateRows(request, node), 0);
+        return Math.max(estimateRows(request, child) + estimateRead(request, child) - estimateRows(request, node), 0);
     }
 
 
@@ -1663,7 +1662,7 @@ final class JoinOptimizer
         }
 
         double rows = leftRows * Math.max(fanout, 1);
-        double hashed = hashCost(hashable, leftRows, rightRows, rows) + estimateGrouped(request, right);
+        double hashed = hashCost(hashable, leftRows, rightRows, rows) + estimateRead(request, right);
 
         LeftJoinPlan plan = new LeftJoinPlan(null, null, rows, hashed);
 
@@ -1750,7 +1749,7 @@ final class JoinOptimizer
         for(VariableBinding binding : bindings.getValues())
             hashable |= isHashable(binding) && isHashable(pattern.getVariable(binding.getVariable()));
 
-        double joined = hashCost(hashable, rows, patternRows, rows) + estimateGrouped(request, pattern);
+        double joined = hashCost(hashable, rows, patternRows, rows) + estimateRead(request, pattern);
         Outer outer = Outer.of(bindings, pattern.getVariableBindings(), table);
 
         if(!pattern.isDeterministic() || outer.bindings().getVariables().isEmpty())

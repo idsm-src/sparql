@@ -280,6 +280,20 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
 
     /**
+     * True if the expression contains a test of a pattern (an EXISTS or a NOT EXISTS, see {@link SqlExists}). How the
+     * database evaluates such a test follows from the place of the expression: a test in a condition of a filter may
+     * become a join of the pattern with the filtered solutions, whereas a test in a condition of an OPTIONAL is
+     * evaluated for the pairs of solutions the join compares. An expression without operands contains none.
+     *
+     * @return true if the expression contains a test of a pattern, false otherwise
+     */
+    public boolean hasPattern()
+    {
+        return false;
+    }
+
+
+    /**
      * Rebuilds the expression over the given (optimised) variable bindings, materialising only the classes in
      * {@code restriction}; with {@code evalServices}, patterns nested in EXISTS evaluate their SERVICE stubs. A
      * reference to a current solution takes its classes and columns from the scope (see {@link Scope}).

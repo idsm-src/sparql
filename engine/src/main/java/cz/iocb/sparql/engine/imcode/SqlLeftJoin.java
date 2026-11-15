@@ -40,11 +40,14 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * solution for every solution of the left side, is a join (see {@link SqlRecursive#matchesEverySolutionOf}). Another
  * walk on the right side whose start the left side binds always is seeded with the distinct values of the start read
  * from the left side, shared so that the statement evaluates it once (see {@link SqlShared}). A condition that the
- * solutions of the right side decide by themselves filters that side, so it is handed down to the contexts of the
- * SERVICE calls of the right side when the side can take it in (see {@link SqlIntercode#sink}). With the join optimizer
- * on, the engine chooses the method of the join as well (see {@link JoinOptimizer#planLeftJoin}): the right side is
- * evaluated once and hashed, or it is looked up for every solution of the left side (see {@link #translate}), also by a
- * variable the left side may leave unbound, for the solutions that bind it (see {@link #translateForSolution}).
+ * solutions of the right side decide by themselves filters that side (see {@link SqlIntercode#keepsValues}): it is
+ * handed down to the contexts of the SERVICE calls of the right side when the side can take it in (see
+ * {@link SqlIntercode#sink}), and it becomes a filter of the right side otherwise, unless that side is a union, over
+ * whose branches a filter is distributed, or a walk the left side may still seed, or the condition tests a pattern (see
+ * {@link SqlExpressionIntercode#hasPattern}). With the join optimizer on, the engine chooses the method of the join as
+ * well (see {@link JoinOptimizer#planLeftJoin}): the right side is evaluated once and hashed, or it is looked up for
+ * every solution of the left side (see {@link #translate}), also by a variable the left side may leave unbound, for the
+ * solutions that bind it (see {@link #translateForSolution}).
  */
 public final class SqlLeftJoin extends SqlIntercode
 {
@@ -315,6 +318,12 @@ public final class SqlLeftJoin extends SqlIntercode
         if(right instanceof SqlStripConstantColumns strip)
             right = strip.getChild();
 
+        // the conditions the right side decides by itself filter it before the sides are optimised
+        SqlIntercode filteredRight = filterRight(request, scope, left, right, conditions, restrictions);
+
+        if(filteredRight != null)
+            return filteredRight.optimize(request, scope, restrictions, reduced, evalServices);
+
         SqlIntercode optLeft = left;
         SqlIntercode optRight = right;
         List<SqlExpressionIntercode> optConditions = conditions;
@@ -516,6 +525,13 @@ public final class SqlLeftJoin extends SqlIntercode
                     .optimize(request, scope, restrictions, optReduced, evalServices);
         }
 
+        // the conditions the right side decides by itself only now filter it (a walk seeded in the meantime, a union
+        // reduced to a branch), which the sides are optimised for again
+        SqlIntercode filtered = filterRight(request, scope, optLeft, optRight, optConditions, restrictions);
+
+        if(filtered != null)
+            return filtered.optimize(request, scope, restrictions, optReduced, evalServices);
+
         if(optLeft instanceof SqlTableAccess l && optRight instanceof SqlTableAccess r && optConditions.isEmpty())
         {
             DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
@@ -533,6 +549,82 @@ public final class SqlLeftJoin extends SqlIntercode
             return this;
 
         return leftJoin(request, scope, optLeft, optRight, optConditions, restrictions);
+    }
+
+
+    /**
+     * The left join of the sides in which the conditions that the right side decides by itself filter that side, or
+     * null when no condition does: a condition (a conjunct of one) whose deciding variables the right side binds
+     * always, or nothing else binds (see {@link SqlIntercode#keepsValues}), holds for a solution of the join exactly
+     * when it holds for the solution of the right side it is made of. The sides are then joined without the solutions
+     * the condition drops, also where the condition tests a variable the left side binds too, which the join itself
+     * would compare only when it joins the sides. A condition stays in the join when the right side is a union (see
+     * {@link #isUnionAlone}), as a filter is distributed over the branches of a union, which are then no longer read by
+     * a single scan (see {@link SqlUnion}); when the right side is a walk the left side may still seed (see
+     * {@link SqlRecursive#holdsSeedableWalk}); when it is not deterministic; when it tests a pattern, which the
+     * database evaluates in the join for the pairs of solutions it compares, whereas in a filter it would join the
+     * pattern, evaluating whole a pattern that cannot be looked up (see {@link SqlExpressionIntercode#hasPattern}); and
+     * when the bindings of the right side do not let rebuild it (see {@link SqlIntercode#filterBy}).
+     *
+     * @param request the current request
+     * @param scope the scope of the join
+     * @param left the left side
+     * @param right the right side
+     * @param conditions the conditions
+     * @param restrictions what the parent needs of the variables
+     * @return the left join whose right side is filtered by the conditions it decides by itself, or null
+     */
+    private static SqlIntercode filterRight(Request request, Scope scope, SqlIntercode left, SqlIntercode right,
+            List<SqlExpressionIntercode> conditions, Restrictions restrictions)
+    {
+        if(conditions.isEmpty() || isUnionAlone(right) || SqlRecursive.holdsSeedableWalk(right))
+            return null;
+
+        ClassRelations relations = request.getConfiguration();
+
+        List<VariableBindings> others = List.of(left.getVariableBindings());
+        VariableBindings known = getExpressionVariableBindings(request, scope, left.getVariableBindings(),
+                right.getVariableBindings());
+
+        SqlIntercode filtered = right;
+        List<SqlExpressionIntercode> kept = new ArrayList<>();
+
+        for(SqlExpressionIntercode condition : getConjuncts(conditions))
+        {
+            SqlIntercode taken = null;
+
+            if(condition.isDeterministic() && !condition.hasPattern()
+                    && keepsValues(getDecidingVariables(relations, condition), right.getVariableBindings(), others))
+                taken = filterBy(request, scope, condition, known, filtered);
+
+            if(taken != null)
+                filtered = taken;
+            else
+                kept.add(condition);
+        }
+
+        return filtered == right ? null : leftJoin(request, scope, left, filtered, kept, restrictions);
+    }
+
+
+    /**
+     * True if the node is a union alone: a union, or a join of a union with empty solutions only, as a group pattern
+     * holding nothing but a union is translated, which the optimisation makes the union itself.
+     *
+     * @param node the node
+     * @return true if the node is a union alone, false otherwise
+     */
+    private static boolean isUnionAlone(SqlIntercode node)
+    {
+        if(node instanceof SqlUnion)
+            return true;
+
+        if(!(node instanceof SqlJoin join))
+            return false;
+
+        List<SqlIntercode> childs = join.getChilds().stream().filter(c -> !c.equals(SqlEmptySolution.get())).toList();
+
+        return childs.size() == 1 && isUnionAlone(childs.get(0));
     }
 
 
