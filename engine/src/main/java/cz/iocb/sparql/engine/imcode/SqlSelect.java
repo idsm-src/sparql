@@ -566,7 +566,9 @@ public final class SqlSelect extends SqlIntercode
      * {@code WITH} clause of a statement made of the code: it declares the declared tables the code reads (see
      * {@link SqlCode}) and, transitively, those their own queries read. The virtual tables come first, each one after
      * the virtual tables its definition reads; the common table expressions follow in the order they were asked for, so
-     * that each one follows the ones its query reads (see {@link CommonTable}). Empty when there is nothing to declare.
+     * that each one follows the ones its query reads (see {@link CommonTable}), a table whose result the database has
+     * to keep being declared as materialized (see {@link Request#getMaterializedTableExpression}). Empty when there is
+     * nothing to declare.
      *
      * @param request the current request
      * @param code the SQL code of the statement without the clause
@@ -592,7 +594,8 @@ public final class SqlSelect extends SqlIntercode
         Stream<String> definitions = ordered.entrySet().stream()
                 .map(e -> e.getKey() + " AS (" + e.getValue().getQuery() + ")");
 
-        Stream<String> expressions = common.stream().map(t -> t + " AS (" + t.getQuery().getText() + ")");
+        Stream<String> expressions = common.stream()
+                .map(t -> t + (t.isMaterialized() ? " AS MATERIALIZED (" : " AS (") + t.getQuery().getText() + ")");
 
         return Stream.concat(definitions, expressions).collect(joining(", ", "WITH ", " "));
     }

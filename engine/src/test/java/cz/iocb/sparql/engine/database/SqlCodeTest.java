@@ -33,7 +33,7 @@ public class SqlCodeTest
      * A common table expression whose query reads the virtual table.
      */
     private static final CommonTable common = new CommonTable(3,
-            new SqlBuilder().append("SELECT 1 FROM ").append(virtual).toCode());
+            new SqlBuilder().append("SELECT 1 FROM ").append(virtual).toCode(), false);
 
     /**
      * An expression column whose expression reads the common table expression.

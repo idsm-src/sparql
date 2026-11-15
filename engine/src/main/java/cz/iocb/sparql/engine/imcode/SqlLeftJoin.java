@@ -43,7 +43,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * solutions of the right side decide by themselves filters that side, so it is handed down to the contexts of the
  * SERVICE calls of the right side when the side can take it in (see {@link SqlIntercode#sink}). With the join optimizer
  * on, the engine chooses the method of the join as well (see {@link JoinOptimizer#planLeftJoin}): the right side is
- * evaluated once and hashed, or it is looked up for every solution of the left side (see {@link #translate}).
+ * evaluated once and hashed, or it is looked up for every solution of the left side (see {@link #translate}), also by a
+ * variable the left side may leave unbound, for the solutions that bind it (see {@link #translateForSolution}).
  */
 public final class SqlLeftJoin extends SqlIntercode
 {
@@ -647,9 +648,10 @@ public final class SqlLeftJoin extends SqlIntercode
      * SQL code of the left join. With the join optimizer on, the right side is written the way the optimizer chooses
      * (see {@link #getPlan}): as it is, for the database to evaluate it once and hash the sides, or as a lateral
      * subquery evaluated for every solution of the left side and restricted to the solutions compatible with it (see
-     * {@link SqlIntercode#translateForRow}), which the database joins by a nested loop over the left side. The
-     * condition of the join is the same in both cases, so the restriction only spares the database the solutions the
-     * condition would drop.
+     * {@link SqlIntercode#translateForRow}), which the database joins by a nested loop over the left side; the subquery
+     * may tell the solutions binding the variables the left side may leave unbound from the others (see
+     * {@link #translateForSolution}). The condition of the join is the same in all cases, so the restriction only
+     * spares the database the solutions the condition would drop.
      */
     @Override
     public SqlCode translate(Request request, Scope scope)
@@ -683,9 +685,9 @@ public final class SqlLeftJoin extends SqlIntercode
     {
         ClassRelations relations = request.getConfiguration();
 
-        // the solutions of the left side the right side is evaluated for one by one, when the optimizer chooses so
-        JoinOptimizer.Outer solutions = request.getConfiguration().isJoinOptimizerEnabled() ?
-                getPlan(request, outer).outer() : null;
+        // the method the optimizer chooses for the join
+        JoinOptimizer.LeftJoinPlan plan = request.getConfiguration().isJoinOptimizerEnabled() ?
+                getPlan(request, outer) : null;
 
         SqlBuilder builder = new SqlBuilder();
 
@@ -705,10 +707,15 @@ public final class SqlLeftJoin extends SqlIntercode
         builder.append(" ) AS ");
         builder.appendAlias(leftTable);
 
-        if(solutions != null)
+        if(plan != null && plan.bound() != null)
         {
             builder.append(" LEFT JOIN LATERAL (");
-            builder.append(right.translateForRow(request, scope, solutions));
+            builder.append(translateForSolution(request, scope, plan));
+        }
+        else if(plan != null && plan.outer() != null)
+        {
+            builder.append(" LEFT JOIN LATERAL (");
+            builder.append(right.translateForRow(request, scope, plan.outer()));
         }
         else
         {
@@ -734,6 +741,70 @@ public final class SqlLeftJoin extends SqlIntercode
 
         if(condition == null && conditions.isEmpty())
             builder.append("true");
+
+        return builder.toCode();
+    }
+
+
+    /**
+     * SQL code of the right side evaluated for one solution of the left side, as the plan tells the solutions apart
+     * (see {@link JoinOptimizer.LeftJoinPlan}): a union of two branches, each guarded by a test of the solution, so
+     * that the database evaluates just one of them. For a solution binding every variable the left side may leave
+     * unbound, the right side is restricted by those variables too. For any other solution it is evaluated as the plan
+     * says without them: restricted by the variables the left side binds always, or whole, in which case the solutions
+     * read it from a common table expression the database keeps the result of (see
+     * {@link Request#getMaterializedTableExpression}), so the right side is evaluated once however many solutions leave
+     * a variable unbound, and not at all when none does. A right side referring to a table that such an expression
+     * cannot see (see {@link SqlCode#getOuterTables}) is written in the place. The union is fenced by {@code OFFSET 0}:
+     * the database then plans it as a unit that depends on the solution only through the values it is evaluated for, so
+     * it may keep the results by those values (its Memoize node) and the solutions leaving a variable unbound, which
+     * all read the same rows, cost what a pairwise comparison does; without the fence it keeps nothing, because the
+     * tests of the branches pulled up into the join read the solution on their own.
+     *
+     * @param request the current request
+     * @param scope the scope of the join
+     * @param plan the method chosen for the join, telling the solutions of the left side apart
+     * @return SQL code of the right side evaluated for one solution of the left side
+     */
+    private SqlCode translateForSolution(Request request, Scope scope, JoinOptimizer.LeftJoinPlan plan)
+    {
+        List<VariableBinding> tested = left.getVariableBindings().getValues().stream()
+                .filter(b -> b.canBeNull() && plan.bound().bindings().get(b.getVariable()) != null).toList();
+
+        Set<Column> columns = right.getVariableBindings().getNonConstantColumns();
+        SqlCode list = columns.isEmpty() ? SqlCode.of("1") : columns.stream().collect(SqlCode.joining(", "));
+
+        SqlBuilder builder = new SqlBuilder();
+
+        builder.append("SELECT ");
+        builder.append(list);
+        builder.append(" FROM (");
+        builder.append(right.translateForRow(request, scope, plan.bound()));
+        builder.append(") AS tab WHERE ");
+        builder.append(tested.stream().map(b -> b.getIsNotNull(leftTable)).collect(SqlCode.joining(" AND ")));
+
+        builder.append(" UNION ALL SELECT ");
+        builder.append(list);
+        builder.append(" FROM ");
+
+        SqlCode whole = plan.outer() != null ? null : right.translate(request, scope);
+
+        if(whole != null && whole.getOuterTables().isEmpty())
+        {
+            builder.append(request.getMaterializedTableExpression(whole));
+        }
+        else
+        {
+            builder.append("(");
+            builder.append(whole != null ? whole : right.translateForRow(request, scope, plan.outer()));
+            builder.append(")");
+        }
+
+        builder.append(" AS tab WHERE ");
+        builder.append(tested.stream().map(b -> b.getIsNull(leftTable)).collect(SqlCode.joining(" OR ")));
+
+        // the fence makes the database plan the union as a unit, so that it can keep the results by the tested values
+        builder.append(" OFFSET 0");
 
         return builder.toCode();
     }

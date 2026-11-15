@@ -38,8 +38,9 @@ import cz.iocb.sparql.testing.Database;
  * The method the join optimizer of the engine chooses for an OPTIONAL: the right side of a few solutions of the left
  * side is evaluated for each of them, as a lateral subquery whose table accesses are restricted by the values of the
  * solution and fenced by OFFSET 0, so that the database looks them up by the indexes; the right side of many solutions
- * is evaluated once and hashed, as it is without the optimizer. The solutions are those of the joins left to the
- * planner.
+ * is evaluated once and hashed, as it is without the optimizer. A variable the left side may leave unbound restricts
+ * the right side for the solutions that bind it, which the subquery tells from the others. The solutions are those of
+ * the joins left to the planner.
  */
 public class OptionalLookupTest
 {
@@ -67,9 +68,9 @@ public class OptionalLookupTest
     /**
      * Creates the {@code optional_lookup_test} schema: the nodes 1 to 1000 with labels and with scores equal to their
      * numbers, 2000 links among the nodes 1 to 200 (every node links to ten), five nodes tagged, aliases of the nodes
-     * holding their IRIs whole, all indexed, and notes of the nodes 1 to 500 with no index, all analysed; and the two
-     * configurations mapping {@code ex:label}, {@code ex:score}, {@code ex:link}, {@code ex:tag}, {@code ex:alias} and
-     * {@code ex:note} over them.
+     * holding their IRIs whole, marks of the nodes 1 to 200, all indexed, and notes of the nodes 1 to 500 with no
+     * index, all analysed; and the two configurations mapping {@code ex:label}, {@code ex:score}, {@code ex:link},
+     * {@code ex:tag}, {@code ex:alias}, {@code ex:note} and {@code ex:mark} over them.
      */
     @BeforeAll
     static void init() throws SQLException
@@ -106,9 +107,14 @@ public class OptionalLookupTest
             statement.execute("create table optional_lookup_test.notes (id integer not null, note varchar not null)");
             statement.execute(
                     "insert into optional_lookup_test.notes select i, 'note ' || i from generate_series(1, 500) as i");
+            statement
+                    .execute("create table optional_lookup_test.marks (id integer primary key, mark varchar not null)");
+            statement.execute(
+                    "insert into optional_lookup_test.marks select i, 'mark ' || i from generate_series(1, 200) as i");
             statement.execute("""
                     analyze optional_lookup_test.nodes, optional_lookup_test.links, optional_lookup_test.few, \
-                    optional_lookup_test.scores, optional_lookup_test.aliases, optional_lookup_test.notes""");
+                    optional_lookup_test.scores, optional_lookup_test.aliases, optional_lookup_test.notes, \
+                    optional_lookup_test.marks""");
         }
 
         DatabaseSchema schema = new DatabaseSchema(connectionPool);
@@ -137,6 +143,7 @@ public class OptionalLookupTest
         DatabaseTable scores = new DatabaseTable("optional_lookup_test", "scores");
         DatabaseTable aliases = new DatabaseTable("optional_lookup_test", "aliases");
         DatabaseTable notes = new DatabaseTable("optional_lookup_test", "notes");
+        DatabaseTable marks = new DatabaseTable("optional_lookup_test", "marks");
 
         config.addQuadMapping(nodes, null, config.createIriMapping("node", "id"), config.createIriMapping("ex:label"),
                 config.createLiteralMapping(xsdString, "label"));
@@ -150,6 +157,8 @@ public class OptionalLookupTest
                 config.createLiteralMapping(xsdString, "alias"));
         config.addQuadMapping(notes, null, config.createIriMapping("node", "id"), config.createIriMapping("ex:note"),
                 config.createLiteralMapping(xsdString, "note"));
+        config.addQuadMapping(marks, null, config.createIriMapping("node", "id"), config.createIriMapping("ex:mark"),
+                config.createLiteralMapping(xsdString, "mark"));
 
         return config;
     }
@@ -435,11 +444,71 @@ public class OptionalLookupTest
 
         assertThat(translate(optimized, query), not(containsString(lookup)));
         check(query);
+    }
 
-        // a variable the left side may leave unbound restricts nothing
-        query = "SELECT ?x ?y ?l WHERE { ?x ex:tag ?t OPTIONAL { ?x ex:link ?y } OPTIONAL { ?y ex:label ?l } }";
+
+    @Test
+    public void unboundVariable() throws Exception
+    {
+        // a tagged node need not link to a node, but the label of the node it links to is looked up
+        String query = "SELECT ?x ?y ?l WHERE { ?x ex:tag ?t OPTIONAL { ?x ex:link ?y } OPTIONAL { ?y ex:label ?l } }";
+
+        String sql = translate(optimized, query);
+        assertThat(count(sql, lookup), is(2));
+        assertThat(sql,
+                containsString("\"optional_lookup_test\".\"nodes\" WHERE (((\"left0\".\"y#node_par0\" = \"id\")))"));
+        assertThat(sql,
+                containsString(" OFFSET 0) AS tab WHERE (\"left0\".\"y#node_par0\" IS NOT NULL) UNION ALL SELECT "));
+
+        // the labels are kept for the nodes that link to none, which are joined with them all
+        assertThat(sql, containsString(" AS MATERIALIZED (SELECT "));
+        assertThat(sql, containsString(
+                " FROM \"cte0\" AS tab WHERE (\"left0\".\"y#node_par0\" IS NULL) OFFSET 0 ) AS \"right0\" ON "));
+
+        assertThat(translate(plain, query), not(containsString("LATERAL")));
+        assertThat(check(query), hasSize(50));
+
+        // the nodes 199 and 200 link to ten nodes each, the nodes 201 and 202 to none
+        query = "SELECT ?x ?y ?l WHERE { ?x ex:score ?s FILTER(?s > 198 && ?s < 203) OPTIONAL { ?x ex:link ?y } "
+                + "OPTIONAL { ?y ex:label ?l } }";
+
+        assertThat(count(translate(optimized, query), lookup), is(2));
+        assertThat(check(query), hasSize(2020));
+
+        // the five tags are compared with the nodes pairwise, which costs less than looking them up
+        query = "SELECT ?x ?y ?u WHERE { ?x ex:score ?s FILTER(?s > 198 && ?s < 203) OPTIONAL { ?x ex:link ?y } "
+                + "OPTIONAL { ?y ex:tag ?u } }";
+
+        assertThat(count(translate(optimized, query), lookup), is(1));
+        assertThat(check(query), hasSize(30));
+
+        // the two hundred marks are few enough for the database to scan them instead of looking them up, which would
+        // cost what comparing them pairwise does
+        query = "SELECT ?x ?y ?m WHERE { ?x ex:tag ?t OPTIONAL { ?x ex:link ?y } OPTIONAL { ?y ex:mark ?m } }";
 
         assertThat(count(translate(optimized, query), lookup), is(1));
         assertThat(check(query), hasSize(50));
+
+        // the notes have no index to look them up by, so the sides are compared pairwise
+        query = "SELECT ?x ?y ?n WHERE { ?x ex:tag ?t OPTIONAL { ?x ex:link ?y } OPTIONAL { ?y ex:note ?n } }";
+
+        assertThat(count(translate(optimized, query), lookup), is(1));
+        assertThat(check(query), hasSize(50));
+
+        // the links back are looked up by the tagged node, and by the node it links to as well when there is one
+        query = "SELECT ?x ?y ?z WHERE { ?x ex:tag ?t OPTIONAL { ?x ex:link ?y } OPTIONAL { ?y ex:link ?x, ?z } }";
+
+        sql = translate(optimized, query);
+        assertThat(count(sql, lookup), is(2));
+        assertThat(sql, not(containsString(" MATERIALIZED ")));
+        assertThat(count(sql, ") AS tab WHERE (\"left0\".\"y#node_par0\" IS "), is(2));
+
+        check(query);
+
+        // the links back of many nodes are hashed by the node, whether it links to a node or not
+        query = "SELECT ?x ?y WHERE { ?x ex:label ?l OPTIONAL { ?x ex:link ?y } OPTIONAL { ?y ex:link ?x } }";
+
+        assertThat(translate(optimized, query), not(containsString("LATERAL")));
+        assertThat(check(query), hasSize(2800));
     }
 }

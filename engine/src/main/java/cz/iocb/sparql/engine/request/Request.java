@@ -221,6 +221,17 @@ public class Request implements AutoCloseable
 
 
     /**
+     * What tells the common table expressions of a request apart (see {@link #getCommonTableExpression}).
+     *
+     * @param text SQL text of the query the common table expression evaluates
+     * @param materialized whether the database is told to keep the result of the query
+     */
+    private record CommonTableKey(String text, boolean materialized)
+    {
+    }
+
+
+    /**
      * Logger of the request processing.
      */
     private static final Logger logger = LoggerFactory.getLogger(Request.class);
@@ -266,10 +277,10 @@ public class Request implements AutoCloseable
     private int lateralId = 0;
 
     /**
-     * Common table expressions of the query being evaluated, by the SQL texts of their queries (see
-     * {@link #getCommonTableExpression}).
+     * Common table expressions of the query being evaluated, by the SQL texts of their queries and by whether the
+     * database keeps their results (see {@link #getCommonTableExpression} and {@link #getMaterializedTableExpression}).
      */
-    private final Map<String, CommonTable> commonTableExpressions = new HashMap<>();
+    private final Map<CommonTableKey, CommonTable> commonTableExpressions = new HashMap<>();
 
     /**
      * Row counts the planner of the database has estimated for statements during the request, by the texts of the
@@ -985,14 +996,44 @@ public class Request implements AutoCloseable
      */
     public CommonTable getCommonTableExpression(SqlCode query)
     {
+        return getTableExpression(query, false);
+    }
+
+
+    /**
+     * The common table expression that evaluates the query like {@link #getCommonTableExpression}, whose result the
+     * database is told to keep wherever it is read: a query that a single place of the statement reads is evaluated in
+     * that place otherwise, which is anew for every row when the place is a subquery evaluated for the rows of another
+     * table. The result is still computed only as far as it is read, so a table no row reads costs nothing. The table
+     * is another one than the table the query has without that.
+     *
+     * @param query SQL code of the query
+     * @return the common table expression evaluating the query, declared as materialized
+     */
+    public CommonTable getMaterializedTableExpression(SqlCode query)
+    {
+        return getTableExpression(query, true);
+    }
+
+
+    /**
+     * The common table expression of the given kind that evaluates the query, created when it is first asked for.
+     *
+     * @param query SQL code of the query
+     * @param materialized whether the database is told to keep the result of the query
+     * @return the common table expression evaluating the query
+     */
+    private CommonTable getTableExpression(SqlCode query, boolean materialized)
+    {
         assert query.getOuterTables().isEmpty();
 
-        CommonTable table = commonTableExpressions.get(query.getText());
+        CommonTableKey key = new CommonTableKey(query.getText(), materialized);
+        CommonTable table = commonTableExpressions.get(key);
 
         if(table == null)
         {
-            table = new CommonTable(commonTableExpressions.size(), query);
-            commonTableExpressions.put(query.getText(), table);
+            table = new CommonTable(commonTableExpressions.size(), query, materialized);
+            commonTableExpressions.put(key, table);
         }
 
         return table;

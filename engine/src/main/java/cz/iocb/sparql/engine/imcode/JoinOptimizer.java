@@ -84,6 +84,14 @@ final class JoinOptimizer
     static final double COMPARISON_COST = 0.3;
 
     /**
+     * How many times cheaper the lookups of the solutions binding a variable have to be than the pairwise comparison of
+     * the sides for the solutions to be told apart (see {@link #planLeftJoin}): the database scans a table of a few
+     * pages whole instead of using its index, so a lookup in a small table costs what the comparison with its rows
+     * does, and the margin leaves such right sides compared pairwise.
+     */
+    static final double PAIRWISE_MARGIN = 16;
+
+    /**
      * Rows of a child nothing is known about.
      */
     static final double DEFAULT_ROWS = 1000;
@@ -195,6 +203,31 @@ final class JoinOptimizer
 
             return new Outer(kept, table);
         }
+
+
+        /**
+         * The rows with the given bindings that bind every variable a node with the given bindings can be restricted
+         * by: of the variables the node binds too, those are kept that the rows bind in a single class, also the ones a
+         * row may leave unbound, which are taken as bound. The node is evaluated so only for the rows that bind them
+         * all (see {@link LeftJoinPlan}).
+         *
+         * @param bindings bindings of the rows
+         * @param node bindings of the node evaluated for the rows
+         * @param table alias the columns of the rows are addressed through
+         * @return the rows binding the variables they may leave unbound
+         */
+        static Outer ofBound(VariableBindings bindings, VariableBindings node, Table table)
+        {
+            VariableBindings kept = new VariableBindings();
+
+            for(VariableBinding binding : bindings.getValues())
+                if(node.get(binding.getVariable()) != null && binding.getMappings().size() == 1
+                        && !binding.getMappings().containsValue(null))
+                    kept.add(!binding.canBeNull() ? binding :
+                            new VariableBinding(binding.getVariable(), binding.getMappings(), false));
+
+            return new Outer(kept, table);
+        }
     }
 
 
@@ -216,10 +249,13 @@ final class JoinOptimizer
      * @param outer the solutions of the left side that the right side is evaluated for one by one, or null when the
      *            right side is evaluated once and the sides are hashed (or compared pairwise when no equality of theirs
      *            can be hashed)
+     * @param bound the solutions of the left side binding the variables it may leave unbound, for which the right side
+     *            is evaluated one by one, restricted by those variables as well, the other solutions being joined as
+     *            {@code outer} says; or null when the solutions are not told apart
      * @param rows estimated number of rows of the result
      * @param cost estimated cost of the join, the evaluation of the left side excluded
      */
-    record LeftJoinPlan(Outer outer, double rows, double cost)
+    record LeftJoinPlan(Outer outer, Outer bound, double rows, double cost)
     {
     }
 
@@ -1324,9 +1360,20 @@ final class JoinOptimizer
      * solutions compatible with it, which costs what the right side costs for one row (see {@link #estimateForRow})
      * times the solutions of the left side. The costs are those of a join of the same sides (see {@link #join}), so an
      * OPTIONAL of a table access is looked up exactly when a join with it would be. A right side that is not
-     * deterministic is evaluated once. The left side gives the join only the solutions that the conditions of the
-     * filters above keep, as far as one of its variables decides them alone (see {@link #getFilters}), because the
-     * database evaluates such a condition on the left side (see {@link #plan(Request, List, Map, Outer)}).
+     * deterministic is evaluated once. A variable the left side may leave unbound restricts the right side for no
+     * solution by itself, and its equality is a disjunction the database can neither hash nor look up, so the solutions
+     * binding all such variables are told apart when it pays (see {@link LeftJoinPlan}): the right side is evaluated
+     * for each of them, restricted by those variables too (see {@link Outer#ofBound}), and the solutions leaving one of
+     * them unbound are joined by the method chosen without those variables. As nothing tells how many solutions leave a
+     * variable unbound, they are told apart only where the others lose little by it: the method chosen for them is a
+     * lookup too, or no equality of the sides can be hashed, so they are compared with the right side pairwise either
+     * way. Read through the union of the subquery, the comparison costs them less than twice as much at worst (and the
+     * same when the database keeps the result of the subquery for them, see {@link SqlLeftJoin#translate}), whereas the
+     * solutions binding the variables may gain orders of magnitude, so the fraction is not guessed. Where the sides are
+     * compared pairwise otherwise, the lookups have to be cheaper by a margin (see {@link #PAIRWISE_MARGIN}), because
+     * the database does not look a small table up. The left side gives the join only the solutions that the conditions
+     * of the filters above keep, as far as one of its variables decides them alone (see {@link #getFilters}), because
+     * the database evaluates such a condition on the left side (see {@link #plan(Request, List, Map, Outer)}).
      *
      * @param request the current request
      * @param left the left side
@@ -1367,19 +1414,41 @@ final class JoinOptimizer
         double rows = leftRows * Math.max(fanout, 1);
         double hashed = hashCost(hashable, leftRows, rightRows, rows);
 
+        LeftJoinPlan plan = new LeftJoinPlan(null, null, rows, hashed);
+
+        if(!right.isDeterministic())
+            return plan;
+
         Outer solutions = Outer.of(left.getVariableBindings(), right.getVariableBindings(), leftTable);
 
-        if(right.isDeterministic() && !solutions.bindings().getVariables().isEmpty())
+        if(!solutions.bindings().getVariables().isEmpty())
         {
             Evaluation evaluation = estimateForRow(request, right, solutions);
             double lookedUp = leftRows * evaluation.cost();
 
             // a right side that no solution of the left side restricts would be evaluated whole for each of them
             if(evaluation.restricted() && lookedUp < hashed)
-                return new LeftJoinPlan(solutions, rows, lookedUp);
+                plan = new LeftJoinPlan(solutions, null, rows, lookedUp);
         }
 
-        return new LeftJoinPlan(null, rows, hashed);
+        // the solutions binding the variables that the left side may leave unbound are told apart only when the others
+        // lose little by it: they are looked up as well, or compared pairwise whatever the method
+        Outer bound = Outer.ofBound(left.getVariableBindings(), right.getVariableBindings(), leftTable);
+
+        if((plan.outer() != null || !hashable)
+                && bound.bindings().getVariables().size() > solutions.bindings().getVariables().size())
+        {
+            Evaluation evaluation = estimateForRow(request, right, bound);
+            double lookedUp = leftRows * evaluation.cost();
+
+            // lookups that only may cost less than a pairwise comparison are not worth the risk of a scan
+            double margin = plan.outer() != null ? 1 : PAIRWISE_MARGIN;
+
+            if(evaluation.restricted() && lookedUp * margin < plan.cost())
+                plan = new LeftJoinPlan(plan.outer(), bound, rows, lookedUp);
+        }
+
+        return plan;
     }
 
 
