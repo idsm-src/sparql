@@ -554,13 +554,25 @@ final class JoinOptimizer
             }
         }
 
-        // the children whose rows can be the outer rows of an index lookup into each child
+        // the children whose rows can be the outer rows of an index lookup into each child: those whose values of a
+        // variable are compared with the column of the child as the column is
         int[] lookupable = new int[n];
 
         for(int j = 0; j < n; j++)
+        {
             for(Shared s : shared)
-                if((s.mask() >> j & 1) != 0 && s.hashable() && canLookUp(request, childs.get(j), s.variable()))
-                    lookupable[j] |= s.mask() & ~(1 << j);
+            {
+                if((s.mask() >> j & 1) == 0 || !s.hashable() || !canLookUp(request, childs.get(j), s.variable()))
+                    continue;
+
+                SqlTableAccess access = (SqlTableAccess) childs.get(j);
+
+                for(int i = 0; i < n; i++)
+                    if(i != j && (s.mask() >> i & 1) != 0
+                            && access.isLookedUpBy(request.getConfiguration(), childs.get(i).getVariable(s.variable())))
+                        lookupable[j] |= 1 << i;
+            }
+        }
 
 
         List<Filter> filters = new ArrayList<>();
@@ -1219,7 +1231,7 @@ final class JoinOptimizer
     /**
      * Estimated evaluation of the node for one of the rows of an outer table it is evaluated for one by one (see
      * {@link SqlIntercode#translateForRow}), which is evaluated anew for every row: a table access restricted to the
-     * rows compatible with the row (see {@link SqlTableAccess#getRowBindings}) has the rows that share the values of
+     * rows compatible with the row (see {@link SqlTableAccess#getRowVariables}) has the rows that share the values of
      * the row and costs a lookup when an index of the table serves one of those values, a join is planned for its
      * children evaluated so, a union is the sum of its branches, an OPTIONAL costs its left side and the join chosen
      * for the rows that side has for one row (see {@link #planLeftJoin}), and a node passing the solutions of a child
@@ -1239,7 +1251,7 @@ final class JoinOptimizer
             double compatible = rows;
             boolean lookedUp = false;
 
-            Set<Variable> variables = access.getRowBindings(outer).getVariables();
+            Set<Variable> variables = access.getRowVariables(request.getConfiguration(), outer);
 
             for(Variable variable : variables)
             {

@@ -26,6 +26,7 @@ import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
+import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
@@ -2095,46 +2096,167 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * The variables by whose values in a row of the outer table the access is restricted to the rows compatible with
-     * the row, as the access binds them to its columns: those the access binds always, to columns of a single class
-     * that holds the class the outer rows bind them in (that class itself, or a more general one). The values are then
-     * compared in the class of the columns, so with the columns as they are, by plain equalities, which an index of the
-     * table can serve; columns of a narrower class would have to be converted to the class of the values first. A row
-     * whose column of another variable is null gives a solution compatible with every outer row, so such a variable
-     * restricts nothing.
+     * The columns the access holds a variable in, with their class, when the access binds the variable always, to
+     * columns of a single class, and the binding gives the variable a value that is never unbound: such a value is
+     * compared with the columns by an equality, which an index of the table can serve as long as the columns are
+     * compared as they are (see {@link #isLookedUpBy}). Null otherwise.
      *
-     * @param outer the rows the access is evaluated for one by one
-     * @return bindings of the variables the access is restricted by, in terms of the columns of the table
+     * @param value binding of the variable in the rows the access is looked up for
+     * @return the columns the access holds the variable in, with their class, or null
      */
-    VariableBindings getRowBindings(JoinOptimizer.Outer outer)
+    private Entry<ResourceClass, List<Column>> getLookupColumns(VariableBinding value)
     {
-        VariableBindings result = new VariableBindings();
+        VariableBinding binding = bindings.get(value.getVariable());
+        VariableBinding inner = internal.get(value.getVariable());
 
-        if(table == null)
-            return result;
+        if(table == null || binding == null || binding.canBeNull() || inner.getMappings().size() != 1
+                || value.canBeNull())
+            return null;
 
-        for(VariableBinding outerBinding : outer.bindings().getValues())
+        Entry<ResourceClass, List<Column>> mapping = inner.getMappings().entrySet().iterator().next();
+
+        return mapping.getValue() == null ? null : mapping;
+    }
+
+
+    /**
+     * True if the values that the binding gives a variable can be converted to the class of the columns the access
+     * holds the variable in (see {@link #getLookupColumns}), with the check of their representability (see
+     * {@link VariableBinding#canDeriveMapping}), so that they are compared with the columns in that class, a value
+     * outside the class being held by no row. Not every class can check that: an IRI cannot be told to belong to no
+     * user IRI class (see {@link ResourceClass#canCheckRepresentability}).
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param value binding of the variable in the rows the access is looked up for
+     * @return true if the values can be converted to the class of the columns of the access, false otherwise
+     */
+    private boolean isConvertedFor(ClassRelations relations, VariableBinding value)
+    {
+        Entry<ResourceClass, List<Column>> mapping = getLookupColumns(value);
+
+        return mapping != null && value.canDeriveMapping(relations, mapping.getKey())
+                && value.deriveMapping(relations, mapping.getKey()) != null;
+    }
+
+
+    /**
+     * True if the values that the binding gives a variable can be compared with the columns the access holds the
+     * variable in as the columns are, so that an index of the table can serve the comparison. The values are converted
+     * to the class of the columns when they can be (see {@link #isConvertedFor}). Otherwise they are compared in the
+     * common class of the two, as a join compares them (see
+     * {@link #generateJoinCondition(ClassRelations, VariableBindings, VariableBindings, Table, Table, Map)}), which
+     * leaves the columns as they are only if their class is stored like that common class (the IRIs of no user IRI
+     * class are stored like any IRIs); columns that the common class stores otherwise would be converted, and the
+     * database would have to read every row.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param value binding of the variable in the rows the access is looked up for
+     * @return true if the values can be compared with the columns of the access as the columns are, false otherwise
+     */
+    boolean isLookedUpBy(ClassRelations relations, VariableBinding value)
+    {
+        Entry<ResourceClass, List<Column>> mapping = getLookupColumns(value);
+
+        if(mapping == null)
+            return false;
+
+        if(isConvertedFor(relations, value))
+            return true;
+
+        ResourceClass resClass = mapping.getKey();
+        List<Column> columns = mapping.getValue();
+
+        for(Entry<ResourceClass, List<Column>> source : value.getMappings().entrySet())
         {
-            VariableBinding binding = bindings.get(outerBinding.getVariable());
-            VariableBinding inner = internal.get(outerBinding.getVariable());
-
-            if(binding == null || binding.canBeNull() || inner.getMappings().size() != 1)
+            if(ResourceClass.areDisjunct(relations, source.getKey(), resClass))
                 continue;
 
-            Entry<ResourceClass, List<Column>> mapping = inner.getMappings().entrySet().iterator().next();
-            ResourceClass outerClass = outerBinding.getMappings().keySet().iterator().next();
+            ResourceClass common = unionize(source.getKey(), resClass);
 
-            if(mapping.getValue() != null && unionize(outerClass, mapping.getKey()).equals(mapping.getKey()))
-                result.add(new VariableBinding(inner.getVariable(), inner.getMappings(), false));
+            if(source.getValue() == null || !resClass.toGeneralClass(common, columns, false).equals(columns))
+                return false;
         }
 
-        return result;
+        return true;
+    }
+
+
+    /**
+     * SQL condition that a row of the access is compatible with a row of an outer table, by which the access is looked
+     * up for that row: every variable both bind has the same value in them or is unbound in one (see
+     * {@link #generateJoinCondition(ClassRelations, VariableBindings, VariableBindings, Table, Table, Map)}). Where the
+     * value of the outer row can be converted to the class of the columns (see {@link #isConvertedFor}), it is compared
+     * with them in that class, so that an index of the table serves the lookup; any other value is compared as a join
+     * compares it. Null when the condition always holds.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param outer bindings of the outer rows
+     * @param table alias the columns of the outer rows are addressed through
+     * @param joined classes per variable in the whole join the access is a child of (see {@link #getJoinedClasses}); a
+     *            variable without an entry compares all its classes
+     * @return SQL condition over the columns of the table and of the outer table, or null
+     */
+    SqlCode getLookupCondition(ClassRelations relations, VariableBindings outer, Table table,
+            Map<Variable, Set<ResourceClass>> joined)
+    {
+        // the values converted to the classes of the columns, addressed through the alias already, and the columns
+        // they are compared with; the other variables are compared as a join compares them
+        VariableBindings converted = new VariableBindings();
+        VariableBindings held = new VariableBindings();
+        VariableBindings others = new VariableBindings();
+
+        for(VariableBinding value : outer.getValues())
+        {
+            VariableBinding inner = internal.get(value.getVariable());
+
+            if(inner == null)
+                continue;
+
+            if(!isConvertedFor(relations, value))
+            {
+                others.add(value);
+                continue;
+            }
+
+            ResourceClass resClass = inner.getMappings().keySet().iterator().next();
+
+            converted.add(new VariableBinding(value.getVariable(),
+                    Map.of(resClass, value.deriveMapping(relations, resClass, table)), false));
+            held.add(new VariableBinding(value.getVariable(), inner.getMappings(), false));
+        }
+
+        SqlCode direct = generateJoinCondition(relations, converted, held, null, null, joined);
+        SqlCode general = generateJoinCondition(relations, others, internal, table, null, joined);
+
+        return direct == null ? general : general == null ? direct : SqlCode.of(direct, " AND ", general);
+    }
+
+
+    /**
+     * The variables by whose values in a row of the outer table the access is restricted to the rows compatible with
+     * the row: those whose values are compared with the columns of the access as the columns are (see
+     * {@link #isLookedUpBy}), by plain equalities, which an index of the table can serve. A row whose column of another
+     * variable is null gives a solution compatible with every outer row, so such a variable restricts nothing.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param outer the rows the access is evaluated for one by one
+     * @return the variables the access is restricted by
+     */
+    Set<Variable> getRowVariables(ClassRelations relations, JoinOptimizer.Outer outer)
+    {
+        Set<Variable> variables = new HashSet<>();
+
+        for(VariableBinding value : outer.bindings().getValues())
+            if(isLookedUpBy(relations, value))
+                variables.add(value.getVariable());
+
+        return variables;
     }
 
 
     /**
      * SQL condition restricting the rows of the access to those compatible with a row of the outer table: its columns
-     * equal the values of the row (see {@link #getRowBindings}). Null when no variable restricts the access.
+     * equal the values of the row (see {@link #getRowVariables}). Null when no variable restricts the access.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param outer the rows the access is evaluated for one by one
@@ -2142,7 +2264,12 @@ public final class SqlTableAccess extends SqlIntercode
      */
     SqlCode getRowCondition(ClassRelations relations, JoinOptimizer.Outer outer)
     {
-        return generateJoinCondition(relations, outer.bindings(), getRowBindings(outer), outer.table(), null);
+        VariableBindings values = new VariableBindings();
+
+        for(Variable variable : getRowVariables(relations, outer))
+            values.add(outer.bindings().get(variable));
+
+        return getLookupCondition(relations, values, outer.table(), Map.of());
     }
 
 

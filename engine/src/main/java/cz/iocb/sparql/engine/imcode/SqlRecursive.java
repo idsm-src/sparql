@@ -1663,8 +1663,9 @@ public final class SqlRecursive extends SqlIntercode
         {
             // with the join optimizer on, the planner is told not to nest loops, so a step reading a table is looked
             // up laterally through an index of the table for every row of the recursion instead of being hashed whole
-            // in every round (see JoinOptimizer)
-            SqlCode condition = generateJoinCondition(relations, tmp, access.getInternalVariableBindings(), left, null);
+            // in every round (see JoinOptimizer); the node reached is converted to the class of the columns of the
+            // step, so that the index serves the lookup also when the path leads through nodes of another class
+            SqlCode condition = access.getLookupCondition(relations, tmp, left, Map.of());
 
             builder.append(" CROSS JOIN LATERAL (");
             builder.append(access.translateLateral(request, condition != null ? condition : SqlCode.TRUE));

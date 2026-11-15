@@ -918,7 +918,7 @@ public abstract class SqlIntercode extends SqlBaseClass
      * leave out the solutions that are not compatible with the row, and it refers to the columns of the row through the
      * alias of the outer table, which the code holding it has to give. A node that can be restricted so returns code
      * that looks the compatible solutions up: a table access compares its columns with the values of the row (see
-     * {@link SqlTableAccess#getRowBindings}), and a node whose solutions are made of solutions of a child that the
+     * {@link SqlTableAccess#getRowVariables}), and a node whose solutions are made of solutions of a child that the
      * values of the row restrict the same way hands the rows down to it. Any other node is evaluated whole, by the code
      * of {@link #translate}; the node holding the code compares its solutions with the row in either case.
      *

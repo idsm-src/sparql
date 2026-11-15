@@ -1190,8 +1190,8 @@ public final class SqlJoin extends SqlIntercode
                 if((outerChilds >> i & 1) == 0)
                     continue;
 
-                SqlCode condition = generateJoinCondition(relations, childs.get(i).getVariableBindings(),
-                        access.getInternalVariableBindings(), tables.get(i), null, joined);
+                SqlCode condition = access.getLookupCondition(relations, childs.get(i).getVariableBindings(),
+                        tables.get(i), joined);
 
                 if(condition != null)
                     conditions.add(condition);

@@ -1,6 +1,8 @@
 package cz.iocb.sparql.engine.test;
 
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -59,9 +61,11 @@ public class JoinOptimizerTest
 
     /**
      * Creates the {@code join_optimizer_test} schema: the nodes 1 to 1000 with labels and with scores equal to their
-     * numbers, 2000 links among the nodes 1 to 200 (every node links to ten), and five nodes tagged, all indexed and
-     * analysed; and the two configurations mapping {@code ex:label}, {@code ex:score}, {@code ex:link} and
-     * {@code ex:tag} over them.
+     * numbers, 2000 links among the nodes 1 to 200 (every node links to ten), five nodes tagged, aliases of the nodes
+     * holding their IRIs whole, and references from a node to the next one given by its whole IRI (none from every
+     * tenth node, but for the tenth one, which refers to a resource that is no node), and notes of resources that are
+     * no nodes, all indexed and analysed; and the two configurations mapping {@code ex:label}, {@code ex:score},
+     * {@code ex:link}, {@code ex:tag}, {@code ex:alias}, {@code ex:ref} and {@code ex:note} over them.
      */
     @BeforeAll
     static void init() throws SQLException
@@ -88,8 +92,26 @@ public class JoinOptimizerTest
                     "create table join_optimizer_test.scores (id integer primary key, score integer not null)");
             statement.execute("insert into join_optimizer_test.scores select i, i from generate_series(1, 1000) as i");
             statement.execute("create index on join_optimizer_test.scores (score)");
-            statement.execute("analyze join_optimizer_test.nodes, join_optimizer_test.links, join_optimizer_test.few, "
-                    + "join_optimizer_test.scores");
+            statement
+                    .execute("create table join_optimizer_test.aliases (iri varchar not null, alias varchar not null)");
+            statement.execute("insert into join_optimizer_test.aliases select 'http://example.org/n/' || i, "
+                    + "'alias ' || i from generate_series(1, 1000) as i");
+            statement.execute("insert into join_optimizer_test.aliases values ('http://example.org/other', 'no node')");
+            statement.execute("create index on join_optimizer_test.aliases (iri)");
+            statement.execute("create table join_optimizer_test.refs (src integer not null, target varchar not null)");
+            statement.execute("insert into join_optimizer_test.refs select i, 'http://example.org/n/' || (i + 1) "
+                    + "from generate_series(1, 1000) as i where i % 10 != 0");
+            statement.execute("insert into join_optimizer_test.refs values (10, 'http://example.org/other')");
+            statement.execute("create index on join_optimizer_test.refs (src)");
+            statement.execute("create table join_optimizer_test.others (iri varchar not null, note varchar not null)");
+            statement.execute("insert into join_optimizer_test.others select 'http://example.org/other' || i, "
+                    + "'note ' || i from generate_series(1, 1000) as i");
+            statement.execute("insert into join_optimizer_test.others values ('http://example.org/other', 'note')");
+            statement.execute("create index on join_optimizer_test.others (iri)");
+            statement.execute("""
+                    analyze join_optimizer_test.nodes, join_optimizer_test.links, join_optimizer_test.few, \
+                    join_optimizer_test.scores, join_optimizer_test.aliases, join_optimizer_test.refs, \
+                    join_optimizer_test.others""");
         }
 
         DatabaseSchema schema = new DatabaseSchema(connectionPool);
@@ -117,6 +139,9 @@ public class JoinOptimizerTest
         DatabaseTable links = new DatabaseTable("join_optimizer_test", "links");
         DatabaseTable few = new DatabaseTable("join_optimizer_test", "few");
         DatabaseTable scores = new DatabaseTable("join_optimizer_test", "scores");
+        DatabaseTable aliases = new DatabaseTable("join_optimizer_test", "aliases");
+        DatabaseTable refs = new DatabaseTable("join_optimizer_test", "refs");
+        DatabaseTable others = new DatabaseTable("join_optimizer_test", "others");
 
         config.addQuadMapping(nodes, graph, config.createIriMapping("node", "id"), config.createIriMapping("ex:label"),
                 config.createLiteralMapping(xsdString, "label"));
@@ -126,6 +151,12 @@ public class JoinOptimizerTest
                 config.createLiteralMapping(xsdString, "tag"));
         config.addQuadMapping(scores, graph, config.createIriMapping("node", "id"), config.createIriMapping("ex:score"),
                 config.createLiteralMapping(xsdInt, "score"));
+        config.addQuadMapping(aliases, graph, config.createIriMapping(iri, "iri"), config.createIriMapping("ex:alias"),
+                config.createLiteralMapping(xsdString, "alias"));
+        config.addQuadMapping(refs, graph, config.createIriMapping("node", "src"), config.createIriMapping("ex:ref"),
+                config.createIriMapping(iri, "target"));
+        config.addQuadMapping(others, graph, config.createIriMapping(unsupportedIri, "iri"),
+                config.createIriMapping("ex:note"), config.createLiteralMapping(xsdString, "note"));
 
         return config;
     }
@@ -354,6 +385,55 @@ public class JoinOptimizerTest
 
         assertThat(translate(optimized, query), not(containsString("LATERAL")));
         assertThat(check(query), hasSize(1000));
+    }
+
+
+    @Test
+    public void lookupAcrossClasses() throws Exception
+    {
+        // the aliases hold whole IRIs and the links the numbers of the nodes: the IRI of an alias is converted to the
+        // number of its node, so that the links are looked up by the index of their source
+        String query = "SELECT ?x ?y WHERE { ?x ex:alias 'alias 3' . ?x ex:link ?y }";
+
+        String sql = translate(optimized, query);
+        assertThat(sql, containsString(" CROSS JOIN LATERAL (SELECT "));
+        assertThat(sql, containsString("::int4 END = \"src\""));
+
+        assertThat(check(query), hasSize(10));
+
+        // an IRI of no node is converted to no number, so it joins no link
+        assertThat(check("SELECT ?x ?y WHERE { ?x ex:alias 'no node' . ?x ex:link ?y }"), hasSize(0));
+
+        // the number of a tagged node is converted to its IRI, which the aliases are looked up by
+        query = "SELECT ?x ?a WHERE { ?x ex:tag ?t . ?x ex:alias ?a }";
+
+        sql = translate(optimized, query);
+        assertThat(sql, containsString(" CROSS JOIN LATERAL (SELECT "));
+        assertThat(sql, containsString("::varchar = \"iri\""));
+
+        assertThat(check(query), hasSize(5));
+
+        // a walk reaches the targets of the references as whole IRIs, each converted to the number of its node, by
+        // which the next references are looked up; the walk ends at the resource that is no node
+        query = "SELECT ?y WHERE { <http://example.org/n/1> ex:ref+ ?y }";
+
+        sql = translate(optimized, query);
+        assertThat(sql, containsString("recursion AS "));
+        assertThat(sql, containsString("::int4 END = \"src\""));
+
+        assertThat(check(query), hasSize(10));
+
+        // an IRI cannot be told to belong to no IRI class of the configuration, so a whole IRI is not converted to the
+        // class of the notes; that class is stored like any IRIs, though, so the notes are still looked up by their
+        // index, with the IRIs compared as they are
+        query = "SELECT ?x ?n WHERE { ?x ex:alias 'no node' . ?x ex:note ?n }";
+
+        sql = translate(optimized, query);
+        assertThat(sql, containsString(" CROSS JOIN LATERAL (SELECT "));
+        assertThat(sql, containsString("\"join_optimizer_test\".\"others\" WHERE ((((\"tab"));
+        assertThat(sql, containsString("\".\"iri\" = \"iri\""));
+
+        assertThat(check(query), hasSize(1));
     }
 
 

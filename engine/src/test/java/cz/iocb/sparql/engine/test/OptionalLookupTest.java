@@ -100,6 +100,8 @@ public class OptionalLookupTest
                     "create table optional_lookup_test.aliases (iri varchar not null, alias varchar not null)");
             statement.execute("insert into optional_lookup_test.aliases select 'http://example.org/n/' || i, "
                     + "'alias ' || i from generate_series(1, 1000) as i");
+            statement
+                    .execute("insert into optional_lookup_test.aliases values ('http://example.org/other', 'no node')");
             statement.execute("create index on optional_lookup_test.aliases (iri)");
             statement.execute("create table optional_lookup_test.notes (id integer not null, note varchar not null)");
             statement.execute(
@@ -405,11 +407,17 @@ public class OptionalLookupTest
 
         assertThat(check(query), hasSize(5));
 
-        // the links hold the numbers of the nodes, which would have to be converted to be compared with a whole IRI
+        // the links hold the numbers of the nodes, which a whole IRI is converted to, so that their index is used
         query = "SELECT ?x ?y WHERE { ?x ex:alias 'alias 3' OPTIONAL { ?x ex:link ?y } }";
 
-        assertThat(translate(optimized, query), not(containsString("LATERAL")));
+        sql = translate(optimized, query);
+        assertThat(sql, containsString(lookup + "SELECT "));
+        assertThat(sql, containsString("THEN right(\"left0\".\"iri\", -21)::int4 END = \"src\""));
+
         assertThat(check(query), hasSize(10));
+
+        // an IRI of no node is converted to no number, so it has no link
+        assertThat(check("SELECT ?x ?y WHERE { ?x ex:alias 'no node' OPTIONAL { ?x ex:link ?y } }"), hasSize(1));
     }
 
 
