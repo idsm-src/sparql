@@ -82,9 +82,9 @@ public abstract class SqlIntercode extends SqlBaseClass
      * either, and a table access binding the variable takes the value into its conditions (see {@link SqlTableAccess}).
      * A filter that holds for several terms of a variable and for no other makes them the accepted terms of the
      * variable (see {@link #getAcceptedTerms}), from which a walk between two variables starts (see
-     * {@link SqlRecursive}). The other conditions of the filters above that a variable decides alone are its filter
-     * conditions (see {@link #getFilterConditions}): they require nothing of a child, but the join optimizer counts
-     * with the solutions they leave (see {@link JoinOptimizer}).
+     * {@link SqlRecursive}). The other conditions of the filters above that a variable decides, alone or along with
+     * other variables, are its filter conditions (see {@link #getFilterConditions}): they require nothing of a child,
+     * but the join optimizer counts with the solutions they leave (see {@link JoinOptimizer}).
      */
     public static class Restrictions
     {
@@ -118,8 +118,8 @@ public abstract class SqlIntercode extends SqlBaseClass
         private final Map<Variable, Set<RdfTerm>> acceptedTerms = new HashMap<>();
 
         /**
-         * Filter conditions per variable: the conditions the nodes above keep the solutions by that the variable alone
-         * decides; a variable without an entry is filtered by none.
+         * Filter conditions per variable: the conditions the nodes above keep the solutions by that the variable
+         * decides, alone or along with other variables; a variable without an entry is filtered by none.
          */
         private final Map<Variable, Set<SqlExpressionIntercode>> filterConditions = new HashMap<>();
 
@@ -621,7 +621,7 @@ public abstract class SqlIntercode extends SqlBaseClass
          * Adds a filter condition of the variable, see {@link #getFilterConditions(Variable)}.
          *
          * @param var the variable
-         * @param condition a condition the variable alone decides that a node above keeps the solutions by
+         * @param condition a condition the variable decides that a node above keeps the solutions by
          */
         public void addFilterCondition(Variable var, SqlExpressionIntercode condition)
         {
@@ -644,11 +644,15 @@ public abstract class SqlIntercode extends SqlBaseClass
 
         /**
          * Filter conditions of the variable: the conditions the filters above the child keep the solutions by that the
-         * variable alone decides, so that a solution binding the variable to a value one of them does not hold for
-         * never reaches the result. They require nothing of the child, which gives all its solutions anyway; they tell
-         * how many of the solutions get on, which the join optimizer counts with when it orders the joins below (see
-         * {@link JoinOptimizer}). A condition requiring a term of the variable is no filter condition: it gives the
-         * accepted value (see {@link #getAcceptedValue(Variable)}). Empty when no condition filters the variable.
+         * variable decides, so that a solution in which one of them does not hold never reaches the result. A condition
+         * the variable decides alone drops the solutions binding the variable to a value it does not hold for. A
+         * condition that several variables decide together is a filter condition of each of them, and the solutions are
+         * filtered by it only where it is a condition of them all (see {@link JoinOptimizer#getFilters}): a node that
+         * stops filtering by a variable drops the condition for that variable only. The conditions require nothing of
+         * the child, which gives all its solutions anyway; they tell how many of the solutions get on, which the join
+         * optimizer counts with when it orders the joins below (see {@link JoinOptimizer}). A condition requiring a
+         * term of the variable is no filter condition: it gives the accepted value (see
+         * {@link #getAcceptedValue(Variable)}). Empty when no condition filters the variable.
          *
          * @param var the variable
          * @return filter conditions of the variable
@@ -666,6 +670,20 @@ public abstract class SqlIntercode extends SqlBaseClass
         public void removeFilterConditions()
         {
             filterConditions.clear();
+        }
+
+
+        /**
+         * Lets the given variables be filtered by no condition, so that a condition one of them decides along with
+         * other variables filters no longer (see {@link #getFilterConditions(Variable)}). A node calls it for the
+         * variables whose values the conditions above take from elsewhere than from the child (the right side of a left
+         * join for the variables of the left side).
+         *
+         * @param vars the variables
+         */
+        public void removeFilterConditions(Collection<Variable> vars)
+        {
+            filterConditions.keySet().removeAll(vars);
         }
 
 
@@ -2444,13 +2462,17 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
     /**
-     * Adds the conditions that one variable decides alone as the filter conditions of that variable (see
+     * Adds the conditions as the filter conditions of the variables deciding them (see
      * {@link Restrictions#getFilterConditions}), for the join optimizer, when it is on, to count with the solutions the
-     * conditions leave: the database evaluates such a condition where the variable is bound, before the joins of the
-     * node holding it. The conjuncts of a conjunction count by themselves. A condition is left out when it is not
-     * deterministic, when it requires a term of its variable (see {@link #getRequiredTerm}), which the table accesses
-     * take in and count with by their statistics, and when nothing is known about how many solutions it keeps (see
-     * {@link JoinOptimizer#isEstimated}), like a test of a pattern, which the database evaluates only above the joins.
+     * conditions leave: the database evaluates a condition as soon as the variables deciding it are bound, so before
+     * the joins of the node holding it when one variable decides it alone, and between those joins otherwise. Of the
+     * conditions several variables decide, only one requiring two variables to be equal is added (see
+     * {@link JoinOptimizer#getEquated}), for both of them: the values the two variables have tell how many solutions it
+     * keeps, whereas what any other such condition keeps could only be guessed. The conjuncts of a conjunction count by
+     * themselves. A condition is left out when it is not deterministic, when it requires a term of its variable (see
+     * {@link #getRequiredTerm}), which the table accesses take in and count with by their statistics, and when nothing
+     * is known about how many solutions it keeps (see {@link JoinOptimizer#isEstimated}), like a test of a pattern,
+     * which the database evaluates only above the joins.
      *
      * @param request the current request
      * @param restrictions the restrictions to extend
@@ -2469,7 +2491,10 @@ public abstract class SqlIntercode extends SqlBaseClass
         {
             Set<Variable> variables = getDecidingVariables(relations, conjunct);
 
-            if(variables.size() != 1 || !conjunct.isDeterministic())
+            if(variables.isEmpty() || !conjunct.isDeterministic())
+                continue;
+
+            if(variables.size() > 1 && JoinOptimizer.getEquated(conjunct) == null)
                 continue;
 
             if(getRequiredTerm(request, conjunct, bindings) != null)
@@ -2478,7 +2503,8 @@ public abstract class SqlIntercode extends SqlBaseClass
             if(!JoinOptimizer.isEstimated(conjunct))
                 continue;
 
-            restrictions.addFilterCondition(variables.iterator().next(), conjunct);
+            for(Variable variable : variables)
+                restrictions.addFilterCondition(variable, conjunct);
         }
     }
 

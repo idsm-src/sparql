@@ -321,6 +321,27 @@ public class OptionalLookupTest
 
 
     @Test
+    public void conditionOnLeftVariable() throws Exception
+    {
+        // the filter of the OPTIONAL tests a variable of the right side, so the database evaluates it there and looks
+        // the links up for the few labels it leaves
+        String query = "SELECT ?x ?y ?l WHERE { ?x ex:score ?s OPTIONAL { ?x ex:label ?l . ?x ex:link ?y "
+                + "FILTER(STRENDS(?l, ' 77')) } }";
+
+        assertThat(translate(optimized, query), containsString(" CROSS JOIN LATERAL (SELECT "));
+        assertThat(check(query), hasSize(1009));
+
+        // a variable the left side binds is taken from that side, so the database tests it only when it joins the
+        // sides, and the labels and the links are hashed whole
+        query = "SELECT ?x ?y ?l WHERE { ?x ex:score ?s OPTIONAL { ?x ex:label ?l . ?x ex:link ?y "
+                + "FILTER(STRENDS(STR(?x), '/77')) } }";
+
+        assertThat(translate(optimized, query), not(containsString("LATERAL")));
+        assertThat(check(query), hasSize(1009));
+    }
+
+
+    @Test
     public void nested() throws Exception
     {
         String query = "SELECT ?x ?y ?l WHERE { ?x ex:tag ?t OPTIONAL { ?x ex:link ?y OPTIONAL { ?y ex:label ?l } } }";

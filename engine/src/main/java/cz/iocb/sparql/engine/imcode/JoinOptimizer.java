@@ -2,8 +2,10 @@ package cz.iocb.sparql.engine.imcode;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -15,6 +17,7 @@ import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.TableStatistics;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison;
+import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical.LogicalOperator;
 import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
@@ -50,9 +53,11 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * by an index nested loop instead, costing a lookup per outer row. The tree that minimises the sum of the costs and of
  * the sizes of the intermediate results is found by dynamic programming over the connected subsets of the children, up
  * to {@link #EXHAUSTIVE_LIMIT} of them, and greedily above that. The costs are in units of one row scanned or hashed,
- * calibrated on the NeXtProt queries over a single table of triples. A filter above the join counts as well: a
- * condition that one variable decides alone reduces the child the join takes the variable from (see
- * {@link SqlIntercode.Restrictions#getFilterConditions}), because the database evaluates it there.
+ * calibrated on the NeXtProt queries over a single table of triples. A filter above the join counts as well (see
+ * {@link SqlIntercode.Restrictions#getFilterConditions}), because the database evaluates a condition as soon as the
+ * variables deciding it are bound: a condition that one variable decides alone reduces the child the join takes the
+ * variable from, and a condition requiring two variables taken from two children to be equal reduces every join that
+ * holds both children, as a variable shared by them would.
  *
  * The sides of an OPTIONAL keep their order, so only the method of their join is chosen (see {@link #planLeftJoin}):
  * the right side is evaluated once and the sides are hashed, or the right side is evaluated for every solution of the
@@ -245,6 +250,44 @@ final class JoinOptimizer
 
 
     /**
+     * A condition of the filters above the join that requires two variables taken from two children to be equal.
+     *
+     * @param mask the two children the join takes the variables of the condition from
+     * @param selectivity estimated fraction of the solutions of a join of those children that the condition keeps
+     */
+    private record Filter(int mask, double selectivity)
+    {
+    }
+
+
+    /**
+     * What the filters above a join leave of the solutions of its children (see {@link #plan}).
+     *
+     * @param kept the fraction of its solutions each child gives the joins
+     * @param values per child, the fraction of its values that each variable keeps in the solutions the child gives the
+     *            joins, by the conditions the variable decides alone; no entry for a variable keeping all its values
+     * @param equated the pairs of variables that the conditions require to be equal and that the join takes from two
+     *            children
+     */
+    private record Filtering(double[] kept, List<Map<Variable, Double>> values, List<List<Variable>> equated)
+    {
+        /**
+         * The filtering by no condition.
+         *
+         * @param n number of children
+         * @return the filtering that leaves all the solutions of the children
+         */
+        static Filtering none(int n)
+        {
+            double[] kept = new double[n];
+            Arrays.fill(kept, 1);
+
+            return new Filtering(kept, Collections.nCopies(n, Map.of()), List.of());
+        }
+    }
+
+
+    /**
      * Not instantiated.
      */
     private JoinOptimizer()
@@ -274,13 +317,18 @@ final class JoinOptimizer
 
 
     /**
-     * Chooses the join tree of the children whose solutions the filters above the join keep by the given conditions.
-     * Such a condition is decided by one variable alone, so the database evaluates it where the variable is bound,
-     * before the joins: the child the join takes the variable from gives the joins only the fraction of its solutions
-     * the conditions are estimated to keep (see {@link #selectivity(Request, SqlIntercode, List)}), and the tree is
-     * chosen for the children so reduced. The estimated rows of the plan are those of the join itself, as the filters
-     * are no part of it. When the join is evaluated for the rows of an outer table one by one, the tree is chosen for
-     * the children as they are evaluated for one of the rows (see {@link #estimateForRow}).
+     * Chooses the join tree of the children whose solutions the filters above the join keep by the given conditions
+     * (see {@link #getFilters}). The database evaluates such a condition as soon as the variables deciding it are
+     * bound. A condition that one variable decides alone is evaluated before the joins: the child the join takes the
+     * variable from gives the joins only the fraction of its solutions the conditions are estimated to keep (see
+     * {@link #selectivity(Request, SqlIntercode, List)}). A condition requiring two variables to be equal (see
+     * {@link #getEquated}) that the join takes from two children is evaluated where the second of them is joined, so
+     * every join holding both has only the fraction of its solutions the condition is estimated to keep (see
+     * {@link #equalitySelectivity}); when a child binds both variables, how many of its solutions hold the same value
+     * twice is not known, so the condition does not count. The tree is chosen for the children and the joins so
+     * reduced; the estimated rows of the plan are those of the join itself, as the filters are no part of it. When the
+     * join is evaluated for the rows of an outer table one by one, the tree is chosen for the children as they are
+     * evaluated for one of the rows (see {@link #estimateForRow}).
      *
      * @param request the current request
      * @param childs the children
@@ -291,30 +339,105 @@ final class JoinOptimizer
     static Plan plan(Request request, List<SqlIntercode> childs, Map<Variable, Set<SqlExpressionIntercode>> conditions,
             Outer outer)
     {
-        double[] unfiltered = new double[childs.size()];
-        double[] kept = new double[childs.size()];
+        int n = childs.size();
 
-        Arrays.fill(unfiltered, 1);
-        Arrays.fill(kept, 1);
+        Map<SqlExpressionIntercode, Set<Variable>> filters = getFilters(request.getConfiguration(), conditions);
 
-        // the conditions each child decides, taken together, so that the bounds of a range are estimated as a range
+        // the conditions each child decides by one variable, taken together, so that the bounds of a range are
+        // estimated as a range, and the pairs of variables taken from two children that a condition requires to be equal
         Map<Integer, List<SqlExpressionIntercode>> decided = new HashMap<>();
+        List<List<Variable>> equated = new ArrayList<>();
 
-        for(Map.Entry<Variable, Set<SqlExpressionIntercode>> entry : conditions.entrySet())
+        for(Map.Entry<SqlExpressionIntercode, Set<Variable>> entry : filters.entrySet())
         {
-            int child = getDecidingChild(childs, entry.getKey());
+            if(entry.getValue().size() == 1)
+            {
+                int child = getDecidingChild(childs, entry.getValue().iterator().next());
 
-            if(child != -1)
-                decided.computeIfAbsent(child, _ -> new ArrayList<>()).addAll(entry.getValue());
+                if(child != -1)
+                    decided.computeIfAbsent(child, _ -> new ArrayList<>()).add(entry.getKey());
+            }
+            else
+            {
+                List<Variable> variables = getEquated(entry.getKey());
+
+                // the values of two variables that one child binds are not independent of each other
+                if(variables == null
+                        || childs.stream().anyMatch(c -> variables.stream().allMatch(v -> c.getVariable(v) != null)))
+                    continue;
+
+                if(variables.stream().allMatch(v -> getDecidingChild(childs, v) != -1))
+                    equated.add(variables);
+            }
         }
 
+        if(decided.isEmpty() && equated.isEmpty())
+            return plan(request, childs, Filtering.none(n), outer);
+
+        double[] kept = new double[n];
+        Arrays.fill(kept, 1);
+
+        List<Map<Variable, Double>> values = new ArrayList<>();
+
+        for(int i = 0; i < n; i++)
+            values.add(new HashMap<>());
+
         for(Map.Entry<Integer, List<SqlExpressionIntercode>> entry : decided.entrySet())
-            kept[entry.getKey()] = selectivity(request, childs.get(entry.getKey()), entry.getValue());
+        {
+            int index = entry.getKey();
+            SqlIntercode child = childs.get(index);
 
-        Plan plan = plan(request, childs, kept, outer);
+            kept[index] = selectivity(request, child, entry.getValue());
 
-        return Arrays.equals(kept, unfiltered) ? plan :
-                new Plan(plan.root(), plan(request, childs, unfiltered, outer).rows(), plan.cost(), plan.restricted());
+            // a condition that a variable decides alone keeps a fraction of the values of the variable
+            Map<Variable, List<SqlExpressionIntercode>> alone = new HashMap<>();
+
+            for(SqlExpressionIntercode condition : entry.getValue())
+                alone.computeIfAbsent(filters.get(condition).iterator().next(), _ -> new ArrayList<>()).add(condition);
+
+            for(Map.Entry<Variable, List<SqlExpressionIntercode>> single : alone.entrySet())
+                values.get(index).put(single.getKey(), single.getValue().size() == entry.getValue().size() ?
+                        kept[index] : selectivity(request, child, single.getValue()));
+        }
+
+        Plan plan = plan(request, childs, new Filtering(kept, values, equated), outer);
+
+        return new Plan(plan.root(), plan(request, childs, Filtering.none(n), outer).rows(), plan.cost(),
+                plan.restricted());
+    }
+
+
+    /**
+     * The conditions that the filters above a node keep its solutions by, out of the filter conditions of its
+     * variables, each with the variables deciding it. A condition that several variables decide is a filter condition
+     * of each of them (see {@link SqlIntercode.Restrictions#getFilterConditions}), and the solutions are filtered by it
+     * only if it is a condition of them all: where it is missing for one of them, the node binding that variable is not
+     * filtered by the conditions above, or the variable is not bound here at all.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param conditions per variable, its filter conditions
+     * @return the conditions the solutions are filtered by, each with the variables deciding it
+     */
+    static Map<SqlExpressionIntercode, Set<Variable>> getFilters(ClassRelations relations,
+            Map<Variable, Set<SqlExpressionIntercode>> conditions)
+    {
+        Map<SqlExpressionIntercode, Set<Variable>> filters = new LinkedHashMap<>();
+
+        for(Set<SqlExpressionIntercode> set : conditions.values())
+        {
+            for(SqlExpressionIntercode condition : set)
+            {
+                if(filters.containsKey(condition))
+                    continue;
+
+                Set<Variable> variables = SqlIntercode.getDecidingVariables(relations, condition);
+
+                if(variables.stream().allMatch(v -> conditions.getOrDefault(v, Set.of()).contains(condition)))
+                    filters.put(condition, variables);
+            }
+        }
+
+        return filters;
     }
 
 
@@ -347,15 +470,15 @@ final class JoinOptimizer
 
 
     /**
-     * Chooses the join tree of the children, each giving the joins the given fraction of its solutions.
+     * Chooses the join tree of the children, of whose solutions the filters above the join leave what is given.
      *
      * @param request the current request
      * @param childs the children
-     * @param kept the fraction of its solutions each child gives the joins
+     * @param filtering what the filters above the join leave of the solutions of the children
      * @param outer the rows the join is evaluated for one by one, or null when it is evaluated once
      * @return the join tree with its estimated rows
      */
-    private static Plan plan(Request request, List<SqlIntercode> childs, double[] kept, Outer outer)
+    private static Plan plan(Request request, List<SqlIntercode> childs, Filtering filtering, Outer outer)
     {
         int n = childs.size();
 
@@ -371,7 +494,7 @@ final class JoinOptimizer
             Evaluation evaluation = outer == null ? null : estimateForRow(request, childs.get(i), outer);
             double solutions = evaluation == null ? estimateRows(request, childs.get(i)) : evaluation.rows();
 
-            rows[i] = Math.max(solutions * kept[i], 1);
+            rows[i] = Math.max(solutions * filtering.kept()[i], 1);
             costs[i] = evaluation == null ? 0 : evaluation.cost();
             restricted |= evaluation != null && evaluation.restricted();
         }
@@ -403,7 +526,7 @@ final class JoinOptimizer
                 SqlIntercode child = childs.get(i);
                 VariableBinding binding = child.getVariable(entry.getKey());
 
-                distinct[i] = Math.max(Math.min(estimateDistinct(request, child, entry.getKey()), rows[i]), 1);
+                distinct[i] = estimateDistinct(request, child, entry.getKey(), rows[i], filtering.values().get(i));
 
                 if(!isHashable(binding))
                     hashable = false;
@@ -440,7 +563,14 @@ final class JoinOptimizer
                     lookupable[j] |= s.mask() & ~(1 << j);
 
 
-        Sizes sizes = new Sizes(n, rows, shared);
+        List<Filter> filters = new ArrayList<>();
+
+        for(List<Variable> equated : filtering.equated())
+            filters.add(new Filter(
+                    1 << getDecidingChild(childs, equated.get(0)) | 1 << getDecidingChild(childs, equated.get(1)),
+                    equalitySelectivity(request, childs, rows, filtering.values(), equated)));
+
+        Sizes sizes = new Sizes(n, rows, shared, filters);
 
         Node root = n <= EXHAUSTIVE_LIMIT ? planExhaustively(n, rows, adjacent, hashableAdjacent, lookupable, sizes) :
                 planGreedily(n, rows, hashableAdjacent, lookupable, sizes);
@@ -520,6 +650,11 @@ final class JoinOptimizer
         private final List<Shared> shared;
 
         /**
+         * The conditions of the filters above the join that require variables of two children to be equal.
+         */
+        private final List<Filter> filters;
+
+        /**
          * The sizes computed, by the subset, when the subsets are few enough.
          */
         private final double[] array;
@@ -536,12 +671,15 @@ final class JoinOptimizer
          * @param n number of children
          * @param rows estimated rows of each child
          * @param shared the shared variables
+         * @param filters the conditions of the filters above the join that require variables of two children to be
+         *            equal
          */
-        Sizes(int n, double[] rows, List<Shared> shared)
+        Sizes(int n, double[] rows, List<Shared> shared, List<Filter> filters)
         {
             this.n = n;
             this.rows = rows;
             this.shared = shared;
+            this.filters = filters;
             this.array = n <= EXHAUSTIVE_LIMIT ? new double[1 << n] : null;
             this.map = n <= EXHAUSTIVE_LIMIT ? null : new HashMap<>();
 
@@ -613,6 +751,11 @@ final class JoinOptimizer
 
                 size /= divisor;
             }
+
+            // a condition is evaluated where the second of the children deciding it is joined
+            for(Filter filter : filters)
+                if((mask & filter.mask()) == filter.mask())
+                    size *= filter.selectivity();
 
             return Math.max(size, 1);
         }
@@ -1170,8 +1313,8 @@ final class JoinOptimizer
      * times the solutions of the left side. The costs are those of a join of the same sides (see {@link #join}), so an
      * OPTIONAL of a table access is looked up exactly when a join with it would be. A right side that is not
      * deterministic is evaluated once. The left side gives the join only the solutions that the conditions of the
-     * filters above keep, as far as its variables decide them alone, because the database evaluates such a condition on
-     * the left side (see {@link #plan(Request, List, Map, Outer)}).
+     * filters above keep, as far as one of its variables decides them alone (see {@link #getFilters}), because the
+     * database evaluates such a condition on the left side (see {@link #plan(Request, List, Map, Outer)}).
      *
      * @param request the current request
      * @param left the left side
@@ -1185,8 +1328,11 @@ final class JoinOptimizer
     static LeftJoinPlan planLeftJoin(Request request, SqlIntercode left, SqlIntercode right, Table leftTable,
             Map<Variable, Set<SqlExpressionIntercode>> conditions, Outer outer)
     {
-        double kept = conditions.isEmpty() ? 1 :
-                selectivity(request, left, conditions.values().stream().flatMap(Set::stream).toList());
+        // only a condition that one variable decides alone is estimated on a single node
+        List<SqlExpressionIntercode> filters = getFilters(request.getConfiguration(), conditions).entrySet().stream()
+                .filter(e -> e.getValue().size() == 1).map(Map.Entry::getKey).toList();
+
+        double kept = filters.isEmpty() ? 1 : selectivity(request, left, filters);
 
         double leftSolutions = outer == null ? estimateRows(request, left) :
                 estimateForRow(request, left, outer).rows();
@@ -1359,6 +1505,84 @@ final class JoinOptimizer
         }
 
         return operand instanceof SqlLiteral || operand instanceof SqlIri ? operand : null;
+    }
+
+
+    /**
+     * Estimated fraction of the solutions of a join of two children that a condition requiring a variable of each of
+     * them to be equal keeps: the solutions in which the variable of the more distinct values takes the value of the
+     * other one, as it would if the two children shared one variable.
+     *
+     * @param request the current request
+     * @param childs the children
+     * @param rows estimated rows each child gives the joins
+     * @param values per child, the fraction of its values that each variable keeps in those rows
+     * @param equated the two variables
+     * @return estimated fraction of the solutions of a join of the two children that the condition keeps
+     */
+    private static double equalitySelectivity(Request request, List<SqlIntercode> childs, double[] rows,
+            List<Map<Variable, Double>> values, List<Variable> equated)
+    {
+        double distinct = 1;
+
+        for(Variable variable : equated)
+        {
+            int child = getDecidingChild(childs, variable);
+
+            distinct = Math.max(distinct,
+                    estimateDistinct(request, childs.get(child), variable, rows[child], values.get(child)));
+        }
+
+        return 1 / distinct;
+    }
+
+
+    /**
+     * Estimated number of distinct values of the variable in the solutions a child gives the joins: the values the
+     * variable has in the child (see {@link #estimateDistinct(Request, SqlIntercode, Variable)}), of which the
+     * conditions the variable decides alone keep the given fraction, whereas a condition another variable decides keeps
+     * solutions, so that the values are only as many at most as the solutions the child gives.
+     *
+     * @param request the current request
+     * @param child the child
+     * @param variable the variable
+     * @param rows estimated rows the child gives the joins
+     * @param values the fraction of its values that each variable keeps in those rows
+     * @return estimated number of distinct values of the variable in the solutions the child gives the joins
+     */
+    private static double estimateDistinct(Request request, SqlIntercode child, Variable variable, double rows,
+            Map<Variable, Double> values)
+    {
+        double distinct = estimateDistinct(request, child, variable) * values.getOrDefault(variable, 1.0);
+
+        return Math.max(Math.min(distinct, rows), 1);
+    }
+
+
+    /**
+     * The two variables a condition requires to be equal: the operands of an equality, or of a test of the same term,
+     * when both of them are variables; null for any other condition.
+     *
+     * @param condition the condition
+     * @return the two variables the condition requires to be equal, or null
+     */
+    static List<Variable> getEquated(SqlExpressionIntercode condition)
+    {
+        if(condition instanceof SqlEffectiveBooleanValue value)
+            return getEquated(value.getOperand());
+
+        List<SqlExpressionIntercode> operands = null;
+
+        if(condition instanceof SqlBinaryComparison comparison && comparison.getOperator() == ComparisonOperator.EQUAL)
+            operands = List.of(comparison.getLeft(), comparison.getRight());
+        else if(condition instanceof SqlBuiltinCall call && call.getFunction().equals("sameterm"))
+            operands = call.getArguments();
+
+        if(operands != null && operands.size() == 2 && operands.get(0) instanceof SqlVariable left
+                && operands.get(1) instanceof SqlVariable right)
+            return List.of(left.getVariable(), right.getVariable());
+
+        return null;
     }
 
 

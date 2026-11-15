@@ -81,8 +81,9 @@ public final class SqlLeftJoin extends SqlIntercode
 
     /**
      * Per variable the left side binds always, the conditions the filters above keep the solutions of the join by (see
-     * {@link Restrictions#getFilterConditions}): the database evaluates such a condition on the left side, before the
-     * join, so the optimizer chooses the method of the join for the solutions of the left side the conditions leave.
+     * {@link Restrictions#getFilterConditions}): the database evaluates a condition that one such variable decides
+     * alone on the left side, before the join, so the optimizer chooses the method of the join for the solutions of the
+     * left side the conditions leave.
      */
     private final Map<Variable, Set<SqlExpressionIntercode>> filterConditions;
 
@@ -339,9 +340,11 @@ public final class SqlLeftJoin extends SqlIntercode
         rightRestrictions.retainAcceptedClasses(getNonNullVariables(optLeft.getVariableBindings()));
         rightRestrictions.add(accepted);
 
-        // the database evaluates the conditions of the join on the right side, but no condition of a filter above
+        // the database evaluates on the right side the conditions of the join that the variables of that side alone
+        // decide (a variable the left side binds is taken from it), but no condition of a filter above
         rightRestrictions.removeFilterConditions();
         addFilterConditions(request, rightRestrictions, optConditions, right.getVariableBindings());
+        rightRestrictions.removeFilterConditions(optLeft.getVariableBindings().getVariables());
 
 
         boolean offered = false;
@@ -418,6 +421,7 @@ public final class SqlLeftJoin extends SqlIntercode
             newRightRestrictions.add(accepted);
             newRightRestrictions.removeFilterConditions();
             addFilterConditions(request, newRightRestrictions, optConditions, right.getVariableBindings());
+            newRightRestrictions.removeFilterConditions(optLeft.getVariableBindings().getVariables());
 
 
             if(newOptReduced == optReduced && newLeftRestrictions.equals(leftRestrictions)

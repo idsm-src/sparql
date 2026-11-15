@@ -275,10 +275,52 @@ public class JoinOptimizerTest
         assertThat(translate(optimized, query), containsString(" CROSS JOIN LATERAL (SELECT "));
         assertThat(check(query), hasSize(14));
 
-        // a condition comparing two variables is decided by no child alone
+        // a condition that nearly all the solutions satisfy leaves the join as it is
         query = "SELECT ?x ?y WHERE { ?x ex:label ?l . ?x ex:link ?y FILTER(?x != ?y) }";
 
         assertThat(translate(optimized, query), not(containsString("LATERAL")));
+        check(query);
+    }
+
+
+    @Test
+    public void filterOverSeveralVariables() throws Exception
+    {
+        String pattern = "?x ex:score ?s . ?x ex:link ?y . ?y ex:score ?t . ?y ex:label ?l";
+
+        // the scores, the links and the labels are many, so they are joined by hashing
+        assertThat(translate(optimized, "SELECT ?x ?y ?l WHERE { " + pattern + " }"), not(containsString("LATERAL")));
+
+        // a filter requiring the two scores to be equal leaves few of the links joined with them, as a variable shared
+        // by the scores would, so the labels are looked up
+        String query = "SELECT ?x ?y ?l WHERE { " + pattern + " FILTER(?s = ?t) }";
+
+        assertThat(translate(optimized, query), containsString(" CROSS JOIN LATERAL (SELECT "));
+        assertThat(translate(optimized, query), containsString("\"join_optimizer_test\".\"nodes\" WHERE "));
+        assertThat(check(query), hasSize(9));
+
+        // so does a conjunct of a filter and a test of the same term: few tags join many scores
+        query = "SELECT ?x ?y WHERE { ?x ex:tag ?t . ?y ex:score ?s . ?y ex:link ?z "
+                + "FILTER(sameTerm(?x, ?y) && ?s != 77) }";
+
+        assertThat(translate(optimized, query), containsString(" CROSS JOIN LATERAL (SELECT "));
+        assertThat(check(query), hasSize(50));
+
+        // how many solutions another comparison of two variables keeps could only be guessed, so it does not count
+        query = "SELECT ?x ?y ?l WHERE { " + pattern + " FILTER(?s - ?t = 0) }";
+
+        assertThat(translate(optimized, query), not(containsString("LATERAL")));
+        assertThat(check(query), hasSize(9));
+
+        // nor does an equality of two variables taken from one table, whose rows may hold the same value twice often
+        query = "SELECT ?x ?y ?l WHERE { ?x ex:link ?y . ?x ex:label ?l FILTER(?x = ?y) }";
+
+        assertThat(translate(optimized, query), not(containsString("LATERAL")));
+        assertThat(check(query), hasSize(9));
+
+        // a condition one of whose variables is bound above the join filters above it
+        query = "SELECT ?x ?y ?n WHERE { ?x ex:label ?l . ?x ex:link ?y BIND(STRLEN(?l) AS ?n) FILTER(?n < ?x) }";
+
         check(query);
     }
 
