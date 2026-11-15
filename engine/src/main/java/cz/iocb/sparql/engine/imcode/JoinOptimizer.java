@@ -32,6 +32,7 @@ import cz.iocb.sparql.engine.imcode.expression.SqlUnary;
 import cz.iocb.sparql.engine.imcode.expression.SqlUnaryLogical;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.Estimator;
@@ -58,7 +59,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * {@link SqlIntercode.Restrictions#getFilterConditions}), because the database evaluates a condition as soon as the
  * variables deciding it are bound: a condition that one variable decides alone reduces the child the join takes the
  * variable from, and a condition requiring two variables taken from two children to be equal reduces every join that
- * holds both children, as a variable shared by them would.
+ * holds both children, as a variable shared by them would; where it holds only for the same term, the children are
+ * joined on it like on such a variable, by hashing or by an index lookup (see {@link Equality}).
  *
  * The sides of an OPTIONAL keep their order, so only the method of their join is chosen (see {@link #planLeftJoin}):
  * the right side is evaluated once and the sides are hashed, or the right side is evaluated for every solution of the
@@ -168,9 +170,43 @@ final class JoinOptimizer
      * @param cost estimated cost of the joins of the tree, together with the costs of the children when the tree is
      *            chosen for one of the rows the join is evaluated for (see {@link #estimateForRow})
      * @param restricted whether the row the tree is chosen for restricts a child (see {@link Evaluation})
+     * @param equalities the equalities of the filters above the join that the tree joins the children by, which the
+     *            join compares in its own conditions (see {@link Equality})
      */
-    record Plan(Node root, double rows, double cost, boolean restricted)
+    record Plan(Node root, double rows, double cost, boolean restricted, List<Equality> equalities)
     {
+    }
+
+
+    /**
+     * A condition of the filters above a join that requires the terms of two variables to be the same (see
+     * {@link #getEquality}), the join taking the variables from two children that bind them always, each in a single
+     * class: the children are joined on it as they are on a variable they share, so the equality connects them in the
+     * join tree, can be hashed and can serve an index lookup of either child. The filter keeps the condition; the join
+     * only compares the terms as well, which leaves out no solution the filter would keep.
+     *
+     * @param left the child the join takes the first variable from
+     * @param leftVariable the first variable
+     * @param right the child the join takes the second variable from
+     * @param rightVariable the second variable
+     */
+    record Equality(int left, Variable leftVariable, int right, Variable rightVariable)
+    {
+        /**
+         * The binding of the variable of one child under the name of the variable of the other child, so that the
+         * values of the two variables are compared as those of a variable the children share.
+         *
+         * @param childs the children
+         * @param child the child whose variable is renamed, one of the two children of the equality
+         * @return the binding of the variable of the child under the name of the variable of the other child
+         */
+        VariableBinding getRenamed(List<SqlIntercode> childs, int child)
+        {
+            Variable variable = child == left ? leftVariable : rightVariable;
+
+            return new VariableBinding(child == left ? rightVariable : leftVariable,
+                    childs.get(child).getVariable(variable).getMappings(), false);
+        }
     }
 
 
@@ -339,8 +375,10 @@ final class JoinOptimizer
      *            joins, by the conditions the variable decides alone; no entry for a variable keeping all its values
      * @param equated the pairs of variables that the conditions require to be equal and that the join takes from two
      *            children
+     * @param equalities those of the pairs that the children are joined on (see {@link Equality})
      */
-    private record Filtering(double[] kept, List<Map<Variable, Double>> values, List<List<Variable>> equated)
+    private record Filtering(double[] kept, List<Map<Variable, Double>> values, List<List<Variable>> equated,
+            List<Equality> equalities)
     {
         /**
          * The filtering by no condition.
@@ -353,7 +391,7 @@ final class JoinOptimizer
             double[] kept = new double[n];
             Arrays.fill(kept, 1);
 
-            return new Filtering(kept, Collections.nCopies(n, Map.of()), List.of());
+            return new Filtering(kept, Collections.nCopies(n, Map.of()), List.of(), List.of());
         }
     }
 
@@ -396,10 +434,11 @@ final class JoinOptimizer
      * {@link #getEquated}) that the join takes from two children is evaluated where the second of them is joined, so
      * every join holding both has only the fraction of its solutions the condition is estimated to keep (see
      * {@link #equalitySelectivity}); when a child binds both variables, how many of its solutions hold the same value
-     * twice is not known, so the condition does not count. The tree is chosen for the children and the joins so
-     * reduced; the estimated rows of the plan are those of the join itself, as the filters are no part of it. When the
-     * join is evaluated for the rows of an outer table one by one, the tree is chosen for the children as they are
-     * evaluated for one of the rows (see {@link #estimateForRow}).
+     * twice is not known, so the condition does not count. Such a condition that holds only for the same term joins the
+     * two children as well (see {@link #getEquality}). The tree is chosen for the children and the joins so reduced;
+     * the estimated rows of the plan are those of the join itself, as the filters are no part of it. When the join is
+     * evaluated for the rows of an outer table one by one, the tree is chosen for the children as they are evaluated
+     * for one of the rows (see {@link #estimateForRow}).
      *
      * @param request the current request
      * @param childs the children
@@ -418,6 +457,7 @@ final class JoinOptimizer
         // estimated as a range, and the pairs of variables taken from two children that a condition requires to be equal
         Map<Integer, List<SqlExpressionIntercode>> decided = new HashMap<>();
         List<List<Variable>> equated = new ArrayList<>();
+        List<Equality> equalities = new ArrayList<>();
 
         for(Map.Entry<SqlExpressionIntercode, Set<Variable>> entry : filters.entrySet())
         {
@@ -438,7 +478,14 @@ final class JoinOptimizer
                     continue;
 
                 if(variables.stream().allMatch(v -> getDecidingChild(childs, v) != -1))
+                {
                     equated.add(variables);
+
+                    Equality equality = getEquality(request, childs, entry.getKey(), variables);
+
+                    if(equality != null)
+                        equalities.add(equality);
+                }
             }
         }
 
@@ -471,10 +518,58 @@ final class JoinOptimizer
                         kept[index] : selectivity(request, child, single.getValue()));
         }
 
-        Plan plan = plan(request, childs, new Filtering(kept, values, equated), outer);
+        Plan plan = plan(request, childs, new Filtering(kept, values, equated, equalities), outer);
 
         return new Plan(plan.root(), plan(request, childs, Filtering.none(n), outer).rows(), plan.cost(),
-                plan.restricted());
+                plan.restricted(), plan.equalities());
+    }
+
+
+    /**
+     * The equality the children are joined on by a condition requiring two variables to be equal (see
+     * {@link Equality}), or null when the condition gives none: the children the join takes the variables from have to
+     * bind them always, each in a single class, and the condition has to hold only for the same term, as a test of the
+     * same term does and an equality of values does where the classes hold a value in one term (see
+     * {@link SqlBinaryComparison#isTermEquality}).
+     *
+     * @param request the current request
+     * @param childs the children
+     * @param condition the condition
+     * @param variables the two variables the condition requires to be equal, taken from two children
+     * @return the equality the children are joined on, or null
+     */
+    private static Equality getEquality(Request request, List<SqlIntercode> childs, SqlExpressionIntercode condition,
+            List<Variable> variables)
+    {
+        int left = getDecidingChild(childs, variables.get(0));
+        int right = getDecidingChild(childs, variables.get(1));
+
+        VariableBinding leftBinding = childs.get(left).getVariable(variables.get(0));
+        VariableBinding rightBinding = childs.get(right).getVariable(variables.get(1));
+
+        if(left == right || !isHashable(leftBinding) || !isHashable(rightBinding))
+            return null;
+
+        SqlExpressionIntercode test = condition instanceof SqlEffectiveBooleanValue value ? value.getOperand() :
+                condition;
+
+        if(test instanceof SqlBinaryComparison && !SqlBinaryComparison.isTermEquality(request.getConfiguration(),
+                getHashedClass(leftBinding), getHashedClass(rightBinding)))
+            return null;
+
+        return new Equality(left, variables.get(0), right, variables.get(1));
+    }
+
+
+    /**
+     * The class a variable whose equality can be hashed has its columns in (see {@link #isHashable}).
+     *
+     * @param binding the binding of the variable
+     * @return the single class the variable has columns in
+     */
+    private static ResourceClass getHashedClass(VariableBinding binding)
+    {
+        return binding.getMappings().entrySet().stream().filter(e -> e.getValue() != null).findFirst().get().getKey();
     }
 
 
@@ -646,6 +741,27 @@ final class JoinOptimizer
         }
 
 
+        // an equality the children are joined on connects them like a variable they share
+        for(Equality equality : filtering.equalities())
+        {
+            int[] ends = { equality.left(), equality.right() };
+            Variable[] variables = { equality.leftVariable(), equality.rightVariable() };
+
+            for(int e = 0; e < 2; e++)
+            {
+                int child = ends[e];
+                int other = ends[1 - e];
+
+                adjacent[child] |= 1 << other;
+                hashableAdjacent[child] |= 1 << other;
+
+                if(canLookUp(request, childs.get(child), variables[e]) && ((SqlTableAccess) childs.get(child))
+                        .isLookedUpBy(request.getConfiguration(), equality.getRenamed(childs, other)))
+                    lookupable[child] |= 1 << other;
+            }
+        }
+
+
         List<Filter> filters = new ArrayList<>();
 
         for(List<Variable> equated : filtering.equated())
@@ -658,7 +774,8 @@ final class JoinOptimizer
         Node root = n <= EXHAUSTIVE_LIMIT ? planExhaustively(n, rows, adjacent, hashableAdjacent, lookupable, sizes) :
                 planGreedily(n, rows, hashableAdjacent, lookupable, sizes);
 
-        return new Plan(root, sizes.get((1 << n) - 1), cost(root, costs, hashableAdjacent, sizes).cost(), restricted);
+        return new Plan(root, sizes.get((1 << n) - 1), cost(root, costs, hashableAdjacent, sizes).cost(), restricted,
+                filtering.equalities());
     }
 
 

@@ -31,6 +31,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasTripleTerm;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasUnsupportedLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDateTime;
@@ -42,6 +43,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDerivedFrom
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloatPoint;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
@@ -660,6 +662,42 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
         }
 
         return terms.isEmpty() ? null : new LinkedHashSet<>(terms.values());
+    }
+
+
+    /**
+     * True if two values of the given classes can be equal only as the same term, so that an equality of them holds for
+     * no other values than a test of the same term does: IRIs, blank nodes, strings, language-tagged strings and
+     * literals of the unsupported class are equal to themselves only, and so are the exact numbers and the booleans of
+     * the canonical classes of one datatype, which hold a value in a single term. Equal values may be different terms
+     * where the classes are numbers of two datatypes or floating-point numbers (the zeros of both signs are equal),
+     * where a class holds a value in several terms (in other lexical forms, or in a box), and among the other literals
+     * compared by value (dates, date-times and durations) and the triple terms.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param left class of the first value
+     * @param right class of the second value
+     * @return true if two values of the classes can be equal only as the same term, false otherwise
+     */
+    public static boolean isTermEquality(ClassRelations relations, ResourceClass left, ResourceClass right)
+    {
+        ComparisonType type = areComparable(relations, EQUAL, left, right);
+
+        // no values of the classes are equal
+        if(type == ComparisonType.DIFFERENT || type == ComparisonType.NULL)
+            return true;
+
+        if(isIri(left) && isIri(right) || isBlankNode(left) && isBlankNode(right))
+            return true;
+
+        if(isStringLiteral(left) && isStringLiteral(right) || isUnsupportedLiteral(left) && isUnsupportedLiteral(right))
+            return true;
+
+        if(!(left instanceof CanonicalLiteralClass l && right instanceof CanonicalLiteralClass r))
+            return false;
+
+        return (isNumeric(left) && !isFloatPoint(left) || isBoolean(left))
+                && l.getDatatype().getTypeIri().equals(r.getDatatype().getTypeIri());
     }
 
 

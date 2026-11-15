@@ -1,14 +1,18 @@
 package cz.iocb.sparql.engine.test;
 
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -23,7 +27,9 @@ import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.imcode.SqlSelect;
+import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
+import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.IntegerUserIriClass;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.request.Engine;
@@ -353,6 +359,73 @@ public class JoinOptimizerTest
         query = "SELECT ?x ?y ?n WHERE { ?x ex:label ?l . ?x ex:link ?y BIND(STRLEN(?l) AS ?n) FILTER(?n < ?x) }";
 
         check(query);
+    }
+
+
+    @Test
+    public void filterEquality() throws Exception
+    {
+        String links = "\"join_optimizer_test\".\"links\" WHERE ";
+
+        // the tags and the links share no variable, but the filter requires the same term of two of their variables,
+        // so the links of the five tagged nodes are looked up
+        String query = "SELECT ?x ?z WHERE { ?x ex:tag ?t . ?y ex:link ?z FILTER(?x = ?y) }";
+
+        String sql = translate(optimized, query);
+        assertThat(sql, containsString(" CROSS JOIN LATERAL (SELECT "));
+        assertThat(sql, containsString(links + "((((\"tab1\".\"id\" = \"src\")))) OFFSET 0"));
+        assertThat(sql, not(containsString(" CROSS JOIN (")));
+        assertThat(check(query), hasSize(50));
+
+        // a test of the same term does the same
+        query = "SELECT ?x ?z WHERE { ?x ex:tag ?t . ?y ex:link ?z FILTER(sameTerm(?y, ?x)) }";
+
+        assertThat(translate(optimized, query), containsString(" CROSS JOIN LATERAL (SELECT "));
+        assertThat(check(query), hasSize(50));
+
+        // many labels and many scores are hashed by the equality
+        query = "SELECT ?x ?s WHERE { ?x ex:label ?l . ?y ex:score ?s FILTER(?x = ?y) }";
+
+        sql = translate(optimized, query);
+        assertThat(sql, not(containsString("LATERAL")));
+        assertThat(sql, containsString(" JOIN (SELECT "));
+        assertThat(sql, not(containsString(" CROSS JOIN ")));
+        assertThat(check(query), hasSize(1000));
+
+        // the aliases hold the nodes as whole IRIs, which the number of a tagged node is converted to
+        query = "SELECT ?x ?a WHERE { ?x ex:tag ?t . ?y ex:alias ?a FILTER(?x = ?y) }";
+
+        sql = translate(optimized, query);
+        assertThat(sql, containsString(" CROSS JOIN LATERAL (SELECT "));
+        assertThat(sql, containsString("::varchar = \"iri\""));
+        assertThat(check(query), hasSize(5));
+
+        // the equality orders the joins as a shared variable would: the few tagged nodes first, then the scores equal
+        // to those of the nodes they link to
+        query = "SELECT ?x ?y ?w WHERE { ?x ex:tag ?t . ?x ex:link ?y . ?y ex:score ?s . ?w ex:score ?u "
+                + "FILTER(?s = ?u) }";
+
+        assertThat(translate(optimized, query), not(containsString(" CROSS JOIN (")));
+        assertThat(check(query), hasSize(50));
+
+        // a variable a member of the join may leave unbound is compared by the filter only
+        query = "SELECT ?x ?y ?s WHERE { { ?x ex:tag ?t OPTIONAL { ?x ex:link ?y } } ?z ex:score ?s FILTER(?y = ?z) }";
+
+        assertThat(check(query), hasSize(50));
+
+        // an equality in an OPTIONAL joins the members of the optional pattern
+        query = "SELECT ?x ?z ?s WHERE { ?x ex:tag ?t OPTIONAL { ?x ex:link ?z . ?y ex:score ?s FILTER(?z = ?y) } }";
+
+        assertThat(translate(optimized, query), not(containsString(" CROSS JOIN (")));
+        assertThat(check(query), hasSize(50));
+
+        // equal values need not be the same term
+        assertThat(SqlBinaryComparison.isTermEquality(ClassRelations.NONE, xsdInt, xsdInt), is(true));
+        assertThat(SqlBinaryComparison.isTermEquality(ClassRelations.NONE, xsdString, xsdString), is(true));
+        assertThat(SqlBinaryComparison.isTermEquality(ClassRelations.NONE, iri, iri), is(true));
+        assertThat(SqlBinaryComparison.isTermEquality(ClassRelations.NONE, xsdInt, xsdInteger), is(false));
+        assertThat(SqlBinaryComparison.isTermEquality(ClassRelations.NONE, xsdDouble, xsdDouble), is(false));
+        assertThat(SqlBinaryComparison.isTermEquality(ClassRelations.NONE, box, box), is(false));
     }
 
 

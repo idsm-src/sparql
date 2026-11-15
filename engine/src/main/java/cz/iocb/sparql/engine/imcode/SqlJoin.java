@@ -1117,7 +1117,9 @@ public final class SqlJoin extends SqlIntercode
             Map<Variable, Set<ResourceClass>> joined = getJoinedClasses(relations,
                     childs.stream().map(c -> c.getVariableBindings()).toList());
 
-            translateTree(request, scope, getPlan(request, outer).root(), joined, outer, builder);
+            JoinOptimizer.Plan plan = getPlan(request, outer);
+
+            translateTree(request, scope, plan.root(), plan.equalities(), joined, outer, builder);
             return builder.toCode();
         }
 
@@ -1151,20 +1153,24 @@ public final class SqlJoin extends SqlIntercode
      * {@link SqlTableAccess#translateLateral}), and a hash join as an explicit join of its sides on the equalities
      * between their children (a cross join when there are none), so that the planner keeps the tree (see
      * {@link cz.iocb.sparql.engine.request.Request#execute}). The equalities compare only the classes of a variable
-     * that meet a class it takes in the whole join (see {@link #getJoinedClasses}). When the join is evaluated for the
-     * rows of an outer table one by one, every child is (see {@link #translateForRow}), a looked up access being
-     * restricted by the values of the row as well.
+     * that meet a class it takes in the whole join (see {@link #getJoinedClasses}). An equality of two variables that
+     * the filters above the join require and the children are joined on (see {@link JoinOptimizer.Equality}) is
+     * compared where its children meet, like a variable they share: in the condition of their hash join, or in the
+     * restriction of the access looked up. When the join is evaluated for the rows of an outer table one by one, every
+     * child is (see {@link #translateForRow}), a looked up access being restricted by the values of the row as well.
      *
      * @param request the current request
      * @param scope the scope of the join
      * @param node the tree
+     * @param equalities the equalities of the filters above the join that the children are joined on
      * @param joined classes per variable in the whole join (see {@link #getJoinedClasses})
      * @param outer the rows the join is evaluated for one by one, or null when it is evaluated once
      * @param builder the SQL code being built
      * @return the children of the tree, as a bit per child
      */
     private int translateTree(Request request, Scope scope, JoinOptimizer.Node node,
-            Map<Variable, Set<ResourceClass>> joined, JoinOptimizer.Outer outer, SqlBuilder builder)
+            List<JoinOptimizer.Equality> equalities, Map<Variable, Set<ResourceClass>> joined,
+            JoinOptimizer.Outer outer, SqlBuilder builder)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -1180,7 +1186,7 @@ public final class SqlJoin extends SqlIntercode
 
         if(node instanceof JoinOptimizer.Lookup lookup)
         {
-            int outerChilds = translateTree(request, scope, lookup.outer(), joined, outer, builder);
+            int outerChilds = translateTree(request, scope, lookup.outer(), equalities, joined, outer, builder);
             SqlTableAccess access = (SqlTableAccess) childs.get(lookup.child());
 
             List<SqlCode> conditions = new ArrayList<>();
@@ -1192,6 +1198,24 @@ public final class SqlJoin extends SqlIntercode
 
                 SqlCode condition = access.getLookupCondition(relations, childs.get(i).getVariableBindings(),
                         tables.get(i), joined);
+
+                if(condition != null)
+                    conditions.add(condition);
+            }
+
+            // the values an outer child gives a variable that a filter requires to be the variable of the access
+            for(JoinOptimizer.Equality equality : equalities)
+            {
+                int other = equality.left() == lookup.child() ? equality.right() :
+                        equality.right() == lookup.child() ? equality.left() : -1;
+
+                if(other == -1 || (outerChilds >> other & 1) == 0)
+                    continue;
+
+                VariableBindings value = new VariableBindings();
+                value.add(equality.getRenamed(childs, other));
+
+                SqlCode condition = access.getLookupCondition(relations, value, tables.get(other), Map.of());
 
                 if(condition != null)
                     conditions.add(condition);
@@ -1213,10 +1237,10 @@ public final class SqlJoin extends SqlIntercode
 
         JoinOptimizer.HashJoin join = (JoinOptimizer.HashJoin) node;
 
-        int left = translateTree(request, scope, join.left(), joined, outer, builder);
+        int left = translateTree(request, scope, join.left(), equalities, joined, outer, builder);
 
         SqlBuilder rightBuilder = new SqlBuilder();
-        int right = translateTree(request, scope, join.right(), joined, outer, rightBuilder);
+        int right = translateTree(request, scope, join.right(), equalities, joined, outer, rightBuilder);
 
         List<SqlCode> conditions = new ArrayList<>();
 
@@ -1236,6 +1260,23 @@ public final class SqlJoin extends SqlIntercode
                 if(condition != null)
                     conditions.add(condition);
             }
+        }
+
+        // the equalities of the filters above whose children the join brings together
+        for(JoinOptimizer.Equality equality : equalities)
+        {
+            int ends = 1 << equality.left() | 1 << equality.right();
+
+            if((left & ends) == 0 || (right & ends) == 0)
+                continue;
+
+            SqlCode condition = generateJoinCondition(relations,
+                    childs.get(equality.left()).getVariable(equality.leftVariable()),
+                    equality.getRenamed(childs, equality.right()), tables.get(equality.left()),
+                    tables.get(equality.right()));
+
+            if(condition != null)
+                conditions.add(condition);
         }
 
         boolean nested = !(join.right() instanceof JoinOptimizer.Leaf);
