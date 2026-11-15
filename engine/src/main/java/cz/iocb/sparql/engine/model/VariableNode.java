@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.model;
 
+import java.util.Objects;
 import cz.iocb.sparql.engine.model.base.BaseComplexNode;
 import cz.iocb.sparql.engine.model.triple.Verb;
 import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
@@ -98,7 +99,7 @@ public final class VariableNode extends BaseComplexNode implements VarOrIri, Ver
         if(!name.equals(variable.name))
             return false;
 
-        if(scope == null && variable.scope != null || !scope.equals(variable.scope))
+        if(!Objects.equals(scope, variable.scope))
             return false;
 
         return true;
