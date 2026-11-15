@@ -623,6 +623,10 @@ public class QueryVisitor extends BaseVisitor<Query>
                 Set<String> variables = new HashSet<>();
                 Range range = Range.compute(selectClauseCtx.star, selectClauseCtx.star);
 
+                // The variables are projected in the order of their first occurrences in the text. The variables in
+                // scope of the model are the same ones, but not in that order, because the triples of a nested node
+                // (a blank node property list, a collection, a reified triple) precede the triple holding the node,
+                // so the parse tree is walked.
                 BaseVisitor<Void> variableVisitor = new BaseVisitor<>()
                 {
                     @Override
@@ -656,12 +660,8 @@ public class QueryVisitor extends BaseVisitor<Query>
                         }
                         else if(!isInAggregateMode(ctx.selectClause(), ctx.solutionModifier()))
                         {
+                            // a sub-select with a star has no GROUP BY clause here, which would mean the aggregate mode
                             visit(ctx.whereClause());
-
-                            if(ctx.solutionModifier().groupClause() != null)
-                                for(GroupConditionContext cnd : ctx.solutionModifier().groupClause().groupCondition())
-                                    if(cnd.var() != null)
-                                        visit(cnd.var());
 
                             if(ctx.valuesClause() != null)
                                 visit(ctx.valuesClause());

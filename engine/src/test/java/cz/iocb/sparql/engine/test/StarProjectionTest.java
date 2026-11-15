@@ -27,9 +27,10 @@ import cz.iocb.sparql.testing.Database;
 
 /**
  * The variables {@code SELECT *} projects, run against an empty configuration: the variables in scope in the pattern of
- * the select and the variables of its trailing VALUES clause. A sub-select brings into scope only what it projects, so
- * the variables of its pattern and of its trailing VALUES clause only if it projects them or uses {@code *} itself. A
- * variable that occurs only in a FILTER, in a MINUS, in an EXISTS or in the expression of a BIND is not in scope.
+ * the select and the variables of its trailing VALUES clause, in the order of their first occurrences in the text. A
+ * sub-select brings into scope only what it projects, so the variables of its pattern and of its trailing VALUES clause
+ * only if it projects them or uses {@code *} itself. A variable that occurs only in a FILTER, in a MINUS, in an EXISTS
+ * or in the expression of a BIND is not in scope.
  */
 public class StarProjectionTest
 {
@@ -113,6 +114,24 @@ public class StarProjectionTest
         assertEquals(List.of("x", "o", "u", "w", "b"), variables("SELECT * WHERE { VALUES ?x { 1 } "
                 + "OPTIONAL { VALUES ?o { 1 } } { VALUES ?u { 1 } } UNION { VALUES ?w { 1 } } BIND(1 AS ?b) }"));
         assertEquals(List.of("g", "x"), variables("SELECT * WHERE { GRAPH ?g { VALUES ?x { 1 } } }"));
+    }
+
+
+    @Test
+    @DisplayName("the variables of nested nodes are projected in the order of the text")
+    void textOrder() throws Exception
+    {
+        String prefix = "PREFIX ex: <http://example.org/> ";
+
+        assertEquals(List.of("s", "r", "t"), variables(prefix + "SELECT * WHERE { ?s ex:p [ ex:q ?r ] ; ex:t ?t }"));
+        assertEquals(List.of("q", "r", "o"), variables(prefix + "SELECT * WHERE { [ ?q ?r ] ex:p ?o }"));
+        assertEquals(List.of("s", "x", "y"), variables(prefix + "SELECT * WHERE { ?s ex:p ( 1 ?x ?y ) }"));
+        assertEquals(List.of("s", "p", "a", "b", "c"), variables(prefix + "SELECT * WHERE { ?s ?p << ?a ?b ?c >> }"));
+        assertEquals(List.of("s", "o", "q", "z"),
+                variables(prefix + "SELECT * WHERE { ?s ex:p ?o {| ?q << ex:a ex:b ?z >> |} }"));
+
+        // the first occurrence decides, although the triples of the nested node precede the triple holding it
+        assertEquals(List.of("a", "b"), variables(prefix + "SELECT * WHERE { ?a ex:p [ ex:q ?b ; ex:r ?a ] }"));
     }
 
 
