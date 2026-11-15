@@ -11,6 +11,7 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDecima
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDoubleType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdFloatType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdLongType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdNegativeIntegerType;
@@ -24,25 +25,36 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsign
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedIntType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedLongType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedShortType;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.joining;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.apache.jena.datatypes.TypeMapper;
 import org.apache.jena.graph.NodeFactory;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -64,7 +76,9 @@ import cz.iocb.sparql.testing.Database;
  * literal of the cast value in the canonical form, also when the operand has the datatype already, whichever class
  * holds the operand: a constant, a literal stored in the classes of a {@link TypedQuadTable} variant or in a box. That
  * form is the one the datatype gives for the lexical form of the operand ({@link Datatype#getCanonicalLexicalForm}) and
- * the one the database prints for the cast value (STR), so the engine and the extension agree on the canonical forms.
+ * the one the database prints for the cast value (STR), so the engine and the extension agree on the canonical forms. A
+ * literal received from a remote SERVICE endpoint is brought to that form as well; the endpoint is a server on the
+ * loopback interface answering every query with the literals of the datatype given in its URL.
  */
 public class CanonicalFormTest
 {
@@ -125,6 +139,21 @@ public class CanonicalFormTest
             new Forms(xsdStringType, List.of("abc", " a  b ")));
 
     /**
+     * Names of the variables of a query.
+     */
+    private static final Pattern variablePattern = Pattern.compile("\\?([A-Za-z0-9_]+)");
+
+    /**
+     * The fake endpoint.
+     */
+    private static HttpServer server = null;
+
+    /**
+     * URL of the fake endpoint, without the parameter telling its answer.
+     */
+    private static String endpoint = null;
+
+    /**
      * Pool of the test database.
      */
     private static DataSource connectionPool = null;
@@ -141,15 +170,22 @@ public class CanonicalFormTest
 
 
     /**
-     * Creates the {@code canonical_form_test} schema with the table {@code literal} holding every lexical form of every
-     * datatype in a box, and the configuration mapping its rows as the triples of the items, the predicate and the
-     * literals.
+     * Starts the fake endpoint and creates the {@code canonical_form_test} schema with the table {@code literal}
+     * holding every lexical form of every datatype in a box, and the configuration mapping its rows as the triples of
+     * the items, the predicate and the literals.
      *
      * @throws SQLException on database errors
+     * @throws IOException if the endpoint cannot be started
      */
     @BeforeAll
-    static void init() throws SQLException
+    static void init() throws SQLException, IOException
     {
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        server.createContext("/sparql", CanonicalFormTest::answer);
+        server.start();
+
+        endpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/sparql";
+
         connectionPool = Database.getPool();
 
         try(Connection connection = connectionPool.getConnection(); Statement statement = connection.createStatement())
@@ -175,6 +211,70 @@ public class CanonicalFormTest
                 config.createIriMapping("<" + predicate + ">"), config.createTermMapping(box, "value"));
 
         engine = new Engine(config);
+    }
+
+
+    /**
+     * Stops the fake endpoint.
+     */
+    @AfterAll
+    static void stop()
+    {
+        server.stop(0);
+    }
+
+
+    /**
+     * Answers a query sent over the SPARQL protocol in the XML results format with the literals of the datatype whose
+     * position in the list of the datatypes the parameter {@code datatype} of the URL gives, as an endpoint keeping its
+     * literals as they were written returns them: the first variable of the query is bound to the position of a lexical
+     * form among the forms of the datatype, the second one to the literal of that form.
+     *
+     * @param exchange the request
+     * @throws IOException on communication errors
+     */
+    private static void answer(HttpExchange exchange) throws IOException
+    {
+        String body = new String(exchange.getRequestBody().readAllBytes(), UTF_8);
+        String query = URLDecoder.decode(body.replaceFirst("^query=", ""), UTF_8);
+
+        List<String> variables = new ArrayList<>();
+        Matcher matcher = variablePattern.matcher(query.split("values")[0]);
+
+        while(matcher.find())
+            if(!variables.contains(matcher.group(1)))
+                variables.add(matcher.group(1));
+
+        String parameter = exchange.getRequestURI().getRawQuery().replaceFirst("^datatype=", "");
+        Forms datatype = datatypes.get(Integer.parseInt(parameter));
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("<?xml version=\"1.0\"?><sparql xmlns=\"http://www.w3.org/2005/sparql-results#\"><head>");
+
+        for(String variable : variables)
+            builder.append("<variable name=\"").append(variable).append("\"/>");
+
+        builder.append("</head><results>");
+
+        for(int i = 0; i < datatype.forms().size(); i++)
+        {
+            builder.append("<result><binding name=\"").append(variables.get(0)).append("\"><literal datatype=\"");
+            builder.append(xsdIntegerIri.getValue()).append("\">").append(i).append("</literal></binding>");
+            builder.append("<binding name=\"").append(variables.get(1)).append("\"><literal datatype=\"");
+            builder.append(datatype.datatype().getTypeIri().getValue()).append("\">");
+            builder.append(datatype.forms().get(i)).append("</literal></binding></result>");
+        }
+
+        builder.append("</results></sparql>");
+
+        byte[] data = builder.toString().getBytes(UTF_8);
+        exchange.getResponseHeaders().add("content-type", "application/sparql-results+xml");
+        exchange.sendResponseHeaders(200, data.length);
+
+        try(OutputStream out = exchange.getResponseBody())
+        {
+            out.write(data);
+        }
     }
 
 
@@ -333,6 +433,33 @@ public class CanonicalFormTest
 
             check(datatype,
                     execute(request, "SELECT ?o " + casts(datatype, "?o") + " WHERE { ?x <" + predicate + "> ?o }"));
+        }
+    }
+
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("getDatatypes")
+    @DisplayName("a literal received from a SERVICE endpoint has the canonical form")
+    void received(Forms datatype) throws Exception
+    {
+        String service = "SERVICE <" + endpoint + "?datatype=" + datatypes.indexOf(datatype) + "> { ?i <" + predicate
+                + "> ?o }";
+
+        try(Request request = engine.getRequest())
+        {
+            List<List<RdfTerm>> rows = execute(request, "SELECT ?i ?o (STR(?o) AS ?s) WHERE { " + service + " }");
+
+            assertEquals(datatype.forms().size(), rows.size());
+
+            // the literal the endpoint gave and what the database prints for the value stored for it
+            for(List<RdfTerm> row : rows)
+            {
+                String form = datatype.forms().get(Integer.parseInt(((Literal) row.get(0)).getValue()));
+                String canonical = datatype.datatype().getCanonicalLexicalForm(form);
+
+                assertEquals(new TypedLiteral(canonical, datatype.datatype().getTypeIri()), row.get(1), form);
+                assertEquals(new TypedLiteral(canonical, xsdStringIri), row.get(2), form);
+            }
         }
     }
 }
