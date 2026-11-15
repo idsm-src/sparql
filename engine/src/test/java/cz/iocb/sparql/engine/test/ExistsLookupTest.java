@@ -324,6 +324,16 @@ public class ExistsLookupTest
         assertThat(translate(optimized, query), not(containsString(" OFFSET 0")));
         assertThat(check(query), hasSize(800));
 
+        // the links of a tagged node are looked up and counted
+        query = "SELECT ?x WHERE { ?x ex:tag ?t "
+                + "MINUS { SELECT ?x WHERE { ?x ex:link ?y } GROUP BY ?x HAVING (COUNT(?y) > 10) } }";
+
+        sql = translate(optimized, query);
+        assertThat(sql,
+                containsString("\"exists_lookup_test\".\"links\" WHERE (((\"left0\".\"id\" = \"src\"))) OFFSET 0"));
+
+        assertThat(check(query), hasSize(5));
+
         // a difference in the difference refers to the solutions of its own left side
         query = "SELECT ?x ?y WHERE { ?x ex:tag ?t . ?x ex:link ?y MINUS { ?y ex:link ?z MINUS { ?z ex:tag ?u } } }";
 

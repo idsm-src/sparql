@@ -215,6 +215,46 @@ public final class SqlDistinct extends SqlIntercode
     @Override
     public SqlCode translate(Request request, Scope scope)
     {
+        return translate(request, scope, null);
+    }
+
+
+    /**
+     * The rows the child is evaluated for when the deduplication is evaluated for the given rows: a variable the
+     * solutions are deduplicated over restricts the child as it restricts the deduplicated solutions, because the
+     * solutions of one value of it are deduplicated among themselves.
+     *
+     * @param outer the rows the deduplication is evaluated for one by one
+     * @return the rows the child is evaluated for one by one, or null when it is evaluated whole
+     */
+    JoinOptimizer.Outer getChildRows(JoinOptimizer.Outer outer)
+    {
+        return outer.retain(distinctVariables);
+    }
+
+
+    /**
+     * The deduplication of the child evaluated for the row of the outer table, as far as the variables the solutions
+     * are deduplicated over restrict it (see {@link #getChildRows}).
+     */
+    @Override
+    SqlCode translateForRow(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
+        return translate(request, scope, getChildRows(outer));
+    }
+
+
+    /**
+     * SQL code of the deduplication, evaluated once or for one of the rows of an outer table (see
+     * {@link #translateForRow}).
+     *
+     * @param request the current request
+     * @param scope the scope of the deduplication
+     * @param outer the rows the child is evaluated for one by one, or null when it is evaluated once
+     * @return SQL code of the deduplication
+     */
+    private SqlCode translate(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
         ClassRelations relations = request.getConfiguration();
 
         Restrictions restrictions = new Restrictions(distinctVariables);
@@ -231,7 +271,7 @@ public final class SqlDistinct extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM (");
-        builder.append(child.translate(request, scope));
+        builder.append(outer == null ? child.translate(request, scope) : child.translateForRow(request, scope, outer));
         builder.append(" ) AS tab");
 
         builder.append(" GROUP BY ");

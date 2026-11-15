@@ -353,18 +353,63 @@ public final class SqlMinus extends SqlIntercode
 
 
     /**
+     * The way the optimizer chooses for the test of the right side (see {@link JoinOptimizer#planTest}): the right side
+     * is tested for the solutions of the left side that the filters above keep (see {@link #filterConditions}).
+     *
+     * @param request the current request
+     * @param outer the rows the whole difference is evaluated for one by one, or null when it is evaluated once
+     * @param table alias through which the right side refers to the solutions of the left side when it is evaluated for
+     *            each of them; the choice does not depend on it
+     * @return the way chosen for the test
+     */
+    JoinOptimizer.TestPlan getPlan(Request request, JoinOptimizer.Outer outer, Table table)
+    {
+        double solutions = outer == null ? JoinOptimizer.estimateRows(request, left) :
+                JoinOptimizer.estimateForRow(request, left, outer).rows();
+
+        return JoinOptimizer.planTest(request, solutions * JoinOptimizer.selectivity(request, left, filterConditions),
+                left.getVariableBindings(), table, right);
+    }
+
+
+    /**
      * SQL code of the difference: the solutions of the left side for which no solution of the right side removing them
      * exists. With the join optimizer on, the right side is written the way the optimizer chooses (see
-     * {@link JoinOptimizer#planTest}): as it is, for the database to evaluate it once and to hash the sides (an
-     * anti-join), or evaluated for every solution of the left side that the filters above keep (see
-     * {@link #filterConditions}), restricted to the solutions compatible with it (see
+     * {@link #getPlan}): as it is, for the database to evaluate it once and to hash the sides (an anti-join), or
+     * evaluated for every solution of the left side, restricted to the solutions compatible with it (see
      * {@link SqlIntercode#translateForRow}), so that the database looks them up. The left side is then named by the
-     * alias of the left side of a left join of the scope (see {@link Scope#getLeftInputTable}), through which the right
-     * side refers to its solutions: unlike the alias used otherwise, no node of the right side gives it to a subquery
-     * the solution is handed to.
+     * alias of the left side of a left join of the scope, through which the right side refers to its solutions: unlike
+     * the alias used otherwise, no node of the right side gives it to a subquery the solution is handed to.
      */
     @Override
     public SqlCode translate(Request request, Scope scope)
+    {
+        return translate(request, scope, null);
+    }
+
+
+    /**
+     * The difference whose left side is evaluated for the row of the outer table: a solution of the difference is a
+     * solution of the left side. The right side is tested the way chosen for the solutions the left side has for one
+     * row.
+     */
+    @Override
+    SqlCode translateForRow(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
+        return translate(request, scope, outer);
+    }
+
+
+    /**
+     * SQL code of the difference, evaluated once (see {@link #translate(Request, Scope)}) or for one of the rows of an
+     * outer table (see {@link #translateForRow}).
+     *
+     * @param request the current request
+     * @param scope the scope of the difference
+     * @param outer the rows the difference is evaluated for one by one, or null when it is evaluated once
+     * @return SQL code of the difference
+     */
+    private SqlCode translate(Request request, Scope scope, JoinOptimizer.Outer outer)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -380,21 +425,19 @@ public final class SqlMinus extends SqlIntercode
             builder.append("1");
 
         // the solutions of the left side the right side is evaluated for one by one, when the optimizer chooses so
-        JoinOptimizer.Outer outer = !request.getConfiguration().isJoinOptimizerEnabled() ? null :
-                JoinOptimizer.planTest(request,
-                        JoinOptimizer.estimateRows(request, left)
-                                * JoinOptimizer.selectivity(request, left, filterConditions),
-                        left.getVariableBindings(), scope.getLeftInputTable(), right);
+        JoinOptimizer.Outer solutions = request.getConfiguration().isJoinOptimizerEnabled() ?
+                getPlan(request, outer, scope.getLeftInputTable()).outer() : null;
 
-        Table table = outer != null ? outer.table() : leftTable;
+        Table table = solutions != null ? solutions.table() : leftTable;
 
         builder.append(" FROM (");
-        builder.append(left.translate(request, scope));
+        builder.append(outer == null ? left.translate(request, scope) : left.translateForRow(request, scope, outer));
         builder.append(") AS ");
         builder.appendAlias(table);
 
         builder.append(" WHERE NOT EXISTS (SELECT 1 FROM (");
-        builder.append(outer != null ? right.translateForRow(request, scope, outer) : right.translate(request, scope));
+        builder.append(
+                solutions != null ? right.translateForRow(request, scope, solutions) : right.translate(request, scope));
         builder.append(") AS ");
         builder.append(rightTable);
 

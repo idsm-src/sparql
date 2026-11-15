@@ -919,8 +919,10 @@ public abstract class SqlIntercode extends SqlBaseClass
      * alias of the outer table, which the code holding it has to give. A node that can be restricted so returns code
      * that looks the compatible solutions up: a table access compares its columns with the values of the row (see
      * {@link SqlTableAccess#getRowVariables}), and a node whose solutions are made of solutions of a child that the
-     * values of the row restrict the same way hands the rows down to it. Any other node is evaluated whole, by the code
-     * of {@link #translate}; the node holding the code compares its solutions with the row in either case.
+     * values of the row restrict the same way hands the rows down to it; a deduplication, a grouping and a sub-select
+     * hand down the values of the variables they keep the solutions apart by (see {@link JoinOptimizer.Outer#retain}).
+     * Any other node is evaluated whole, by the code of {@link #translate}; the node holding the code compares its
+     * solutions with the row in either case.
      *
      * @param request the current request
      * @param scope the scope of the node

@@ -356,7 +356,7 @@ public final class SqlFilter extends SqlIntercode
                 own.add(binding);
 
         SqlIntercode source = test.getSource(request, scope);
-        JoinOptimizer.Outer rows = JoinOptimizer.planTest(request, solutions, own, null, source);
+        JoinOptimizer.Outer rows = JoinOptimizer.planTest(request, solutions, own, null, source).outer();
 
         if(rows == null)
             return rendered;

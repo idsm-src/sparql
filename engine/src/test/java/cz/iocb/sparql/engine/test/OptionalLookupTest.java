@@ -431,6 +431,69 @@ public class OptionalLookupTest
 
 
     @Test
+    public void subselect() throws Exception
+    {
+        String links = "\"optional_lookup_test\".\"links\" WHERE (((\"left0\".\"id\" = \"src\")))";
+
+        // the links of a tagged node are looked up and counted
+        String query = "SELECT ?x ?c WHERE { ?x ex:tag ?t "
+                + "OPTIONAL { SELECT ?x (COUNT(?y) AS ?c) WHERE { ?x ex:link ?y } GROUP BY ?x } }";
+
+        String sql = translate(optimized, query);
+        assertThat(sql, containsString(lookup + "SELECT "));
+        assertThat(sql, containsString(links + " OFFSET 0 ) AS \"outer0\" GROUP BY \"src\""));
+
+        assertThat(translate(plain, query), not(containsString("LATERAL")));
+        assertThat(check(query), hasSize(5));
+
+        // the links of many nodes are counted at once
+        query = "SELECT ?x ?c WHERE { ?x ex:label ?l "
+                + "OPTIONAL { SELECT ?x (COUNT(?y) AS ?c) WHERE { ?x ex:link ?y } GROUP BY ?x } }";
+
+        assertThat(translate(optimized, query), not(containsString("LATERAL")));
+        assertThat(check(query), hasSize(1000));
+
+        // the nodes two links away are looked up for a tagged node and deduplicated
+        query = "SELECT ?x ?z WHERE { ?x ex:tag ?t "
+                + "OPTIONAL { SELECT DISTINCT ?x ?z WHERE { ?x ex:link ?y . ?y ex:link ?z } } }";
+
+        sql = translate(optimized, query);
+        assertThat(sql, containsString(lookup + "SELECT "));
+        assertThat(sql, containsString(links + " OFFSET 0"));
+
+        check(query);
+
+        // a slice is picked from all the links, whichever node they belong to
+        query = "SELECT ?x ?y WHERE { ?x ex:tag ?t "
+                + "OPTIONAL { SELECT ?x ?y WHERE { ?x ex:link ?y } ORDER BY ?x ?y LIMIT 500 } }";
+
+        assertThat(translate(optimized, query), not(containsString("LATERAL")));
+        check(query);
+
+        // a count is no grouping variable, so it restricts nothing
+        query = "SELECT ?x ?y WHERE { ?x ex:tag ?t BIND(10 AS ?c) "
+                + "OPTIONAL { SELECT ?y (COUNT(?z) AS ?c) WHERE { ?y ex:link ?z } GROUP BY ?y } }";
+
+        assertThat(translate(optimized, query), not(containsString("LATERAL")));
+        assertThat(check(query), hasSize(1000));
+    }
+
+
+    @Test
+    public void difference() throws Exception
+    {
+        // the links of a tagged node are looked up, and the tags of their targets are tested for them
+        String query = "SELECT ?x ?y WHERE { ?x ex:tag ?t OPTIONAL { ?x ex:link ?y MINUS { ?y ex:tag ?u } } }";
+
+        String sql = translate(optimized, query);
+        assertThat(sql, containsString(lookup + "SELECT "));
+        assertThat(sql, containsString("\"optional_lookup_test\".\"links\" WHERE (((\"left0\".\"id\" = \"src\")))"));
+
+        check(query);
+    }
+
+
+    @Test
     public void unrestricted() throws Exception
     {
         // the right side shares no variable with the left one

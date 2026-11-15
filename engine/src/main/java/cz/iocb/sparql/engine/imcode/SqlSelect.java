@@ -688,6 +688,49 @@ public final class SqlSelect extends SqlIntercode
     @Override
     public SqlCode translate(Request request, Scope scope)
     {
+        return translate(request, scope, null);
+    }
+
+
+    /**
+     * The rows the child is evaluated for when the sub-select is evaluated for the given rows: a projected variable
+     * restricts the child as it restricts the solutions of the sub-select, unless the sub-select takes a slice of them,
+     * which it picks from them all.
+     *
+     * @param outer the rows the sub-select is evaluated for one by one
+     * @return the rows the child is evaluated for one by one, or null when it is evaluated whole
+     */
+    JoinOptimizer.Outer getChildRows(JoinOptimizer.Outer outer)
+    {
+        if(isTopLevel() || limit != null || offset != null && !offset.equals(BigInteger.ZERO))
+            return null;
+
+        return outer.retain(bindings.getVariables());
+    }
+
+
+    /**
+     * The sub-select of the child evaluated for the row of the outer table, as far as the projected variables restrict
+     * it (see {@link #getChildRows}).
+     */
+    @Override
+    SqlCode translateForRow(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
+        return translate(request, scope, getChildRows(outer));
+    }
+
+
+    /**
+     * SQL code of the select, evaluated once or, a sub-select, for one of the rows of an outer table (see
+     * {@link #translateForRow}).
+     *
+     * @param request the current request
+     * @param scope the scope of the select
+     * @param outer the rows the child of a sub-select is evaluated for one by one, or null when it is evaluated once
+     * @return SQL code of the select
+     */
+    private SqlCode translate(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
         ClassRelations relations = request.getConfiguration();
 
         SqlBuilder builder = new SqlBuilder();
@@ -707,7 +750,8 @@ public final class SqlSelect extends SqlIntercode
             }
 
             builder.append(" FROM (");
-            builder.append(child.translate(request, scope));
+            builder.append(
+                    outer == null ? child.translate(request, scope) : child.translateForRow(request, scope, outer));
             builder.append(") AS tab");
 
         }
@@ -1145,6 +1189,28 @@ public final class SqlSelect extends SqlIntercode
             return new SqlCode("");
 
         return builder.toCode();
+    }
+
+
+    /**
+     * Projected solutions.
+     *
+     * @return projected solutions
+     */
+    public final SqlIntercode getChild()
+    {
+        return child;
+    }
+
+
+    /**
+     * LIMIT, or null.
+     *
+     * @return LIMIT, or null
+     */
+    public final BigInteger getLimit()
+    {
+        return limit;
     }
 
 

@@ -418,6 +418,45 @@ public final class SqlAggregation extends SqlIntercode
     @Override
     public SqlCode translate(Request request, Scope scope)
     {
+        return translate(request, scope, null);
+    }
+
+
+    /**
+     * The rows the child is evaluated for when the grouping is evaluated for the given rows: a grouping variable
+     * restricts the child as it restricts the groups, because the solutions of one value of it make groups of their
+     * own, which no other solution belongs to.
+     *
+     * @param outer the rows the grouping is evaluated for one by one
+     * @return the rows the child is evaluated for one by one, or null when it is evaluated whole
+     */
+    JoinOptimizer.Outer getChildRows(JoinOptimizer.Outer outer)
+    {
+        return outer.retain(groupVariables);
+    }
+
+
+    /**
+     * The grouping of the child evaluated for the row of the outer table, as far as the grouping variables restrict it
+     * (see {@link #getChildRows}).
+     */
+    @Override
+    SqlCode translateForRow(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
+        return translate(request, scope, getChildRows(outer));
+    }
+
+
+    /**
+     * SQL code of the grouping, evaluated once or for one of the rows of an outer table (see {@link #translateForRow}).
+     *
+     * @param request the current request
+     * @param scope the scope of the grouping
+     * @param outer the rows the child is evaluated for one by one, or null when it is evaluated once
+     * @return SQL code of the grouping
+     */
+    private SqlCode translate(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
         Set<Column> groupByColumns = new HashSet<>();
 
         for(Variable var : groupVariables)
@@ -475,7 +514,7 @@ public final class SqlAggregation extends SqlIntercode
 
 
         builder.append(" FROM (");
-        builder.append(child.translate(request, scope));
+        builder.append(outer == null ? child.translate(request, scope) : child.translateForRow(request, scope, outer));
         builder.append(" ) AS ");
         builder.appendAlias(scope.getInputTable());
 
@@ -488,6 +527,28 @@ public final class SqlAggregation extends SqlIntercode
 
 
         return builder.toCode();
+    }
+
+
+    /**
+     * Solutions being grouped.
+     *
+     * @return solutions being grouped
+     */
+    public final SqlIntercode getChild()
+    {
+        return child;
+    }
+
+
+    /**
+     * Grouping variables.
+     *
+     * @return grouping variables
+     */
+    public final Set<Variable> getGroupVariables()
+    {
+        return groupVariables;
     }
 
 

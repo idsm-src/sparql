@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.imcode;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -64,7 +65,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * left side anew, restricted to the solutions compatible with it (see {@link SqlIntercode#translateForRow}), which is
  * the index nested loop of a join. The second way costs what the right side costs for one row (see
  * {@link #estimateForRow}): a table access looked up by an index costs a lookup, a join is planned again for the
- * children so restricted, and a node that cannot be restricted costs its whole evaluation.
+ * children so restricted, and a node that cannot be restricted costs its whole evaluation. The test of a pattern for
+ * the solutions of another node (the pattern of an EXISTS, the right side of a MINUS) is chosen the same way (see
+ * {@link #planTest}).
  */
 final class JoinOptimizer
 {
@@ -228,6 +231,26 @@ final class JoinOptimizer
 
             return new Outer(kept, table);
         }
+
+
+        /**
+         * The rows a child of a node is evaluated for when the node is evaluated for these rows and only the given
+         * variables restrict the child the way they restrict the node: the rows with the bindings of those variables
+         * alone, or null when none of them is left, so that the child is evaluated whole.
+         *
+         * @param variables the variables whose values restrict the child
+         * @return the rows the child is evaluated for one by one, or null when it is evaluated whole
+         */
+        Outer retain(Collection<Variable> variables)
+        {
+            VariableBindings kept = new VariableBindings();
+
+            for(VariableBinding binding : bindings.getValues())
+                if(variables.contains(binding.getVariable()))
+                    kept.add(binding);
+
+            return kept.getVariables().isEmpty() ? null : new Outer(kept, table);
+        }
     }
 
 
@@ -239,6 +262,18 @@ final class JoinOptimizer
      * @param restricted whether the row restricts the node anywhere, so that the node is not evaluated whole for it
      */
     record Evaluation(double rows, double cost, boolean restricted)
+    {
+    }
+
+
+    /**
+     * The way chosen for the test of a pattern for the solutions of another node (see {@link #planTest}).
+     *
+     * @param outer the solutions the pattern is evaluated for one by one, or null when it is evaluated once and the
+     *            database joins it with the solutions
+     * @param cost estimated cost of the test, the evaluation of the solutions excluded
+     */
+    record TestPlan(Outer outer, double cost)
     {
     }
 
@@ -1083,9 +1118,10 @@ final class JoinOptimizer
     /**
      * Estimated number of rows of the solutions of the node: a table access from the statistics of its table, inline
      * data by its rows, a join by its plan, a union by the sum of its branches, a filter by the selectivities of its
-     * conditions, a distinct by the distinct values of its variables, an OPTIONAL by the fan-out of its right side, a
-     * MINUS by its left side, a lateral join by the product of its sides, and the nodes passing the solutions of a
-     * child on by the child; {@link #DEFAULT_ROWS} for the other nodes.
+     * conditions, a distinct by the distinct values of its variables, a grouping by those of its grouping variables, a
+     * sub-select by its child and its limit, an OPTIONAL by the fan-out of its right side, a MINUS by its left side, a
+     * lateral join by the product of its sides, and the nodes passing the solutions of a child on by the child;
+     * {@link #DEFAULT_ROWS} for the other nodes.
      *
      * @param request the current request
      * @param node the node
@@ -1135,6 +1171,25 @@ final class JoinOptimizer
             return Math.min(rows, values);
         }
 
+        if(node instanceof SqlAggregation aggregation)
+        {
+            // a group for every combination of the values of the grouping variables, a single one without them
+            double rows = estimateRows(request, aggregation.getChild());
+            double groups = 1;
+
+            for(Variable variable : aggregation.getGroupVariables())
+                groups *= Math.max(estimateDistinct(request, aggregation.getChild(), variable), 1);
+
+            return aggregation.getGroupVariables().isEmpty() ? 1 : Math.min(rows, groups);
+        }
+
+        if(node instanceof SqlSelect select)
+        {
+            double rows = estimateRows(request, select.getChild());
+
+            return select.getLimit() == null ? rows : Math.min(rows, select.getLimit().doubleValue());
+        }
+
         if(node instanceof SqlLeftJoin leftJoin)
         {
             double rows = estimateRows(request, leftJoin.getLeft());
@@ -1171,6 +1226,46 @@ final class JoinOptimizer
             return 0;
 
         return DEFAULT_ROWS;
+    }
+
+
+    /**
+     * Estimated number of the rows that the groupings and the deduplications of the node read beyond the solutions the
+     * node has, when the node is evaluated whole: such a node has to read all the solutions of its child, however few
+     * it makes of them, whereas the cost of joining a node counts only its solutions (see {@link #hashCost}). The nodes
+     * passing the solutions of a child on are looked through; any other node counts by its solutions, which no index
+     * may spare a grouping.
+     *
+     * @param request the current request
+     * @param node the node
+     * @return estimated number of the rows read beyond the solutions of the node
+     */
+    private static double estimateGrouped(Request request, SqlIntercode node)
+    {
+        SqlIntercode child = node;
+
+        while(true)
+        {
+            if(child instanceof SqlFilter filter)
+                child = filter.getChild();
+            else if(child instanceof SqlBind bind)
+                child = bind.getChild();
+            else if(child instanceof SqlStripConstantColumns strip)
+                child = strip.getChild();
+            else if(child instanceof SqlSelect select)
+                child = select.getChild();
+            else
+                break;
+        }
+
+        SqlIntercode grouped = child instanceof SqlAggregation aggregation ? aggregation.getChild() :
+                child instanceof SqlDistinct distinct ? distinct.getChild() : null;
+
+        if(grouped == null)
+            return 0;
+
+        return Math.max(
+                estimateRows(request, grouped) + estimateGrouped(request, grouped) - estimateRows(request, node), 0);
     }
 
 
@@ -1243,6 +1338,14 @@ final class JoinOptimizer
         {
             distinct = estimateDistinct(request, d.getChild(), variable);
         }
+        else if(node instanceof SqlAggregation aggregation && aggregation.getGroupVariables().contains(variable))
+        {
+            distinct = estimateDistinct(request, aggregation.getChild(), variable);
+        }
+        else if(node instanceof SqlSelect select)
+        {
+            distinct = estimateDistinct(request, select.getChild(), variable);
+        }
         else if(node instanceof SqlFilter filter)
         {
             distinct = estimateDistinct(request, filter.getChild(), variable);
@@ -1270,9 +1373,11 @@ final class JoinOptimizer
      * rows compatible with the row (see {@link SqlTableAccess#getRowVariables}) has the rows that share the values of
      * the row and costs a lookup when an index of the table serves one of those values, a join is planned for its
      * children evaluated so, a union is the sum of its branches, an OPTIONAL costs its left side and the join chosen
-     * for the rows that side has for one row (see {@link #planLeftJoin}), and a node passing the solutions of a child
-     * on is evaluated as the child. Any other node, like a table access that cannot be restricted or looked up, is
-     * evaluated whole for every row, which costs a pass over its solutions.
+     * for the rows that side has for one row (see {@link #planLeftJoin}), a MINUS its left side and the test chosen for
+     * those rows (see {@link #planTest}), and a node passing the solutions of a child on is evaluated as the child, as
+     * is a deduplication, a grouping or a projection by the variables it keeps of the row (see {@link Outer#retain}).
+     * Any other node, like a table access that cannot be restricted or looked up, is evaluated whole for every row,
+     * which costs a pass over its solutions.
      *
      * @param request the current request
      * @param node the node
@@ -1347,9 +1452,42 @@ final class JoinOptimizer
         if(node instanceof SqlStripConstantColumns strip)
             return estimateForRow(request, strip.getChild(), outer);
 
-        double rows = estimateRows(request, node);
+        if(node instanceof SqlMinus minus)
+        {
+            Evaluation left = estimateForRow(request, minus.getLeft(), outer);
 
-        return new Evaluation(rows, Math.max(rows, 1), false);
+            return new Evaluation(left.rows(), left.cost() + minus.getPlan(request, outer, null).cost(),
+                    left.restricted());
+        }
+
+        // a node whose solutions are made of the solutions of its child that share the values of the row
+        Outer rows = null;
+        SqlIntercode child = null;
+
+        if(node instanceof SqlDistinct distinct)
+        {
+            rows = distinct.getChildRows(outer);
+            child = distinct.getChild();
+        }
+        else if(node instanceof SqlAggregation aggregation)
+        {
+            rows = aggregation.getChildRows(outer);
+            child = aggregation.getChild();
+        }
+        else if(node instanceof SqlSelect select)
+        {
+            rows = select.getChildRows(outer);
+            child = select.getChild();
+        }
+
+        double all = estimateRows(request, node);
+
+        if(rows == null)
+            return new Evaluation(all, Math.max(all, 1), false);
+
+        Evaluation evaluation = estimateForRow(request, child, rows);
+
+        return new Evaluation(Math.min(evaluation.rows(), all), evaluation.cost(), evaluation.restricted());
     }
 
 
@@ -1408,7 +1546,7 @@ final class JoinOptimizer
         }
 
         double rows = leftRows * Math.max(fanout, 1);
-        double hashed = hashCost(hashable, leftRows, rightRows, rows);
+        double hashed = hashCost(hashable, leftRows, rightRows, rows) + estimateGrouped(request, right);
 
         LeftJoinPlan plan = new LeftJoinPlan(null, null, rows, hashed);
 
@@ -1483,16 +1621,11 @@ final class JoinOptimizer
      * @param bindings bindings of the solutions the pattern is tested for
      * @param table alias the columns of the solutions are addressed through, or null when the bindings address them
      * @param pattern the tested pattern
-     * @return the solutions the pattern is evaluated for one by one, or null when it is evaluated once
+     * @return the way chosen for the test
      */
-    static Outer planTest(Request request, double solutions, VariableBindings bindings, Table table,
+    static TestPlan planTest(Request request, double solutions, VariableBindings bindings, Table table,
             SqlIntercode pattern)
     {
-        Outer outer = Outer.of(bindings, pattern.getVariableBindings(), table);
-
-        if(!pattern.isDeterministic() || outer.bindings().getVariables().isEmpty())
-            return null;
-
         double rows = Math.max(solutions, 1);
         double patternRows = Math.max(estimateRows(request, pattern), 1);
         boolean hashable = false;
@@ -1500,14 +1633,20 @@ final class JoinOptimizer
         for(VariableBinding binding : bindings.getValues())
             hashable |= isHashable(binding) && isHashable(pattern.getVariable(binding.getVariable()));
 
+        double joined = hashCost(hashable, rows, patternRows, rows) + estimateGrouped(request, pattern);
+        Outer outer = Outer.of(bindings, pattern.getVariableBindings(), table);
+
+        if(!pattern.isDeterministic() || outer.bindings().getVariables().isEmpty())
+            return new TestPlan(null, joined);
+
         Evaluation evaluation = estimateForRow(request, pattern, outer);
-        double evaluated = rows * evaluation.cost() * (hashable ? 1 : PAIRWISE_MARGIN);
+        double evaluated = rows * evaluation.cost();
 
         // a pattern that no solution restricts would be evaluated whole for each of them
-        if(evaluation.restricted() && evaluated < hashCost(hashable, rows, patternRows, rows))
-            return outer;
+        if(evaluation.restricted() && evaluated * (hashable ? 1 : PAIRWISE_MARGIN) < joined)
+            return new TestPlan(outer, evaluated);
 
-        return null;
+        return new TestPlan(null, joined);
     }
 
 
