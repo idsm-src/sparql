@@ -167,6 +167,10 @@ public final class SqlAggregation extends SqlIntercode
             childRestrictions = newChildRestrictions;
         }
 
+        // no solutions make no group of a GROUP BY clause, whereas without the clause they make the one group there is
+        if(optChild.equals(SqlNoSolution.get()) && !groupVariables.isEmpty())
+            return SqlNoSolution.get();
+
         /* expand union if its child are grouped by disjoint values */
         if(optChild instanceof SqlUnion union && !optChild.hasConstantVariables(groupVariables))
         {
