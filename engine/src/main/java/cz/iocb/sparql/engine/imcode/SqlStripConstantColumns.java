@@ -145,6 +145,30 @@ public final class SqlStripConstantColumns extends SqlIntercode
     @Override
     public SqlCode translate(Request request, Scope scope)
     {
+        return translate(request, scope, null);
+    }
+
+
+    /**
+     * The child evaluated for the row of the outer table, its constants turned into columns as well.
+     */
+    @Override
+    SqlCode translateForRow(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
+        return translate(request, scope, outer);
+    }
+
+
+    /**
+     * SQL code of the node, evaluated once or for one of the rows of an outer table (see {@link #translateForRow}).
+     *
+     * @param request the current request
+     * @param scope the scope of the node
+     * @param outer the rows the node is evaluated for one by one, or null when it is evaluated once
+     * @return SQL code of the node
+     */
+    private SqlCode translate(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
         SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT ");
@@ -167,7 +191,7 @@ public final class SqlStripConstantColumns extends SqlIntercode
         }
 
         builder.append(" FROM (");
-        builder.append(child.translate(request, scope));
+        builder.append(outer == null ? child.translate(request, scope) : child.translateForRow(request, scope, outer));
         builder.append(" ) AS tab");
 
         return builder.toCode();

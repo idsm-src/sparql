@@ -895,6 +895,27 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
     /**
+     * SQL code of the subtree evaluated for one of the rows of an outer table, which the database evaluates for every
+     * row anew (the right side of an OPTIONAL joined by lookups, see {@link JoinOptimizer#planLeftJoin}): the code may
+     * leave out the solutions that are not compatible with the row, and it refers to the columns of the row through the
+     * alias of the outer table, which the code holding it has to give. A node that can be restricted so returns code
+     * that looks the compatible solutions up: a table access compares its columns with the values of the row (see
+     * {@link SqlTableAccess#getRowBindings}), and a node whose solutions are made of solutions of a child that the
+     * values of the row restrict the same way hands the rows down to it. Any other node is evaluated whole, by the code
+     * of {@link #translate}; the node holding the code compares its solutions with the row in either case.
+     *
+     * @param request the current request
+     * @param scope the scope of the node
+     * @param outer the rows the subtree is evaluated for one by one
+     * @return SQL code of the subtree evaluated for one of the rows
+     */
+    SqlCode translateForRow(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
+        return translate(request, scope);
+    }
+
+
+    /**
      * True if the subtree contains a SERVICE stub that has not been evaluated yet, the patterns of the EXISTS
      * expressions of its nodes included; the second optimisation pass has to reach every such stub.
      *

@@ -41,7 +41,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * walk on the right side whose start the left side binds always is seeded with the distinct values of the start read
  * from the left side, shared so that the statement evaluates it once (see {@link SqlShared}). A condition that the
  * solutions of the right side decide by themselves filters that side, so it is handed down to the contexts of the
- * SERVICE calls of the right side when the side can take it in (see {@link SqlIntercode#sink}).
+ * SERVICE calls of the right side when the side can take it in (see {@link SqlIntercode#sink}). With the join optimizer
+ * on, the engine chooses the method of the join as well (see {@link JoinOptimizer#planLeftJoin}): the right side is
+ * evaluated once and hashed, or it is looked up for every solution of the left side (see {@link #translate}).
  */
 public final class SqlLeftJoin extends SqlIntercode
 {
@@ -77,6 +79,13 @@ public final class SqlLeftJoin extends SqlIntercode
      */
     private final Map<Column, Column> columnMap;
 
+    /**
+     * Per variable the left side binds always, the conditions the filters above keep the solutions of the join by (see
+     * {@link Restrictions#getFilterConditions}): the database evaluates such a condition on the left side, before the
+     * join, so the optimizer chooses the method of the join for the solutions of the left side the conditions leave.
+     */
+    private final Map<Variable, Set<SqlExpressionIntercode>> filterConditions;
+
 
     /**
      * Creates the node.
@@ -88,10 +97,12 @@ public final class SqlLeftJoin extends SqlIntercode
      * @param leftTable alias of the left side
      * @param rightTable alias of the right side
      * @param columnMap the column map
+     * @param filterConditions per variable the left side binds always, the conditions the filters above keep the
+     *            solutions by
      */
     protected SqlLeftJoin(VariableBindings bindings, SqlIntercode left, SqlIntercode right,
             List<SqlExpressionIntercode> conditions, InputTable leftTable, InputTable rightTable,
-            Map<Column, Column> columnMap)
+            Map<Column, Column> columnMap, Map<Variable, Set<SqlExpressionIntercode>> filterConditions)
     {
         super(bindings, left.isDeterministic() && right.isDeterministic()
                 && conditions.stream().allMatch(c -> c.isDeterministic()));
@@ -102,6 +113,7 @@ public final class SqlLeftJoin extends SqlIntercode
         this.leftTable = leftTable;
         this.rightTable = rightTable;
         this.columnMap = columnMap;
+        this.filterConditions = filterConditions;
     }
 
 
@@ -157,7 +169,33 @@ public final class SqlLeftJoin extends SqlIntercode
         VariableBindings bindings = getJoinVariableBindings(request, left.getVariableBindings(),
                 setCanBeNull(right.getVariableBindings()), leftTable, rightTable, restrictions, map);
 
-        return new SqlLeftJoin(bindings, left, right, conditions, leftTable, rightTable, map);
+        return new SqlLeftJoin(bindings, left, right, conditions, leftTable, rightTable, map,
+                getFilterConditions(left, restrictions));
+    }
+
+
+    /**
+     * The conditions the filters above keep the solutions of a left join by, per variable its left side binds always
+     * (see {@link Restrictions#getFilterConditions}): every solution of the join takes such a variable from the left
+     * side, so the database evaluates the conditions there.
+     *
+     * @param left the left side
+     * @param restrictions what the parent needs of the variables, or null
+     * @return per variable the left side binds always, the conditions the filters above keep the solutions by
+     */
+    private static Map<Variable, Set<SqlExpressionIntercode>> getFilterConditions(SqlIntercode left,
+            Restrictions restrictions)
+    {
+        Map<Variable, Set<SqlExpressionIntercode>> conditions = new HashMap<>();
+
+        if(restrictions == null)
+            return conditions;
+
+        for(VariableBinding binding : left.getVariableBindings().getValues())
+            if(!binding.canBeNull() && !restrictions.getFilterConditions(binding.getVariable()).isEmpty())
+                conditions.put(binding.getVariable(), restrictions.getFilterConditions(binding.getVariable()));
+
+        return conditions;
     }
 
 
@@ -485,7 +523,8 @@ public final class SqlLeftJoin extends SqlIntercode
 
 
         if(optLeft == left && optRight == right && optConditions.equals(conditions)
-                && restrictions.isOptimized(relations, bindings))
+                && restrictions.isOptimized(relations, bindings)
+                && filterConditions.equals(getFilterConditions(optLeft, restrictions)))
             return this;
 
         return leftJoin(request, scope, optLeft, optRight, optConditions, restrictions);
@@ -586,10 +625,63 @@ public final class SqlLeftJoin extends SqlIntercode
     }
 
 
+    /**
+     * The method the optimizer chooses for the join of the sides (see {@link JoinOptimizer#planLeftJoin}), the right
+     * side referring to the solutions of the left side through the alias of that side.
+     *
+     * @param request the current request
+     * @param outer the rows the whole join is evaluated for one by one, or null when it is evaluated once
+     * @return the method chosen for the join
+     */
+    JoinOptimizer.LeftJoinPlan getPlan(Request request, JoinOptimizer.Outer outer)
+    {
+        return JoinOptimizer.planLeftJoin(request, left, right, leftTable, filterConditions, outer);
+    }
+
+
+    /**
+     * SQL code of the left join. With the join optimizer on, the right side is written the way the optimizer chooses
+     * (see {@link #getPlan}): as it is, for the database to evaluate it once and hash the sides, or as a lateral
+     * subquery evaluated for every solution of the left side and restricted to the solutions compatible with it (see
+     * {@link SqlIntercode#translateForRow}), which the database joins by a nested loop over the left side. The
+     * condition of the join is the same in both cases, so the restriction only spares the database the solutions the
+     * condition would drop.
+     */
     @Override
     public SqlCode translate(Request request, Scope scope)
     {
+        return translate(request, scope, null);
+    }
+
+
+    /**
+     * The left join whose left side is evaluated for the row of the outer table: a solution of the join is made of a
+     * solution of the left side, which gives every variable it binds its value. The right side is joined by the method
+     * chosen for the solutions the left side has for one row.
+     */
+    @Override
+    SqlCode translateForRow(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
+        return translate(request, scope, outer);
+    }
+
+
+    /**
+     * SQL code of the left join, evaluated once (see {@link #translate(Request, Scope)}) or for one of the rows of an
+     * outer table (see {@link #translateForRow}).
+     *
+     * @param request the current request
+     * @param scope the scope of the join
+     * @param outer the rows the join is evaluated for one by one, or null when it is evaluated once
+     * @return SQL code of the left join
+     */
+    private SqlCode translate(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
         ClassRelations relations = request.getConfiguration();
+
+        // the solutions of the left side the right side is evaluated for one by one, when the optimizer chooses so
+        JoinOptimizer.Outer solutions = request.getConfiguration().isJoinOptimizerEnabled() ?
+                getPlan(request, outer).outer() : null;
 
         SqlBuilder builder = new SqlBuilder();
 
@@ -605,12 +697,21 @@ public final class SqlLeftJoin extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM (");
-        builder.append(left.translate(request, scope));
+        builder.append(outer == null ? left.translate(request, scope) : left.translateForRow(request, scope, outer));
         builder.append(" ) AS ");
         builder.appendAlias(leftTable);
 
-        builder.append(" LEFT JOIN (");
-        builder.append(right.translate(request, scope));
+        if(solutions != null)
+        {
+            builder.append(" LEFT JOIN LATERAL (");
+            builder.append(right.translateForRow(request, scope, solutions));
+        }
+        else
+        {
+            builder.append(" LEFT JOIN (");
+            builder.append(right.translate(request, scope));
+        }
+
         builder.append(" ) AS ");
         builder.appendAlias(rightTable);
 
@@ -722,6 +823,9 @@ public final class SqlLeftJoin extends SqlIntercode
             return false;
 
         if(!Objects.equals(conditions, imcode.conditions))
+            return false;
+
+        if(!filterConditions.equals(imcode.filterConditions))
             return false;
 
         if(!Objects.equals(left, imcode.left))

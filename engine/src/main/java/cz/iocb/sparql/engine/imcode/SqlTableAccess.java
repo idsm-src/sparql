@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.imcode;
 
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
@@ -2077,6 +2078,71 @@ public final class SqlTableAccess extends SqlIntercode
     public SqlCode translate(Request request, Scope scope)
     {
         return translateAccess(request, null);
+    }
+
+
+    /**
+     * The access restricted to the rows compatible with the row of the outer table and fenced like a looked up access
+     * (see {@link #translateLateral}), so that the database looks them up through an index of the table for every row.
+     */
+    @Override
+    SqlCode translateForRow(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
+        SqlCode condition = getRowCondition(request.getConfiguration(), outer);
+
+        return condition == null ? translate(request, scope) : translateLateral(request, condition);
+    }
+
+
+    /**
+     * The variables by whose values in a row of the outer table the access is restricted to the rows compatible with
+     * the row, as the access binds them to its columns: those the access binds always, to columns of a single class
+     * that holds the class the outer rows bind them in (that class itself, or a more general one). The values are then
+     * compared in the class of the columns, so with the columns as they are, by plain equalities, which an index of the
+     * table can serve; columns of a narrower class would have to be converted to the class of the values first. A row
+     * whose column of another variable is null gives a solution compatible with every outer row, so such a variable
+     * restricts nothing.
+     *
+     * @param outer the rows the access is evaluated for one by one
+     * @return bindings of the variables the access is restricted by, in terms of the columns of the table
+     */
+    VariableBindings getRowBindings(JoinOptimizer.Outer outer)
+    {
+        VariableBindings result = new VariableBindings();
+
+        if(table == null)
+            return result;
+
+        for(VariableBinding outerBinding : outer.bindings().getValues())
+        {
+            VariableBinding binding = bindings.get(outerBinding.getVariable());
+            VariableBinding inner = internal.get(outerBinding.getVariable());
+
+            if(binding == null || binding.canBeNull() || inner.getMappings().size() != 1)
+                continue;
+
+            Entry<ResourceClass, List<Column>> mapping = inner.getMappings().entrySet().iterator().next();
+            ResourceClass outerClass = outerBinding.getMappings().keySet().iterator().next();
+
+            if(mapping.getValue() != null && unionize(outerClass, mapping.getKey()).equals(mapping.getKey()))
+                result.add(new VariableBinding(inner.getVariable(), inner.getMappings(), false));
+        }
+
+        return result;
+    }
+
+
+    /**
+     * SQL condition restricting the rows of the access to those compatible with a row of the outer table: its columns
+     * equal the values of the row (see {@link #getRowBindings}). Null when no variable restricts the access.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param outer the rows the access is evaluated for one by one
+     * @return SQL condition over the columns of the table and of the outer table, or null
+     */
+    SqlCode getRowCondition(ClassRelations relations, JoinOptimizer.Outer outer)
+    {
+        return generateJoinCondition(relations, outer.bindings(), getRowBindings(outer), outer.table(), null);
     }
 
 

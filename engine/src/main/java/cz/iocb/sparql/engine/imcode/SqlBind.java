@@ -245,8 +245,33 @@ public final class SqlBind extends SqlIntercode
     @Override
     public SqlCode translate(Request request, Scope scope)
     {
+        return translate(request, scope, null);
+    }
+
+
+    /**
+     * The binding of the child evaluated for the row of the outer table: the expression extends every solution of the
+     * child by itself, with a variable the child does not bind.
+     */
+    @Override
+    SqlCode translateForRow(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
+        return translate(request, scope, outer);
+    }
+
+
+    /**
+     * SQL code of the binding, evaluated once or for one of the rows of an outer table (see {@link #translateForRow}).
+     *
+     * @param request the current request
+     * @param scope the scope of the binding
+     * @param outer the rows the binding is evaluated for one by one, or null when it is evaluated once
+     * @return SQL code of the binding
+     */
+    private SqlCode translate(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
         if(!expression.getBinding().hasExpressionColumn())
-            return child.translate(request, scope);
+            return translateChild(request, scope, outer);
 
 
         SqlBuilder builder = new SqlBuilder();
@@ -303,13 +328,27 @@ public final class SqlBind extends SqlIntercode
         if(!child.equals(SqlEmptySolution.get()))
         {
             builder.append(" FROM (");
-            builder.append(child.translate(request, scope));
+            builder.append(translateChild(request, scope, outer));
             builder.append(" ) AS ");
             builder.appendAlias(scope.getInputTable());
         }
 
 
         return builder.toCode();
+    }
+
+
+    /**
+     * SQL code of the child, evaluated once or for one of the rows of an outer table.
+     *
+     * @param request the current request
+     * @param scope the scope of the binding
+     * @param outer the rows the binding is evaluated for one by one, or null when it is evaluated once
+     * @return SQL code of the child
+     */
+    private SqlCode translateChild(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
+        return outer == null ? child.translate(request, scope) : child.translateForRow(request, scope, outer);
     }
 
 

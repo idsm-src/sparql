@@ -81,6 +81,17 @@ public final class SqlJoin extends SqlIntercode
      */
     private JoinOptimizer.Plan plan;
 
+    /**
+     * The rows the join tree {@link #rowPlan} was chosen for, once it has been chosen.
+     */
+    private JoinOptimizer.Outer rowOuter;
+
+    /**
+     * The join tree chosen by the optimizer for the join evaluated for one of the rows {@link #rowOuter} (see
+     * {@link #getPlan(Request, JoinOptimizer.Outer)}).
+     */
+    private JoinOptimizer.Plan rowPlan;
+
 
     /**
      * Creates the node.
@@ -1025,14 +1036,64 @@ public final class SqlJoin extends SqlIntercode
     JoinOptimizer.Plan getPlan(Request request)
     {
         if(plan == null)
-            plan = JoinOptimizer.plan(request, childs, filterConditions);
+            plan = JoinOptimizer.plan(request, childs, filterConditions, null);
 
         return plan;
     }
 
 
+    /**
+     * The join tree chosen by the optimizer for the join evaluated for the rows of an outer table one by one (see
+     * {@link #translateForRow}), where the children are restricted to the solutions compatible with a row; kept for the
+     * rows it was chosen for last.
+     *
+     * @param request the current request
+     * @param outer the rows the join is evaluated for one by one, or null when it is evaluated once
+     * @return the join tree chosen by the optimizer for the children
+     */
+    JoinOptimizer.Plan getPlan(Request request, JoinOptimizer.Outer outer)
+    {
+        if(outer == null)
+            return getPlan(request);
+
+        if(!outer.equals(rowOuter))
+        {
+            rowPlan = JoinOptimizer.plan(request, childs, filterConditions, outer);
+            rowOuter = outer;
+        }
+
+        return rowPlan;
+    }
+
+
     @Override
     public SqlCode translate(Request request, Scope scope)
+    {
+        return translateJoin(request, scope, null);
+    }
+
+
+    /**
+     * The join of the children evaluated for the row of the outer table, in the tree the optimizer chooses for them so
+     * evaluated: a solution of the join is made of a solution of every child, so it is compatible with the row only if
+     * each of them is.
+     */
+    @Override
+    SqlCode translateForRow(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
+        return translateJoin(request, scope, outer);
+    }
+
+
+    /**
+     * SQL code of the join, evaluated once or for one of the rows of an outer table (see {@link #translateForRow}).
+     *
+     * @param request the current request
+     * @param scope the scope of the join
+     * @param outer the rows the join is evaluated for one by one, or null when it is evaluated once
+     * @return SQL code of the join
+     */
+    private SqlCode translateJoin(Request request, Scope scope, JoinOptimizer.Outer outer)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -1056,7 +1117,7 @@ public final class SqlJoin extends SqlIntercode
             Map<Variable, Set<ResourceClass>> joined = getJoinedClasses(relations,
                     childs.stream().map(c -> c.getVariableBindings()).toList());
 
-            translateTree(request, scope, getPlan(request).root(), joined, builder);
+            translateTree(request, scope, getPlan(request, outer).root(), joined, outer, builder);
             return builder.toCode();
         }
 
@@ -1066,7 +1127,7 @@ public final class SqlJoin extends SqlIntercode
                 builder.append(", ");
 
             builder.append("(");
-            builder.append(childs.get(i).translate(request, scope));
+            builder.append(translateChild(request, scope, childs.get(i), outer));
             builder.append(") AS ");
             builder.append(tables.get(i));
         }
@@ -1090,24 +1151,27 @@ public final class SqlJoin extends SqlIntercode
      * {@link SqlTableAccess#translateLateral}), and a hash join as an explicit join of its sides on the equalities
      * between their children (a cross join when there are none), so that the planner keeps the tree (see
      * {@link cz.iocb.sparql.engine.request.Request#execute}). The equalities compare only the classes of a variable
-     * that meet a class it takes in the whole join (see {@link #getJoinedClasses}).
+     * that meet a class it takes in the whole join (see {@link #getJoinedClasses}). When the join is evaluated for the
+     * rows of an outer table one by one, every child is (see {@link #translateForRow}), a looked up access being
+     * restricted by the values of the row as well.
      *
      * @param request the current request
      * @param scope the scope of the join
      * @param node the tree
      * @param joined classes per variable in the whole join (see {@link #getJoinedClasses})
+     * @param outer the rows the join is evaluated for one by one, or null when it is evaluated once
      * @param builder the SQL code being built
      * @return the children of the tree, as a bit per child
      */
     private int translateTree(Request request, Scope scope, JoinOptimizer.Node node,
-            Map<Variable, Set<ResourceClass>> joined, SqlBuilder builder)
+            Map<Variable, Set<ResourceClass>> joined, JoinOptimizer.Outer outer, SqlBuilder builder)
     {
         ClassRelations relations = request.getConfiguration();
 
         if(node instanceof JoinOptimizer.Leaf leaf)
         {
             builder.append("(");
-            builder.append(childs.get(leaf.child()).translate(request, scope));
+            builder.append(translateChild(request, scope, childs.get(leaf.child()), outer));
             builder.append(") AS ");
             builder.append(tables.get(leaf.child()));
 
@@ -1116,14 +1180,14 @@ public final class SqlJoin extends SqlIntercode
 
         if(node instanceof JoinOptimizer.Lookup lookup)
         {
-            int outer = translateTree(request, scope, lookup.outer(), joined, builder);
+            int outerChilds = translateTree(request, scope, lookup.outer(), joined, outer, builder);
             SqlTableAccess access = (SqlTableAccess) childs.get(lookup.child());
 
             List<SqlCode> conditions = new ArrayList<>();
 
             for(int i = 0; i < childs.size(); i++)
             {
-                if((outer >> i & 1) == 0)
+                if((outerChilds >> i & 1) == 0)
                     continue;
 
                 SqlCode condition = generateJoinCondition(relations, childs.get(i).getVariableBindings(),
@@ -1133,21 +1197,26 @@ public final class SqlJoin extends SqlIntercode
                     conditions.add(condition);
             }
 
+            SqlCode rowCondition = outer == null ? null : access.getRowCondition(relations, outer);
+
+            if(rowCondition != null)
+                conditions.add(rowCondition);
+
             builder.append(" CROSS JOIN LATERAL (");
             builder.append(access.translateLateral(request, conditions.isEmpty() ? SqlCode.TRUE :
                     conditions.stream().collect(SqlCode.joining(" AND ", "(", ")"))));
             builder.append(") AS ");
             builder.append(tables.get(lookup.child()));
 
-            return outer | 1 << lookup.child();
+            return outerChilds | 1 << lookup.child();
         }
 
         JoinOptimizer.HashJoin join = (JoinOptimizer.HashJoin) node;
 
-        int left = translateTree(request, scope, join.left(), joined, builder);
+        int left = translateTree(request, scope, join.left(), joined, outer, builder);
 
         SqlBuilder rightBuilder = new SqlBuilder();
-        int right = translateTree(request, scope, join.right(), joined, rightBuilder);
+        int right = translateTree(request, scope, join.right(), joined, outer, rightBuilder);
 
         List<SqlCode> conditions = new ArrayList<>();
 
@@ -1188,6 +1257,21 @@ public final class SqlJoin extends SqlIntercode
         }
 
         return left | right;
+    }
+
+
+    /**
+     * SQL code of a child, evaluated once or for one of the rows of an outer table the join is evaluated for.
+     *
+     * @param request the current request
+     * @param scope the scope of the join
+     * @param child the child
+     * @param outer the rows the join is evaluated for one by one, or null when it is evaluated once
+     * @return SQL code of the child
+     */
+    private static SqlCode translateChild(Request request, Scope scope, SqlIntercode child, JoinOptimizer.Outer outer)
+    {
+        return outer == null ? child.translate(request, scope) : child.translateForRow(request, scope, outer);
     }
 
 

@@ -11,6 +11,7 @@ import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.TableStatistics;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison;
@@ -52,6 +53,13 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * calibrated on the NeXtProt queries over a single table of triples. A filter above the join counts as well: a
  * condition that one variable decides alone reduces the child the join takes the variable from (see
  * {@link SqlIntercode.Restrictions#getFilterConditions}), because the database evaluates it there.
+ *
+ * The sides of an OPTIONAL keep their order, so only the method of their join is chosen (see {@link #planLeftJoin}):
+ * the right side is evaluated once and the sides are hashed, or the right side is evaluated for every solution of the
+ * left side anew, restricted to the solutions compatible with it (see {@link SqlIntercode#translateForRow}), which is
+ * the index nested loop of a join. The second way costs what the right side costs for one row (see
+ * {@link #estimateForRow}): a table access looked up by an index costs a lookup, a join is planned again for the
+ * children so restricted, and a node that cannot be restricted costs its whole evaluation.
  */
 final class JoinOptimizer
 {
@@ -141,8 +149,83 @@ final class JoinOptimizer
      *
      * @param root the root of the tree
      * @param rows estimated number of rows of the result
+     * @param cost estimated cost of the joins of the tree, together with the costs of the children when the tree is
+     *            chosen for one of the rows the join is evaluated for (see {@link #estimateForRow})
+     * @param restricted whether the row the tree is chosen for restricts a child (see {@link Evaluation})
      */
-    record Plan(Node root, double rows)
+    record Plan(Node root, double rows, double cost, boolean restricted)
+    {
+    }
+
+
+    /**
+     * The rows a node is evaluated for one by one, as the inner side of a nested loop over them (see
+     * {@link SqlIntercode#translateForRow}): the solutions of the left side of an OPTIONAL whose right side is looked
+     * up for each of them.
+     *
+     * @param bindings bindings of the variables by whose values in a row the node can be restricted to its solutions
+     *            compatible with the row: the variables every row binds, in a single class
+     * @param table alias the columns of the rows are addressed through
+     */
+    record Outer(VariableBindings bindings, Table table)
+    {
+        /**
+         * The rows with the given bindings for a node with the given bindings: of the variables the node binds too,
+         * those are kept that every row binds in a single class, because the value of such a variable is compared with
+         * the columns of the node by a plain equality.
+         *
+         * @param bindings bindings of the rows
+         * @param node bindings of the node evaluated for the rows
+         * @param table alias the columns of the rows are addressed through
+         * @return the rows
+         */
+        static Outer of(VariableBindings bindings, VariableBindings node, Table table)
+        {
+            VariableBindings kept = new VariableBindings();
+
+            for(VariableBinding binding : bindings.getValues())
+                if(node.get(binding.getVariable()) != null && !binding.canBeNull() && binding.getMappings().size() == 1
+                        && !binding.getMappings().containsValue(null))
+                    kept.add(binding);
+
+            return new Outer(kept, table);
+        }
+    }
+
+
+    /**
+     * Estimated evaluation of a node for one of the rows it is evaluated for (see {@link #estimateForRow}).
+     *
+     * @param rows estimated number of rows of the solutions of the node for one row
+     * @param cost estimated cost of finding them, in units of one row scanned or hashed
+     * @param restricted whether the row restricts the node anywhere, so that the node is not evaluated whole for it
+     */
+    record Evaluation(double rows, double cost, boolean restricted)
+    {
+    }
+
+
+    /**
+     * The method chosen for the join of the sides of an OPTIONAL (see {@link #planLeftJoin}).
+     *
+     * @param outer the solutions of the left side that the right side is evaluated for one by one, or null when the
+     *            right side is evaluated once and the sides are hashed (or compared pairwise when no equality of theirs
+     *            can be hashed)
+     * @param rows estimated number of rows of the result
+     * @param cost estimated cost of the join, the evaluation of the left side excluded
+     */
+    record LeftJoinPlan(Outer outer, double rows, double cost)
+    {
+    }
+
+
+    /**
+     * The children of a join tree with the cost of the tree (see {@link #cost}).
+     *
+     * @param mask the children of the tree, as a bit per child
+     * @param cost cost of the tree
+     */
+    private record Cost(int mask, double cost)
     {
     }
 
@@ -196,14 +279,17 @@ final class JoinOptimizer
      * before the joins: the child the join takes the variable from gives the joins only the fraction of its solutions
      * the conditions are estimated to keep (see {@link #selectivity(Request, SqlIntercode, List)}), and the tree is
      * chosen for the children so reduced. The estimated rows of the plan are those of the join itself, as the filters
-     * are no part of it.
+     * are no part of it. When the join is evaluated for the rows of an outer table one by one, the tree is chosen for
+     * the children as they are evaluated for one of the rows (see {@link #estimateForRow}).
      *
      * @param request the current request
      * @param childs the children
      * @param conditions per variable, the conditions the filters above keep the solutions of the join by
+     * @param outer the rows the join is evaluated for one by one, or null when it is evaluated once
      * @return the join tree with the estimated rows of the join
      */
-    static Plan plan(Request request, List<SqlIntercode> childs, Map<Variable, Set<SqlExpressionIntercode>> conditions)
+    static Plan plan(Request request, List<SqlIntercode> childs, Map<Variable, Set<SqlExpressionIntercode>> conditions,
+            Outer outer)
     {
         double[] unfiltered = new double[childs.size()];
         double[] kept = new double[childs.size()];
@@ -225,9 +311,10 @@ final class JoinOptimizer
         for(Map.Entry<Integer, List<SqlExpressionIntercode>> entry : decided.entrySet())
             kept[entry.getKey()] = selectivity(request, childs.get(entry.getKey()), entry.getValue());
 
-        Plan plan = plan(request, childs, kept);
+        Plan plan = plan(request, childs, kept, outer);
 
-        return Arrays.equals(kept, unfiltered) ? plan : new Plan(plan.root(), plan(request, childs, unfiltered).rows());
+        return Arrays.equals(kept, unfiltered) ? plan :
+                new Plan(plan.root(), plan(request, childs, unfiltered, outer).rows(), plan.cost(), plan.restricted());
     }
 
 
@@ -265,16 +352,29 @@ final class JoinOptimizer
      * @param request the current request
      * @param childs the children
      * @param kept the fraction of its solutions each child gives the joins
+     * @param outer the rows the join is evaluated for one by one, or null when it is evaluated once
      * @return the join tree with its estimated rows
      */
-    private static Plan plan(Request request, List<SqlIntercode> childs, double[] kept)
+    private static Plan plan(Request request, List<SqlIntercode> childs, double[] kept, Outer outer)
     {
         int n = childs.size();
 
         double[] rows = new double[n];
 
+        // what a child costs as a leaf of the tree: nothing beyond its rows when the join is evaluated once, its whole
+        // evaluation when the join is evaluated for a row, as the child is then evaluated for every row anew
+        double[] costs = new double[n];
+        boolean restricted = false;
+
         for(int i = 0; i < n; i++)
-            rows[i] = Math.max(estimateRows(request, childs.get(i)) * kept[i], 1);
+        {
+            Evaluation evaluation = outer == null ? null : estimateForRow(request, childs.get(i), outer);
+            double solutions = evaluation == null ? estimateRows(request, childs.get(i)) : evaluation.rows();
+
+            rows[i] = Math.max(solutions * kept[i], 1);
+            costs[i] = evaluation == null ? 0 : evaluation.cost();
+            restricted |= evaluation != null && evaluation.restricted();
+        }
 
 
         Map<Variable, Integer> masks = new HashMap<>();
@@ -305,9 +405,7 @@ final class JoinOptimizer
 
                 distinct[i] = Math.max(Math.min(estimateDistinct(request, child, entry.getKey()), rows[i]), 1);
 
-                long classes = binding.getMappings().values().stream().filter(columns -> columns != null).count();
-
-                if(binding.canBeNull() || classes != 1)
+                if(!isHashable(binding))
                     hashable = false;
             }
 
@@ -344,10 +442,10 @@ final class JoinOptimizer
 
         Sizes sizes = new Sizes(n, rows, shared);
 
-        if(n <= EXHAUSTIVE_LIMIT)
-            return planExhaustively(n, rows, adjacent, hashableAdjacent, lookupable, sizes);
+        Node root = n <= EXHAUSTIVE_LIMIT ? planExhaustively(n, rows, adjacent, hashableAdjacent, lookupable, sizes) :
+                planGreedily(n, rows, hashableAdjacent, lookupable, sizes);
 
-        return planGreedily(n, rows, hashableAdjacent, lookupable, sizes);
+        return new Plan(root, sizes.get((1 << n) - 1), cost(root, costs, hashableAdjacent, sizes).cost(), restricted);
     }
 
 
@@ -384,6 +482,20 @@ final class JoinOptimizer
 
         return columns.size() == 1 && columns.iterator().next() instanceof TableColumn column
                 && schema.canLookUp(access.getTable(), column, bound);
+    }
+
+
+    /**
+     * True if an equality of the variable of the binding can be hashed: the variable is bound always and has columns in
+     * a single class, so the equality is no disjunction.
+     *
+     * @param binding the binding of the variable, or null when the variable is not bound
+     * @return true if an equality of the variable of the binding can be hashed, false otherwise
+     */
+    private static boolean isHashable(VariableBinding binding)
+    {
+        return binding != null && !binding.canBeNull()
+                && binding.getMappings().values().stream().filter(columns -> columns != null).count() == 1;
     }
 
 
@@ -522,18 +634,7 @@ final class JoinOptimizer
     private static Map.Entry<Double, Node> join(int left, int right, Node leftTree, Node rightTree,
             int[] hashableAdjacent, int[] lookupable, Sizes sizes)
     {
-        double leftSize = sizes.get(left);
-        double rightSize = sizes.get(right);
-        double size = sizes.get(left | right);
-
-        boolean hashable = false;
-
-        for(int i = 0; i < hashableAdjacent.length; i++)
-            if((left >> i & 1) != 0 && (hashableAdjacent[i] & right) != 0)
-                hashable = true;
-
-        double cost = hashable ? HASH_COST * Math.min(leftSize, rightSize) + Math.max(leftSize, rightSize) + size :
-                leftSize * rightSize * COMPARISON_COST + size;
+        double cost = hashCost(left, right, hashableAdjacent, sizes);
         Node node = new HashJoin(leftTree, rightTree);
 
         if((right & right - 1) == 0)
@@ -542,7 +643,7 @@ final class JoinOptimizer
 
             if((lookupable[child] & left) != 0)
             {
-                double lookup = leftSize * LOOKUP_COST + 2 * size;
+                double lookup = lookupCost(left, right, sizes);
 
                 if(lookup < cost)
                 {
@@ -557,6 +658,92 @@ final class JoinOptimizer
 
 
     /**
+     * Cost of joining two subsets of the children by hashing the smaller one and probing it with the other one, or by
+     * comparing them pairwise when no equality between them can be hashed.
+     *
+     * @param left the left subset
+     * @param right the right subset
+     * @param hashableAdjacent the children adjacent to each child through a hashable variable
+     * @param sizes the sizes of the joins
+     * @return the cost of the join
+     */
+    private static double hashCost(int left, int right, int[] hashableAdjacent, Sizes sizes)
+    {
+        boolean hashable = false;
+
+        for(int i = 0; i < hashableAdjacent.length; i++)
+            if((left >> i & 1) != 0 && (hashableAdjacent[i] & right) != 0)
+                hashable = true;
+
+        return hashCost(hashable, sizes.get(left), sizes.get(right), sizes.get(left | right));
+    }
+
+
+    /**
+     * Cost of joining two sides of the given sizes by hashing the smaller one and probing it with the other one, or by
+     * comparing them pairwise when no equality between them can be hashed.
+     *
+     * @param hashable whether an equality between the sides can be hashed
+     * @param leftSize estimated rows of the left side
+     * @param rightSize estimated rows of the right side
+     * @param size estimated rows of the join
+     * @return the cost of the join
+     */
+    private static double hashCost(boolean hashable, double leftSize, double rightSize, double size)
+    {
+        return hashable ? HASH_COST * Math.min(leftSize, rightSize) + Math.max(leftSize, rightSize) + size :
+                leftSize * rightSize * COMPARISON_COST + size;
+    }
+
+
+    /**
+     * Cost of joining a subset of the children with a child looked up by an index for every row of the subset.
+     *
+     * @param left the outer subset
+     * @param right the child looked up, as a subset
+     * @param sizes the sizes of the joins
+     * @return the cost of the join
+     */
+    private static double lookupCost(int left, int right, Sizes sizes)
+    {
+        return sizes.get(left) * LOOKUP_COST + 2 * sizes.get(left | right);
+    }
+
+
+    /**
+     * Cost of a join tree: the costs of its joins (see {@link #join}) and of the children that are its leaves, whereas
+     * a child looked up by an index costs its lookups only.
+     *
+     * @param node the tree
+     * @param costs the cost of each child as a leaf of the tree
+     * @param hashableAdjacent the children adjacent to each child through a hashable variable
+     * @param sizes the sizes of the joins
+     * @return the children of the tree with its cost
+     */
+    private static Cost cost(Node node, double[] costs, int[] hashableAdjacent, Sizes sizes)
+    {
+        if(node instanceof Leaf leaf)
+            return new Cost(1 << leaf.child(), costs[leaf.child()]);
+
+        if(node instanceof Lookup lookup)
+        {
+            Cost outer = cost(lookup.outer(), costs, hashableAdjacent, sizes);
+            int child = 1 << lookup.child();
+
+            return new Cost(outer.mask() | child, outer.cost() + lookupCost(outer.mask(), child, sizes));
+        }
+
+        HashJoin join = (HashJoin) node;
+
+        Cost left = cost(join.left(), costs, hashableAdjacent, sizes);
+        Cost right = cost(join.right(), costs, hashableAdjacent, sizes);
+
+        return new Cost(left.mask() | right.mask(),
+                left.cost() + right.cost() + hashCost(left.mask(), right.mask(), hashableAdjacent, sizes));
+    }
+
+
+    /**
      * The cheapest join tree over every subset of the children by dynamic programming: a subset is joined from two
      * disjoint subsets connected by a shared variable, or from any two when none are connected.
      *
@@ -566,9 +753,9 @@ final class JoinOptimizer
      * @param hashableAdjacent the children adjacent to each child through a hashable variable
      * @param lookupable the children whose rows can be the outer rows of an index lookup into each child
      * @param sizes the sizes of the joins
-     * @return the join tree with its estimated rows
+     * @return the join tree
      */
-    private static Plan planExhaustively(int n, double[] rows, int[] adjacent, int[] hashableAdjacent, int[] lookupable,
+    private static Node planExhaustively(int n, double[] rows, int[] adjacent, int[] hashableAdjacent, int[] lookupable,
             Sizes sizes)
     {
         int full = (1 << n) - 1;
@@ -636,7 +823,7 @@ final class JoinOptimizer
             }
         }
 
-        return new Plan(trees[full], sizes.get(full));
+        return trees[full];
     }
 
 
@@ -649,9 +836,9 @@ final class JoinOptimizer
      * @param hashableAdjacent the children adjacent to each child through a hashable variable
      * @param lookupable the children whose rows can be the outer rows of an index lookup into each child
      * @param sizes the sizes of the joins
-     * @return the join tree with its estimated rows
+     * @return the join tree
      */
-    private static Plan planGreedily(int n, double[] rows, int[] hashableAdjacent, int[] lookupable, Sizes sizes)
+    private static Node planGreedily(int n, double[] rows, int[] hashableAdjacent, int[] lookupable, Sizes sizes)
     {
         int full = (1 << n) - 1;
 
@@ -698,7 +885,7 @@ final class JoinOptimizer
             }
         }
 
-        return new Plan(bestTree, sizes.get(full));
+        return bestTree;
     }
 
 
@@ -883,6 +1070,158 @@ final class JoinOptimizer
         }
 
         return Math.max(Math.min(distinct, rows), 1);
+    }
+
+
+    /**
+     * Estimated evaluation of the node for one of the rows of an outer table it is evaluated for one by one (see
+     * {@link SqlIntercode#translateForRow}), which is evaluated anew for every row: a table access restricted to the
+     * rows compatible with the row (see {@link SqlTableAccess#getRowBindings}) has the rows that share the values of
+     * the row and costs a lookup when an index of the table serves one of those values, a join is planned for its
+     * children evaluated so, a union is the sum of its branches, an OPTIONAL costs its left side and the join chosen
+     * for the rows that side has for one row (see {@link #planLeftJoin}), and a node passing the solutions of a child
+     * on is evaluated as the child. Any other node, like a table access that cannot be restricted or looked up, is
+     * evaluated whole for every row, which costs a pass over its solutions.
+     *
+     * @param request the current request
+     * @param node the node
+     * @param outer the rows the node is evaluated for one by one
+     * @return estimated evaluation of the node for one of the rows
+     */
+    static Evaluation estimateForRow(Request request, SqlIntercode node, Outer outer)
+    {
+        if(node instanceof SqlTableAccess access)
+        {
+            double rows = estimateRows(request, access);
+            double compatible = rows;
+            boolean lookedUp = false;
+
+            Set<Variable> variables = access.getRowBindings(outer).getVariables();
+
+            for(Variable variable : variables)
+            {
+                compatible /= estimateDistinct(request, access, variable);
+                lookedUp |= canLookUp(request, access, variable);
+            }
+
+            return new Evaluation(compatible, lookedUp ? LOOKUP_COST + 2 * compatible : Math.max(rows, 1),
+                    !variables.isEmpty());
+        }
+
+        if(node instanceof SqlJoin join)
+        {
+            Plan plan = join.getPlan(request, outer);
+
+            return new Evaluation(plan.rows(), plan.cost(), plan.restricted());
+        }
+
+        if(node instanceof SqlUnion union)
+        {
+            double rows = 0;
+            double cost = 0;
+            boolean restricted = false;
+
+            for(SqlIntercode child : union.getChilds())
+            {
+                Evaluation evaluation = estimateForRow(request, child, outer);
+
+                rows += evaluation.rows();
+                cost += evaluation.cost();
+                restricted |= evaluation.restricted();
+            }
+
+            return new Evaluation(rows, cost, restricted);
+        }
+
+        if(node instanceof SqlLeftJoin leftJoin)
+        {
+            Evaluation left = estimateForRow(request, leftJoin.getLeft(), outer);
+            LeftJoinPlan plan = leftJoin.getPlan(request, outer);
+
+            return new Evaluation(plan.rows(), left.cost() + plan.cost(), left.restricted());
+        }
+
+        if(node instanceof SqlFilter filter)
+        {
+            Evaluation child = estimateForRow(request, filter.getChild(), outer);
+
+            return new Evaluation(child.rows()
+                    * selectivity(request, filter.getChild(), SqlIntercode.getConjuncts(filter.getConditions())),
+                    child.cost(), child.restricted());
+        }
+
+        if(node instanceof SqlBind bind)
+            return estimateForRow(request, bind.getChild(), outer);
+
+        if(node instanceof SqlStripConstantColumns strip)
+            return estimateForRow(request, strip.getChild(), outer);
+
+        double rows = estimateRows(request, node);
+
+        return new Evaluation(rows, Math.max(rows, 1), false);
+    }
+
+
+    /**
+     * Chooses the method of the join of the sides of an OPTIONAL, whose order is given. The right side is evaluated
+     * once and the sides are joined by hashing, as the database does by itself (compared pairwise when no equality of
+     * theirs can be hashed), or the right side is evaluated for every solution of the left side anew, restricted to the
+     * solutions compatible with it, which costs what the right side costs for one row (see {@link #estimateForRow})
+     * times the solutions of the left side. The costs are those of a join of the same sides (see {@link #join}), so an
+     * OPTIONAL of a table access is looked up exactly when a join with it would be. A right side that is not
+     * deterministic is evaluated once. The left side gives the join only the solutions that the conditions of the
+     * filters above keep, as far as its variables decide them alone, because the database evaluates such a condition on
+     * the left side (see {@link #plan(Request, List, Map, Outer)}).
+     *
+     * @param request the current request
+     * @param left the left side
+     * @param right the right side
+     * @param leftTable alias of the left side, through which the right side refers to its solutions
+     * @param conditions per variable the left side binds always, the conditions the filters above keep the solutions of
+     *            the join by
+     * @param outer the rows the whole join is evaluated for one by one, or null when it is evaluated once
+     * @return the method chosen for the join
+     */
+    static LeftJoinPlan planLeftJoin(Request request, SqlIntercode left, SqlIntercode right, Table leftTable,
+            Map<Variable, Set<SqlExpressionIntercode>> conditions, Outer outer)
+    {
+        double kept = conditions.isEmpty() ? 1 :
+                selectivity(request, left, conditions.values().stream().flatMap(Set::stream).toList());
+
+        double leftSolutions = outer == null ? estimateRows(request, left) :
+                estimateForRow(request, left, outer).rows();
+
+        double leftRows = Math.max(leftSolutions * kept, 1);
+        double rightRows = Math.max(estimateRows(request, right), 1);
+
+        double fanout = rightRows;
+        boolean hashable = false;
+
+        for(Variable variable : left.getVariableBindings().getVariables())
+        {
+            if(right.getVariable(variable) == null)
+                continue;
+
+            fanout /= Math.max(estimateDistinct(request, right, variable), 1);
+            hashable |= isHashable(left.getVariable(variable)) && isHashable(right.getVariable(variable));
+        }
+
+        double rows = leftRows * Math.max(fanout, 1);
+        double hashed = hashCost(hashable, leftRows, rightRows, rows);
+
+        Outer solutions = Outer.of(left.getVariableBindings(), right.getVariableBindings(), leftTable);
+
+        if(right.isDeterministic() && !solutions.bindings().getVariables().isEmpty())
+        {
+            Evaluation evaluation = estimateForRow(request, right, solutions);
+            double lookedUp = leftRows * evaluation.cost();
+
+            // a right side that no solution of the left side restricts would be evaluated whole for each of them
+            if(evaluation.restricted() && lookedUp < hashed)
+                return new LeftJoinPlan(solutions, rows, lookedUp);
+        }
+
+        return new LeftJoinPlan(null, rows, hashed);
     }
 
 

@@ -239,6 +239,31 @@ public final class SqlFilter extends SqlIntercode
     @Override
     public SqlCode translate(Request request, Scope scope)
     {
+        return translate(request, scope, null);
+    }
+
+
+    /**
+     * The filter of the child evaluated for the row of the outer table: the conditions keep a solution or drop it by
+     * the solution alone.
+     */
+    @Override
+    SqlCode translateForRow(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
+        return translate(request, scope, outer);
+    }
+
+
+    /**
+     * SQL code of the filter, evaluated once or for one of the rows of an outer table (see {@link #translateForRow}).
+     *
+     * @param request the current request
+     * @param scope the scope of the filter
+     * @param outer the rows the filter is evaluated for one by one, or null when it is evaluated once
+     * @return SQL code of the filter
+     */
+    private SqlCode translate(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
         SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT ");
@@ -251,7 +276,7 @@ public final class SqlFilter extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM (");
-        builder.append(child.translate(request, scope));
+        builder.append(outer == null ? child.translate(request, scope) : child.translateForRow(request, scope, outer));
         builder.append(" ) AS ");
         builder.appendAlias(scope.getInputTable());
 

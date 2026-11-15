@@ -343,7 +343,18 @@ public final class SqlUnion extends SqlIntercode
     @Override
     public SqlCode translate(Request request, Scope scope)
     {
-        return translate(request, scope, null);
+        return translate(request, scope, null, null);
+    }
+
+
+    /**
+     * The union of the branches evaluated for the row of the outer table, each as it can be: a solution of the union is
+     * a solution of a branch.
+     */
+    @Override
+    SqlCode translateForRow(Request request, Scope scope, JoinOptimizer.Outer outer)
+    {
+        return translate(request, scope, null, outer);
     }
 
 
@@ -360,6 +371,25 @@ public final class SqlUnion extends SqlIntercode
      * @return SQL code of the union
      */
     public SqlCode translate(Request request, Scope scope, BiFunction<SqlIntercode, Table, SqlCode> conditions)
+    {
+        return translate(request, scope, conditions, null);
+    }
+
+
+    /**
+     * SQL code of the union, evaluated once (see {@link #translate(Request, Scope, BiFunction)}) or for one of the rows
+     * of an outer table (see {@link #translateForRow}). The branches evaluated for a row are not written together as a
+     * single scan either, because each of them is restricted by the values of the row by itself.
+     *
+     * @param request the current request
+     * @param scope the scope of the union
+     * @param conditions the condition of a branch given the branch and its alias (null for none), or null when the
+     *            branches get no conditions
+     * @param outer the rows the union is evaluated for one by one, or null when it is evaluated once
+     * @return SQL code of the union
+     */
+    private SqlCode translate(Request request, Scope scope, BiFunction<SqlIntercode, Table, SqlCode> conditions,
+            JoinOptimizer.Outer outer)
     {
         SqlBuilder builder = new SqlBuilder();
 
@@ -382,7 +412,7 @@ public final class SqlUnion extends SqlIntercode
             SqlIntercode child = childs.get(i);
             Map<Column, Column> columnMapping = columnMappings.get(i);
 
-            if(conditions == null && child instanceof SqlTableAccess access)
+            if(conditions == null && outer == null && child instanceof SqlTableAccess access)
             {
                 int partner = findUnionPartner(access, i, merged);
 
@@ -417,7 +447,8 @@ public final class SqlUnion extends SqlIntercode
                 builder.append("1");
 
             builder.append(" FROM (");
-            builder.append(child.translate(request, scope));
+            builder.append(
+                    outer == null ? child.translate(request, scope) : child.translateForRow(request, scope, outer));
             builder.append(") AS tab");
             builder.append(i);
 
