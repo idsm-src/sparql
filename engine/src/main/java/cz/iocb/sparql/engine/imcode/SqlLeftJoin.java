@@ -52,7 +52,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * solutions that bind it (see {@link #translateForSolution}). Where the sides share only such variables and the right
  * side is evaluated once, their equality is a disjunction the database could just compare pairwise, so the solutions
  * binding them are joined apart from the others, by a plain equality (see {@link #translateForBound}), with the
- * optimizer and without it.
+ * optimizer and without it; where the sides can be hashed by a variable both bind always, the optimizer tells them
+ * apart as well when hashing them by the other variables too spares enough comparisons.
  */
 public final class SqlLeftJoin extends SqlIntercode
 {
@@ -808,13 +809,18 @@ public final class SqlLeftJoin extends SqlIntercode
         // hashed right side is read whole
         Set<Variable> hashed = Set.of();
 
+        boolean hashable = JoinOptimizer.isHashable(left.getVariableBindings(), right.getVariableBindings());
+
         if(plan != null)
             hashed = plan.hashed();
-        else if(right.isDeterministic() && !scope.isWithinExpression())
+        else if(right.isDeterministic() && !scope.isWithinExpression() && !hashable)
             hashed = JoinOptimizer.getHashedWhenBound(left.getVariableBindings(), right.getVariableBindings());
 
+        // the solutions leaving a variable unbound are hashed too where the sides can be hashed as they are
+        boolean fenced = plan != null && !hashable;
+
         SqlCode whole = hashed.isEmpty() ? null : right.translate(request, scope);
-        SqlCode apart = whole == null ? null : translateForBound(request, scope, outer, hashed, whole, plan != null);
+        SqlCode apart = whole == null ? null : translateForBound(request, scope, outer, hashed, whole, fenced);
 
         if(apart != null)
             return apart;
@@ -889,24 +895,25 @@ public final class SqlLeftJoin extends SqlIntercode
 
 
     /**
-     * SQL code of the left join whose sides share only variables the left side may leave unbound (see
-     * {@link JoinOptimizer#getHashedWhenBound}), so that the equality of the join is a disjunction the database can
-     * neither hash nor look up. The right side is joined twice. The first join compares the variables by a plain
-     * equality, which holds only for the solutions of the left side binding them all, so the database joins those as it
-     * would for variables bound always. The second join is a subquery that gives the other solutions the right side,
-     * compared with them by the condition of the join as it is. A solution of the left side is extended by one of the
-     * joins at most, so the columns of the right side are those of the join that gave them. Both subqueries name the
-     * right side by its alias, which the conditions and the column map address its columns through: the second one
-     * inside itself, and the columns taken from the two joins again in the subquery that the solutions of the join are
-     * read from.
+     * SQL code of the left join whose sides share variables the left side may leave unbound (see
+     * {@link JoinOptimizer#getHashedWhenBound}), whose equality is a disjunction the database can neither hash nor look
+     * up, written so that the solutions binding them are joined by those variables apart from the others. The right
+     * side is joined twice. The first join compares the variables by a plain equality, which holds only for the
+     * solutions of the left side binding them all, so the database joins those as it would for variables bound always.
+     * The second join is a subquery that gives the other solutions the right side, compared with them by the condition
+     * of the join as it is. A solution of the left side is extended by one of the joins at most, so the columns of the
+     * right side are those of the join that gave them. Both subqueries name the right side by its alias, which the
+     * conditions and the column map address its columns through: the second one inside itself, and the columns taken
+     * from the two joins again in the subquery that the solutions of the join are read from.
      * <p>
-     * With the optimizer on, the second subquery is guarded by the test that the solution leaves a variable unbound,
-     * which the database evaluates once per solution, and fenced by {@code OFFSET 0}, because the test pulled up into
-     * the join would be evaluated for every pair. It reads the right side from a common table expression the database
-     * keeps the result of (see {@link Request#getMaterializedTableExpression}). The first join reads that expression
-     * too, so that the right side is evaluated once, unless the right side is an access to a table: the table is read
-     * in place then, so that nothing is kept while every solution binds the variables, and a second time only when a
-     * solution leaves one unbound, which costs what reading a kept result does.
+     * Where the optimizer is on and the sides share no other variable they could be hashed by, the second subquery is
+     * guarded by the test that the solution leaves a variable unbound, which the database evaluates once per solution,
+     * and fenced by {@code OFFSET 0}, because the test pulled up into the join would be evaluated for every pair. It
+     * reads the right side from a common table expression the database keeps the result of (see
+     * {@link Request#getMaterializedTableExpression}). The first join reads that expression too, so that the right side
+     * is evaluated once, unless the right side is an access to a table: the table is read in place then, so that
+     * nothing is kept while every solution binds the variables, and a second time only when a solution leaves one
+     * unbound, which costs what reading a kept result does.
      * <p>
      * A fenced subquery is one the database cannot merge into the query around it, and it then no longer evaluates a
      * pattern holding the join just for the rows of a join around that pattern, which it does by itself when it plans
@@ -914,12 +921,15 @@ public final class SqlLeftJoin extends SqlIntercode
      * written as an equality the database can hash: the solution leaves a variable unbound exactly when that equals
      * whether the row of the right side binds a variable it binds always. The solutions binding the variables then find
      * no row by the hash, at the price of one more pass over the right side, which both joins read from the kept
-     * result, or from the table in place.
+     * result, or from the table in place. The join is written the same way with the optimizer on where the sides can be
+     * hashed by a variable both bind always and the optimizer finds the other variables worth a second join (see
+     * {@link JoinOptimizer#planLeftJoin}): the equalities of the variables bound always are among the conditions of the
+     * second subquery, so the solutions leaving a variable unbound are hashed by them as they were.
      *
      * @param request the current request
      * @param scope the scope of the join
      * @param outer the rows the join is evaluated for one by one, or null when it is evaluated once
-     * @param hashed the variables the left side may leave unbound that the sides are joined by
+     * @param hashed the variables the left side may leave unbound that the solutions binding them are joined by
      * @param whole SQL code of the right side
      * @param fenced whether the second subquery is guarded by a test evaluated once per solution, which fences it, or
      *            by an equality the database hashes

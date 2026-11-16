@@ -87,9 +87,10 @@ public class OptionalLookupTest
     /**
      * Creates the {@code optional_lookup_test} schema: the nodes 1 to 1000 with labels and with scores equal to their
      * numbers, 2000 links among the nodes 1 to 200 (every node links to ten), five nodes tagged, aliases of the nodes
-     * holding their IRIs whole, marks of the nodes 1 to 200, all indexed, and notes of the nodes 1 to 500 with no
-     * index, all analysed; and the two configurations mapping {@code ex:label}, {@code ex:score}, {@code ex:link},
-     * {@code ex:tag}, {@code ex:alias}, {@code ex:note} and {@code ex:mark} over them.
+     * holding their IRIs whole, marks of the nodes 1 to 200, all indexed, notes of the nodes 1 to 500 with no index,
+     * and the nodes 1 to 1000 in four kinds, indexed by the node only, all analysed; and the two configurations mapping
+     * {@code ex:label}, {@code ex:score}, {@code ex:link}, {@code ex:tag}, {@code ex:alias}, {@code ex:note},
+     * {@code ex:mark} and {@code ex:kind} over them.
      */
     @BeforeAll
     static void init() throws SQLException
@@ -130,10 +131,14 @@ public class OptionalLookupTest
                     .execute("create table optional_lookup_test.marks (id integer primary key, mark varchar not null)");
             statement.execute(
                     "insert into optional_lookup_test.marks select i, 'mark ' || i from generate_series(1, 200) as i");
+            statement
+                    .execute("create table optional_lookup_test.kinds (id integer primary key, kind integer not null)");
+            statement.execute(
+                    "insert into optional_lookup_test.kinds select i, i % 4 from generate_series(1, 1000) as i");
             statement.execute("""
                     analyze optional_lookup_test.nodes, optional_lookup_test.links, optional_lookup_test.few, \
                     optional_lookup_test.scores, optional_lookup_test.aliases, optional_lookup_test.notes, \
-                    optional_lookup_test.marks""");
+                    optional_lookup_test.marks, optional_lookup_test.kinds""");
         }
 
         DatabaseSchema schema = new DatabaseSchema(connectionPool);
@@ -163,6 +168,7 @@ public class OptionalLookupTest
         DatabaseTable aliases = new DatabaseTable("optional_lookup_test", "aliases");
         DatabaseTable notes = new DatabaseTable("optional_lookup_test", "notes");
         DatabaseTable marks = new DatabaseTable("optional_lookup_test", "marks");
+        DatabaseTable kinds = new DatabaseTable("optional_lookup_test", "kinds");
 
         config.addQuadMapping(nodes, null, config.createIriMapping("node", "id"), config.createIriMapping("ex:label"),
                 config.createLiteralMapping(xsdString, "label"));
@@ -178,6 +184,8 @@ public class OptionalLookupTest
                 config.createLiteralMapping(xsdString, "note"));
         config.addQuadMapping(marks, null, config.createIriMapping("node", "id"), config.createIriMapping("ex:mark"),
                 config.createLiteralMapping(xsdString, "mark"));
+        config.addQuadMapping(kinds, null, config.createIriMapping("node", "id"), config.createIriMapping("ex:kind"),
+                config.createLiteralMapping(xsdInt, "kind"));
 
         return config;
     }
@@ -724,5 +732,34 @@ public class OptionalLookupTest
         assertThat(translate(optimized, query), not(containsString(apart)));
         assertThat(translate(plain, query), not(containsString("LATERAL")));
         assertThat(check(query), hasSize(5));
+    }
+
+    @Test
+    public void selectiveVariable() throws Exception
+    {
+        // the sides can be hashed by the kind, which a quarter of the nodes share, so the nodes linked to are hashed by
+        // the node as well; the nodes 191 to 200 link to ten nodes each, a quarter of them of the kind of the node on
+        // average, and the nodes 201 to 210 link to none, so each is joined with the 250 nodes of its kind
+        String query = "SELECT ?x ?y ?k WHERE { ?x ex:score ?s FILTER(?s > 190 && ?s < 211) ?x ex:kind ?k "
+                + "OPTIONAL { ?x ex:link ?y } OPTIONAL { ?y ex:kind ?k } }";
+
+        String sql = translate(optimized, query);
+        assertThat(sql, containsString(merged));
+        assertThat(sql, containsString(keyed));
+        assertThat(sql, not(containsString(apart)));
+
+        // the database hashes the sides by the kind itself otherwise
+        assertThat(translate(plain, query), not(containsString("LATERAL")));
+
+        List<List<RdfTerm>> rows = check(query);
+        assertThat(rows, hasSize(2600));
+        assertThat(rows.stream().filter(r -> r.get(1) == null).count(), is(0L));
+
+        // the scores are hashed by the node, which is the node linked to, so nothing more would be spared
+        query = "SELECT ?x ?y ?s WHERE { ?x ex:score ?s FILTER(?s > 190 && ?s < 211) OPTIONAL { ?x ex:link ?y } "
+                + "OPTIONAL { ?x ex:score ?s . ?y ex:kind ?k } }";
+
+        assertThat(translate(optimized, query), not(containsString("\"unbound\"")));
+        check(query);
     }
 }

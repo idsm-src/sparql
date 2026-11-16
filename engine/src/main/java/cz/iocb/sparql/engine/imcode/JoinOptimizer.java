@@ -97,6 +97,14 @@ final class JoinOptimizer
     static final double PAIRWISE_MARGIN = 16;
 
     /**
+     * How many times more the comparisons spared by hashing the solutions of the left side of an OPTIONAL that bind a
+     * variable apart from the others have to cost than the second join it takes (see {@link #planLeftJoin}). The costs
+     * of the two are rough estimates, and the right side is then kept for the joins to read it twice, which they do not
+     * count.
+     */
+    static final double SECOND_JOIN_MARGIN = 2;
+
+    /**
      * Rows of a child nothing is known about.
      */
     static final double DEFAULT_ROWS = 1000;
@@ -324,9 +332,10 @@ final class JoinOptimizer
      *            is evaluated one by one, restricted by those variables as well, the other solutions being joined as
      *            {@code outer} says; or null when the solutions are not told apart so
      * @param hashed the variables the left side may leave unbound by which the sides are hashed for the solutions
-     *            binding them all, the right side being evaluated once and the other solutions compared with it
-     *            pairwise (see {@link #getHashedWhenBound}); empty when the solutions are not told apart so, as when
-     *            the right side is evaluated for them one by one
+     *            binding them all (see {@link #getHashedWhenBound}), the right side being evaluated once and the other
+     *            solutions hashed by the variables both sides bind always, or compared with it pairwise when there is
+     *            no such variable; empty when the solutions are not told apart so, as when the right side is evaluated
+     *            for them one by one
      * @param rows estimated number of rows of the result
      * @param cost estimated cost of the join, the evaluation of the left side excluded
      */
@@ -834,12 +843,29 @@ final class JoinOptimizer
 
 
     /**
+     * True if an equality of the sides of a join can be hashed as the sides are: some variable is bound always, in a
+     * single class, on both sides (see {@link #isHashable(VariableBinding)}).
+     *
+     * @param left bindings of the left side
+     * @param right bindings of the right side
+     * @return true if an equality of the sides can be hashed as they are, false otherwise
+     */
+    static boolean isHashable(VariableBindings left, VariableBindings right)
+    {
+        for(VariableBinding binding : left.getValues())
+            if(isHashable(binding) && isHashable(right.get(binding.getVariable())))
+                return true;
+
+        return false;
+    }
+
+
+    /**
      * The variables by which the sides of an OPTIONAL can be hashed only for the solutions of the left side that bind
      * them: the variables the left side may leave unbound and binds in a single class, which the right side binds
      * always, in a single class. The equality of such a variable is a disjunction for the solutions of the left side as
      * a whole, which the database can neither hash nor look up, but a plain equality for the solutions binding the
-     * variable. No variable is given when an equality of the sides can be hashed as they are (see {@link #isHashable}),
-     * which serves every solution.
+     * variable.
      *
      * @param left bindings of the left side
      * @param right bindings of the right side
@@ -850,16 +876,9 @@ final class JoinOptimizer
         Set<Variable> variables = new HashSet<>();
 
         for(VariableBinding binding : left.getValues())
-        {
-            if(!isHashable(right.get(binding.getVariable())))
-                continue;
-
-            if(isHashable(binding))
-                return Set.of();
-
-            if(binding.getMappings().size() == 1 && !binding.getMappings().containsValue(null))
+            if(binding.canBeNull() && binding.getMappings().size() == 1 && !binding.getMappings().containsValue(null)
+                    && isHashable(right.get(binding.getVariable())))
                 variables.add(binding.getVariable());
-        }
 
         return variables;
     }
@@ -1663,10 +1682,13 @@ final class JoinOptimizer
      * {@link SqlLeftJoin#translate}), whereas the solutions binding the variables may gain orders of magnitude, so the
      * fraction is not guessed. Where the sides are compared pairwise otherwise, the lookups have to be cheaper by a
      * margin (see {@link #PAIRWISE_MARGIN}), because the database does not look a small table up; where the solutions
-     * binding those variables are hashed otherwise, the lookups compete with the hashing as any lookups do. The left
-     * side gives the join only the solutions that the conditions of the filters above keep, as far as one of its
-     * variables decides them alone (see {@link #getFilters}), because the database evaluates such a condition on the
-     * left side (see {@link #plan(Request, List, Map, Outer)}).
+     * binding those variables are hashed otherwise, the lookups compete with the hashing as any lookups do. Sides that
+     * can be hashed as they are compare a solution with every row of the right side agreeing with it in the variables
+     * both sides bind always, so the solutions binding the other variables are told apart there as well, and hashed by
+     * those too, when the comparisons spared cost more than the second join it takes, by a margin (see
+     * {@link #SECOND_JOIN_MARGIN}). The left side gives the join only the solutions that the conditions of the filters
+     * above keep, as far as one of its variables decides them alone (see {@link #getFilters}), because the database
+     * evaluates such a condition on the left side (see {@link #plan(Request, List, Map, Outer)}).
      *
      * @param request the current request
      * @param left the left side
@@ -1689,6 +1711,7 @@ final class JoinOptimizer
         double rightRows = Math.max(estimateRows(request, right), 1);
 
         double fanout = rightRows;
+        double candidates = rightRows;
         boolean hashable = false;
 
         for(Variable variable : left.getVariableBindings().getVariables())
@@ -1696,14 +1719,24 @@ final class JoinOptimizer
             if(right.getVariable(variable) == null)
                 continue;
 
-            fanout /= Math.max(estimateDistinct(request, right, variable), 1);
-            hashable |= isHashable(left.getVariable(variable)) && isHashable(right.getVariable(variable));
+            double distinct = Math.max(estimateDistinct(request, right, variable), 1);
+            fanout /= distinct;
+
+            // the rows of the right side a solution is compared with when the sides are hashed as they are
+            if(isHashable(left.getVariable(variable)) && isHashable(right.getVariable(variable)))
+            {
+                hashable = true;
+                candidates /= distinct;
+            }
         }
 
-        // the solutions binding the variables the left side may leave unbound are hashed by them when no equality
-        // serves every solution; the right side is then written twice, so it has to give the same solutions both times
-        Set<Variable> split = right.isDeterministic() ?
+        // the solutions binding the variables the left side may leave unbound can be hashed by them; the right side is
+        // then written twice, so it has to give the same solutions both times
+        Set<Variable> unbound = right.isDeterministic() ?
                 getHashedWhenBound(left.getVariableBindings(), right.getVariableBindings()) : Set.of();
+
+        // they are told apart for sure when no equality serves every solution
+        Set<Variable> split = hashable ? Set.of() : unbound;
 
         double rows = leftRows * Math.max(fanout, 1);
         double hashed = hashCost(hashable || !split.isEmpty(), leftRows, rightRows, rows)
@@ -1741,6 +1774,19 @@ final class JoinOptimizer
 
             if(evaluation.restricted() && lookedUp * margin < plan.cost())
                 plan = new LeftJoinPlan(plan.outer(), bound, Set.of(), rows, lookedUp);
+        }
+
+        // sides hashed as they are compare a solution with every row of the right side that agrees with it in the
+        // hashed variables; the solutions binding the other variables are hashed by those too when the comparisons
+        // that spares clearly cost more than the second join, by which the remaining solutions are hashed as before,
+        // with the pass over the right side it reads
+        if(plan.outer() == null && plan.bound() == null && hashable && !unbound.isEmpty())
+        {
+            double spared = (leftRows * Math.max(candidates, 1) - rows) * COMPARISON_COST;
+            double second = hashCost(true, leftRows, rightRows, 0) + rightRows;
+
+            if(spared > SECOND_JOIN_MARGIN * second)
+                plan = new LeftJoinPlan(null, null, unbound, rows, plan.cost() + second);
         }
 
         return plan;
