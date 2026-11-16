@@ -7,6 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.HashMap;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 
@@ -14,7 +18,8 @@ import org.junit.jupiter.api.Test;
 /**
  * The identity of primitive classes: a class is identified by its name, so two classes of the same column layout
  * registered under different names are different classes, which the subclass test and the unions keep apart even when
- * the classes compare no other property of their own.
+ * the classes compare no other property of their own. The name makes the names of the columns of a variable bound in
+ * the class as well, so no two built-in classes share one.
  */
 public class PrimitiveResourceClassTest
 {
@@ -64,5 +69,27 @@ public class PrimitiveResourceClassTest
         assertTrue(x.isSubclassOf(xsdString));
         assertNotEquals(x, unionize(x, y));
         assertEquals(xsdString, unionize(x, y, xsdString));
+    }
+
+
+    @Test
+    void builtinClassesHaveUniqueNames() throws IllegalAccessException
+    {
+        Map<String, PrimitiveResourceClass> names = new HashMap<>();
+
+        for(Field field : BuiltinClasses.class.getFields())
+        {
+            if(!Modifier.isStatic(field.getModifiers())
+                    || !(field.get(null) instanceof PrimitiveResourceClass resClass))
+                continue;
+
+            PrimitiveResourceClass other = names.putIfAbsent(resClass.getResourceName(), resClass);
+
+            // a class may be given under several names of fields, but a name belongs to one class
+            assertTrue(other == null || other == resClass,
+                    "the name " + resClass.getResourceName() + " of " + field.getName() + " is taken");
+        }
+
+        assertFalse(names.isEmpty());
     }
 }

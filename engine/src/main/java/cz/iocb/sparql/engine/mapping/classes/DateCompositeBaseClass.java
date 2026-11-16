@@ -30,7 +30,7 @@ public final class DateCompositeBaseClass extends BaseLiteralClass
      */
     protected DateCompositeBaseClass()
     {
-        super("base-date@1c", xsdDateType, List.of(DATE, INT4, VARCHAR), Set.of(box, genScalarDate));
+        super("base-date@2c", xsdDateType, List.of(DATE, INT4, VARCHAR), Set.of(box, genScalarDate));
     }
 
 
