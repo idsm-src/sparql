@@ -949,7 +949,8 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
 
             case DATETIME ->
             {
-                //FIXME: we assume that genScalarDateTime is equivalent to genDateTime
+                //NOTE: genScalarDateTime and genDateTime hold the same values (see DateTimeScalarBaseClass), so every
+                // operand is taken as genDateTime, whose instants the built-in operators of timestamptz compare
                 Column cl = left.get(relations, genDateTime).get(0);
                 Column cr = right.get(relations, genDateTime).get(0);
                 yield SqlCode.of("(", cl, " ", operator.getText(), " ", cr, ")");
@@ -1090,8 +1091,6 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                 //NOTE: to ensure that the expression column is not used more than once during conversion
                 if(left.hasExpressionColumn(relations, lset) || right.hasExpressionColumn(relations, rset))
                     cmp = getExpressionClass(classes);
-
-                //FIXME: use correct compare operator, when unionClass is rdfbox or user type
 
                 List<Column> cl = left.get(relations, cmp);
                 List<Column> cr = right.get(relations, cmp);

@@ -51,6 +51,9 @@ public class SqlType
      */
     public static final SqlType NUMERIC = builtin("numeric", BigDecimal.class, "decimal");
 
+    //FIXME: the equality of the floating-point types takes -0.0 and 0.0 for the same value, whereas they are different
+    // terms: sameTerm is true for them, and joins, DISTINCT and GROUP BY over such columns merge them
+
     /**
      * PostgreSQL {@code real}.
      */

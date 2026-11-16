@@ -578,17 +578,6 @@ public final class SqlValues extends SqlIntercode
         if(newSize == 0)
             return SqlNoSolution.get();
 
-        if(newSize == 1)
-        {
-            //TODO: return SqlTableAccess
-            /*
-            for(int i = 0; i < mask.length; i++)
-                if(mask[i])
-                    return getSlice(i);
-            */
-        }
-
-
         Map<Variable, List<ResourceClass>> filteredResourceClasses = resourceClasses.entrySet().stream()
                 .collect(toMap(Entry::getKey, e -> filterByMask(e.getValue(), mask), (a, _) -> a, HashMap::new));
 

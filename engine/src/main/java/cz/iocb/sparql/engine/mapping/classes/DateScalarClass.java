@@ -30,7 +30,7 @@ public final class DateScalarClass extends CanonicalLiteralClass
      */
     protected DateScalarClass()
     {
-        super("date@1c", xsdDateType, List.of(ZONEDDATE), Set.of(box, genScalarDate, genDate /*, xsdDate*/));
+        super("date@1c", xsdDateType, List.of(ZONEDDATE), Set.of(box, genScalarDate, genDate));
     }
 
 
@@ -72,10 +72,6 @@ public final class DateScalarClass extends CanonicalLiteralClass
                     expression(INT4, "sparql.zoneddate_get_zone(%s)", date), !canBeNull ? constant("", VARCHAR) :
                             expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN ''::varchar END", date));
 
-        //if(targetClass.equals(xsdDate))
-        //    return List.of(expression("sparql.zoneddate_get_value(%s)", date),
-        //           expression("sparql.zoneddate_get_zone(%s)", date));
-
         throw new IllegalArgumentException();
     }
 
@@ -99,9 +95,6 @@ public final class DateScalarClass extends CanonicalLiteralClass
         if(sourceClass.equals(genDate))
             return List.of(expression(ZONEDDATE, "(CASE %s WHEN '' THEN sparql.zoneddate_create(%s, %s) END)",
                     columns.get(2), columns.get(0), columns.get(1)));
-
-        //if(sourceClass.equals(xsdDate))
-        //    return List.of(expression("sparql.zoneddate_create(%s, %s)", columns.get(0), columns.get(1)));
 
         throw new IllegalArgumentException();
     }

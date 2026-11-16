@@ -68,7 +68,6 @@ public class EnumUserIriClass extends SimpleUserIriClass
         this.prefix = first.substring(0, length);
         this.values = values;
 
-        //FIXME: check whether the pattern is valid also in pcre2
         this.regexp = values.keySet().stream().map(i -> Pattern.quote(i.getValue())).collect(joining("|"));
         this.pattern = Pattern.compile(regexp);
     }

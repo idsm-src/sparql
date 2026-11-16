@@ -17,7 +17,10 @@ import cz.iocb.sparql.engine.request.Request;
 
 
 /**
- * Any valid xsd:date value as a {@code sparql.zoneddate} column plus its lexical form.
+ * Any valid xsd:date value as a {@code sparql.zoneddate} column plus its lexical form. The class holds the same values
+ * as {@link DateCompositeBaseClass}: a {@code zoneddate} of pgsparql is the date as written with the timezone offset,
+ * which is what the columns of that class hold, so the conversions between the two need no check. The hierarchy must
+ * not be cyclic, so only this class is declared as the superclass of the other one.
  */
 public final class DateScalarBaseClass extends BaseLiteralClass
 {
@@ -26,7 +29,7 @@ public final class DateScalarBaseClass extends BaseLiteralClass
      */
     protected DateScalarBaseClass()
     {
-        super("base-date@1c", xsdDateType, List.of(ZONEDDATE, VARCHAR), Set.of(box/*, genDate*/));
+        super("base-date@1c", xsdDateType, List.of(ZONEDDATE, VARCHAR), Set.of(box));
     }
 
 
@@ -61,10 +64,6 @@ public final class DateScalarBaseClass extends BaseLiteralClass
         if(targetClass.equals(box))
             return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_date_with_lexical(%s, %s)", date, lexical));
 
-        //if(targetClass.equals(genDate))
-        //    return List.of(expression("sparql.zoneddate_get_value(%s)", date),
-        //            expression("sparql.zoneddate_get_zone(%s)", date), lexical);
-
         throw new IllegalArgumentException();
     }
 
@@ -82,10 +81,6 @@ public final class DateScalarBaseClass extends BaseLiteralClass
         if(sourceClass.equals(box))
             return List.of(expression(ZONEDDATE, "sparql.rdfbox_get_date(%s)", columns.get(0)),
                     expression(VARCHAR, "sparql.rdfbox_get_date_lexical(%s)", columns.get(0)));
-
-        //if(sourceClass.equals(genDate))
-        //    return List.of(expression("sparql.zoneddate_create(%s, %s)", columns.get(0), columns.get(1)),
-        //            columns.get(2));
 
         throw new IllegalArgumentException();
     }

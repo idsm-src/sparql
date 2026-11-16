@@ -17,7 +17,13 @@ import cz.iocb.sparql.engine.request.Request;
 
 
 /**
- * Any valid xsd:dateTime value as a {@code sparql.zoneddatetime} column plus its lexical form.
+ * Any valid xsd:dateTime value as a {@code sparql.zoneddatetime} column plus its lexical form. The class holds the same
+ * values as {@link DateTimeCompositeBaseClass}: a {@code zoneddatetime} of pgsparql is the instant as a
+ * {@code timestamptz} with the timezone offset, a date-time without a timezone being its local time taken as UTC with
+ * no offset, which is what the columns of that class hold, so the conversions between the two need no check. The
+ * hierarchy must not be cyclic, so only this class is declared as the superclass of the other one. The value operators
+ * of {@code zoneddatetime} compare the instants (the implicit timezone of pgsparql being UTC), so comparing the
+ * {@code timestamptz} columns of the other class gives the same, by built-in operators that an index can serve.
  */
 public final class DateTimeScalarBaseClass extends BaseLiteralClass
 {
@@ -26,7 +32,7 @@ public final class DateTimeScalarBaseClass extends BaseLiteralClass
      */
     protected DateTimeScalarBaseClass()
     {
-        super("base-datetime@1c", xsdDateTimeType, List.of(ZONEDDATETIME, VARCHAR), Set.of(box /*, genDateTime*/));
+        super("base-datetime@1c", xsdDateTimeType, List.of(ZONEDDATETIME, VARCHAR), Set.of(box));
     }
 
 
@@ -62,10 +68,6 @@ public final class DateTimeScalarBaseClass extends BaseLiteralClass
             return List
                     .of(expression(RDFBOX, "sparql.rdfbox_create_from_datetime_with_lexical(%s, %s)", time, lexical));
 
-        //if(targetClass.equals(genDateTime))
-        //    return List.of(expression("sparql.zoneddatetime_get_value(%s)", time),
-        //            expression("sparql.zoneddatetime_get_zone(%s)", time), lexical);
-
         throw new IllegalArgumentException();
     }
 
@@ -83,10 +85,6 @@ public final class DateTimeScalarBaseClass extends BaseLiteralClass
         if(sourceClass.equals(box))
             return List.of(expression(ZONEDDATETIME, "sparql.rdfbox_get_datetime(%s)", columns.get(0)),
                     expression(VARCHAR, "sparql.rdfbox_get_datetime_lexical(%s)", columns.get(0)));
-
-        //if(sourceClass.equals(genDateTime))
-        //    return List.of(expression("sparql.zoneddatetime_create(%s, %s)", columns.get(0), columns.get(1)),
-        //            columns.get(2));
 
         throw new IllegalArgumentException();
     }

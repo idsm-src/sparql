@@ -102,7 +102,6 @@ import cz.iocb.sparql.engine.model.VarOrIri;
 import cz.iocb.sparql.engine.model.VariableNode;
 import cz.iocb.sparql.engine.model.VariableOrBlankNode;
 import cz.iocb.sparql.engine.model.base.Element;
-import cz.iocb.sparql.engine.model.base.Range;
 import cz.iocb.sparql.engine.model.expression.BuiltInCallExpression;
 import cz.iocb.sparql.engine.model.expression.ExistsExpression;
 import cz.iocb.sparql.engine.model.expression.Expression;
@@ -221,11 +220,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      * User IRI classes of the configuration.
      */
     private final List<UserIriClass> iriClasses;
-
-    /**
-     * Source ranges of every occurrence of each variable name in the WHERE clause.
-     */
-    private Map<String, List<Range>> variableOccurrences;
 
     /**
      * Quad mappings in effect at the current position: the mappings of the queried service the dataset clauses of the
@@ -558,7 +552,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                         translatedWhereClause.getVariableBindings(), this);
                 SqlExpressionIntercode expression = visitor.visitElement(groupBy.getExpression());
 
-                //TODO: add optimizations based on the expression value
+                //TODO: a key computed from grouping variables alone could be bound above the aggregation; the keys
+                // that are constants, always unbound or copies of variables are handled by the bind and the grouping
 
                 translatedWhereClause = SqlBind.bind(request, var, expression, translatedWhereClause);
             }
@@ -1967,31 +1962,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     public SqlSelect translate(Query sparqlQuery, BigInteger offset, BigInteger limit, List<Variable> order)
             throws SQLException, ServiceException
     {
-        variableOccurrences = new HashMap<>();
-
-        new ElementVisitor<Void>()
-        {
-            @Override
-            public Void visit(VariableNode variable)
-            {
-                List<Range> occurrences = variableOccurrences.get(variable.getName());
-
-                if(occurrences == null)
-                {
-                    occurrences = new LinkedList<>();
-                    variableOccurrences.put(variable.getName(), occurrences);
-                }
-
-                // implicit projection variables are added with null range by parser,
-                // they are ignored here due to engines that replace blank nodes by variables
-                if(variable.getRange() != null)
-                    occurrences.add(variable.getRange());
-
-                return defaultResult();
-            }
-        }.visitElement(sparqlQuery == null ? null : sparqlQuery.getSelect().getPattern()); //FIXME: virtuoso workaround (only sparqlQuery should be used)
-
-
         try
         {
             SqlSelect imcode = (SqlSelect) visitElement(sparqlQuery);

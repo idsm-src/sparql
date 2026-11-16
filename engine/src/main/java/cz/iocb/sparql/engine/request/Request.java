@@ -1150,15 +1150,14 @@ public class Request implements AutoCloseable
 
 
     /**
-     * Class of the blank node: the in-segment class of its segment.
+     * Class of the blank node: the in-segment class of its segment. Every call gives a new instance, which is the same
+     * class as any other one of the segment, because the classes are compared by their values.
      *
      * @param bnode the blank node
      * @return class of the blank node: the in-segment class of its segment
      */
     public ResourceClass getBlankNodeClass(BlankNode bnode)
     {
-        //TODO use cache
-
         return switch(bnode)
         {
             case StrBlankNode s -> new StrBlankNodeInSegmentClass(s.getSegment());

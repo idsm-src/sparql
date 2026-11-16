@@ -769,8 +769,6 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     List<Column> lcols = left.get(relations, unionClass);
                     List<Column> rcols = right.get(relations, unionClass);
 
-                    //FIXME: use correct compare operator, when unionClass is rdfbox
-
                     variants.add(getIdentityConditions(unionClass, lcols, rcols).stream()
                             .collect(SqlCode.joining(" AND ", "(", ")")));
 
@@ -3006,8 +3004,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             }
 
             default:
-                //TODO: SPARQL 1.2
-                throw new IllegalArgumentException("unsupported function: " + function); // unexpected
+                // the grammar and the internal callers give only the names handled above
+                throw new IllegalArgumentException("unsupported function: " + function);
         }
 
     }
@@ -3535,7 +3533,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     case "concat" ->
                     {
-                        //TODO can be improved
+                        //NOTE: every string literal is a valid argument, of whatever kind the result is needed in
                         yield arguments.stream()
                                 .map(a -> a.optimize(request, scope, bindings,
                                         new Restriction(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString),

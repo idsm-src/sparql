@@ -1408,7 +1408,7 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
                     parameters.add(new Parameter(iri, triple.getObject()));
                 else
                     messages.add(new TranslateMessage(MessageType.invalidProcedureParameterValue,
-                            triple.getPredicate().getRange())); //TODO: could be supported in a future version
+                            triple.getPredicate().getRange()));
             }
 
 
@@ -1423,7 +1423,7 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
                     results.add(new Parameter(iri, triple.getObject()));
                 else
                     messages.add(new TranslateMessage(MessageType.invalidProcedureResultValue,
-                            triple.getPredicate().getRange())); //TODO: could be supported in a future version
+                            triple.getPredicate().getRange()));
             }
         }
 
