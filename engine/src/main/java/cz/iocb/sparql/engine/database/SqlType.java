@@ -3,7 +3,10 @@ package cz.iocb.sparql.engine.database;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
@@ -50,9 +53,6 @@ public class SqlType
      * PostgreSQL {@code numeric}.
      */
     public static final SqlType NUMERIC = builtin("numeric", BigDecimal.class, "decimal");
-
-    //FIXME: the equality of the floating-point types takes -0.0 and 0.0 for the same value, whereas they are different
-    // terms; the conditions below tell them apart, but DISTINCT and GROUP BY over such columns still merge them
 
     /**
      * PostgreSQL {@code real}.
@@ -295,6 +295,77 @@ public class SqlType
         boolean negative = Double.doubleToRawLongBits(number) != 0;
 
         return "'\\x" + (negative ? "00" : "80") + (equals(FLOAT4) ? "000000" : "00000000000000") + "'::bytea";
+    }
+
+
+    /**
+     * True if the values of the type cannot be grouped or deduplicated by themselves, because equal values of the type
+     * need not be identical, and have an additional grouping key for that (see {@link #getGroupingKey}).
+     *
+     * @return true if the values of the type have an additional grouping key, false otherwise
+     */
+    public boolean hasGroupingKey()
+    {
+        return isFloatingPoint();
+    }
+
+
+    /**
+     * The key by which rows have to be grouped or deduplicated besides the value of the type itself, so that only
+     * identical values fall into one group, or null when the equal values of the type are identical. For a
+     * floating-point type it is the binary image of a zero, which tells the zeros of the two signs apart, and NULL for
+     * any other value (every NaN among them, as all NaNs are one term). Being made of the value alone and no boolean,
+     * the key leaves the estimate the database makes of the number of groups as it is for the value (it counts a
+     * boolean expression as two distinct values).
+     *
+     * @param value the value
+     * @return SQL expression of the additional grouping key of the value, or null when there is none
+     */
+    public SqlCode getGroupingKey(Column value)
+    {
+        if(!hasGroupingKey())
+            return null;
+
+        return SqlCode.of("(CASE WHEN ", value, " = '0'::", name, " THEN ", image(value), " END)");
+    }
+
+
+    /**
+     * The keys by which rows are grouped or deduplicated when the rows of a group are to agree in the given values as
+     * RDF terms do: the values themselves, each followed by its additional key when it has one (see
+     * {@link #getGroupingKey}).
+     *
+     * @param values the values
+     * @return SQL list of the grouping keys of the values
+     */
+    public static SqlCode getGroupingKeys(Collection<Column> values)
+    {
+        List<SqlCode> keys = new ArrayList<>();
+
+        for(Column value : values)
+        {
+            keys.add(value.getCode());
+
+            SqlCode additional = value.getType().getGroupingKey(value);
+
+            if(additional != null)
+                keys.add(additional);
+        }
+
+        return keys.stream().collect(SqlCode.joining(", "));
+    }
+
+
+    /**
+     * True if rows cannot be deduplicated by the given values alone, because some of the values need an additional
+     * grouping key (see {@link #getGroupingKey}).
+     *
+     * @param values the values
+     * @return true if some of the values need an additional grouping key, false otherwise
+     */
+    public static boolean hasGroupingKey(Collection<Column> values)
+    {
+        return values.stream().anyMatch(v -> v.getType().hasGroupingKey());
     }
 
 

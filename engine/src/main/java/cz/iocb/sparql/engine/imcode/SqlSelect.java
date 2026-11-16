@@ -795,8 +795,10 @@ public final class SqlSelect extends SqlIntercode
 
         if(distinct)
         {
+            Set<Column> columns = bindings.getNonConstantColumns();
+
             builder.append(") AS tab GROUP BY ");
-            builder.append(translateInnerSelectVariables(bindings));
+            builder.append(columns.isEmpty() ? new SqlCode("1") : SqlType.getGroupingKeys(columns));
             builder.append(" ORDER BY min(\"#rn\")");
         }
         else if(!orderBy.isEmpty() || !simpleOrderBy.isEmpty())

@@ -22,6 +22,7 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
@@ -1541,6 +1542,32 @@ public final class SqlRecursive extends SqlIntercode
             }
         }
 
+        /* NOTE: UNION takes two rows for the same when their values are equal, whereas equal values of some types need
+         * not be identical (see SqlType.getGroupingKey), so the recursion carries the grouping keys of such values as
+         * columns of its own.
+         */
+        List<SqlCode> initKeys = new ArrayList<>();
+        List<SqlCode> stepKeys = new ArrayList<>();
+
+        for(int i = 0; i < ev.size(); i++)
+            if(ev.get(i).getType().hasGroupingKey())
+                initKeys.add(ev.get(i).getType().getGroupingKey(iv.get(i)));
+
+        int keys = initKeys.size();
+
+        for(ResourceClass resClass : endVarClasses)
+            for(Column column : endBinding.getMapping(resClass))
+                if(!(column instanceof ConstantColumn) && column.getType().hasGroupingKey())
+                    keys++;
+
+        for(int i = 0; i < keys; i++)
+        {
+            appendComma(builder, hasRecursionVariable);
+            hasRecursionVariable = true;
+
+            builder.append("\"@key" + i + "\"");
+        }
+
         if(!hasRecursionVariable)
             builder.append("\"@none\"");
 
@@ -1583,7 +1610,20 @@ public final class SqlRecursive extends SqlIntercode
 
                 builder.append(" AS ");
                 builder.append(endBinding.getMapping(resClass).get(j));
+
+                SqlType type = endBinding.getMapping(resClass).get(j).getType();
+
+                if(type.hasGroupingKey())
+                    initKeys.add(type.getGroupingKey(columns.get(j)));
             }
+        }
+
+        for(SqlCode key : initKeys)
+        {
+            appendComma(builder, hasInitSelect);
+            hasInitSelect = true;
+
+            builder.append(key);
         }
 
         if(!hasInitSelect)
@@ -1632,6 +1672,10 @@ public final class SqlRecursive extends SqlIntercode
 
         boolean hasUnionSelect = !ev.isEmpty();
 
+        for(Column column : ev)
+            if(column.getType().hasGroupingKey())
+                stepKeys.add(column.getType().getGroupingKey(column.fromTable(left)));
+
         VariableBinding nextEndBinding = next.getVariableBindings().get(endVar);
 
         for(ResourceClass resClass : endVarClasses)
@@ -1653,7 +1697,20 @@ public final class SqlRecursive extends SqlIntercode
                     builder.append(columns.get(j));
                 else
                     builder.append("NULL");
+
+                SqlType type = endBinding.getMapping(resClass).get(j).getType();
+
+                if(type.hasGroupingKey())
+                    stepKeys.add(columns != null ? type.getGroupingKey(columns.get(j)) : new SqlCode("NULL::boolean"));
             }
+        }
+
+        for(SqlCode key : stepKeys)
+        {
+            appendComma(builder, hasUnionSelect);
+            hasUnionSelect = true;
+
+            builder.append(key);
         }
 
         if(!hasUnionSelect)

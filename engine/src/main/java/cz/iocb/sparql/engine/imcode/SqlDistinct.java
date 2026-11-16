@@ -15,6 +15,7 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -280,7 +281,7 @@ public final class SqlDistinct extends SqlIntercode
                 .getNonConstantColumns();
 
         if(!groupColumns.isEmpty())
-            builder.append(groupColumns.stream().collect(SqlCode.joining(", ")));
+            builder.append(SqlType.getGroupingKeys(groupColumns));
         else
             builder.append("1");
 

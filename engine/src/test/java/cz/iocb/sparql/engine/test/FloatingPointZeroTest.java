@@ -4,7 +4,10 @@ import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDoubleIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdFloatIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
@@ -19,6 +22,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
+import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
@@ -44,12 +48,14 @@ import cz.iocb.sparql.testing.Database;
  * {@code -0.0E0} are equal, and so are those of xsd:float, but they are different RDF terms, whereas the equality of
  * the database takes them for one value. Wherever the terms have to be the same (a variable shared by the members of a
  * join, by the sides of an OPTIONAL or a MINUS or by an EXISTS pattern and its solution, sameTerm, a constant of a
- * pattern or of VALUES), the zeros are told apart; the operators {@code =} and IN compare the values. Every NaN is the
- * same term, whatever its sign bit is.
+ * pattern or of VALUES) and wherever solutions are grouped or deduplicated (DISTINCT, GROUP BY, the aggregates of
+ * distinct values, a mapping whose rows are deduplicated, a walk of a property path), the zeros are told apart; the
+ * operators {@code =} and IN compare the values. Every NaN is the same term, whatever its sign bit is.
  *
  * The table {@code item} holds the items 1 to 6 with the numbers 0, -0, 1.5, NaN, a NaN with the sign bit set and 0,
  * each as a {@code float8} and as a {@code float4}; the table {@code other} holds the items 10 to 12 with the numbers
- * 0, -0 and NaN.
+ * 0, -0 and NaN; the table {@code multi} holds the rows of the item 7 with the numbers 0, -0 and 0 and those of the
+ * item 8 with the numbers 0, NaN and a NaN with the sign bit set.
  */
 public class FloatingPointZeroTest
 {
@@ -71,9 +77,10 @@ public class FloatingPointZeroTest
 
 
     /**
-     * Creates the {@code floating_point_zero_test} schema with the tables {@code item} and {@code other} and maps the
-     * numbers of the items by ex:d (xsd:double) and ex:f (xsd:float), and those of the other items by ex:e (xsd:double)
-     * and ex:g (xsd:float).
+     * Creates the {@code floating_point_zero_test} schema with the tables {@code item}, {@code other} and {@code multi}
+     * and maps the numbers of the items by ex:d (xsd:double) and ex:f (xsd:float), those of the other items by ex:e
+     * (xsd:double) and ex:g (xsd:float), and the rows of the table {@code multi} by ex:m and, deduplicated, by ex:u
+     * (both xsd:double).
      *
      * @throws SQLException on database errors
      */
@@ -96,6 +103,10 @@ public class FloatingPointZeroTest
                     + "f float4 not null)");
             statement.execute("insert into floating_point_zero_test.other values (10, '0', '0'), (11, '-0', '-0'), "
                     + "(12, 'NaN', 'NaN')");
+            statement.execute("create table floating_point_zero_test.multi (id int primary key, s int not null, "
+                    + "d float8 not null)");
+            statement.execute("insert into floating_point_zero_test.multi values (1, 7, '0'), (2, 7, '-0'), "
+                    + "(3, 8, '0'), (4, 7, '0'), (5, 8, 'NaN'), (6, 8, -'NaN'::float8)");
         }
 
         DatabaseSchema schema = new DatabaseSchema(connectionPool);
@@ -123,7 +134,9 @@ public class FloatingPointZeroTest
 
         DatabaseTable item = new DatabaseTable("floating_point_zero_test", "item");
         DatabaseTable other = new DatabaseTable("floating_point_zero_test", "other");
+        DatabaseTable multi = new DatabaseTable("floating_point_zero_test", "multi");
         TermMapping subject = configuration.createIriMapping("item", "id");
+        TermMapping owner = configuration.createIriMapping("item", "s");
 
         configuration.addQuadMapping(item, null, subject, configuration.createIriMapping("ex:d"),
                 configuration.createLiteralMapping(xsdDouble, "d"));
@@ -133,6 +146,10 @@ public class FloatingPointZeroTest
                 configuration.createLiteralMapping(xsdDouble, "d"));
         configuration.addQuadMapping(other, null, subject, configuration.createIriMapping("ex:g"),
                 configuration.createLiteralMapping(xsdFloat, "f"));
+        configuration.addQuadMapping(multi, null, owner, configuration.createIriMapping("ex:m"),
+                configuration.createLiteralMapping(xsdDouble, "d"));
+        configuration.addQuadMapping(multi, null, owner, configuration.createIriMapping("ex:u"),
+                configuration.createLiteralMapping(xsdDouble, "d"), new Conditions(true), true);
         configuration.setJoinOptimizer(joinOptimizer);
 
         return configuration;
@@ -264,6 +281,33 @@ public class FloatingPointZeroTest
     }
 
 
+    /**
+     * Rows of literals of the datatype, one literal each.
+     *
+     * @param datatype the datatype
+     * @param numbers lexical forms of the literals
+     * @return rows of the literals
+     */
+    private static Object[] numbers(Iri datatype, String... numbers)
+    {
+        return Arrays.stream(numbers).map(n -> List.<RdfTerm> of(new TypedLiteral(n, datatype))).toArray();
+    }
+
+
+    /**
+     * Row of an xsd:double literal and the number of its solutions as an xsd:integer literal.
+     *
+     * @param number lexical form of the literal
+     * @param count the number of the solutions
+     * @return row of the literal and the number of its solutions
+     */
+    private static List<RdfTerm> group(String number, int count)
+    {
+        return List.of(new TypedLiteral(number, xsdDoubleIri),
+                new TypedLiteral(Integer.toString(count), xsdIntegerIri));
+    }
+
+
     @Test
     @DisplayName("a variable shared by the members of a join")
     void join() throws Exception
@@ -365,5 +409,78 @@ public class FloatingPointZeroTest
 
         assertThat(execute("SELECT ?s WHERE { ?s ex:d ?v MINUS { VALUES ?v { 0.0E0 } } }"),
                 containsInAnyOrder(items(2, 3, 4, 5)));
+    }
+
+
+    @Test
+    @DisplayName("DISTINCT")
+    void distinct() throws Exception
+    {
+        Object[] doubles = numbers(xsdDoubleIri, "0.0E0", "-0.0E0", "1.5E0", "NaN");
+
+        assertThat(execute("SELECT DISTINCT ?v WHERE { ?s ex:d ?v }"), containsInAnyOrder(doubles));
+
+        assertThat(execute("SELECT DISTINCT ?v WHERE { ?s ex:f ?v }"),
+                containsInAnyOrder(numbers(xsdFloatIri, "0.0E0", "-0.0E0", "1.5E0", "NaN")));
+
+        // an ordered select deduplicates its rows by grouping them itself
+        assertThat(execute("SELECT DISTINCT ?v WHERE { ?s ex:d ?v } ORDER BY ?s"), containsInAnyOrder(doubles));
+
+        assertThat(execute("SELECT ?v WHERE { { SELECT DISTINCT ?v WHERE { ?s ex:d ?v } } }"),
+                containsInAnyOrder(doubles));
+
+        // only the columns of the floating-point types get the key telling the zeros apart
+        assertThat(translate("SELECT DISTINCT ?s WHERE { ?s ex:d ?v }"), not(containsString("float8send")));
+    }
+
+
+    @Test
+    @DisplayName("GROUP BY and the aggregates of distinct values")
+    void groupBy() throws Exception
+    {
+        assertThat(execute("SELECT ?v (COUNT(*) AS ?c) WHERE { ?s ex:d ?v } GROUP BY ?v"),
+                containsInAnyOrder(group("0.0E0", 2), group("-0.0E0", 1), group("1.5E0", 1), group("NaN", 2)));
+
+        assertThat(execute("SELECT (COUNT(DISTINCT ?v) AS ?c) WHERE { ?s ex:d ?v }"),
+                contains(List.of(new TypedLiteral("4", xsdIntegerIri))));
+
+        // with another aggregate, the distinct values are counted by the aggregate itself
+        assertThat(execute("SELECT (COUNT(DISTINCT ?v) AS ?c) (COUNT(*) AS ?n) WHERE { ?s ex:d ?v }"),
+                contains(List.of(new TypedLiteral("4", xsdIntegerIri), new TypedLiteral("6", xsdIntegerIri))));
+
+        // the zeros are two distinct values, so the average of the distinct values 0, -0 and 1.5 is a third of their
+        // sum (the filter leaves the NaNs out, which are not equal to themselves)
+        String aggregates = "(SUM(DISTINCT ?v) AS ?s) (AVG(DISTINCT ?v) AS ?a)";
+
+        assertThat(execute("SELECT " + aggregates + " WHERE { ?i ex:d ?v FILTER(?v = ?v) }"),
+                contains(List.of(new TypedLiteral("1.5E0", xsdDoubleIri), new TypedLiteral("5.0E-1", xsdDoubleIri))));
+
+        assertThat(execute("SELECT (AVG(DISTINCT ?v) AS ?a) WHERE { ?i ex:f ?v FILTER(?v = ?v) }"),
+                contains(List.of(new TypedLiteral("5.0E-1", xsdFloatIri))));
+    }
+
+
+    @Test
+    @DisplayName("a mapping whose rows are deduplicated")
+    void deduplicatedMapping() throws Exception
+    {
+        assertThat(execute("SELECT ?s ?v WHERE { ?s ex:u ?v }"),
+                containsInAnyOrder(number(7, "0.0E0"), number(7, "-0.0E0"), number(8, "0.0E0"), number(8, "NaN")));
+
+        assertThat(execute("SELECT ?s WHERE { ?s ex:u ?v }"), containsInAnyOrder(items(7, 7, 8, 8)));
+    }
+
+
+    @Test
+    @DisplayName("a walk of a property path")
+    void walk() throws Exception
+    {
+        Object[] pairs = { number(7, "0.0E0"), number(7, "-0.0E0"), number(8, "0.0E0"), number(8, "NaN") };
+
+        assertThat(execute("SELECT ?s ?v WHERE { ?s ex:m+ ?v }"), containsInAnyOrder(pairs));
+        assertThat(execute("SELECT ?s ?v WHERE { ?v ^ex:m+ ?s }"), containsInAnyOrder(pairs));
+
+        assertThat(execute("SELECT ?v WHERE { item:7 ex:m* ?v }"), containsInAnyOrder(List.of(item(7)),
+                List.of(new TypedLiteral("0.0E0", xsdDoubleIri)), List.of(new TypedLiteral("-0.0E0", xsdDoubleIri))));
     }
 }

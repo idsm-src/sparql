@@ -383,23 +383,27 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 }
                 else
                 {
-                    if(argument.canBeNull() && columns.size() > 1)
+                    // distinct values are told apart also by their grouping keys (see SqlType.getGroupingKey)
+                    boolean row = columns.size() > 1 || distinct && SqlType.hasGroupingKey(columns);
+
+                    if(argument.canBeNull() && row)
                         builder.append("CASE WHEN ").append(argument.getIsNotNull()).append(" THEN ");
 
-                    if(columns.size() > 1)
+                    if(row)
                         builder.append("row(");
 
                     if(columns.size() > 0)
-                        builder.append(columns.stream().collect(SqlCode.joining(", ")));
+                        builder.append(distinct ? SqlType.getGroupingKeys(columns) :
+                                columns.stream().collect(SqlCode.joining(", ")));
                     else if(argument.getResourceClasses().size() > 0)
                         builder.append("1");
                     else
                         builder.append("NULL");
 
-                    if(columns.size() > 1)
+                    if(row)
                         builder.append(")");
 
-                    if(argument.canBeNull() && columns.size() > 1)
+                    if(argument.canBeNull() && row)
                         builder.append(" END");
                 }
 
@@ -447,7 +451,12 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                 SqlBuilder builder = new SqlBuilder();
 
-                if(promotedClasses.size() == 1)
+                // equal values of some types need not be identical (see SqlType.getGroupingKey), so the distinct values
+                // of such a type are told apart as boxes, whose equality is the identity
+                boolean boxed = distinct && promotedClasses.size() == 1
+                        && promotedClasses.iterator().next().getSqlTypes().get(0).hasGroupingKey();
+
+                if(promotedClasses.size() == 1 && !boxed)
                 {
                     // a value that is no number is promoted to NULL, which the aggregate takes for an error as well
                     ResourceClass promotedClass = promotedClasses.iterator().next();

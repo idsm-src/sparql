@@ -16,6 +16,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryArithmetic;
 import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
@@ -523,7 +524,7 @@ public final class SqlAggregation extends SqlIntercode
         builder.appendAlias(scope.getInputTable());
 
         if(!groupByColumns.isEmpty())
-            builder.append(groupByColumns.stream().collect(SqlCode.joining(", ", " GROUP BY ", "")));
+            builder.append(" GROUP BY ").append(SqlType.getGroupingKeys(groupByColumns));
         else if(!groupVariables.isEmpty())
             builder.append(" GROUP BY true::boolean");
         else if(!aggregated)

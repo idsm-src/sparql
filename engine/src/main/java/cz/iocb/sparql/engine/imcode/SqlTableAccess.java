@@ -26,6 +26,7 @@ import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
@@ -2328,9 +2329,11 @@ public final class SqlTableAccess extends SqlIntercode
 
         Set<Column> groupColumns = null;
 
-        if(distinct && !getCoveredColumns(projected).containsAll(distinctColumns))
+        if(distinct
+                && (!getCoveredColumns(projected).containsAll(distinctColumns) || SqlType.hasGroupingKey(projected)))
         {
-            // some distinct column is not projected, so the rows have to be grouped instead
+            // some distinct column is not projected, or some column is grouped by an additional key as well (see
+            // SqlType.getGroupingKey), so the rows have to be grouped instead
             groupColumns = new HashSet<>(projected);
             groupColumns.addAll(distinctColumns);
         }
@@ -2369,7 +2372,7 @@ public final class SqlTableAccess extends SqlIntercode
         if(groupColumns != null)
         {
             builder.append(" GROUP BY ");
-            builder.append(groupColumns.stream().sorted().collect(SqlCode.joining(", ")));
+            builder.append(SqlType.getGroupingKeys(groupColumns.stream().sorted().toList()));
         }
 
         if(existence)
