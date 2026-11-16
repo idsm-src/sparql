@@ -52,7 +52,7 @@ public class SqlType
     public static final SqlType NUMERIC = builtin("numeric", BigDecimal.class, "decimal");
 
     //FIXME: the equality of the floating-point types takes -0.0 and 0.0 for the same value, whereas they are different
-    // terms: sameTerm is true for them, and joins, DISTINCT and GROUP BY over such columns merge them
+    // terms; the conditions below tell them apart, but DISTINCT and GROUP BY over such columns still merge them
 
     /**
      * PostgreSQL {@code real}.
@@ -241,11 +241,85 @@ public class SqlType
 
 
     /**
+     * True if the type is one of the floating-point types {@code float4} and {@code float8}, whose {@code =} takes the
+     * zeros of the two signs for equal, although {@code 0.0E0} and {@code -0.0E0} are different RDF terms. (It takes
+     * every two NaNs for equal too, which is what the identity needs, as all of them are the term {@code NaN}.)
+     *
+     * @return true if the type is one of the floating-point types, false otherwise
+     */
+    private boolean isFloatingPoint()
+    {
+        return equals(FLOAT4) || equals(FLOAT8);
+    }
+
+
+    /**
+     * The binary image of a value of a floating-point type, by which the zeros of the two signs differ.
+     *
+     * @param value the value
+     * @return SQL expression of the binary image of the value
+     */
+    private SqlCode image(Column value)
+    {
+        return SqlCode.of(equals(FLOAT4) ? "float4send(" : "float8send(", value, ")");
+    }
+
+
+    /**
+     * The binary image of the zero of the other sign than the zero the constant of a floating-point type is, or null
+     * when the value is no constant zero.
+     *
+     * @param value the value
+     * @return SQL constant of the binary image of the zero of the other sign, or null when the value is no constant
+     *         zero
+     */
+    private String getOtherZero(Column value)
+    {
+        if(!(value instanceof ValueColumn constant))
+            return null;
+
+        double number;
+
+        try
+        {
+            number = Double.parseDouble(constant.getValue());
+        }
+        catch(NumberFormatException e)
+        {
+            return null;
+        }
+
+        if(number != 0)
+            return null;
+
+        boolean negative = Double.doubleToRawLongBits(number) != 0;
+
+        return "'\\x" + (negative ? "00" : "80") + (equals(FLOAT4) ? "000000" : "00000000000000") + "'::bytea";
+    }
+
+
+    /**
+     * True if the value of a floating-point type is a constant other than a zero (the NULL among them): the {@code =}
+     * of the type takes only the values identical to such a constant for equal to it.
+     *
+     * @param value the value
+     * @return true if the value is a constant other than a zero, false otherwise
+     */
+    private boolean isNonZeroConstant(Column value)
+    {
+        return value instanceof ConstantColumn && getOtherZero(value) == null;
+    }
+
+
+    /**
      * SQL condition that two not-null values of the type are identical, i.e. represent the same RDF term part. The
      * default is the {@code =} operator of the type; for the types of the pgsparql extension, whose {@code =} is the
      * value equality (two date-times in different zones may be equal), it is the operator {@code @=} of their operator
-     * classes, which is the identity and is therefore usable in merge and hash joins. The conditions are parenthesised,
-     * so that they can be combined with any operator.
+     * classes, which is the identity and is therefore usable in merge and hash joins. Two values of a floating-point
+     * type have to be equal and, when they are zeros, of the same sign: their binary images are compared then, which
+     * the condition asks for only among the zeros, so that the database still hashes and looks up by the plain equality
+     * and estimates the condition as that equality; a constant zero is compared with the image of the zero of the other
+     * sign. The conditions are parenthesised, so that they can be combined with any operator.
      *
      * @param left the left value
      * @param right the right value
@@ -256,7 +330,17 @@ public class SqlType
         if(hasIdentityOperators())
             return SqlCode.of("(", left, " operator(sparql.@=) ", right, ")");
 
-        return SqlCode.of("(", left, " = ", right, ")");
+        if(!isFloatingPoint() || isNonZeroConstant(left) || isNonZeroConstant(right))
+            return SqlCode.of("(", left, " = ", right, ")");
+
+        if(getOtherZero(right) != null && !(left instanceof ConstantColumn))
+            return SqlCode.of("(", left, " = ", right, " AND ", image(left), " <> ", getOtherZero(right), ")");
+
+        if(getOtherZero(left) != null && !(right instanceof ConstantColumn))
+            return SqlCode.of("(", left, " = ", right, " AND ", image(right), " <> ", getOtherZero(left), ")");
+
+        return SqlCode.of("(", left, " = ", right, " AND (", left, " <> '0'::", name, " OR ", image(left), " = ",
+                image(right), "))");
     }
 
 
@@ -274,7 +358,19 @@ public class SqlType
             return SqlCode.of("COALESCE(", left, " operator(sparql.@=) ", right, ", ", left, " IS NULL AND ", right,
                     " IS NULL)");
 
-        return SqlCode.of("(", left, " IS NOT DISTINCT FROM ", right, ")");
+        if(!isFloatingPoint() || isNonZeroConstant(left) || isNonZeroConstant(right))
+            return SqlCode.of("(", left, " IS NOT DISTINCT FROM ", right, ")");
+
+        if(getOtherZero(right) != null && !(left instanceof ConstantColumn))
+            return SqlCode.of("(", left, " IS NOT DISTINCT FROM ", right, " AND ", image(left), " <> ",
+                    getOtherZero(right), ")");
+
+        if(getOtherZero(left) != null && !(right instanceof ConstantColumn))
+            return SqlCode.of("(", left, " IS NOT DISTINCT FROM ", right, " AND ", image(right), " <> ",
+                    getOtherZero(left), ")");
+
+        return SqlCode.of("(", left, " IS NOT DISTINCT FROM ", right, " AND (", left, " <> '0'::", name, " OR ",
+                image(left), " IS NOT DISTINCT FROM ", image(right), "))");
     }
 
 
@@ -292,7 +388,10 @@ public class SqlType
             return SqlCode.of("(NOT COALESCE(", left, " operator(sparql.@=) ", right, ", ", left, " IS NULL AND ",
                     right, " IS NULL))");
 
-        return SqlCode.of("(", left, " IS DISTINCT FROM ", right, ")");
+        if(!isFloatingPoint() || isNonZeroConstant(left) || isNonZeroConstant(right))
+            return SqlCode.of("(", left, " IS DISTINCT FROM ", right, ")");
+
+        return SqlCode.of("(NOT ", notDistinct(left, right), ")");
     }
 
 
@@ -309,7 +408,17 @@ public class SqlType
         if(hasIdentityOperators())
             return SqlCode.of("(", left, " operator(sparql.@<>) ", right, ")");
 
-        return SqlCode.of("(", left, " != ", right, ")");
+        if(!isFloatingPoint() || isNonZeroConstant(left) || isNonZeroConstant(right))
+            return SqlCode.of("(", left, " != ", right, ")");
+
+        if(getOtherZero(right) != null && !(left instanceof ConstantColumn))
+            return SqlCode.of("(", left, " != ", right, " OR ", image(left), " = ", getOtherZero(right), ")");
+
+        if(getOtherZero(left) != null && !(right instanceof ConstantColumn))
+            return SqlCode.of("(", left, " != ", right, " OR ", image(right), " = ", getOtherZero(left), ")");
+
+        return SqlCode.of("(", left, " != ", right, " OR (", left, " = '0'::", name, " AND ", image(left), " != ",
+                image(right), "))");
     }
 
 
