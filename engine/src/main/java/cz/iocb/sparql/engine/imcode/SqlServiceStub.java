@@ -1471,11 +1471,12 @@ public final class SqlServiceStub extends SqlIntercode
     /**
      * True if the call is evaluated by the join it lies in, for the solutions of its siblings (see
      * {@link SqlJoin#optimize}), and not for a context of its own: with the reordering of calls, which leaves the calls
-     * without contexts, and when the endpoint is named by a variable that the context does not bind, because only a
-     * sibling can supply its value then (a call inside an EXISTS pattern, which has no context either, or a call
-     * standing before the member that binds the variable). Such a call that has no sibling binding the variable, like
-     * one whose endpoint only the left side of an OPTIONAL or the current solution of an EXISTS names, asks no endpoint
-     * and has no solution.
+     * without contexts, and when the endpoint is named by a variable that the context does not bind in every solution
+     * (see {@link #namesEndpoint}), because only a sibling can supply its value then (a call inside an EXISTS pattern,
+     * which has no context either, a call standing before the member that binds the variable, or a call standing
+     * between a member that binds the variable in some solutions and a member that binds it in the others). Such a call
+     * that has no sibling binding the variable, like one whose endpoint only the left side of an OPTIONAL or the
+     * current solution of an EXISTS names, asks no endpoint and has no solution.
      *
      * @param request the current request
      * @return true if the call is evaluated by the join it lies in, false otherwise
@@ -1483,7 +1484,25 @@ public final class SqlServiceStub extends SqlIntercode
     protected boolean isEvaluatedByJoin(Request request)
     {
         return request.isServiceReorderEnabled()
-                || name instanceof Variable variable && context.getVariable(variable) == null;
+                || name instanceof Variable variable && !namesEndpoint(context, variable);
+    }
+
+
+    /**
+     * True if every solution of the context names the endpoint of a call by the variable, so that the call can be
+     * evaluated for the context by itself. A context that leaves the variable unbound in some solutions is no context
+     * of the call: another member of the join the call lies in may name the endpoint for those solutions, so the join
+     * evaluates the call for the solutions of all its members.
+     *
+     * @param context the solutions preceding the call in its group
+     * @param variable the variable naming the endpoint
+     * @return true if every solution of the context binds the variable, false otherwise
+     */
+    public static boolean namesEndpoint(SqlIntercode context, Variable variable)
+    {
+        VariableBinding binding = context.getVariable(variable);
+
+        return binding != null && !binding.canBeNull();
     }
 
 

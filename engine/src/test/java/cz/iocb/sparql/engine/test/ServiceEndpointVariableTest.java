@@ -59,7 +59,9 @@ import cz.iocb.sparql.testing.Database;
  * no endpoint. The join takes the received solutions back only for the solutions of the siblings they were asked for,
  * also when those may leave a variable of the call unbound, which agrees with any value: a solution leaving it unbound
  * gets what the endpoint answers without the value, a solution binding it what the endpoint answers for its value, and
- * a solution leaving the variable that names the endpoint unbound gets nothing.
+ * a solution leaving the variable that names the endpoint unbound gets nothing. Members before the call that name the
+ * endpoint only in some of their solutions are no context of the call either: a member after the call may name the
+ * endpoint for the other solutions, so the join evaluates the call for the solutions of all its members.
  *
  * The table {@code item} holds the items 1 to 6 with the values 1 to 6, the notes {@code x} of the item 1 and {@code y}
  * of the item 3, and the endpoints of the items: the first one for the odd items, the second one for the even ones. The
@@ -449,6 +451,35 @@ public class ServiceEndpointVariableTest
                     containsInAnyOrder(row(integer(1), item(1), integer(10))));
 
             assertThat(requests, containsInAnyOrder("/first 1"));
+        }
+    }
+
+
+    @Test
+    @DisplayName("members before the call naming the endpoint in some solutions, a member after it in the others")
+    void endpointNamedPartly() throws Exception
+    {
+        for(boolean reorder : new boolean[] { false, true })
+        {
+            // a row of the list that leaves the endpoint unbound takes it from the member after the call
+            String values = "VALUES (?s ?e) { (item:1 <first>) (item:3 UNDEF) } SERVICE ?e { ?s :p ?o } "
+                    + "VALUES ?e { <first> }";
+
+            assertThat(execute(reorder, "SELECT ?s ?o WHERE { " + values + " }"),
+                    containsInAnyOrder(row(item(1), integer(10)), row(item(3), integer(30))));
+
+            // the items 1 and 3 have notes, so only they name their endpoint before the call
+            String optional = "?s :v ?v OPTIONAL { ?s :n ?n . ?s :e ?e } SERVICE ?e { ?s :p ?o } VALUES ?e { <first> }";
+
+            assertThat(execute(reorder, "SELECT ?s ?o WHERE { " + optional + " }"), containsInAnyOrder(
+                    row(item(1), integer(10)), row(item(3), integer(30)), row(item(5), integer(50))));
+
+            // the first branch names the endpoint of every item, the second one of none
+            String union = "{ ?s :e ?e } UNION { ?s :v ?v } SERVICE ?e { ?s :p ?o } VALUES ?e { <first> }";
+
+            assertThat(execute(reorder, "SELECT ?s ?o WHERE { " + union + " }"),
+                    containsInAnyOrder(row(item(1), integer(10)), row(item(3), integer(30)), row(item(5), integer(50)),
+                            row(item(1), integer(10)), row(item(3), integer(30)), row(item(5), integer(50))));
         }
     }
 }
