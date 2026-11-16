@@ -125,6 +125,7 @@ public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expressi
                         scopeVars.stream().map(v -> (Expression) v).collect(toList()) : List.of();
 
                 BuiltInCallExpression card = new BuiltInCallExpression("card", args);
+                card.setDistinct(builtInCallExpression.isDistinct());
                 card.setRange(builtInCallExpression.getRange());
 
                 builtInCallExpression = card;

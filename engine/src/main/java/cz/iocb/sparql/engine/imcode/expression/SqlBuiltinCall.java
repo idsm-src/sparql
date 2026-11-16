@@ -326,21 +326,16 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                 builder.append("count(");
 
-                if(distinct)
-                    builder.append("DISTINCT ");
-
-                if(columns.size() > 1)
-                    builder.append("row(");
-
-                if(columns.size() > 0)
-                    builder.append(columns.stream().collect(SqlCode.joining(", ")));
-                else if(distinct)
-                    builder.append("1");
-                else
+                // the distinct solutions are told apart by the row of all the columns of their variables, which is a
+                // value also where a solution leaves every variable unbound (a single column would leave out its
+                // NULLs), together with the grouping keys of the columns (see SqlType.getGroupingKey); without such
+                // columns, all solutions are the same
+                if(!distinct)
                     builder.append("*");
-
-                if(columns.size() > 1)
-                    builder.append(")");
+                else if(columns.isEmpty())
+                    builder.append("DISTINCT 1");
+                else
+                    builder.append("DISTINCT row(").append(SqlType.getGroupingKeys(columns)).append(")");
 
                 builder.append(")::decimal");
 
