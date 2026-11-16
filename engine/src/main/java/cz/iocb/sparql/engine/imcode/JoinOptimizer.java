@@ -322,11 +322,15 @@ final class JoinOptimizer
      *            can be hashed)
      * @param bound the solutions of the left side binding the variables it may leave unbound, for which the right side
      *            is evaluated one by one, restricted by those variables as well, the other solutions being joined as
-     *            {@code outer} says; or null when the solutions are not told apart
+     *            {@code outer} says; or null when the solutions are not told apart so
+     * @param hashed the variables the left side may leave unbound by which the sides are hashed for the solutions
+     *            binding them all, the right side being evaluated once and the other solutions compared with it
+     *            pairwise (see {@link #getHashedWhenBound}); empty when the solutions are not told apart so, as when
+     *            the right side is evaluated for them one by one
      * @param rows estimated number of rows of the result
      * @param cost estimated cost of the join, the evaluation of the left side excluded
      */
-    record LeftJoinPlan(Outer outer, Outer bound, double rows, double cost)
+    record LeftJoinPlan(Outer outer, Outer bound, Set<Variable> hashed, double rows, double cost)
     {
     }
 
@@ -826,6 +830,38 @@ final class JoinOptimizer
     {
         return binding != null && !binding.canBeNull()
                 && binding.getMappings().values().stream().filter(columns -> columns != null).count() == 1;
+    }
+
+
+    /**
+     * The variables by which the sides of an OPTIONAL can be hashed only for the solutions of the left side that bind
+     * them: the variables the left side may leave unbound and binds in a single class, which the right side binds
+     * always, in a single class. The equality of such a variable is a disjunction for the solutions of the left side as
+     * a whole, which the database can neither hash nor look up, but a plain equality for the solutions binding the
+     * variable. No variable is given when an equality of the sides can be hashed as they are (see {@link #isHashable}),
+     * which serves every solution.
+     *
+     * @param left bindings of the left side
+     * @param right bindings of the right side
+     * @return the variables the sides can be hashed by only for the solutions of the left side binding them
+     */
+    static Set<Variable> getHashedWhenBound(VariableBindings left, VariableBindings right)
+    {
+        Set<Variable> variables = new HashSet<>();
+
+        for(VariableBinding binding : left.getValues())
+        {
+            if(!isHashable(right.get(binding.getVariable())))
+                continue;
+
+            if(isHashable(binding))
+                return Set.of();
+
+            if(binding.getMappings().size() == 1 && !binding.getMappings().containsValue(null))
+                variables.add(binding.getVariable());
+        }
+
+        return variables;
     }
 
 
@@ -1610,24 +1646,27 @@ final class JoinOptimizer
     /**
      * Chooses the method of the join of the sides of an OPTIONAL, whose order is given. The right side is evaluated
      * once and the sides are joined by hashing, as the database does by itself (compared pairwise when no equality of
-     * theirs can be hashed), or the right side is evaluated for every solution of the left side anew, restricted to the
-     * solutions compatible with it, which costs what the right side costs for one row (see {@link #estimateForRow})
-     * times the solutions of the left side. The costs are those of a join of the same sides (see {@link #join}), so an
-     * OPTIONAL of a table access is looked up exactly when a join with it would be. A right side that is not
-     * deterministic is evaluated once. A variable the left side may leave unbound restricts the right side for no
-     * solution by itself, and its equality is a disjunction the database can neither hash nor look up, so the solutions
-     * binding all such variables are told apart when it pays (see {@link LeftJoinPlan}): the right side is evaluated
-     * for each of them, restricted by those variables too (see {@link Outer#ofBound}), and the solutions leaving one of
-     * them unbound are joined by the method chosen without those variables. As nothing tells how many solutions leave a
-     * variable unbound, they are told apart only where the others lose little by it: the method chosen for them is a
-     * lookup too, or no equality of the sides can be hashed, so they are compared with the right side pairwise either
-     * way. Read through the union of the subquery, the comparison costs them less than twice as much at worst (and the
-     * same when the database keeps the result of the subquery for them, see {@link SqlLeftJoin#translate}), whereas the
-     * solutions binding the variables may gain orders of magnitude, so the fraction is not guessed. Where the sides are
-     * compared pairwise otherwise, the lookups have to be cheaper by a margin (see {@link #PAIRWISE_MARGIN}), because
-     * the database does not look a small table up. The left side gives the join only the solutions that the conditions
-     * of the filters above keep, as far as one of its variables decides them alone (see {@link #getFilters}), because
-     * the database evaluates such a condition on the left side (see {@link #plan(Request, List, Map, Outer)}).
+     * theirs can be hashed, also for the solutions binding the variables the left side may leave unbound, see
+     * {@link #getHashedWhenBound}), or the right side is evaluated for every solution of the left side anew, restricted
+     * to the solutions compatible with it, which costs what the right side costs for one row (see
+     * {@link #estimateForRow}) times the solutions of the left side. The costs are those of a join of the same sides
+     * (see {@link #join}), so an OPTIONAL of a table access is looked up exactly when a join with it would be. A right
+     * side that is not deterministic is evaluated once. A variable the left side may leave unbound restricts the right
+     * side for no solution by itself, and its equality is a disjunction the database can neither hash nor look up, so
+     * the solutions binding all such variables are told apart when it pays (see {@link LeftJoinPlan}): the right side
+     * is evaluated for each of them, restricted by those variables too (see {@link Outer#ofBound}), and the solutions
+     * leaving one of them unbound are joined by the method chosen without those variables. As nothing tells how many
+     * solutions leave a variable unbound, they are told apart only where the others lose little by it: the method
+     * chosen for them is a lookup too, or no equality of the sides can be hashed as they are, so they are compared with
+     * the right side pairwise either way. Read through the union of the subquery, the comparison costs them less than
+     * twice as much at worst (and the same when the database keeps the result of the subquery for them, see
+     * {@link SqlLeftJoin#translate}), whereas the solutions binding the variables may gain orders of magnitude, so the
+     * fraction is not guessed. Where the sides are compared pairwise otherwise, the lookups have to be cheaper by a
+     * margin (see {@link #PAIRWISE_MARGIN}), because the database does not look a small table up; where the solutions
+     * binding those variables are hashed otherwise, the lookups compete with the hashing as any lookups do. The left
+     * side gives the join only the solutions that the conditions of the filters above keep, as far as one of its
+     * variables decides them alone (see {@link #getFilters}), because the database evaluates such a condition on the
+     * left side (see {@link #plan(Request, List, Map, Outer)}).
      *
      * @param request the current request
      * @param left the left side
@@ -1661,10 +1700,16 @@ final class JoinOptimizer
             hashable |= isHashable(left.getVariable(variable)) && isHashable(right.getVariable(variable));
         }
 
-        double rows = leftRows * Math.max(fanout, 1);
-        double hashed = hashCost(hashable, leftRows, rightRows, rows) + estimateRead(request, right);
+        // the solutions binding the variables the left side may leave unbound are hashed by them when no equality
+        // serves every solution; the right side is then written twice, so it has to give the same solutions both times
+        Set<Variable> split = right.isDeterministic() ?
+                getHashedWhenBound(left.getVariableBindings(), right.getVariableBindings()) : Set.of();
 
-        LeftJoinPlan plan = new LeftJoinPlan(null, null, rows, hashed);
+        double rows = leftRows * Math.max(fanout, 1);
+        double hashed = hashCost(hashable || !split.isEmpty(), leftRows, rightRows, rows)
+                + estimateRead(request, right);
+
+        LeftJoinPlan plan = new LeftJoinPlan(null, null, split, rows, hashed);
 
         if(!right.isDeterministic())
             return plan;
@@ -1678,7 +1723,7 @@ final class JoinOptimizer
 
             // a right side that no solution of the left side restricts would be evaluated whole for each of them
             if(evaluation.restricted() && lookedUp < hashed)
-                plan = new LeftJoinPlan(solutions, null, rows, lookedUp);
+                plan = new LeftJoinPlan(solutions, null, Set.of(), rows, lookedUp);
         }
 
         // the solutions binding the variables that the left side may leave unbound are told apart only when the others
@@ -1692,10 +1737,10 @@ final class JoinOptimizer
             double lookedUp = leftRows * evaluation.cost();
 
             // lookups that only may cost less than a pairwise comparison are not worth the risk of a scan
-            double margin = plan.outer() != null ? 1 : PAIRWISE_MARGIN;
+            double margin = plan.outer() != null || !split.isEmpty() ? 1 : PAIRWISE_MARGIN;
 
             if(evaluation.restricted() && lookedUp * margin < plan.cost())
-                plan = new LeftJoinPlan(plan.outer(), bound, rows, lookedUp);
+                plan = new LeftJoinPlan(plan.outer(), bound, Set.of(), rows, lookedUp);
         }
 
         return plan;

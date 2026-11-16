@@ -24,6 +24,7 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.imcode.SqlSelect;
 import cz.iocb.sparql.engine.mapping.classes.IntegerUserIriClass;
+import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.request.Engine;
 import cz.iocb.sparql.engine.request.Request;
@@ -53,6 +54,12 @@ public class OptionalLookupTest
      * The start of the right side of a left join that is evaluated for every solution of the left side.
      */
     private static final String lookup = " LEFT JOIN LATERAL (";
+
+    /**
+     * The end of the subquery that the solutions of the left side leaving a variable unbound read the right side from,
+     * when the solutions binding the variable are joined with the right side apart from them.
+     */
+    private static final String apart = " OFFSET 0) AS \"unbound\" ON true CROSS JOIN LATERAL (SELECT ";
 
     /**
      * Configuration with the join optimizer on.
@@ -575,24 +582,34 @@ public class OptionalLookupTest
         assertThat(count(translate(optimized, query), lookup), is(2));
         assertThat(check(query), hasSize(2020));
 
-        // the five tags are compared with the nodes pairwise, which costs less than looking them up
+        // the five tags are hashed for the nodes linked to, which costs less than looking them up
         query = "SELECT ?x ?y ?u WHERE { ?x ex:score ?s FILTER(?s > 198 && ?s < 203) OPTIONAL { ?x ex:link ?y } "
                 + "OPTIONAL { ?y ex:tag ?u } }";
 
-        assertThat(count(translate(optimized, query), lookup), is(1));
+        sql = translate(optimized, query);
+        assertThat(count(sql, lookup), is(2));
+        assertThat(sql, containsString(apart));
         assertThat(check(query), hasSize(30));
 
-        // the two hundred marks are few enough for the database to scan them instead of looking them up, which would
-        // cost what comparing them pairwise does
+        // the two hundred marks are few enough for the database to scan them instead of looking them up, so they are
+        // hashed as well
         query = "SELECT ?x ?y ?m WHERE { ?x ex:tag ?t OPTIONAL { ?x ex:link ?y } OPTIONAL { ?y ex:mark ?m } }";
 
-        assertThat(count(translate(optimized, query), lookup), is(1));
+        sql = translate(optimized, query);
+        assertThat(count(sql, lookup), is(2));
+        assertThat(sql, containsString(apart));
         assertThat(check(query), hasSize(50));
 
-        // the notes have no index to look them up by, so the sides are compared pairwise
+        // the notes have no index to look them up by, so they are hashed for the nodes linked to
         query = "SELECT ?x ?y ?n WHERE { ?x ex:tag ?t OPTIONAL { ?x ex:link ?y } OPTIONAL { ?y ex:note ?n } }";
 
-        assertThat(count(translate(optimized, query), lookup), is(1));
+        sql = translate(optimized, query);
+        assertThat(count(sql, lookup), is(2));
+        assertThat(sql, containsString(" ) AS \"right0\" ON (((\"left0\".\"y#node_par0\" = \"right0\".\"id\"))) "
+                + "LEFT JOIN LATERAL (SELECT "));
+        assertThat(sql,
+                containsString(" FROM \"cte0\" AS \"right0\" WHERE ((\"left0\".\"y#node_par0\" IS NULL)) AND "));
+        assertThat(sql, containsString(apart));
         assertThat(check(query), hasSize(50));
 
         // the links back are looked up by the tagged node, and by the node it links to as well when there is one
@@ -610,5 +627,62 @@ public class OptionalLookupTest
 
         assertThat(translate(optimized, query), not(containsString("LATERAL")));
         assertThat(check(query), hasSize(2800));
+    }
+
+    @Test
+    public void apart() throws Exception
+    {
+        Iri unlinked = new Iri("http://example.org/n/201");
+
+        // the nodes 199 and 200 link to ten nodes each, which have a note each; the nodes 201 and 202 link to none, so
+        // each of them is joined with all five hundred notes
+        String query = "SELECT ?x ?y ?n WHERE { ?x ex:score ?s FILTER(?s > 198 && ?s < 203) OPTIONAL { ?x ex:link ?y } "
+                + "OPTIONAL { ?y ex:note ?n } }";
+
+        assertThat(translate(optimized, query), containsString(apart));
+
+        // without the optimizer the join is written plainly, for the database to plan the query around it freely
+        assertThat(translate(plain, query), not(containsString("LATERAL")));
+
+        List<List<RdfTerm>> rows = check(query);
+        assertThat(rows, hasSize(1020));
+        assertThat(rows.stream().filter(r -> r.get(0).equals(unlinked)).count(), is(500L));
+        assertThat(rows.stream().filter(r -> r.get(1) == null || r.get(2) == null).count(), is(0L));
+
+        // a condition of the OPTIONAL holds for the solutions of either kind: the node 199 links to no node with one
+        // of the nine short notes, the node 201 is joined with those notes, and the nodes 200 and 202 get no note
+        query = "SELECT ?x ?y ?n WHERE { ?x ex:score ?s FILTER(?s > 198 && ?s < 203) OPTIONAL { ?x ex:link ?y } "
+                + "OPTIONAL { ?y ex:note ?n FILTER(?s != 200 && ?s != 202 && STRLEN(?n) < 7) } }";
+
+        assertThat(translate(optimized, query), containsString(apart));
+
+        rows = check(query);
+        assertThat(rows, hasSize(30));
+        assertThat(rows.stream().filter(r -> r.get(0).equals(unlinked)).count(), is(9L));
+        assertThat(rows.stream().filter(r -> r.get(1) == null).count(), is(1L));
+        assertThat(rows.stream().filter(r -> r.get(2) == null).count(), is(21L));
+
+        // a grouping on the right side is evaluated once and read by the solutions of either kind
+        query = "SELECT ?x ?y ?c WHERE { ?x ex:score ?s FILTER(?s > 198 && ?s < 203) OPTIONAL { ?x ex:link ?y } "
+                + "OPTIONAL { { SELECT ?y (COUNT(*) AS ?c) WHERE { ?y ex:note ?n } GROUP BY ?y } } }";
+
+        String sql = translate(optimized, query);
+        assertThat(sql, containsString(" ) AS \"left0\" LEFT JOIN \"cte0\" AS \"right0\" ON "));
+        assertThat(sql, containsString(apart));
+        assertThat(check(query), hasSize(1020));
+
+        // a right side that is not deterministic is written once, so it is compared with all the solutions pairwise
+        query = "SELECT ?x ?y ?n ?r WHERE { ?x ex:tag ?t OPTIONAL { ?x ex:link ?y } "
+                + "OPTIONAL { ?y ex:note ?n BIND(RAND() AS ?r) } }";
+
+        assertThat(translate(optimized, query), not(containsString(apart)));
+        assertThat(execute(optimized, query), hasSize(50));
+
+        // so is a right side reading the current solution of an EXISTS, which no common table expression can hold
+        query = "SELECT ?a WHERE { ?a ex:tag ?t FILTER EXISTS { ?a ex:score ?s OPTIONAL { ?a ex:link ?y } "
+                + "OPTIONAL { ?y ex:note ?n FILTER(?n != ?t) } FILTER(BOUND(?n)) } }";
+
+        assertThat(translate(optimized, query), not(containsString(apart)));
+        assertThat(check(query), hasSize(5));
     }
 }
