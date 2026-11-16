@@ -1263,6 +1263,20 @@ public final class SqlServiceStub extends SqlIntercode
 
 
     /**
+     * The variable by which the siblings of the call and its context tell whether a solution binds the given variable
+     * (see {@link SqlJoin#optimize}). It is given by the call and the variable, so the copies of the stub evaluated for
+     * the same context share one result.
+     *
+     * @param variable a variable of the context that a solution may leave unbound
+     * @return the variable telling whether a solution binds the given variable
+     */
+    protected Variable getBoundFlag(Variable variable)
+    {
+        return new Variable("@bound" + -blankNodeClass.getSegment() + "_" + variable.getName());
+    }
+
+
+    /**
      * What an evaluation of the call for the context keeps of the variables: what the parent needs of them, except that
      * every value of a variable that only the context binds, and that a context solution may leave unbound, is kept.
      * The values of such a variable come from the context alone, and the copies of the stub in the branches of a union,

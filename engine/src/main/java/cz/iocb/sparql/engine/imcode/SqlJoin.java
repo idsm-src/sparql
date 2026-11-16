@@ -24,7 +24,9 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
+import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -377,16 +379,56 @@ public final class SqlJoin extends SqlIntercode
             SqlServiceStub service = entry.getKey();
 
             Set<Variable> vars = entry.getValue().vars;
-            SqlIntercode context = SqlDistinct.create(request, join(request, readable), vars).optimize(request, scope,
+            SqlIntercode distinct = SqlDistinct.create(request, join(request, readable), vars).optimize(request, scope,
                     new Restrictions(vars), false, false);
 
-            SqlIntercode evaluated = service.eval(request, scope, context,
-                    getRestrictions(relations, service, flatChilds, restrictions));
+            Restrictions serviceRestrictions = getRestrictions(relations, service, flatChilds, restrictions);
+
+            optChilds = new ArrayList<>(optChilds);
+
+            /* NOTE: The received solutions are merged with the context solutions they were asked for, and the join
+             * takes them back for the solutions of the siblings that the context solution stands for. Where the context
+             * binds its variables always, those are the solutions agreeing with it in them, which the join compares
+             * anyway. A variable that a solution may leave unbound agrees with any value, so a solution of the siblings
+             * would take also the solutions received for the other context solutions: those asked with the variable
+             * bound when it leaves the variable unbound, and the other way round. The siblings and the context
+             * therefore tell, by a variable of their own that is always bound, whether they bind such a variable, which
+             * the join compares as well.
+             */
+            List<Variable> unbound = vars.stream()
+                    .filter(v -> distinct.getVariable(v) != null && distinct.getVariable(v).canBeNull())
+                    .sorted(Comparator.comparing(Variable::getName)).toList();
+
+            SqlIntercode context = distinct;
+
+            if(!unbound.isEmpty())
+            {
+                SqlIntercode siblings = readable.size() == 1 ? readable.get(0) : join(request, readable);
+                Set<Variable> keys = new HashSet<>(vars);
+
+                for(Variable variable : unbound)
+                {
+                    Variable flag = service.getBoundFlag(variable);
+                    SqlExpressionIntercode bound = SqlBuiltinCall.create(request, "bound", false,
+                            List.of(SqlVariable.create(relations, siblings.getVariable(variable))));
+
+                    siblings = SqlBind.bind(request, flag, bound, siblings);
+                    keys.add(flag);
+                    serviceRestrictions.add(flag);
+                }
+
+                context = SqlDistinct.create(request, siblings, keys).optimize(request, scope, new Restrictions(keys),
+                        false, false);
+
+                optChilds.removeAll(readable);
+                optChilds.add(siblings);
+            }
+
+            SqlIntercode evaluated = service.eval(request, scope, context, serviceRestrictions);
 
 
             nondeterministic.remove(service);
 
-            optChilds = new ArrayList<>(optChilds);
             optChilds.add(evaluated);
 
             List<SqlIntercode> fullChilds = mergeChilds(request, scope, optChilds, nondeterministic, restrictions,

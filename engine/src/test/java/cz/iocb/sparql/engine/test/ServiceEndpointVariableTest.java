@@ -56,7 +56,10 @@ import cz.iocb.sparql.testing.Database;
  * pattern and with the reordering of calls, where a call has no context of its own and the join evaluates it for the
  * solutions of its siblings. The siblings that refer to the current solution of an EXISTS pattern have a meaning only
  * at their place, so the call is not evaluated for them. A call that no member of its join names the endpoint of asks
- * no endpoint.
+ * no endpoint. The join takes the received solutions back only for the solutions of the siblings they were asked for,
+ * also when those may leave a variable of the call unbound, which agrees with any value: a solution leaving it unbound
+ * gets what the endpoint answers without the value, a solution binding it what the endpoint answers for its value, and
+ * a solution leaving the variable that names the endpoint unbound gets nothing.
  *
  * The table {@code item} holds the items 1 to 6 with the values 1 to 6, the notes {@code x} of the item 1 and {@code y}
  * of the item 3, and the endpoints of the items: the first one for the odd items, the second one for the even ones. The
@@ -381,6 +384,71 @@ public class ServiceEndpointVariableTest
 
             assertThat(execute(reorder, "SELECT ?s ?o WHERE { ?s :v ?v SERVICE ?e { ?s :p ?o } }"), is(empty()));
             assertThat(requests, is(empty()));
+        }
+    }
+
+
+    @Test
+    @DisplayName("a variable of a call evaluated by its join that the siblings may leave unbound")
+    void unboundVariable() throws Exception
+    {
+        List<List<RdfTerm>> expected = List.of(row(integer(1), item(1), integer(10)),
+                row(integer(2), item(1), integer(10)), row(integer(2), item(3), integer(30)),
+                row(integer(2), item(5), integer(50)));
+
+        for(boolean reorder : new boolean[] { false, true })
+        {
+            String before = "VALUES (?k ?s) { (1 item:1) (2 UNDEF) } SERVICE <first> { ?s :p ?o }";
+
+            assertThat(execute(reorder, "SELECT ?k ?s ?o WHERE { " + before + " }"),
+                    containsInAnyOrder(expected.toArray()));
+
+            assertThat(requests, containsInAnyOrder("/first 1", "/first *"));
+
+            // the endpoint is named after the call, so the join evaluates the call without the reordering too
+            String after = "SERVICE ?e { ?s :p ?o } VALUES (?k ?e ?s) { (1 <first> item:1) (2 <first> UNDEF) }";
+
+            assertThat(execute(reorder, "SELECT ?k ?s ?o WHERE { " + after + " }"),
+                    containsInAnyOrder(expected.toArray()));
+
+            assertThat(requests, containsInAnyOrder("/first 1", "/first *"));
+        }
+    }
+
+
+    @Test
+    @DisplayName("a variable of a call evaluated by its join that an OPTIONAL leaves unbound")
+    void variableUnboundByOptional() throws Exception
+    {
+        for(boolean reorder : new boolean[] { false, true })
+        {
+            String pattern = "?z :v ?v OPTIONAL { ?z :n ?n BIND(?z AS ?s) } SERVICE <first> { ?s :p ?o } FILTER(?v < 4)";
+
+            assertThat(execute(reorder, "SELECT ?z ?s ?o WHERE { " + pattern + " }"),
+                    containsInAnyOrder(row(item(1), item(1), integer(10)), row(item(2), item(1), integer(10)),
+                            row(item(2), item(3), integer(30)), row(item(2), item(5), integer(50)),
+                            row(item(3), item(3), integer(30))));
+        }
+    }
+
+
+    @Test
+    @DisplayName("a sibling leaving the variable that names the endpoint unbound names no endpoint")
+    void unboundEndpoint() throws Exception
+    {
+        String values = "VALUES (?k ?e ?s) { (1 <first> item:1) (2 UNDEF item:1) (3 UNDEF UNDEF) }";
+
+        for(boolean reorder : new boolean[] { false, true })
+        {
+            assertThat(execute(reorder, "SELECT ?k ?s ?o WHERE { " + values + " SERVICE ?e { ?s :p ?o } }"),
+                    containsInAnyOrder(row(integer(1), item(1), integer(10))));
+
+            assertThat(requests, containsInAnyOrder("/first 1"));
+
+            assertThat(execute(reorder, "SELECT ?k ?s ?o WHERE { SERVICE ?e { ?s :p ?o } " + values + " }"),
+                    containsInAnyOrder(row(integer(1), item(1), integer(10))));
+
+            assertThat(requests, containsInAnyOrder("/first 1"));
         }
     }
 }
