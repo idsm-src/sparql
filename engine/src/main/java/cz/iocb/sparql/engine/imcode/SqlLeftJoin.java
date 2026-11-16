@@ -51,7 +51,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * every solution of the left side (see {@link #translate}), also by a variable the left side may leave unbound, for the
  * solutions that bind it (see {@link #translateForSolution}). Where the sides share only such variables and the right
  * side is evaluated once, their equality is a disjunction the database could just compare pairwise, so the solutions
- * binding them are joined apart from the others, by a plain equality (see {@link #translateForBound}).
+ * binding them are joined apart from the others, by a plain equality (see {@link #translateForBound}), with the
+ * optimizer and without it.
  */
 public final class SqlLeftJoin extends SqlIntercode
 {
@@ -760,9 +761,10 @@ public final class SqlLeftJoin extends SqlIntercode
      * {@link #translateForSolution}). The condition of the join is the same in all cases, so the restriction only
      * spares the database the solutions the condition would drop. A right side evaluated once that shares with the left
      * side only variables that side may leave unbound is joined apart with the solutions binding them (see
-     * {@link #translateForBound}). Without the optimizer the join is written plainly: the subquery that form guards the
-     * right side by cannot be merged into the query around it, and the database then no longer evaluates a pattern
-     * holding the join just for the rows of a join around the pattern, which it does by itself otherwise.
+     * {@link #translateForBound}), also without the optimizer, when the database chooses the methods itself: it can
+     * hash a side, or look a table up, only by a plain equality. The join is left as it is then in a pattern of an
+     * expression (see {@link Scope#isWithinExpression}), where the database compares the sides only until it finds a
+     * solution.
      */
     @Override
     public SqlCode translate(Request request, Scope scope)
@@ -800,11 +802,22 @@ public final class SqlLeftJoin extends SqlIntercode
         JoinOptimizer.LeftJoinPlan plan = request.getConfiguration().isJoinOptimizerEnabled() ?
                 getPlan(request, outer) : null;
 
-        SqlCode whole = plan == null || plan.hashed().isEmpty() ? null : right.translate(request, scope);
+        // the solutions binding the variables the left side may leave unbound are joined apart where the optimizer says
+        // so, and wherever the equality of the sides is a disjunction when the database chooses the method itself; not
+        // in a pattern of an expression then, which the database stops evaluating at its first solution, whereas a
+        // hashed right side is read whole
+        Set<Variable> hashed = Set.of();
 
-        // a right side referring to a table that a common table expression cannot see is written once
-        if(whole != null && whole.getOuterTables().isEmpty())
-            return translateForBound(request, scope, outer, plan.hashed(), whole);
+        if(plan != null)
+            hashed = plan.hashed();
+        else if(right.isDeterministic() && !scope.isWithinExpression())
+            hashed = JoinOptimizer.getHashedWhenBound(left.getVariableBindings(), right.getVariableBindings());
+
+        SqlCode whole = hashed.isEmpty() ? null : right.translate(request, scope);
+        SqlCode apart = whole == null ? null : translateForBound(request, scope, outer, hashed, whole, plan != null);
+
+        if(apart != null)
+            return apart;
 
         SqlBuilder builder = new SqlBuilder();
 
@@ -879,31 +892,52 @@ public final class SqlLeftJoin extends SqlIntercode
      * SQL code of the left join whose sides share only variables the left side may leave unbound (see
      * {@link JoinOptimizer#getHashedWhenBound}), so that the equality of the join is a disjunction the database can
      * neither hash nor look up. The right side is joined twice. The first join compares the variables by a plain
-     * equality, which holds only for the solutions of the left side binding them all, so the database hashes those as
-     * it would for variables bound always. The second join is a subquery evaluated for the other solutions only:
-     * guarded by the test that the solution leaves a variable unbound, which the database evaluates once per solution,
-     * it reads the right side from a common table expression the database keeps the result of (see
-     * {@link Request#getMaterializedTableExpression}) and compares it with the solution by the condition of the join as
-     * it is. The subquery is fenced by {@code OFFSET 0}, because the test pulled up into the join would be evaluated
-     * for every pair. The first join reads that common table expression too, so that the right side is evaluated once,
-     * unless the right side is an access to a table: the table is read in place then, so that nothing is kept while
-     * every solution binds the variables, and a second time only when a solution leaves one unbound, which costs what
-     * reading a kept result does. A solution of the left side is extended by one of the joins at most, so the columns
-     * of the right side are those of the join that gave them. Both subqueries name the right side by its alias, which
-     * the conditions and the column map address its columns through: the second one inside itself, and the columns
-     * taken from the two joins again in the subquery that the solutions of the join are read from.
+     * equality, which holds only for the solutions of the left side binding them all, so the database joins those as it
+     * would for variables bound always. The second join is a subquery that gives the other solutions the right side,
+     * compared with them by the condition of the join as it is. A solution of the left side is extended by one of the
+     * joins at most, so the columns of the right side are those of the join that gave them. Both subqueries name the
+     * right side by its alias, which the conditions and the column map address its columns through: the second one
+     * inside itself, and the columns taken from the two joins again in the subquery that the solutions of the join are
+     * read from.
+     * <p>
+     * With the optimizer on, the second subquery is guarded by the test that the solution leaves a variable unbound,
+     * which the database evaluates once per solution, and fenced by {@code OFFSET 0}, because the test pulled up into
+     * the join would be evaluated for every pair. It reads the right side from a common table expression the database
+     * keeps the result of (see {@link Request#getMaterializedTableExpression}). The first join reads that expression
+     * too, so that the right side is evaluated once, unless the right side is an access to a table: the table is read
+     * in place then, so that nothing is kept while every solution binds the variables, and a second time only when a
+     * solution leaves one unbound, which costs what reading a kept result does.
+     * <p>
+     * A fenced subquery is one the database cannot merge into the query around it, and it then no longer evaluates a
+     * pattern holding the join just for the rows of a join around that pattern, which it does by itself when it plans
+     * the joins. Without the optimizer the second subquery is therefore left for the database to merge, and its test is
+     * written as an equality the database can hash: the solution leaves a variable unbound exactly when that equals
+     * whether the row of the right side binds a variable it binds always. The solutions binding the variables then find
+     * no row by the hash, at the price of one more pass over the right side, which both joins read from the kept
+     * result, or from the table in place.
      *
      * @param request the current request
      * @param scope the scope of the join
      * @param outer the rows the join is evaluated for one by one, or null when it is evaluated once
      * @param hashed the variables the left side may leave unbound that the sides are joined by
-     * @param whole SQL code of the right side, which refers to no outer table
-     * @return SQL code of the left join
+     * @param whole SQL code of the right side
+     * @param fenced whether the second subquery is guarded by a test evaluated once per solution, which fences it, or
+     *            by an equality the database hashes
+     * @return SQL code of the left join, or null when the join cannot be written so: the right side refers to an outer
+     *         table, which a common table expression cannot see, or binds the variables to constants only, which no
+     *         equality of the second subquery can be made of
      */
     private SqlCode translateForBound(Request request, Scope scope, JoinOptimizer.Outer outer, Set<Variable> hashed,
-            SqlCode whole)
+            SqlCode whole, boolean fenced)
     {
         ClassRelations relations = request.getConfiguration();
+
+        // a table is read in place, any other right side is evaluated once for both joins
+        SqlIntercode pattern = right instanceof SqlStripConstantColumns strip ? strip.getChild() : right;
+        boolean inPlace = pattern instanceof SqlTableAccess;
+
+        if(!whole.getOuterTables().isEmpty() && (fenced || !inPlace))
+            return null;
 
         // the left side as its solutions binding the variables bind them
         VariableBindings bound = new VariableBindings();
@@ -922,12 +956,18 @@ public final class SqlLeftJoin extends SqlIntercode
             }
         }
 
+        // every row of the right side binds the variables, which makes the test an equality of two tests
+        SqlCode always = tested.stream().map(b -> right.getVariable(b.getVariable()).getIsNotNull(rightTable))
+                .filter(c -> !c.equals(SqlCode.TRUE)).findFirst().orElse(null);
+
+        if(!fenced && always == null)
+            return null;
+
         Set<Column> columns = bindings.getNonConstantColumns();
         Set<Column> rightColumns = right.getVariableBindings().getNonConstantColumns();
 
-        // a table is read in place, any other right side is evaluated once for both joins
-        SqlIntercode pattern = right instanceof SqlStripConstantColumns strip ? strip.getChild() : right;
-        CommonTable kept = request.getMaterializedTableExpression(whole);
+        CommonTable kept = fenced || !inPlace ? request.getMaterializedTableExpression(whole) : null;
+        SqlCode unbound = tested.stream().map(b -> b.getIsNull(leftTable)).collect(SqlCode.joining(" OR "));
 
         SqlBuilder builder = new SqlBuilder();
 
@@ -944,18 +984,7 @@ public final class SqlLeftJoin extends SqlIntercode
         builder.append(" ) AS ");
         builder.appendAlias(leftTable);
         builder.append(" LEFT JOIN ");
-
-        if(pattern instanceof SqlTableAccess)
-        {
-            builder.append("(");
-            builder.append(whole);
-            builder.append(" )");
-        }
-        else
-        {
-            builder.append(kept);
-        }
-
+        builder.append(inPlace ? SqlCode.of("(", whole, " )") : kept);
         builder.append(" AS ");
         builder.appendAlias(rightTable);
         builder.append(" ON ");
@@ -964,14 +993,14 @@ public final class SqlLeftJoin extends SqlIntercode
         builder.append(" LEFT JOIN LATERAL (SELECT ");
         builder.append(rightColumns.isEmpty() ? SqlCode.of("1") : rightColumns.stream().collect(SqlCode.joining(", ")));
         builder.append(" FROM ");
-        builder.append(kept);
+        builder.append(fenced || !inPlace ? kept : SqlCode.of("(", whole, " )"));
         builder.append(" AS ");
         builder.appendAlias(rightTable);
-        builder.append(" WHERE (");
-        builder.append(tested.stream().map(b -> b.getIsNull(leftTable)).collect(SqlCode.joining(" OR ")));
-        builder.append(") AND ");
+        builder.append(" WHERE ");
+        builder.append(fenced ? SqlCode.of("(", unbound, ")") : SqlCode.of("((", unbound, ") = ", always, ")"));
+        builder.append(" AND ");
         appendCondition(builder, relations, left.bindings);
-        builder.append(" OFFSET 0) AS ");
+        builder.append(fenced ? " OFFSET 0) AS " : ") AS ");
         builder.appendAlias(unboundTable);
         builder.append(" ON true");
 

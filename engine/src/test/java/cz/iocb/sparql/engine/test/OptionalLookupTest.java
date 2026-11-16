@@ -62,6 +62,18 @@ public class OptionalLookupTest
     private static final String apart = " OFFSET 0) AS \"unbound\" ON true CROSS JOIN LATERAL (SELECT ";
 
     /**
+     * The end of that subquery when the database chooses the methods of the joins itself: it is not fenced, and its
+     * test is an equality the database can hash (see {@link #keyed}).
+     */
+    private static final String merged = ")) AS \"unbound\" ON true CROSS JOIN LATERAL (SELECT ";
+
+    /**
+     * The test of that subquery for the node a node links to, written as an equality: the node is unbound exactly when
+     * that equals whether the row of the right side binds its node.
+     */
+    private static final String keyed = " WHERE (((\"left0\".\"y#node_par0\" IS NULL)) = (\"right0\".\"id\" IS NOT NULL)) AND ";
+
+    /**
      * Configuration with the join optimizer on.
      */
     private static SparqlDatabaseConfiguration optimized = null;
@@ -572,7 +584,15 @@ public class OptionalLookupTest
         assertThat(sql, containsString(
                 " FROM \"cte0\" AS tab WHERE (\"left0\".\"y#node_par0\" IS NULL) OFFSET 0 ) AS \"right0\" ON "));
 
-        assertThat(translate(plain, query), not(containsString("LATERAL")));
+        // without the optimizer the labelled nodes are joined by a plain equality, which the database may look up by,
+        // and the tagged nodes that link to none find them by a test the database can hash, with no fence around it
+        sql = translate(plain, query);
+        assertThat(sql, containsString(" ) AS \"right0\" ON (((\"left0\".\"y#node_par0\" = \"right0\".\"id\"))) "
+                + "LEFT JOIN LATERAL (SELECT "));
+        assertThat(sql, containsString(keyed));
+        assertThat(sql, containsString(merged));
+        assertThat(sql, not(containsString(" OFFSET 0")));
+        assertThat(sql, not(containsString(" MATERIALIZED ")));
         assertThat(check(query), hasSize(50));
 
         // the nodes 199 and 200 link to ten nodes each, the nodes 201 and 202 to none
@@ -641,8 +661,11 @@ public class OptionalLookupTest
 
         assertThat(translate(optimized, query), containsString(apart));
 
-        // without the optimizer the join is written plainly, for the database to plan the query around it freely
-        assertThat(translate(plain, query), not(containsString("LATERAL")));
+        // without the optimizer the subquery is not fenced, for the database to plan the query around it freely
+        String sql = translate(plain, query);
+        assertThat(sql, containsString(keyed));
+        assertThat(sql, containsString(merged));
+        assertThat(sql, not(containsString(" OFFSET 0")));
 
         List<List<RdfTerm>> rows = check(query);
         assertThat(rows, hasSize(1020));
@@ -655,6 +678,7 @@ public class OptionalLookupTest
                 + "OPTIONAL { ?y ex:note ?n FILTER(?s != 200 && ?s != 202 && STRLEN(?n) < 7) } }";
 
         assertThat(translate(optimized, query), containsString(apart));
+        assertThat(translate(plain, query), containsString(merged));
 
         rows = check(query);
         assertThat(rows, hasSize(30));
@@ -666,9 +690,14 @@ public class OptionalLookupTest
         query = "SELECT ?x ?y ?c WHERE { ?x ex:score ?s FILTER(?s > 198 && ?s < 203) OPTIONAL { ?x ex:link ?y } "
                 + "OPTIONAL { { SELECT ?y (COUNT(*) AS ?c) WHERE { ?y ex:note ?n } GROUP BY ?y } } }";
 
-        String sql = translate(optimized, query);
+        sql = translate(optimized, query);
         assertThat(sql, containsString(" ) AS \"left0\" LEFT JOIN \"cte0\" AS \"right0\" ON "));
         assertThat(sql, containsString(apart));
+
+        sql = translate(plain, query);
+        assertThat(sql, containsString(" ) AS \"left0\" LEFT JOIN \"cte0\" AS \"right0\" ON "));
+        assertThat(sql, containsString(" FROM \"cte0\" AS \"right0\" WHERE (((\"left0\".\"y#node_par0\" IS NULL)) = "));
+        assertThat(sql, containsString(merged));
         assertThat(check(query), hasSize(1020));
 
         // a right side that is not deterministic is written once, so it is compared with all the solutions pairwise
@@ -676,13 +705,24 @@ public class OptionalLookupTest
                 + "OPTIONAL { ?y ex:note ?n BIND(RAND() AS ?r) } }";
 
         assertThat(translate(optimized, query), not(containsString(apart)));
+        assertThat(translate(plain, query), not(containsString("LATERAL")));
         assertThat(execute(optimized, query), hasSize(50));
+        assertThat(execute(plain, query), hasSize(50));
+
+        // in the pattern of an EXISTS the database compares the sides only until it finds a solution, so the join is
+        // left as it is without the optimizer
+        query = "SELECT ?a WHERE { ?a ex:tag ?t FILTER EXISTS { ?a ex:score ?s OPTIONAL { ?a ex:link ?y } "
+                + "OPTIONAL { ?y ex:note ?n } FILTER(BOUND(?n)) } }";
+
+        assertThat(translate(plain, query), not(containsString("LATERAL")));
+        assertThat(check(query), hasSize(5));
 
         // so is a right side reading the current solution of an EXISTS, which no common table expression can hold
         query = "SELECT ?a WHERE { ?a ex:tag ?t FILTER EXISTS { ?a ex:score ?s OPTIONAL { ?a ex:link ?y } "
                 + "OPTIONAL { ?y ex:note ?n FILTER(?n != ?t) } FILTER(BOUND(?n)) } }";
 
         assertThat(translate(optimized, query), not(containsString(apart)));
+        assertThat(translate(plain, query), not(containsString("LATERAL")));
         assertThat(check(query), hasSize(5));
     }
 }
