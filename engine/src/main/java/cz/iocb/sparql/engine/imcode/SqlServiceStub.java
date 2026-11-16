@@ -946,12 +946,14 @@ public final class SqlServiceStub extends SqlIntercode
      * cached per context in the state shared by the stubs of one call, and a result serves the later evaluations for
      * the same context whose parents need no more of it (see {@link Evaluation#serves}); a failing endpoint is an error
      * unless the service is SILENT, when the call yields the solutions of the context with the variables of the call
-     * unbound, which is cached as well. The context and result limits are those of the endpoint when the call names it,
-     * and the defaults of the configuration when the endpoint is a variable; the other settings are those of the
-     * endpoint of each request. A context referring to the current solutions of enclosing lateral joins (see
-     * {@link Enclosure}) is evaluated for all their solutions at once, joined laterally with their left sides, and the
-     * result keeps the received solutions computed for the current ones; the limits then apply to the solutions of all
-     * of them.
+     * unbound, which is cached as well. A SILENT call naming its endpoint by a variable is a call of its own for every
+     * endpoint, so a failing endpoint leaves only the context solutions naming it as they are, whatever it has answered
+     * to other requests of the call, and the solutions naming the other endpoints are merged with what those answer.
+     * The context and result limits are those of the endpoint when the call names it, and the defaults of the
+     * configuration when the endpoint is a variable; the other settings are those of the endpoint of each request. A
+     * context referring to the current solutions of enclosing lateral joins (see {@link Enclosure}) is evaluated for
+     * all their solutions at once, joined laterally with their left sides, and the result keeps the received solutions
+     * computed for the current ones; the limits then apply to the solutions of all of them.
      *
      * @param request the current request
      * @param scope the scope of the call
@@ -1108,110 +1110,154 @@ public final class SqlServiceStub extends SqlIntercode
         for(Enclosure enclosure : referred)
             resultRestrictions.add(enclosure.binding().getVariable());
 
-        try(ResultHandler results = new StoredResultHandler(request, scope, resultRestrictions))
+        // endpoints named by the variable of a SILENT call that have failed
+        Set<String> failed = new HashSet<>();
+
+        while(true)
         {
-            int call = 0;
+            // endpoints that have answered a request of this pass
+            Set<String> answered = new HashSet<>();
+            boolean repeat = false;
 
-            for(Entry<Call, List<Map<Variable, RdfTerm>>> entry : calls.entrySet())
+            try(ResultHandler results = new StoredResultHandler(request, scope, resultRestrictions))
             {
-                String endpoint = entry.getKey().endpoint();
-                String query = entry.getKey().query();
-                ServiceSettings endpointSettings = config.getServiceSettings(new Iri(endpoint));
+                int call = 0;
 
-
-                /* open connection */
-
-                HttpURLConnection connection = null;
-
-                try
+                for(Entry<Call, List<Map<Variable, RdfTerm>>> entry : calls.entrySet())
                 {
-                    String url = endpoint;
+                    String endpoint = entry.getKey().endpoint();
+                    String query = entry.getKey().query();
+                    ServiceSettings endpointSettings = config.getServiceSettings(new Iri(endpoint));
 
-                    for(int i = 0; i <= endpointSettings.redirectLimit() && url != null; i++)
+
+                    if(failed.contains(endpoint))
                     {
-                        connection = (HttpURLConnection) (new URI(url)).toURL().openConnection();
-                        connection.setRequestMethod("POST");
-                        connection.setRequestProperty("content-type",
-                                "application/x-www-form-urlencoded; charset=UTF-8");
-                        connection.setRequestProperty("user-agent", userAgent);
-                        connection.setRequestProperty("accept", "application/sparql-results+xml");
-                        connection.setDoOutput(true);
+                        for(Map<Variable, RdfTerm> solution : entry.getValue())
+                            results.add(solution);
 
-                        try(OutputStream out = connection.getOutputStream())
+                        continue;
+                    }
+
+
+                    /* open connection */
+
+                    HttpURLConnection connection = null;
+
+                    try
+                    {
+                        String url = endpoint;
+
+                        for(int i = 0; i <= endpointSettings.redirectLimit() && url != null; i++)
                         {
-                            out.write(("query=" + URLEncoder.encode(query, "UTF-8")).getBytes());
+                            connection = (HttpURLConnection) (new URI(url)).toURL().openConnection();
+                            connection.setRequestMethod("POST");
+                            connection.setRequestProperty("content-type",
+                                    "application/x-www-form-urlencoded; charset=UTF-8");
+                            connection.setRequestProperty("user-agent", userAgent);
+                            connection.setRequestProperty("accept", "application/sparql-results+xml");
+                            connection.setDoOutput(true);
+
+                            try(OutputStream out = connection.getOutputStream())
+                            {
+                                out.write(("query=" + URLEncoder.encode(query, "UTF-8")).getBytes());
+                            }
+
+                            url = connection.getHeaderField("Location");
                         }
 
-                        url = connection.getHeaderField("Location");
+                        if(connection.getResponseCode() != HttpURLConnection.HTTP_OK)
+                            throw new IOException(connection.getResponseMessage());
                     }
-
-                    if(connection.getResponseCode() != HttpURLConnection.HTTP_OK)
-                        throw new IOException(connection.getResponseMessage());
-                }
-                catch(IOException | URISyntaxException e)
-                {
-                    e.printStackTrace();
-
-                    if(!silent)
-                        throw new ServiceException(String.format(MessageType.badServiceEndpoint.getText(), endpoint));
-
-                    // the earlier calls of the context are evaluated already, and the copies of the stub share the
-                    // result instead of asking the failing endpoint again
-                    SqlIntercode result = local.optimize(request, scope, getContextRestrictions(restrictions), false,
-                            true);
-
-                    if(context.isDeterministic())
-                        evaluations.add(new Evaluation(new Restrictions(restrictions), result));
-
-                    return result;
-                }
-
-
-                /* receive result */
-
-                try
-                {
-                    ResultsHandler handler = new ResultsHandler(request, serviceVariables, entry.getValue(), results,
-                            call++ + "r", blankNodeClass.getSegment(), endpointSettings.canonicalizeLiterals(),
-                            settings.resultLimit());
-
-                    try(InputStream input = connection.getInputStream())
-                    {
-                        SAXParserFactory factory = SAXParserFactory.newInstance();
-                        factory.setNamespaceAware(true);
-                        SAXParser saxParser = factory.newSAXParser();
-                        saxParser.parse(input, handler);
-                    }
-                }
-                catch(ParserConfigurationException | SAXException | IOException e)
-                {
-                    if(e instanceof SAXException && results.size() >= settings.resultLimit())
-                    {
-                        throw new ServiceException(
-                                String.format(MessageType.serviceResultLimitExceeded.getText(), endpoint));
-                    }
-                    else
+                    catch(IOException | URISyntaxException e)
                     {
                         e.printStackTrace();
-                        throw new ServiceException(String.format(MessageType.badServiceEndpoint.getText(), endpoint));
+
+                        if(!silent)
+                            throw new ServiceException(
+                                    String.format(MessageType.badServiceEndpoint.getText(), endpoint));
+
+                        if(name instanceof Iri)
+                        {
+                            // the earlier calls of the context are evaluated already, and the copies of the stub share
+                            // the result instead of asking the failing endpoint again
+                            SqlIntercode result = local.optimize(request, scope, getContextRestrictions(restrictions),
+                                    false, true);
+
+                            if(context.isDeterministic())
+                                evaluations.add(new Evaluation(new Restrictions(restrictions), result));
+
+                            return result;
+                        }
+
+                        // the call has failed only for the context solutions naming this endpoint; what the endpoint
+                        // has answered to the other requests of this call is left out by another pass
+                        failed.add(endpoint);
+
+                        if(answered.contains(endpoint))
+                        {
+                            repeat = true;
+                            break;
+                        }
+
+                        for(Map<Variable, RdfTerm> solution : entry.getValue())
+                            results.add(solution);
+
+                        continue;
                     }
+
+
+                    /* receive result */
+
+                    try
+                    {
+                        ResultsHandler handler = new ResultsHandler(request, serviceVariables, entry.getValue(),
+                                results, call++ + "r", blankNodeClass.getSegment(),
+                                endpointSettings.canonicalizeLiterals(), settings.resultLimit());
+
+                        try(InputStream input = connection.getInputStream())
+                        {
+                            SAXParserFactory factory = SAXParserFactory.newInstance();
+                            factory.setNamespaceAware(true);
+                            SAXParser saxParser = factory.newSAXParser();
+                            saxParser.parse(input, handler);
+                        }
+                    }
+                    catch(ParserConfigurationException | SAXException | IOException e)
+                    {
+                        if(e instanceof SAXException && results.size() >= settings.resultLimit())
+                        {
+                            throw new ServiceException(
+                                    String.format(MessageType.serviceResultLimitExceeded.getText(), endpoint));
+                        }
+                        else
+                        {
+                            e.printStackTrace();
+                            throw new ServiceException(
+                                    String.format(MessageType.badServiceEndpoint.getText(), endpoint));
+                        }
+                    }
+
+                    answered.add(endpoint);
                 }
+
+                if(repeat)
+                    continue;
+
+                SqlIntercode result = restrictToEnclosures(request, scope, results.get(), referred, restrictions);
+
+                if(context.isDeterministic())
+                    evaluations.add(new Evaluation(new Restrictions(restrictions), result));
+
+                return result;
             }
-
-            SqlIntercode result = restrictToEnclosures(request, scope, results.get(), referred, restrictions);
-
-            if(context.isDeterministic())
-                evaluations.add(new Evaluation(new Restrictions(restrictions), result));
-
-            return result;
-        }
-        catch(ServiceException e)
-        {
-            throw new ServiceRuntimeException(e);
-        }
-        catch(SQLException e)
-        {
-            throw new SQLRuntimeException(e);
+            catch(ServiceException e)
+            {
+                throw new ServiceRuntimeException(e);
+            }
+            catch(SQLException e)
+            {
+                throw new SQLRuntimeException(e);
+            }
         }
     }
 
