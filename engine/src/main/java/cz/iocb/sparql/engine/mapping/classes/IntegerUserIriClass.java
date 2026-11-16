@@ -33,7 +33,8 @@ public class IntegerUserIriClass extends SimpleUserIriClass
     private final Pattern pattern;
 
     /**
-     * Regular expression of the IRIs.
+     * Regular expression of the IRIs, anchored to the whole IRI (see {@link #wholeIriRegexp}); Java evaluates it in
+     * {@link #match} and PCRE2 in the conversions with the representability check.
      */
     private final String regexp;
 
@@ -60,7 +61,10 @@ public class IntegerUserIriClass extends SimpleUserIriClass
      * @param sqlType the SQL type
      * @param prefix the prefix
      * @param length width of the number: positive fixed, negative minimal, zero unpadded
-     * @param pattern regular expression constraining the digits, or null
+     * @param pattern regular expression constraining the digits, or null; both {@code java.util.regex} and PCRE2 (in
+     *            the UTF mode without UCP) evaluate it, so it has to keep to their common subset (not, e.g.,
+     *            {@code \p{javaDigit}}, an intersection of character classes, a POSIX property name like
+     *            {@code \p{Alpha}} or {@code (?U)})
      * @param suffix the suffix
      */
     public IntegerUserIriClass(String name, SqlType sqlType, String prefix, int length, String pattern, String suffix)
@@ -74,11 +78,10 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
         StringBuilder builder = new StringBuilder();
 
-        builder.append("^(");
         builder.append(Pattern.quote(prefix));
 
         if(pattern != null)
-            builder.append("(" + pattern + ")");
+            builder.append("(?:" + pattern + ")");
         else if(length > 0)
             builder.append(format(ROOT, "[0-9]{%d}", length));
         else if(sqlType.equals(INT2))
@@ -93,10 +96,7 @@ public class IntegerUserIriClass extends SimpleUserIriClass
         if(suffix != null)
             builder.append(Pattern.quote(suffix));
 
-        builder.append(")$");
-
-        //FIXME: check whether the pattern is valid also in pcre2
-        this.regexp = builder.toString();
+        this.regexp = wholeIriRegexp(builder.toString());
         this.pattern = Pattern.compile(regexp);
     }
 
@@ -291,6 +291,13 @@ public class IntegerUserIriClass extends SimpleUserIriClass
     public String getPrefix(List<Column> columns)
     {
         return prefix;
+    }
+
+
+    @Override
+    public List<String> getSqlRegexps()
+    {
+        return List.of(regexp);
     }
 
 

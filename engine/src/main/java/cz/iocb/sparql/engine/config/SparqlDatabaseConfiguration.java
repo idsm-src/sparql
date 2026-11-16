@@ -40,6 +40,9 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsign
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedShortType;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -63,6 +66,7 @@ import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.DefaultStatistics;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
+import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
@@ -364,17 +368,39 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * detection of the class of an IRI ({@link cz.iocb.sparql.engine.request.Request#getIriClass}) skip the classes
      * disjoint with a class already found; classes that do share IRIs are declared by
      * {@link #addIriClassOverlap(UserIriClass, UserIriClass)}. Classes are kept ordered by
-     * {@link UserIriClass#getCheckCost}, so the detection tries the cheap ones first.
+     * {@link UserIriClass#getCheckCost}, so the detection tries the cheap ones first. The database has to compile the
+     * regular expressions a new class hands to the extension (see {@link #checkSqlRegexps}).
      *
      * @param iriClass the user IRI class
-     * @throws IllegalArgumentException if a different class is already registered under the same name
+     * @throws IllegalArgumentException if a different class is already registered under the same name, or if the
+     *             extension does not compile a regular expression of the class
+     * @throws SQLRuntimeException on database errors
      */
     public void addIriClass(UserIriClass iriClass)
+    {
+        addIriClass(iriClass, true);
+    }
+
+
+    /**
+     * Registers a user IRI class (see {@link #addIriClass(UserIriClass)}), checking its regular expressions only when
+     * asked to, as a class registered by another configuration over the same database has been checked already.
+     *
+     * @param iriClass the user IRI class
+     * @param check whether the regular expressions of a new class are checked
+     * @throws IllegalArgumentException if a different class is already registered under the same name, or if the
+     *             extension does not compile a regular expression of the class
+     * @throws SQLRuntimeException on database errors
+     */
+    private void addIriClass(UserIriClass iriClass, boolean check)
     {
         UserIriClass previous = iriClassMap.get(iriClass.getResourceName());
 
         if(previous == null)
         {
+            if(check)
+                checkSqlRegexps(iriClass);
+
             int possition = (int) iriClasses.stream().filter(c -> c.getCheckCost() <= iriClass.getCheckCost()).count();
             iriClasses.add(possition, iriClass);
             iriClassMap.put(iriClass.getResourceName(), iriClass);
@@ -383,6 +409,46 @@ public class SparqlDatabaseConfiguration implements ClassRelations
         {
             throw new IllegalArgumentException(
                     "resource class definition conflict for iri class '" + iriClass.getResourceName() + "'");
+        }
+    }
+
+
+    /**
+     * Checks that the extension compiles every regular expression the class hands to it (see
+     * {@link UserIriClass#getSqlRegexps}): {@code sparql.regex_string} returns NULL for an expression PCRE2 does not
+     * compile, which would turn every conversion to the class with the representability check into an unbound value.
+     * What PCRE2 compiles depends on its version, so the database of the deployment is asked; without a connection pool
+     * nothing is checked.
+     *
+     * @param iriClass the user IRI class
+     * @throws IllegalArgumentException if the extension does not compile a regular expression of the class
+     * @throws SQLRuntimeException on database errors
+     */
+    private void checkSqlRegexps(UserIriClass iriClass)
+    {
+        List<String> regexps = iriClass.getSqlRegexps();
+
+        if(connectionPool == null || regexps.isEmpty())
+            return;
+
+        try(Connection connection = connectionPool.getConnection();
+                PreparedStatement statement = connection.prepareStatement("SELECT sparql.regex_string('', ?)"))
+        {
+            for(String regexp : regexps)
+            {
+                statement.setString(1, regexp);
+
+                try(ResultSet result = statement.executeQuery())
+                {
+                    if(!result.next() || result.getObject(1) == null)
+                        throw new IllegalArgumentException("the extension does not compile the regular expression '"
+                                + regexp + "' of iri class '" + iriClass.getResourceName() + "'");
+                }
+            }
+        }
+        catch(SQLException e)
+        {
+            throw new SQLRuntimeException(e);
         }
     }
 
@@ -1087,8 +1153,9 @@ public class SparqlDatabaseConfiguration implements ClassRelations
         for(Datatype dataType : other.getDatatypes())
             addDatatype(dataType);
 
+        // the classes of a configuration over the same database have been checked already
         for(UserIriClass iriClass : other.getIriClasses())
-            addIriClass(iriClass);
+            addIriClass(iriClass, other.connectionPool != connectionPool);
 
         for(Entry<UserIriClass, Set<UserIriClass>> entry : other.iriClassOverlaps.entrySet())
             for(UserIriClass overlapping : entry.getValue())

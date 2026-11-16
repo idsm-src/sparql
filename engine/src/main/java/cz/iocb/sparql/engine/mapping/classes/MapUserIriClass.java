@@ -52,7 +52,8 @@ public class MapUserIriClass extends SimpleUserIriClass
     private final Pattern pattern;
 
     /**
-     * Regular expression of the IRIs.
+     * Regular expression of the IRIs, anchored to the whole IRI (see {@link #wholeIriRegexp}); Java evaluates it in
+     * {@link #match} and PCRE2 in the conversions with the representability check.
      */
     private final String regexp;
 
@@ -82,7 +83,10 @@ public class MapUserIriClass extends SimpleUserIriClass
      * @param to column holding the ids
      * @param prefix the prefix
      * @param length fixed length of the id, or zero
-     * @param pattern regular expression constraining the id, or null
+     * @param pattern regular expression constraining the id, or null; both {@code java.util.regex} and PCRE2 (in the
+     *            UTF mode without UCP) evaluate it, so it has to keep to their common subset (not, e.g.,
+     *            {@code \p{javaLowerCase}}, an intersection of character classes, a POSIX property name like
+     *            {@code \p{Alpha}} or {@code (?U)})
      * @param suffix the suffix
      */
     public MapUserIriClass(String name, SqlType sqlType, DatabaseTable table, TableColumn from, TableColumn to,
@@ -118,25 +122,20 @@ public class MapUserIriClass extends SimpleUserIriClass
 
         StringBuilder builder = new StringBuilder();
 
-        builder.append("^(");
-
         if(prefix != null)
             builder.append(Pattern.quote(prefix));
 
         if(pattern != null)
-            builder.append("(" + pattern + ")");
+            builder.append("(?:" + pattern + ")");
         else if(length > 0)
-            builder.append(".{").append(length).append("}");
+            builder.append("(?:.{").append(length).append("})");
         else
-            builder.append(".*");
+            builder.append("(?:.*)");
 
         if(suffix != null)
             builder.append(Pattern.quote(suffix));
 
-        builder.append(")$");
-
-        //FIXME: check whether the pattern is valid also in pcre2
-        this.regexp = builder.toString();
+        this.regexp = wholeIriRegexp(builder.toString());
         this.pattern = Pattern.compile(regexp);
     }
 
@@ -150,7 +149,10 @@ public class MapUserIriClass extends SimpleUserIriClass
      * @param from column holding the stored values
      * @param to column holding the ids
      * @param prefix the prefix
-     * @param pattern regular expression constraining the id, or null
+     * @param pattern regular expression constraining the id, or null; both {@code java.util.regex} and PCRE2 (in the
+     *            UTF mode without UCP) evaluate it, so it has to keep to their common subset (not, e.g.,
+     *            {@code \p{javaLowerCase}}, an intersection of character classes, a POSIX property name like
+     *            {@code \p{Alpha}} or {@code (?U)})
      * @param suffix the suffix
      */
     public MapUserIriClass(String name, SqlType sqlType, DatabaseTable table, TableColumn from, TableColumn to,
@@ -170,7 +172,10 @@ public class MapUserIriClass extends SimpleUserIriClass
      * @param to column holding the ids
      * @param prefix the prefix
      * @param length fixed length of the id, or zero
-     * @param pattern regular expression constraining the id, or null
+     * @param pattern regular expression constraining the id, or null; both {@code java.util.regex} and PCRE2 (in the
+     *            UTF mode without UCP) evaluate it, so it has to keep to their common subset (not, e.g.,
+     *            {@code \p{javaLowerCase}}, an intersection of character classes, a POSIX property name like
+     *            {@code \p{Alpha}} or {@code (?U)})
      */
     public MapUserIriClass(String name, SqlType sqlType, DatabaseTable table, TableColumn from, TableColumn to,
             String prefix, int length, String pattern)
@@ -188,7 +193,10 @@ public class MapUserIriClass extends SimpleUserIriClass
      * @param from column holding the stored values
      * @param to column holding the ids
      * @param prefix the prefix
-     * @param pattern regular expression constraining the id, or null
+     * @param pattern regular expression constraining the id, or null; both {@code java.util.regex} and PCRE2 (in the
+     *            UTF mode without UCP) evaluate it, so it has to keep to their common subset (not, e.g.,
+     *            {@code \p{javaLowerCase}}, an intersection of character classes, a POSIX property name like
+     *            {@code \p{Alpha}} or {@code (?U)})
      */
     public MapUserIriClass(String name, SqlType sqlType, DatabaseTable table, TableColumn from, TableColumn to,
             String prefix, String pattern)
@@ -356,6 +364,13 @@ public class MapUserIriClass extends SimpleUserIriClass
     public String getPrefix(List<Column> columns)
     {
         return prefix;
+    }
+
+
+    @Override
+    public List<String> getSqlRegexps()
+    {
+        return List.of(regexp);
     }
 
 

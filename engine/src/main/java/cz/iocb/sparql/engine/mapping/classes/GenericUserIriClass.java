@@ -72,17 +72,18 @@ public class GenericUserIriClass extends UserIriClass
     protected final String sqlQuery;
 
     /**
-     * Compiled regular expression.
+     * Compiled regular expression, the one anchored to the whole IRI ({@link #anchoredRegexp}).
      */
     protected final Pattern pattern;
 
     /**
-     * Regular expression recognising the IRIs.
+     * Regular expression recognising the IRIs, as the deployment gives it.
      */
     protected final String regexp;
 
     /**
-     * The regular expression anchored to the whole IRI for the search of the extension.
+     * The regular expression anchored to the whole IRI (see {@link #wholeIriRegexp}), which both Java and the search of
+     * the extension (PCRE2) evaluate.
      */
     protected final String anchoredRegexp;
 
@@ -105,7 +106,11 @@ public class GenericUserIriClass extends UserIriClass
      * @param schema the schema name
      * @param function name of the SQL function building the IRI
      * @param sqlTypes the SQL types
-     * @param regexp regular expression recognising the IRIs
+     * @param regexp regular expression recognising the IRIs; both {@code java.util.regex} and PCRE2 (in the UTF mode
+     *            without UCP) evaluate it as a whole, so it has to keep to their common subset (not, e.g.,
+     *            {@code \p{javaLowerCase}}, an intersection of character classes, a POSIX property name like
+     *            {@code \p{Alpha}} or {@code (?U)}; an expression PCRE2 does not compile is refused by the
+     *            configuration), and an expression PCRE2 backtracks in a lot may still yield no answer there
      * @param sqlCheck when to verify IRIs in the database
      */
     public GenericUserIriClass(String name, String schema, String function, List<SqlType> sqlTypes, String regexp,
@@ -130,10 +135,9 @@ public class GenericUserIriClass extends UserIriClass
 
         this.sqlQuery = "SELECT " + inverseFunction.stream().map(f -> f + "(?)").collect(joining(", "));
 
-        //FIXME: check whether the pattern is valid also in pcre2
         this.regexp = regexp;
-        this.anchoredRegexp = "^(?:" + regexp + ")$";
-        this.pattern = Pattern.compile(regexp);
+        this.anchoredRegexp = wholeIriRegexp(regexp);
+        this.pattern = Pattern.compile(anchoredRegexp);
     }
 
 
@@ -144,7 +148,8 @@ public class GenericUserIriClass extends UserIriClass
      * @param schema the schema name
      * @param function name of the SQL function building the IRI
      * @param sqlTypes the SQL types
-     * @param pattern regular expression recognising the IRIs
+     * @param pattern regular expression recognising the IRIs, kept to the common subset of {@code java.util.regex} and
+     *            PCRE2 (see the main constructor)
      */
     public GenericUserIriClass(String name, String schema, String function, List<SqlType> sqlTypes, String pattern)
     {
@@ -270,6 +275,17 @@ public class GenericUserIriClass extends UserIriClass
         }
 
         return result;
+    }
+
+
+    /**
+     * The regular expression anchored to the whole IRI, unless the class leaves the IRIs it does not recognise to its
+     * inverse functions ({@link SqlCheck#IF_NOT_MATCH}), which never hands it to the extension.
+     */
+    @Override
+    public List<String> getSqlRegexps()
+    {
+        return sqlCheck == SqlCheck.IF_NOT_MATCH ? List.of() : List.of(anchoredRegexp);
     }
 
 

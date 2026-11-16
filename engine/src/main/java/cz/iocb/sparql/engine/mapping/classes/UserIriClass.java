@@ -17,7 +17,11 @@ import cz.iocb.sparql.engine.database.SqlType;
  * ({@link cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration#addIriClassOverlap(UserIriClass, UserIriClass)});
  * the declarations ({@link ClassRelations}) are not kept by the classes, as they depend on the classes registered
  * together, but are supplied to the operations deciding disjointness. An IRI belonging to several classes gets their
- * intersection as its class.
+ * intersection as its class. A class recognising its IRIs by a regular expression evaluates it in Java when it matches
+ * an IRI and hands the same text to {@code sparql.regex_string} of the extension, which evaluates it by PCRE2, when it
+ * converts a value with the representability check; it anchors the text by {@link #wholeIriRegexp}, so that both
+ * dialects decide alike, and lists it by {@link #getSqlRegexps}, so that the configuration checks that PCRE2 compiles
+ * it.
  */
 public non-sealed abstract class UserIriClass extends IriClass
 {
@@ -42,6 +46,36 @@ public non-sealed abstract class UserIriClass extends IriClass
      *         needed, 2 when it always is
      */
     public abstract int getCheckCost();
+
+
+    /**
+     * The regular expressions the class hands to {@code sparql.regex_string} of the extension, which returns NULL for
+     * an expression PCRE2 does not compile: the configuration checks them when it registers the class
+     * ({@link cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration#addIriClass}). None by default.
+     *
+     * @return the regular expressions the class hands to {@code sparql.regex_string}
+     */
+    public List<String> getSqlRegexps()
+    {
+        return List.of();
+    }
+
+
+    /**
+     * Regular expression matching an IRI as a whole when the body matches it, written so that {@code java.util.regex}
+     * and PCRE2 decide alike: anchored by {@code ^} and {@code \z} (the {@code $} of PCRE2 matches also before a final
+     * line feed), with {@code .} matching every character ({@code (?s)}; Java does not match the carriage return and
+     * the other line terminators otherwise), and the body in a group of its own, so that an alternation stays inside. A
+     * class compiles in Java the same text it hands to {@code sparql.regex_string}, so the dialects decide the
+     * membership of an IRI alike as long as the body keeps to their common subset.
+     *
+     * @param body regular expression of the IRIs
+     * @return regular expression matching an IRI as a whole when the body matches it
+     */
+    protected static String wholeIriRegexp(String body)
+    {
+        return "(?s)^(?:" + body + ")\\z";
+    }
 
 
     /**

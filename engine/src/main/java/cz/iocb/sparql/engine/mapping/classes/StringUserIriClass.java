@@ -27,7 +27,8 @@ public class StringUserIriClass extends SimpleUserIriClass
     private final Pattern pattern;
 
     /**
-     * Regular expression of the IRIs.
+     * Regular expression of the IRIs, anchored to the whole IRI (see {@link #wholeIriRegexp}); Java evaluates it in
+     * {@link #match} and PCRE2 in the conversions with the representability check.
      */
     private final String regexp;
 
@@ -53,7 +54,10 @@ public class StringUserIriClass extends SimpleUserIriClass
      * @param name the name
      * @param prefix the prefix
      * @param length fixed length of the id, or zero
-     * @param pattern regular expression constraining the id, or null
+     * @param pattern regular expression constraining the id, or null; both {@code java.util.regex} and PCRE2 (in the
+     *            UTF mode without UCP) evaluate it, so it has to keep to their common subset (not, e.g.,
+     *            {@code \p{javaLowerCase}}, an intersection of character classes, a POSIX property name like
+     *            {@code \p{Alpha}} or {@code (?U)})
      * @param suffix the suffix
      */
     public StringUserIriClass(String name, String prefix, int length, String pattern, String suffix)
@@ -67,23 +71,18 @@ public class StringUserIriClass extends SimpleUserIriClass
 
         StringBuilder builder = new StringBuilder();
 
-        builder.append("^(");
-
         if(prefix != null)
             builder.append(Pattern.quote(prefix));
 
         if(pattern == null)
             pattern = length > 0 ? ".{" + length + "}" : ".*";
 
-        builder.append("(" + pattern + ")");
+        builder.append("(?:" + pattern + ")");
 
         if(suffix != null)
             builder.append(Pattern.quote(suffix));
 
-        builder.append(")$");
-
-        //FIXME: check whether the pattern is valid also in pcre2
-        this.regexp = builder.toString();
+        this.regexp = wholeIriRegexp(builder.toString());
         this.pattern = Pattern.compile(regexp);
     }
 
@@ -93,7 +92,10 @@ public class StringUserIriClass extends SimpleUserIriClass
      *
      * @param name the name
      * @param prefix the prefix
-     * @param pattern regular expression constraining the id, or null
+     * @param pattern regular expression constraining the id, or null; both {@code java.util.regex} and PCRE2 (in the
+     *            UTF mode without UCP) evaluate it, so it has to keep to their common subset (not, e.g.,
+     *            {@code \p{javaLowerCase}}, an intersection of character classes, a POSIX property name like
+     *            {@code \p{Alpha}} or {@code (?U)})
      * @param suffix the suffix
      */
     public StringUserIriClass(String name, String prefix, String pattern, String suffix)
@@ -108,7 +110,10 @@ public class StringUserIriClass extends SimpleUserIriClass
      * @param name the name
      * @param prefix the prefix
      * @param length fixed length of the id, or zero
-     * @param pattern regular expression constraining the id, or null
+     * @param pattern regular expression constraining the id, or null; both {@code java.util.regex} and PCRE2 (in the
+     *            UTF mode without UCP) evaluate it, so it has to keep to their common subset (not, e.g.,
+     *            {@code \p{javaLowerCase}}, an intersection of character classes, a POSIX property name like
+     *            {@code \p{Alpha}} or {@code (?U)})
      */
     public StringUserIriClass(String name, String prefix, int length, String pattern)
     {
@@ -121,7 +126,10 @@ public class StringUserIriClass extends SimpleUserIriClass
      *
      * @param name the name
      * @param prefix the prefix
-     * @param pattern regular expression constraining the id, or null
+     * @param pattern regular expression constraining the id, or null; both {@code java.util.regex} and PCRE2 (in the
+     *            UTF mode without UCP) evaluate it, so it has to keep to their common subset (not, e.g.,
+     *            {@code \p{javaLowerCase}}, an intersection of character classes, a POSIX property name like
+     *            {@code \p{Alpha}} or {@code (?U)})
      */
     public StringUserIriClass(String name, String prefix, String pattern)
     {
@@ -233,6 +241,13 @@ public class StringUserIriClass extends SimpleUserIriClass
             return (prefix != null ? prefix : "") + col.getValue() + (suffix != null ? suffix : "");
 
         return prefix;
+    }
+
+
+    @Override
+    public List<String> getSqlRegexps()
+    {
+        return List.of(regexp);
     }
 
 
