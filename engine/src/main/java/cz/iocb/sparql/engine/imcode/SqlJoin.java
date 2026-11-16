@@ -696,9 +696,11 @@ public final class SqlJoin extends SqlIntercode
 
         Map<Variable, List<VariableBinding>> constants = new HashMap<>();
 
+        // a variable that a solution may leave unbound agrees with any value, so only a constant bound always restricts
+        // the other children, and only those binding the variable always (see below)
         for(SqlIntercode child : childs)
             for(VariableBinding v : child.getVariableBindings().getValues())
-                if(v.isConstant()) // children are joinable, so constants should be consistent
+                if(v.isConstant() && !v.canBeNull()) // children are joinable, so constants should be consistent
                     constants.computeIfAbsent(v.getVariable(), _ -> new ArrayList<>()).add(v);
 
         List<SqlIntercode> optChilds = new ArrayList<>(childs);
@@ -718,7 +720,7 @@ public final class SqlJoin extends SqlIntercode
                     {
                         VariableBinding v = access.getInternalVariableBinding(e.getKey());
 
-                        if(v == null || v.isConstant())
+                        if(v == null || v.isConstant() || v.canBeNull())
                             continue;
 
                         for(VariableBinding o : e.getValue())

@@ -41,7 +41,8 @@ import cz.iocb.sparql.testing.Database;
  * table joined with an access to the parent table it references by a foreign key, and the deduplication of an access
  * implied by a key. The decisions must only count on equalities holding in every disjunct of the conditions, a parent
  * condition equating a key column with another column cannot be moved onto the child row, and a child row with a null
- * in any column of a foreign key references no parent row.
+ * in any column of a foreign key references no parent row. A constant that another member of a join binds a variable to
+ * becomes a condition only of an access binding the variable always, because an unbound value agrees with it.
  *
  * The table {@code parent} holds the items 1 to 4 of the kinds 1, 2, 2 and 3, so only the items 1 and 2 are of their
  * own kind; the table {@code child} references the items 3, 4 and 1. The table {@code item} holds the rows (id, a, b)
@@ -377,5 +378,25 @@ public class KeyMergeTest
         assertThat(execute(query),
                 containsInAnyOrder(optional(1, null), optional(2, 5), optional(3, 7), optional(4, 1)));
         assertThat(reads(translate(query), "optional"), is(1));
+    }
+
+
+    @Test
+    @DisplayName("a constant does not restrict an access that may leave the variable unbound")
+    void constantWithUnboundVariable() throws Exception
+    {
+        String pattern = "?x a ex:Optional OPTIONAL { ?x ex:opt ?o }";
+        String item = "<http://example.org/item/5>";
+
+        // an unbound value is compatible with the constant: the item 1, which refers to no item, takes it
+        assertThat(execute("SELECT ?x ?o WHERE { " + pattern + " VALUES ?o { " + item + " } }"),
+                containsInAnyOrder(optional(1, 5), optional(2, 5)));
+
+        assertThat(execute("SELECT ?x ?o WHERE { { " + pattern + " } { BIND(" + item + " AS ?o) } }"),
+                containsInAnyOrder(optional(1, 5), optional(2, 5)));
+
+        // an access that binds the variable always is restricted by the constant
+        assertThat(execute("SELECT ?x ?o WHERE { ?x ex:opt ?o VALUES ?o { " + item + " } }"),
+                containsInAnyOrder(optional(2, 5)));
     }
 }
