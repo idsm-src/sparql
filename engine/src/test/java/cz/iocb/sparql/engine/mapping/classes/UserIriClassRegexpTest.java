@@ -39,8 +39,9 @@ public class UserIriClassRegexpTest
     /**
      * Ids of the IRIs every class is tested on, after its prefix and with a final line feed as well.
      */
-    private static final List<String> ids = List.of("1", "007", "1234", "99999", "2147483648", "11", "12", "abcd",
-            "ab_X", "ABC_C", "abc_N", "x1", "1/x.y", "a\rb", "a\u2028b", "a\u0085b", "a\nb", "");
+    private static final List<String> ids = List.of("1", "007", "1234", "99999", "2147483648", "32767", "32768",
+            "009223372036854775807_W", "009223372036854775808_W", "11", "12", "abcd", "ab_X", "ABC_C", "abc_N", "x1",
+            "1/x.y", "a\rb", "a\u2028b", "a\u0085b", "a\nb", "");
 
 
     /**
@@ -96,6 +97,9 @@ public class UserIriClassRegexpTest
                 new Member(new IntegerUserIriClass("i4s", INT4, prefix("i4s"), "/x.y"), prefix("i4s"), "1/x.y", false),
                 new Member(new IntegerUserIriClass("i4p", INT4, prefix("i4p"), 0, "([1-9])\\1", null), prefix("i4p"),
                         "11", false),
+                new Member(new IntegerUserIriClass("i2w", INT2, prefix("i2w"), 5), prefix("i2w"), "32767", false),
+                new Member(new IntegerUserIriClass("i8w", INT8, prefix("i8w"), 21, "_W"), prefix("i8w"),
+                        "009223372036854775807_W", false),
                 new Member(new StringUserIriClass("s", prefix("s")), prefix("s"), "a\u2028b", true),
                 new Member(new StringUserIriClass("sf", prefix("sf"), 4), prefix("sf"), "abcd", false),
                 new Member(new StringUserIriClass("sp", prefix("sp"), "[a-z]+"), prefix("sp"), "abcd", false),

@@ -23,7 +23,9 @@ import cz.iocb.sparql.engine.request.Request;
 /**
  * IRIs of the form {@code prefix + number + suffix} with an integer id stored in an {@code int2}, {@code int4} or
  * {@code int8} column. A positive {@code length} means a zero-padded fixed width, a negative one a zero-padded minimal
- * width, zero no padding.
+ * width, zero no padding. Unless a pattern constrains the digits, the regular expression of the IRIs admits just the
+ * numbers from zero to the largest number of the SQL type, so that an IRI of a greater number is no member, whose id
+ * the database could not hold.
  */
 public class IntegerUserIriClass extends SimpleUserIriClass
 {
@@ -61,10 +63,11 @@ public class IntegerUserIriClass extends SimpleUserIriClass
      * @param sqlType the SQL type
      * @param prefix the prefix
      * @param length width of the number: positive fixed, negative minimal, zero unpadded
-     * @param pattern regular expression constraining the digits, or null; both {@code java.util.regex} and PCRE2 (in
-     *            the UTF mode without UCP) evaluate it, so it has to keep to their common subset (not, e.g.,
-     *            {@code \p{javaDigit}}, an intersection of character classes, a POSIX property name like
-     *            {@code \p{Alpha}} or {@code (?U)})
+     * @param pattern regular expression constraining the digits, or null; it alone decides which numbers belong to the
+     *            class, so it has to admit only numbers of the SQL type written with the padding of the class, and both
+     *            {@code java.util.regex} and PCRE2 (in the UTF mode without UCP) evaluate it, so it has to keep to
+     *            their common subset (not, e.g., {@code \p{javaDigit}}, an intersection of character classes, a POSIX
+     *            property name like {@code \p{Alpha}} or {@code (?U)})
      * @param suffix the suffix
      */
     public IntegerUserIriClass(String name, SqlType sqlType, String prefix, int length, String pattern, String suffix)
@@ -83,15 +86,9 @@ public class IntegerUserIriClass extends SimpleUserIriClass
         if(pattern != null)
             builder.append("(?:" + pattern + ")");
         else if(length > 0)
-            builder.append(format(ROOT, "[0-9]{%d}", length));
-        else if(sqlType.equals(INT2))
-            builder.append(generateMaxNumberPattern("32767", -length));
-        else if(sqlType.equals(INT4))
-            builder.append(generateMaxNumberPattern("2147483647", -length));
-        else if(sqlType.equals(INT8))
-            builder.append(generateMaxNumberPattern("9223372036854775807", -length));
+            builder.append(generateFixedWidthPattern(getMaxNumber(sqlType), length));
         else
-            throw new IllegalArgumentException("unsupported sql numeric type: " + sqlType);
+            builder.append(generateMaxNumberPattern(getMaxNumber(sqlType), -length));
 
         if(suffix != null)
             builder.append(Pattern.quote(suffix));
@@ -263,6 +260,42 @@ public class IntegerUserIriClass extends SimpleUserIriClass
         else
             builder.append(format(ROOT, "(([1-9][0-9]{0,%d})?[0-9]{%d}|", max.length() - 2 - minLength, minLength));
 
+        builder.append(generateFullLengthPattern(max));
+        builder.append(")");
+
+        return builder.toString();
+    }
+
+
+    /**
+     * Regular expression of the decimal numbers from 0 to {@code max} written with exactly {@code width} digits, padded
+     * by leading zeros.
+     *
+     * @param max decimal digits of the largest number
+     * @param width number of digits
+     * @return regular expression of the decimal numbers from 0 to {@code max} written with exactly {@code width} digits
+     */
+    private static String generateFixedWidthPattern(String max, int width)
+    {
+        if(width < max.length())
+            return format(ROOT, "[0-9]{%d}", width);
+
+        return format(ROOT, "%s(0[0-9]{%d}|%s)", "0".repeat(width - max.length()), max.length() - 1,
+                generateFullLengthPattern(max));
+    }
+
+
+    /**
+     * Regular expression of the decimal numbers not greater than {@code max} that have as many digits as it, the first
+     * of them not a zero.
+     *
+     * @param max decimal digits of the largest number, the first of them greater than one
+     * @return regular expression of the decimal numbers not greater than {@code max} that have as many digits as it
+     */
+    private static String generateFullLengthPattern(String max)
+    {
+        StringBuilder builder = new StringBuilder();
+
         builder.append(format(ROOT, "[1-%d][0-9]{%d}|", max.charAt(0) - '0' - 1, max.length() - 1));
 
         for(int i = 1; i < max.length() - 1; i++)
@@ -271,9 +304,29 @@ public class IntegerUserIriClass extends SimpleUserIriClass
                         max.length() - i - 1));
 
         builder.append(
-                format(ROOT, "%s[0-%d])", max.substring(0, max.length() - 1), max.charAt(max.length() - 1) - '0'));
+                format(ROOT, "%s[0-%d]", max.substring(0, max.length() - 1), max.charAt(max.length() - 1) - '0'));
 
         return builder.toString();
+    }
+
+
+    /**
+     * Decimal digits of the largest number of the SQL type.
+     *
+     * @param sqlType the SQL type
+     * @return decimal digits of the largest number of the SQL type
+     * @throws IllegalArgumentException if the type is no integer type
+     */
+    private static String getMaxNumber(SqlType sqlType)
+    {
+        if(sqlType.equals(INT2))
+            return Short.toString(Short.MAX_VALUE);
+        else if(sqlType.equals(INT4))
+            return Integer.toString(Integer.MAX_VALUE);
+        else if(sqlType.equals(INT8))
+            return Long.toString(Long.MAX_VALUE);
+        else
+            throw new IllegalArgumentException("unsupported sql numeric type: " + sqlType);
     }
 
 
