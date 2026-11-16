@@ -324,11 +324,56 @@ public final class SqlLeftJoin extends SqlIntercode
     }
 
 
+    /**
+     * True if the right side changes no value the parent reads: it is deterministic and calls no SERVICE (nor do the
+     * conditions), and every variable it binds that the parent needs is bound always by the left side or by the current
+     * solution of the pattern the join lies in, which every solution of the right side extends (see
+     * {@link Scope#getCurrentSolution}). Every solution of the left side is then a solution of the join, extended at
+     * most by values the parent does not read, so where duplicate solutions do not matter, the join is its left side:
+     * an OPTIONAL whose own variables nothing uses, like one at the start of an EXISTS pattern, is left out.
+     *
+     * @param scope the scope of the join
+     * @param restrictions what the parent needs of the variables
+     * @return true if the right side changes no value the parent reads, false otherwise
+     */
+    private boolean isRightSideUnread(Scope scope, Restrictions restrictions)
+    {
+        if(!right.isDeterministic() || right.hasServiceSubpattern()
+                || conditions.stream().anyMatch(c -> c.hasServiceSubpattern()))
+            return false;
+
+        VariableBindings current = scope.getCurrentSolution();
+
+        for(Variable variable : right.getVariableBindings().getVariables())
+        {
+            if(!restrictions.containsVar(variable))
+                continue;
+
+            VariableBinding binding = left.getVariable(variable);
+
+            if(binding != null && !binding.canBeNull())
+                continue;
+
+            VariableBinding value = current != null ? current.get(variable) : null;
+
+            if(value == null || value.canBeNull())
+                return false;
+        }
+
+        return true;
+    }
+
+
     @Override
     public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
             boolean evalServices)
     {
         ClassRelations relations = request.getConfiguration();
+
+        // where duplicate solutions do not matter, a right side changing no value the parent reads leaves the solutions
+        // of the left side as they are
+        if(reduced && isRightSideUnread(scope, restrictions))
+            return left.optimize(request, scope, restrictions, reduced, evalServices);
 
         SqlIntercode right = this.right;
 
