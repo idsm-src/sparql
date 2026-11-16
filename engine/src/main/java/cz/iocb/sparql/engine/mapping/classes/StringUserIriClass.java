@@ -175,9 +175,10 @@ public class StringUserIriClass extends SimpleUserIriClass
         assert match(request, iri);
 
         String value = iri.getValue();
-        String id = value.substring(prefix.length(), value.length() - (suffix != null ? suffix.length() : 0));
+        int start = prefix != null ? prefix.length() : 0;
+        int end = value.length() - (suffix != null ? suffix.length() : 0);
 
-        return List.of(constant(id, VARCHAR));
+        return List.of(constant(value.substring(start, end), VARCHAR));
     }
 
 
@@ -240,7 +241,7 @@ public class StringUserIriClass extends SimpleUserIriClass
         if(columns.get(0) instanceof ValueColumn col)
             return (prefix != null ? prefix : "") + col.getValue() + (suffix != null ? suffix : "");
 
-        return prefix;
+        return prefix != null ? prefix : "";
     }
 
 

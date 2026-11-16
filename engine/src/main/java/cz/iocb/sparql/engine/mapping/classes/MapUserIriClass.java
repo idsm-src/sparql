@@ -363,7 +363,7 @@ public class MapUserIriClass extends SimpleUserIriClass
     @Override
     public String getPrefix(List<Column> columns)
     {
-        return prefix;
+        return prefix != null ? prefix : "";
     }
 
 
