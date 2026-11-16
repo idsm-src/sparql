@@ -217,13 +217,13 @@ public class StringUserIriClass extends SimpleUserIriClass
         else if(length > 0 && prefix == null)
             return expression(sqlType, "substring(%s, %d, %d)::%s", column, 1, length, sqlType);
         else if(length > 0)
-            return expression(sqlType, "substring(%s, %d, %d)::%s", column, prefix.length() + 1, length, sqlType);
+            return expression(sqlType, "substring(%s, %d, %d)::%s", column, sqlLength(prefix) + 1, length, sqlType);
         else if(prefix == null)
-            return expression(sqlType, "left(%s, -%d)::%s", column, suffix.length(), sqlType);
+            return expression(sqlType, "left(%s, -%d)::%s", column, sqlLength(suffix), sqlType);
         else if(suffix == null)
-            return expression(sqlType, "right(%s, -%d)::%s", column, prefix.length(), sqlType);
+            return expression(sqlType, "right(%s, -%d)::%s", column, sqlLength(prefix), sqlType);
         else
-            return expression(sqlType, "left(right(%s, -%d), -%d)::%s", column, prefix.length(), suffix.length(),
+            return expression(sqlType, "left(right(%s, -%d), -%d)::%s", column, sqlLength(prefix), sqlLength(suffix),
                     sqlType);
     }
 

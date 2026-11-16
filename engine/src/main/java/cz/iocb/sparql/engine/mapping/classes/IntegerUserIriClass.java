@@ -228,11 +228,11 @@ public class IntegerUserIriClass extends SimpleUserIriClass
         SqlType sqlType = sqlTypes.get(0);
 
         if(length > 0)
-            return expression(sqlType, "substring(%s, %d, %d)::%s", column, prefix.length() + 1, length, sqlType);
+            return expression(sqlType, "substring(%s, %d, %d)::%s", column, sqlLength(prefix) + 1, length, sqlType);
         else if(suffix == null)
-            return expression(sqlType, "right(%s, -%d)::%s", column, prefix.length(), sqlType);
+            return expression(sqlType, "right(%s, -%d)::%s", column, sqlLength(prefix), sqlType);
         else
-            return expression(sqlType, "left(right(%s, -%d), -%d)::%s", column, prefix.length(), suffix.length(),
+            return expression(sqlType, "left(right(%s, -%d), -%d)::%s", column, sqlLength(prefix), sqlLength(suffix),
                     sqlType);
     }
 

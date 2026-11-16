@@ -114,4 +114,18 @@ public non-sealed abstract class UserIriClass extends IriClass
         else
             return value;
     }
+
+
+    /**
+     * Length of the text in the characters the SQL functions of strings ({@code substring}, {@code left},
+     * {@code right}) count, which are code points, whereas a Java string counts a character beyond the Basic
+     * Multilingual Plane twice.
+     *
+     * @param text the text, or null
+     * @return number of the code points of the text, zero for null
+     */
+    protected static int sqlLength(String text)
+    {
+        return text != null ? text.codePointCount(0, text.length()) : 0;
+    }
 }

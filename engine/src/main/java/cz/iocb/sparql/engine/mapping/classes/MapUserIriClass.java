@@ -108,14 +108,13 @@ public class MapUserIriClass extends SimpleUserIriClass
         if(prefix == null && suffix == null)
             code = "?::varchar";
         else if(length > 0)
-            code = String.format(ROOT, "substring(?, %d, %d)::varchar", prefix != null ? prefix.length() + 1 : 1,
-                    length);
+            code = String.format(ROOT, "substring(?, %d, %d)::varchar", sqlLength(prefix) + 1, length);
         else if(prefix == null)
-            code = String.format(ROOT, "left(?, -%d)::varchar", suffix.length());
+            code = String.format(ROOT, "left(?, -%d)::varchar", sqlLength(suffix));
         else if(suffix == null)
-            code = String.format(ROOT, "right(?, -%d)::varchar", prefix.length());
+            code = String.format(ROOT, "right(?, -%d)::varchar", sqlLength(prefix));
         else
-            code = String.format(ROOT, "left(right(?, -%d), -%d)::varchar", prefix.length(), suffix.length());
+            code = String.format(ROOT, "left(right(?, -%d), -%d)::varchar", sqlLength(prefix), sqlLength(suffix));
 
         this.sqlQuery = String.format("(SELECT %s::varchar FROM %s WHERE %s = %s)", from, table, to, code);
 
@@ -338,13 +337,14 @@ public class MapUserIriClass extends SimpleUserIriClass
         else if(length > 0 && prefix == null)
             return expression(VARCHAR, "substring(%s, %d, %d)::varchar", column, 1, length);
         else if(length > 0 && prefix != null)
-            return expression(VARCHAR, "substring(%s, %d, %d)::varchar", column, prefix.length() + 1, length);
+            return expression(VARCHAR, "substring(%s, %d, %d)::varchar", column, sqlLength(prefix) + 1, length);
         else if(prefix == null)
-            return expression(VARCHAR, "left(%s, -%d)::varchar", column, suffix.length());
+            return expression(VARCHAR, "left(%s, -%d)::varchar", column, sqlLength(suffix));
         else if(suffix == null)
-            return expression(VARCHAR, "right(%s, -%d)::varchar", column, prefix.length());
+            return expression(VARCHAR, "right(%s, -%d)::varchar", column, sqlLength(prefix));
         else
-            return expression(VARCHAR, "left(right(%s, -%d), -%d)::varchar", column, prefix.length(), suffix.length());
+            return expression(VARCHAR, "left(right(%s, -%d), -%d)::varchar", column, sqlLength(prefix),
+                    sqlLength(suffix));
     }
 
 
