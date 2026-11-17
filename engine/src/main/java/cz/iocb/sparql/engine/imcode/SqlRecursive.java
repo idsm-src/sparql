@@ -24,6 +24,7 @@ import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.TableColumn;
+import cz.iocb.sparql.engine.database.ValueColumn;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
@@ -1836,7 +1837,10 @@ public final class SqlRecursive extends SqlIntercode
 
 
     /**
-     * Binding of the end variable over the disjoint classes it takes in the initial and the recursive step.
+     * Binding of the end variable over the disjoint classes it takes in the initial and the recursive step. A column
+     * that both the initial solutions and the step bind to one constant keeps the constant, as a union keeps it, so
+     * that the recursion neither carries nor compares it: the constant is in every row of both sides, so its class is
+     * the only class of the end.
      *
      * @param request the current request
      * @param endVar the end variable
@@ -1847,6 +1851,7 @@ public final class SqlRecursive extends SqlIntercode
     private static VariableBinding createEndVariableBinding(Request request, Variable endVar, SqlIntercode init,
             SqlIntercode next)
     {
+        ClassRelations relations = request.getConfiguration();
         VariableBinding initEndBinding = init.getVariableBindings().get(endVar);
         VariableBinding nextEndBinding = next.getVariableBindings().get(endVar);
 
@@ -1854,10 +1859,22 @@ public final class SqlRecursive extends SqlIntercode
 
         VariableBinding endBinding = new VariableBinding(endVar, false);
 
-        for(ResourceClass resClass : unionResourceClasses(request.getConfiguration(), defs))
-            endBinding.addMapping(resClass, resClass.createColumns(request.getColumnMap(), endVar));
+        for(ResourceClass resClass : unionResourceClasses(relations, defs))
+        {
+            List<Column> columns = new ArrayList<>(resClass.createColumns(request.getColumnMap(), endVar));
 
-        //TODO: handle constant columns
+            List<Column> initColumns = initEndBinding != null ? initEndBinding.deriveMapping(relations, resClass) :
+                    null;
+            List<Column> nextColumns = nextEndBinding != null ? nextEndBinding.deriveMapping(relations, resClass) :
+                    null;
+
+            if(initColumns != null && nextColumns != null)
+                for(int i = 0; i < columns.size(); i++)
+                    if(initColumns.get(i) instanceof ValueColumn value && value.equals(nextColumns.get(i)))
+                        columns.set(i, value);
+
+            endBinding.addMapping(resClass, columns);
+        }
 
         return endBinding;
     }
