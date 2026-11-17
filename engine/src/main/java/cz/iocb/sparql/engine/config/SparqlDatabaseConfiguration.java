@@ -522,9 +522,12 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * @param table the virtual table
      * @param definition the definition of the virtual table
      * @throws IllegalArgumentException if the table is already registered with a different definition
+     * @throws IllegalStateException if the configuration has no database schema
      */
     public void addVirtualTable(VirtualTable table, VirtualTableDefinition definition)
     {
+        checkSchema("a virtual table");
+
         VirtualTableDefinition previous = virtualTables.get(table);
 
         if(previous == null)
@@ -933,10 +936,14 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * @param distinct distinct flag of each table
      * @throws IllegalArgumentException if the graph or the predicate mapping cannot hold an IRI, or if a referenced
      *             column of the table is unknown to the schema or declared with another type
+     * @throws IllegalStateException if the mapping has a table and the configuration has no database schema
      */
     public void addQuadMapping(SourceTable table, TermMapping graph, TermMapping subject, TermMapping predicate,
             TermMapping object, Conditions conditions, boolean distinct)
     {
+        if(table != null)
+            checkSchema("a mapping of a table");
+
         checkVirtualTables(table == null ? List.of() : List.of(table));
         checkIriMapping(graph);
         checkIriMapping(predicate);
@@ -1020,11 +1027,13 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * @param conditions the conditions
      * @param distinct distinct flag of each table
      * @throws IllegalArgumentException if a referenced column is unknown to the schema or declared with another type
+     * @throws IllegalStateException if the configuration has no database schema
      */
     public void addQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions,
             List<Boolean> distinct)
     {
+        checkSchema("a mapping of a table");
         checkVirtualTables(tables);
         checkMapping(tables.get(0), subject);
         checkMapping(tables.get(tables.size() - 1), object);
@@ -1426,9 +1435,23 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
+     * Checks that the configuration has a database schema, which the columns of a table are checked against and which
+     * the translation of a query reads the facts of the tables from.
+     *
+     * @param subject what needs the schema, for the message
+     * @throws IllegalStateException if the configuration has no database schema
+     */
+    private void checkSchema(String subject)
+    {
+        if(databaseSchema == null)
+            throw new IllegalStateException(subject + " needs a database schema");
+    }
+
+
+    /**
      * Checks that a column of the table referenced by a mapping or a condition is known to the database schema with the
-     * type it is declared with; constants and expressions are not checked, nor is anything when the configuration has
-     * no database schema.
+     * type it is declared with; constants and expressions are not checked. A configuration mapping a table has a
+     * database schema (see {@link #checkSchema}).
      *
      * @param table the table
      * @param column the column
@@ -1436,7 +1459,7 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      */
     private void checkColumn(SourceTable table, Column column)
     {
-        if(!(column instanceof TableColumn) || databaseSchema == null)
+        if(!(column instanceof TableColumn))
             return;
 
         SqlType type = databaseSchema.getColumnType(table, column);
