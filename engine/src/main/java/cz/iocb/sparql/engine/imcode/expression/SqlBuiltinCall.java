@@ -819,7 +819,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             {
                 SqlExpressionIntercode argument = arguments.get(0);
 
-                if(argument instanceof SqlNull)
+                // an argument of no class, like a variable bound only to errors, is never bound
+                if(argument instanceof SqlNull || argument.getResourceClasses().isEmpty())
                     return SqlNull.get();
 
                 boolean canBeNull = argument.canBeNull();
