@@ -741,8 +741,12 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 if(set.isEmpty() && !canBeNull)
                     return falseValue;
 
-                // terms whose classes never pair are different, unless one of them is missing
-                SqlCode absent = SqlCode.of("NULLIF(", left.getIsNull(), " OR ", right.getIsNull(), ", true)");
+                // terms whose classes never pair are different, unless one of them is missing, which terms bound always
+                // never are (a term of a class without columns, left only by an EXISTS pattern, is then different, and
+                // the comparison with the current solution rejects its solution anyway)
+                SqlCode absent = canBeNull ?
+                        SqlCode.of("NULLIF(", left.getIsNull(), " OR ", right.getIsNull(), ", true)") :
+                        SqlCode.of("false");
 
                 if(set.isEmpty())
                 {
@@ -3408,7 +3412,10 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     case "sameterm" ->
                     {
-                        //TODO: can be improved
+                        // NOTE: the arguments keep every class: a term of a class left without columns would look
+                        // missing to the tests of the missing terms instead of being a different term; arguments bound
+                        // always could be restricted, which would only shorten the SQL
+
                         yield arguments.stream().map(a -> a.optimize(request, scope, bindings, ALL, evalServices))
                                 .toList();
                     }
@@ -3511,7 +3518,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     case "strstarts", "strends", "contains" ->
                     {
-                        //TODO can be improved
+                        // NOTE: create pairs only the compatible kinds of the arguments, so restricting each argument
+                        // to the kinds compatible with some kind of the other would only shorten the SQL
                         yield arguments.stream()
                                 .map(a -> a.optimize(request, scope, bindings,
                                         new Restriction(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString),
@@ -3521,7 +3529,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     case "strbefore", "strafter" ->
                     {
-                        //TODO can be improved
+                        // NOTE: as for strstarts, create pairs only the compatible kinds of the arguments
                         yield arguments.stream()
                                 .map(a -> a.optimize(request, scope, bindings,
                                         new Restriction(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString),

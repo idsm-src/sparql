@@ -280,6 +280,18 @@ public class SameTermTest
 
 
     @Test
+    @DisplayName("operands bound always are compared without testing whether they are missing")
+    void boundOperands() throws Exception
+    {
+        String query = "SELECT ?id (sameTerm(?a, 1) AS ?r) (!sameTerm(?a, 1) AS ?d) WHERE { "
+                + "VALUES (?id ?a) { (item:1 1) (item:2 'a') (item:3 item:5) (item:5 1.0) } } ORDER BY ?id";
+
+        assertThat(execute(query), contains(row(1, true), row(2, false), row(3, false), row(5, false)));
+        assertThat(translate(query), not(containsString("NULLIF")));
+    }
+
+
+    @Test
     @DisplayName("a filter comparing a variable of one class with a constant is a plain condition on its column")
     void filterByConstant() throws Exception
     {
