@@ -22,10 +22,12 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDayTimeDuration;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDayTimeDuration;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasString;
@@ -35,6 +37,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDayTimeDuration;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDerivedFromInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDerivedFromInteger;
@@ -295,6 +298,12 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
         DATE,
 
         /**
+         * Comparison of the values of durations, whatever their lexical forms are; the ordering operators, for which
+         * SPARQL has no row in its operator mapping, compare them as the box does.
+         */
+        DURATION,
+
+        /**
          * Equality of literals of the unsupported class: the same term is equal, anything else is an error.
          */
         LITERAL,
@@ -545,6 +554,11 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
         if(isDate(l) && isDate(r))
             return ComparisonType.NOT_NULL;
 
+        // durations compare by value whatever their lexical forms are, as the canonical and the other ones are classes
+        // of their own
+        if(isDayTimeDuration(l) && isDayTimeDuration(r))
+            return ComparisonType.NOT_NULL;
+
         if(hasNumeric(l) && hasNumeric(r))
             return ComparisonType.FULL;
 
@@ -558,6 +572,9 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             return ComparisonType.FULL;
 
         if(hasDate(l) && hasDate(r))
+            return ComparisonType.FULL;
+
+        if(hasDayTimeDuration(l) && hasDayTimeDuration(r))
             return ComparisonType.FULL;
 
         if(!equalityComparison)
@@ -800,6 +817,8 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             return ComparisonMode.DATETIME;
         else if(isDate(left) && isDate(right))
             return ComparisonMode.DATE;
+        else if(isDayTimeDuration(left) && isDayTimeDuration(right))
+            return ComparisonMode.DURATION;
         else if(isBoolean(left) && isBoolean(right))
             return ComparisonMode.BOOLEAN;
         else if(isString(left) && isString(right))
@@ -809,6 +828,8 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
         else if(hasDateTime(left) && hasDateTime(right))
             return ComparisonMode.BOX;
         else if(hasDate(left) && hasDate(right))
+            return ComparisonMode.BOX;
+        else if(hasDayTimeDuration(left) && hasDayTimeDuration(right))
             return ComparisonMode.BOX;
         else if(hasBoolean(left) && hasBoolean(right))
             return ComparisonMode.BOX;
@@ -964,6 +985,14 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                 Column cl = left.get(relations, genScalarDate).get(0);
                 Column cr = right.get(relations, genScalarDate).get(0);
                 yield SqlCode.of("(", cl, " operator(sparql.", operator.getText(), ") ", cr, ")");
+            }
+
+            case DURATION ->
+            {
+                // the length of the duration in microseconds, the first column of genDayTimeDuration
+                Column cl = left.get(relations, genDayTimeDuration).get(0);
+                Column cr = right.get(relations, genDayTimeDuration).get(0);
+                yield SqlCode.of("(", cl, " ", operator.getText(), " ", cr, ")");
             }
 
             case DATE_SAME_TZ ->

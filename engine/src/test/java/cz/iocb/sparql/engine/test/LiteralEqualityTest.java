@@ -146,6 +146,37 @@ public class LiteralEqualityTest
 
 
     @Test
+    @DisplayName("durations compare by value whatever their lexical forms are")
+    void durations() throws Exception
+    {
+        assertThat(compare("""
+                ("PT1H"^^xsd:dayTimeDuration "PT60M"^^xsd:dayTimeDuration)
+                ("PT60M"^^xsd:dayTimeDuration "PT3600S"^^xsd:dayTimeDuration)
+                ("PT1H"^^xsd:dayTimeDuration "PT1H"^^xsd:dayTimeDuration)
+                ("PT1H"^^xsd:dayTimeDuration "PT61M"^^xsd:dayTimeDuration)
+                ("-PT5H"^^xsd:dayTimeDuration "-PT300M"^^xsd:dayTimeDuration)"""),
+                containsInAnyOrder(equal, equal, equal, different, equal));
+
+        // the zone of a date-time is a duration of the canonical form
+        assertThat(execute("""
+                SELECT ?e WHERE {
+                  VALUES ?d { "2020-01-01T00:00:00-05:00"^^xsd:dateTime }
+                  BIND(TIMEZONE(?d) = "-PT300M"^^xsd:dayTimeDuration AS ?e)
+                }"""), containsInAnyOrder(row(yes)));
+
+        // the ordering operators compare the values too, in the classes of the durations as in the box
+        assertThat(execute("""
+                SELECT ?a ?b ?c ?d WHERE {
+                  VALUES ?t { true }
+                  BIND("PT60M"^^xsd:dayTimeDuration < "PT2H"^^xsd:dayTimeDuration AS ?a)
+                  BIND("PT90M"^^xsd:dayTimeDuration >= "PT1H30M"^^xsd:dayTimeDuration AS ?b)
+                  BIND(IF(?t, "PT60M"^^xsd:dayTimeDuration, "x") < "PT2H"^^xsd:dayTimeDuration AS ?c)
+                  BIND(IF(?t, "PT2H"^^xsd:dayTimeDuration, "x") < "PT60M"^^xsd:dayTimeDuration AS ?d)
+                }"""), containsInAnyOrder(row(yes, yes, yes, no)));
+    }
+
+
+    @Test
     @DisplayName("literals stored in the box follow the same rules")
     void boxed() throws Exception
     {
