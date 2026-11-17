@@ -48,7 +48,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * without being distinct over it is shared, so that its distinct values seed the other walk, see {@link SqlShared}),
  * evaluates nondeterministic children last, and evaluates the SERVICE calls that have no context of their own (see
  * {@link SqlServiceStub#isEvaluatedByJoin}) for the solutions of their siblings, deciding by row estimates which of the
- * shared variables the calls are asked about.
+ * shared variables the calls are asked about: a call keeps the variables whose distinct combinations in the solutions
+ * of the siblings are estimated to fit into the context limit of its endpoint (see
+ * {@link SqlServiceStub#getServiceSettings}), leaving out the variables of the most distinct values first.
  */
 public final class SqlJoin extends SqlIntercode
 {
@@ -356,9 +358,11 @@ public final class SqlJoin extends SqlIntercode
                 if(endpoint != null)
                     set.add(endpoint);
 
+                // the call keeps the variables as long as the endpoint takes the estimated context solutions
+                long limit = service.getServiceSettings(request.getConfiguration()).contextLimit();
                 long count = estimator.estimateDistinct(request, scope, join, set);
 
-                while(count > 20000l && !order.isEmpty()) //TODO: export limit
+                while(count > limit && !order.isEmpty())
                 {
                     set.remove(order.pop());
                     count = estimator.estimateDistinct(request, scope, join, set);

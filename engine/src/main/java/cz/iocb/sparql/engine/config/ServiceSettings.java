@@ -16,7 +16,9 @@ package cz.iocb.sparql.engine.config;
  * @param canonicalizeLiterals whether the received literals of the datatypes known to the configuration are brought to
  *            their canonical lexical forms (an invalid lexical form is kept)
  * @param contextLimit maximum number of context solutions a call may be evaluated for (the solutions of the pattern the
- *            call is joined with); exceeding it fails the query
+ *            call is joined with); exceeding it fails the query; with the reordering of calls, the context solutions
+ *            are the distinct combinations of the shared variables the call is asked about, which keeps only as many of
+ *            them as are estimated to fit into the limit
  * @param resultLimit maximum number of solutions one evaluation of a call may collect from the endpoint, counted after
  *            the merge with the context solutions; exceeding it fails the query
  * @param redirectLimit maximum number of HTTP redirects followed by one request to the endpoint

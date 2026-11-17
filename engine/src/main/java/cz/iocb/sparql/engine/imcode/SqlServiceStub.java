@@ -976,8 +976,7 @@ public final class SqlServiceStub extends SqlIntercode
 
 
         SparqlDatabaseConfiguration config = request.getConfiguration();
-        ServiceSettings settings = name instanceof Iri iri ? config.getServiceSettings(iri) :
-                config.getServiceSettings();
+        ServiceSettings settings = getServiceSettings(config);
 
 
         /* create variable lists */
@@ -1465,6 +1464,20 @@ public final class SqlServiceStub extends SqlIntercode
     public Variable getEndpointVariable()
     {
         return name instanceof Variable variable ? variable : null;
+    }
+
+
+    /**
+     * The settings whose limits bound an evaluation of the call (see {@link #eval}): those of the endpoint when the
+     * call names it by an IRI, and the defaults of the configuration when the endpoint is a variable, as the context
+     * solutions are counted before they are told apart by their endpoints.
+     *
+     * @param config the configuration
+     * @return the settings whose limits bound an evaluation of the call
+     */
+    public ServiceSettings getServiceSettings(SparqlDatabaseConfiguration config)
+    {
+        return name instanceof Iri iri ? config.getServiceSettings(iri) : config.getServiceSettings();
     }
 
 

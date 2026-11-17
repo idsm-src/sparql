@@ -28,7 +28,8 @@ public class Engine
 
     /**
      * Creates a request; with {@code serviceReorder}, SERVICE calls may be evaluated independently of their context and
-     * joined afterwards.
+     * joined afterwards, each asked about as many of its shared variables as the context limit of its endpoint takes by
+     * the estimates.
      *
      * @param serviceReorder whether SERVICE calls may be evaluated independently of their context
      * @return the new request
