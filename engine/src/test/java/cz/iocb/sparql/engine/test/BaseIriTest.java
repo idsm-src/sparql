@@ -242,6 +242,36 @@ public class BaseIriTest
 
 
     @Test
+    @DisplayName("an IRI may hold the characters RFC 3987 allows, and a malformed IRI is an error")
+    void iriSyntax() throws Exception
+    {
+        String space = Character.toString(0xA0);
+        String separator = Character.toString(0x2028);
+
+        assertThat(execute(plain, "SELECT (<http://example.org/a" + space + "b> AS ?a) WHERE { }"),
+                contains(iris("http://example.org/a" + space + "b")));
+
+        assertThat(
+                execute(plain,
+                        "BASE <http://example.org/" + separator + "/> SELECT (<a" + space + "> AS ?a) WHERE { }"),
+                contains(iris("http://example.org/" + separator + "/a" + space)));
+
+        // the default base IRI as well
+        Engine spaced = new Engine(new SparqlDatabaseConfiguration("http://example.org/" + space + "/endpoint",
+                Database.getPool(), null, false));
+
+        assertThat(execute(spaced, "SELECT (<data> AS ?a) WHERE { }"),
+                contains(iris("http://example.org/" + space + "/data")));
+
+        // two fragments, and a control character that the grammar lets through
+        assertEquals(List.of("IRI is malformed."), errors(plain, "SELECT (<http://example.org/a##b> AS ?a) WHERE { }"));
+        assertEquals(List.of("IRI is malformed."),
+                errors(plain, "SELECT (<http://example.org/" + Character.toString(0x85) + "> AS ?a) WHERE { }"));
+        assertEquals(List.of("IRI is malformed."), errors(plain, "BASE <http://example.org/a##b> SELECT * WHERE { }"));
+    }
+
+
+    @Test
     @DisplayName("the function IRI resolves a reference against the base IRI of the query")
     void iriFunction() throws Exception
     {

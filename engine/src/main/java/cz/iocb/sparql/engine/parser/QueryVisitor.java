@@ -4,8 +4,6 @@ import static cz.iocb.sparql.engine.translator.TermGenerator.getIri;
 import static java.util.stream.Collectors.toCollection;
 import static java.util.stream.Collectors.toSet;
 import java.math.BigInteger;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -1105,15 +1103,10 @@ class PrologueVisitor extends BaseVisitor<Void>
         Range range = Range.compute(ctx.IRIREF().getSymbol(), ctx.IRIREF().getSymbol());
         String uri = IriVisitor.unescapeIri(ctx.IRIREF().getText(), messages, range);
 
-        try
-        {
-            if(!(new URI(uri)).isAbsolute())
-                messages.add(new TranslateMessage(MessageType.invalidBaseIri, Range.compute(ctx)));
-        }
-        catch(URISyntaxException e)
-        {
+        if(!IriResolver.isIriReference(uri))
             messages.add(new TranslateMessage(MessageType.malformedIri, range));
-        }
+        else if(!IriResolver.hasScheme(uri))
+            messages.add(new TranslateMessage(MessageType.invalidBaseIri, Range.compute(ctx)));
 
         prologue.setBase(uri);
 
@@ -2373,8 +2366,8 @@ class IriVisitor extends BaseVisitor<IriNode>
 
     /**
      * Strips the angle brackets of an IRI reference and resolves it against the base IRI in effect if it is relative; a
-     * malformed IRI and a relative IRI that has no base IRI to be resolved against are reported and returned as they
-     * are.
+     * malformed IRI (one that is no IRI reference by the syntax of RFC 3987, {@link IriResolver#isIriReference}) and a
+     * relative IRI that has no base IRI to be resolved against are reported and returned as they are.
      *
      * @param iriRef the IRIREF token
      * @param prologue the prologue of the query
@@ -2385,19 +2378,16 @@ class IriVisitor extends BaseVisitor<IriNode>
         Range range = Range.compute(iriRef.getSymbol(), iriRef.getSymbol());
         String uri = unescapeIri(iriRef.getText(), messages, range);
 
-        try
-        {
-            if(!(new URI(uri)).isAbsolute())
-            {
-                if(prologue.getBase().isEmpty())
-                    messages.add(new TranslateMessage(MessageType.relativeIriWithoutBase, range, uri));
-                else
-                    uri = IriResolver.resolve(prologue.getBase(), uri);
-            }
-        }
-        catch(URISyntaxException e)
+        if(!IriResolver.isIriReference(uri))
         {
             messages.add(new TranslateMessage(MessageType.malformedIri, range));
+        }
+        else if(!IriResolver.hasScheme(uri))
+        {
+            if(prologue.getBase().isEmpty())
+                messages.add(new TranslateMessage(MessageType.relativeIriWithoutBase, range, uri));
+            else
+                uri = IriResolver.resolve(prologue.getBase(), uri);
         }
 
         return uri;

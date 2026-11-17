@@ -38,8 +38,6 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsign
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedIntType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedLongType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedShortType;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -57,6 +55,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.sql.DataSource;
+import cz.iocb.sparql.engine.common.IriResolver;
 import cz.iocb.sparql.engine.database.CatalogStatistics;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
@@ -1509,14 +1508,9 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      */
     public Iri getBaseIri()
     {
-        try
-        {
-            if(serviceIri != null && new URI(serviceIri.getValue()).isAbsolute())
-                return serviceIri;
-        }
-        catch(URISyntaxException e)
-        {
-        }
+        if(serviceIri != null && IriResolver.isIriReference(serviceIri.getValue())
+                && IriResolver.hasScheme(serviceIri.getValue()))
+            return serviceIri;
 
         return null;
     }
