@@ -760,4 +760,16 @@ public class EndpointServletTest
         assertEquals("bool\r\ntrue\r\n", response.getBody());
         assertEquals(get(parameters("query", "SELECT (true AS ?bool) WHERE {}"), csv).getBody(), response.getBody());
     }
+
+
+    @Test
+    @DisplayName("a GET without a query gets the empty graph as the description of a configuration without a service")
+    void noServiceDescription() throws Exception
+    {
+        Response response = get(parameters(), ntriples);
+
+        assertEquals(HttpServletResponse.SC_OK, response.status);
+        assertEquals(ntriples, response.contentType);
+        assertEquals("", response.getBody());
+    }
 }

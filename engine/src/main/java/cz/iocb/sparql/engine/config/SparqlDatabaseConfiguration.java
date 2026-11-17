@@ -99,6 +99,7 @@ import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
 import cz.iocb.sparql.engine.mapping.extension.ParameterDefinition;
 import cz.iocb.sparql.engine.mapping.extension.ProcedureDefinition;
 import cz.iocb.sparql.engine.mapping.extension.ResultDefinition;
+import cz.iocb.sparql.engine.parser.Rdf;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.TripleTerm;
@@ -117,6 +118,26 @@ import info.adams.ryu.RyuFloat;
  */
 public class SparqlDatabaseConfiguration implements ClassRelations
 {
+    /**
+     * Namespace of the terms of the SPARQL service description.
+     */
+    private static final String serviceDescriptionNamespace = "http://www.w3.org/ns/sparql-service-description#";
+
+    /**
+     * Namespace of the entailment regimes.
+     */
+    private static final String entailmentNamespace = "http://www.w3.org/ns/entailment/";
+
+    /**
+     * Namespace of the formats of the results.
+     */
+    private static final String formatNamespace = "http://www.w3.org/ns/formats/";
+
+    /**
+     * Namespace of the versions of SPARQL.
+     */
+    private static final String versionNamespace = "http://www.w3.org/ns/sparql#";
+
     /**
      * IRI of this endpoint's service, or null.
      */
@@ -593,7 +614,7 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     /**
      * Constant IRI mapping whose IRI class and columns are detected lazily.
      *
-     * @param iri IRI of the service
+     * @param iri the IRI
      * @return constant IRI mapping whose IRI class and columns are detected lazily
      */
     public ConstantIriMapping createIriMapping(Iri iri)
@@ -1185,53 +1206,48 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     /**
      * Adds the quads of the SPARQL 1.2 service description (features, the supported language with its versions, result
      * formats, extension functions and procedure properties) to the description graph; the SPARQL 1.1 language term is
-     * kept for older clients. Requires the {@code rdf}, {@code sd}, {@code ent} and {@code format} prefixes.
+     * kept for older clients. The terms are given by their IRIs, whatever prefixes the configuration registers. The
+     * functions and procedures registered for the service after the call are not described.
+     *
+     * @throws IllegalStateException if the configuration has no service IRI
      */
     public void addBasicServiceDescription()
     {
-        //FIXME: code depends on prefix definitions
+        if(serviceIri == null)
+            throw new IllegalStateException("a service description needs a service IRI");
 
         ConstantIriMapping graph = createIriMapping(descriptionGraphIri);
         ConstantIriMapping endpoint = createIriMapping(serviceIri);
+        ConstantIriMapping type = createIriMapping(new Iri(Rdf.TYPE));
 
 
-        addQuadMapping(graph, endpoint, createIriMapping("rdf:type"), createIriMapping("sd:Service"));
-        addQuadMapping(graph, endpoint, createIriMapping("sd:endpoint"), endpoint);
+        addQuadMapping(graph, endpoint, type, sd("Service"));
+        addQuadMapping(graph, endpoint, sd("endpoint"), endpoint);
 
-        addQuadMapping(graph, endpoint, createIriMapping("sd:feature"), createIriMapping("sd:BasicFederatedQuery"));
-        addQuadMapping(graph, endpoint, createIriMapping("sd:feature"), createIriMapping("sd:EmptyGraphs"));
+        addQuadMapping(graph, endpoint, sd("feature"), sd("BasicFederatedQuery"));
+        addQuadMapping(graph, endpoint, sd("feature"), sd("EmptyGraphs"));
 
         if(autoAddToDefaultGraph)
-            addQuadMapping(graph, endpoint, createIriMapping("sd:feature"), createIriMapping("sd:UnionDefaultGraph"));
+            addQuadMapping(graph, endpoint, sd("feature"), sd("UnionDefaultGraph"));
 
-        addQuadMapping(graph, endpoint, createIriMapping("sd:defaultEntailmentRegime"), createIriMapping("ent:Simple"));
-        addQuadMapping(graph, endpoint, createIriMapping("sd:supportedLanguage"), createIriMapping("sd:SPARQLQuery"));
-        addQuadMapping(graph, endpoint, createIriMapping("sd:supportedLanguage"), createIriMapping("sd:SPARQL11Query"));
+        addQuadMapping(graph, endpoint, sd("defaultEntailmentRegime"),
+                createIriMapping(new Iri(entailmentNamespace + "Simple")));
+        addQuadMapping(graph, endpoint, sd("supportedLanguage"), sd("SPARQLQuery"));
+        addQuadMapping(graph, endpoint, sd("supportedLanguage"), sd("SPARQL11Query"));
 
         for(String version : List.of("1.2", "1.2-basic", "1.1"))
-            addQuadMapping(graph, endpoint, createIriMapping("sd:supportedVersion"),
-                    createIriMapping("<http://www.w3.org/ns/sparql#version-" + version + ">"));
+            addQuadMapping(graph, endpoint, sd("supportedVersion"),
+                    createIriMapping(new Iri(versionNamespace + "version-" + version)));
 
-        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"),
-                createIriMapping("format:SPARQL_Results_XML"));
-        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"),
-                createIriMapping("format:SPARQL_Results_JSON"));
-        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"),
-                createIriMapping("format:SPARQL_Results_CSV"));
-        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"),
-                createIriMapping("format:SPARQL_Results_TSV"));
-        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"), createIriMapping("format:RDF_JSON"));
-        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"), createIriMapping("format:RDF_XML"));
-        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"), createIriMapping("format:Turtle"));
-        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"), createIriMapping("format:TriG"));
-        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"), createIriMapping("format:N-Triples"));
-        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"), createIriMapping("format:N-Quads"));
+        for(String format : List.of("SPARQL_Results_XML", "SPARQL_Results_JSON", "SPARQL_Results_CSV",
+                "SPARQL_Results_TSV", "RDF_JSON", "RDF_XML", "Turtle", "TriG", "N-Triples", "N-Quads"))
+            addQuadMapping(graph, endpoint, sd("resultFormat"), createIriMapping(new Iri(formatNamespace + format)));
 
         for(FunctionDefinition def : functions.get(serviceIri).values())
         {
             ConstantIriMapping function = createIriMapping(new Iri(def.getFunctionName()));
-            addQuadMapping(graph, endpoint, createIriMapping("sd:extensionFunction"), function);
-            addQuadMapping(graph, function, createIriMapping("rdf:type"), createIriMapping("sd:Function"));
+            addQuadMapping(graph, endpoint, sd("extensionFunction"), function);
+            addQuadMapping(graph, function, type, sd("Function"));
         }
 
 
@@ -1253,9 +1269,21 @@ public class SparqlDatabaseConfiguration implements ClassRelations
         for(String iri : propertyIris)
         {
             ConstantIriMapping procedure = createIriMapping(new Iri(iri));
-            addQuadMapping(graph, endpoint, createIriMapping("sd:propertyFeature"), procedure);
-            addQuadMapping(graph, procedure, createIriMapping("rdf:type"), createIriMapping("sd:Feature"));
+            addQuadMapping(graph, endpoint, sd("propertyFeature"), procedure);
+            addQuadMapping(graph, procedure, type, sd("Feature"));
         }
+    }
+
+
+    /**
+     * Constant IRI mapping of a term of the SPARQL service description.
+     *
+     * @param name the local name of the term
+     * @return constant IRI mapping of the term
+     */
+    private ConstantIriMapping sd(String name)
+    {
+        return createIriMapping(new Iri(serviceDescriptionNamespace + name));
     }
 
 
@@ -1517,12 +1545,16 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
-     * CONSTRUCT query returning the service description graph.
+     * CONSTRUCT query returning the service description graph, or the empty graph when the configuration has no
+     * description graph.
      *
      * @return CONSTRUCT query returning the service description graph
      */
     public String getServiceDescriptionQuery()
     {
+        if(descriptionGraphIri == null)
+            return "construct {} where {}";
+
         return "construct {?s ?p ?o} where { graph " + descriptionGraphIri + " {?s ?p ?o}}";
     }
 
