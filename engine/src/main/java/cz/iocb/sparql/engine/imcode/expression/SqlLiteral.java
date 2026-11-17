@@ -74,28 +74,6 @@ public final class SqlLiteral extends SqlExpressionIntercode
      */
     public static SqlExpressionIntercode create(Request request, Literal literal)
     {
-        return create(request, literal, Restriction.ALL);
-    }
-
-
-    /**
-     * Constant literal expression; the boolean constants are the shared instances.
-     *
-     * @param request the current request
-     * @param literal the literal
-     * @param restriction the result classes the parent needs
-     * @return constant literal expression; the boolean constants are the shared instances
-     */
-    private static SqlExpressionIntercode create(Request request, Literal literal, Restriction restriction)
-    {
-        //TODO: delete these variants after the equals method is used
-
-        if(literal.equals(trueLiteral))
-            return trueValue;
-
-        if(literal.equals(falseLiteral))
-            return falseValue;
-
         ResourceClass resClass = request.getLiteralClass(literal);
         List<Column> columns = resClass.toColumns(request, literal);
 
@@ -129,10 +107,8 @@ public final class SqlLiteral extends SqlExpressionIntercode
     public SqlExpressionIntercode optimize(Request request, Scope scope, VariableBindings bindings,
             Restriction restriction, boolean evalServices)
     {
-        if(restriction.isOptimized(request.getConfiguration(), variableBinding))
-            return this;
-
-        return create(request, literal, restriction);
+        // a constant keeps the single class of its literal whatever the parent needs
+        return this;
     }
 
 
