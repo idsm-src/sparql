@@ -41,8 +41,9 @@ import cz.iocb.sparql.testing.Database;
 /**
  * A procedure call is evaluated for the solutions of the patterns preceding it in its group, so that its parameters can
  * take their values from them. A call whose parameters take no value from those solutions is evaluated once and joined
- * with them instead; otherwise the database runs the function again for every solution. Such a call is evaluated once
- * even when the statement contains it several times, e.g. in every branch of a union the join was distributed over.
+ * with them instead; otherwise the database runs the function again for every solution. Such a call of a deterministic
+ * procedure, which the procedure here is, is evaluated once even when the statement contains it several times, e.g. in
+ * every branch of a union the join was distributed over (see {@link ProcedureDeterminismTest} for the other ones).
  */
 public class ProcedureContextTest
 {

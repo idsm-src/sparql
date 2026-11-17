@@ -10,7 +10,8 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
  * Specialises the calls of a procedure to the classes a query can use its results in (see
  * {@link ProcedureDefinition#setSpecializer}): a query joining a result with a pattern of one class, or filtering it by
  * a constant, accepts a value of that class only, and the function need not compute the values of the other classes.
- * How the function is told is up to the specialisation: another SQL function, or other arguments.
+ * How the function is told is up to the specialisation: another SQL function, or other arguments; a specialised call
+ * has to be as deterministic as the procedure is declared to be (see {@link ProcedureDefinition#setDeterministic}).
  */
 @FunctionalInterface
 public interface ProcedureSpecializer

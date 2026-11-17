@@ -50,14 +50,15 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * {@link ParameterDefinition}), so a literal of the datatype of a canonical declared class supplies its value in every
  * valid lexical form and a numeric declared class takes the value of every numeric XPath substitutes or promotes to its
  * datatype (see {@link SqlExpressionIntercode#getValue}), and a parameter supplying no value of its class gives no
- * solution. A call over the empty solution, which takes nothing from any context, is evaluated by a common table
- * expression (see {@link Request#getCommonTableExpression}), so that the statement evaluates it once even when it
- * occurs several times, e.g. in every branch of a union a join above it was distributed over, or in the pattern of an
- * EXISTS evaluated for every current solution; PostgreSQL folds a common table expression referenced once into the
- * query unless the function is volatile. A call whose parameter takes a value of a current solution, that of an EXISTS
- * pattern or of the left side of a lateral join (see {@link Scope#refersToCurrentSolution}), stays in its place, where
- * the value is known. A result is bound to the classes the parent accepts a value of only, and a specialiser of the
- * procedure may adapt the call to them (see {@link ProcedureDefinition#setSpecializer}).
+ * solution. A call of a deterministic procedure (see {@link ProcedureDefinition#setDeterministic}) over the empty
+ * solution, which takes nothing from any context, is evaluated by a common table expression (see
+ * {@link Request#getCommonTableExpression}), so that the statement evaluates it once even when it occurs several times,
+ * e.g. in every branch of a union a join above it was distributed over, or in the pattern of an EXISTS evaluated for
+ * every current solution; PostgreSQL folds a common table expression referenced once into the query unless the function
+ * is volatile. A call whose parameter takes a value of a current solution, that of an EXISTS pattern or of the left
+ * side of a lateral join (see {@link Scope#refersToCurrentSolution}), stays in its place, where the value is known. A
+ * result is bound to the classes the parent accepts a value of only, and a specialiser of the procedure may adapt the
+ * call to them (see {@link ProcedureDefinition#setSpecializer}).
  */
 public final class SqlProcedureCall extends SqlIntercode
 {
@@ -120,7 +121,7 @@ public final class SqlProcedureCall extends SqlIntercode
             LinkedHashMap<ResultDefinition, Variable> results, SqlIntercode child, Map<Column, Column> columnMap,
             Map<ResultDefinition, Set<ResourceClass>> resultClasses, ProcedureSpecialization specialization)
     {
-        super(bindings, child.isDeterministic()); //TODO: is procedure deterministic?
+        super(bindings, child.isDeterministic() && procedure.isDeterministic());
 
         this.child = child;
         this.procedure = procedure;
@@ -271,9 +272,9 @@ public final class SqlProcedureCall extends SqlIntercode
         for(Entry<ParameterDefinition, SqlExpressionIntercode> entry : parameters.entrySet())
             childRestrictions.add(entry.getValue().getRequirements(relations));
 
-        //FIXME: is procedure deterministic?
-
-        SqlIntercode optChild = child.optimize(request, scope, childRestrictions, reduced, evalServices);
+        // a procedure that is not deterministic is called for every solution of the child, so duplicates do matter
+        SqlIntercode optChild = child.optimize(request, scope, childRestrictions,
+                reduced && procedure.isDeterministic(), evalServices);
         LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> optParameters = optimize(request, scope, parameters,
                 optChild);
 
@@ -407,8 +408,9 @@ public final class SqlProcedureCall extends SqlIntercode
         builder.append(" FROM ");
 
         SqlCode call = translateCall(request, scope);
-        CommonTable table = child.equals(SqlEmptySolution.get()) && !scope.refersToCurrentSolution(call) ?
-                request.getCommonTableExpression(call) : null;
+        // the common table expression of a call is shared by every place of the statement calling it alike
+        CommonTable table = procedure.isDeterministic() && child.equals(SqlEmptySolution.get())
+                && !scope.refersToCurrentSolution(call) ? request.getCommonTableExpression(call) : null;
 
         if(table != null)
         {

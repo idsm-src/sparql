@@ -10,7 +10,8 @@ import cz.iocb.sparql.engine.database.Function;
  * Definition of a procedure, a set-returning SQL function callable from a graph pattern (see
  * {@link cz.iocb.sparql.engine.model.pattern.ProcedureCall}): the procedure IRI, the SQL function, and its named
  * parameters and results in declaration order. A specialiser may adapt the calls to the classes the query can use the
- * results in (see {@link #setSpecializer}).
+ * results in (see {@link #setSpecializer}). A procedure is deterministic unless declared otherwise (see
+ * {@link #setDeterministic}).
  */
 public class ProcedureDefinition
 {
@@ -38,6 +39,12 @@ public class ProcedureDefinition
      * Specialiser of the calls to the classes the query can use the results in (see {@link #setSpecializer}), or null.
      */
     private ProcedureSpecializer specializer = null;
+
+    /**
+     * Whether the procedure gives the same results whenever it is called with the same arguments (see
+     * {@link #setDeterministic}).
+     */
+    private boolean deterministic = true;
 
 
     /**
@@ -112,6 +119,35 @@ public class ProcedureDefinition
     public ProcedureSpecializer getSpecializer()
     {
         return specializer;
+    }
+
+
+    /**
+     * Declares whether the procedure gives the same results whenever it is called with the same arguments, which it
+     * does by default. The engine evaluates a call of a procedure that does not once for every solution it is called
+     * for, a call taking no values of a context once at every place of the query it occurs at, and neither shares nor
+     * deduplicates its calls, whereas it may evaluate the calls of a deterministic procedure once for equal arguments.
+     * The declaration is not read from the volatility of the SQL function, as a function of a procedural language is
+     * volatile unless declared otherwise.
+     *
+     * @param deterministic whether the procedure gives the same results whenever it is called with the same arguments
+     */
+    public void setDeterministic(boolean deterministic)
+    {
+        this.deterministic = deterministic;
+    }
+
+
+    /**
+     * True if the procedure gives the same results whenever it is called with the same arguments (see
+     * {@link #setDeterministic}).
+     *
+     * @return true if the procedure gives the same results whenever it is called with the same arguments, false
+     *         otherwise
+     */
+    public boolean isDeterministic()
+    {
+        return deterministic;
     }
 
 
