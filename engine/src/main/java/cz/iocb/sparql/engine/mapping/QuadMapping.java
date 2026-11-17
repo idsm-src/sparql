@@ -46,8 +46,6 @@ public abstract class QuadMapping
      */
     public QuadMapping(TermMapping graph, TermMapping subject, TermMapping predicate, TermMapping object)
     {
-        //TODO: add support for parameterized graph mapping
-
         this.graph = graph;
         this.subject = subject;
         this.predicate = predicate;

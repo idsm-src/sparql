@@ -1014,9 +1014,10 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     /**
      * Registers a join quad mapping of this service (see {@link JoinTableQuadMapping}): graph, subject and predicate
      * come from the first table, the object from the last one. With {@code autoAddToDefaultGraph}, a named-graph
-     * mapping is also added to the default graph. The columns referenced by the mappings, the join columns and the
-     * conditions are checked against the database schema: they have to exist in their tables with the types they are
-     * declared with.
+     * mapping is also added to the default graph. The graph is a constant IRI or a column of the first table of a class
+     * that can hold IRIs, such as the box. The columns referenced by the mappings, the join columns and the conditions
+     * are checked against the database schema: they have to exist in their tables with the types they are declared
+     * with.
      *
      * @param tables the tables
      * @param joinColumnsPairs join columns between adjacent tables
@@ -1026,15 +1027,18 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * @param object the object mapping
      * @param conditions the conditions
      * @param distinct distinct flag of each table
-     * @throws IllegalArgumentException if a referenced column is unknown to the schema or declared with another type
+     * @throws IllegalArgumentException if the graph mapping cannot hold an IRI, or if a referenced column is unknown to
+     *             the schema or declared with another type
      * @throws IllegalStateException if the configuration has no database schema
      */
-    public void addQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
+    public void addQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions,
             List<Boolean> distinct)
     {
         checkSchema("a mapping of a table");
         checkVirtualTables(tables);
+        checkIriMapping(graph);
+        checkMapping(tables.get(0), graph);
         checkMapping(tables.get(0), subject);
         checkMapping(tables.get(tables.size() - 1), object);
 
@@ -1044,7 +1048,7 @@ public class SparqlDatabaseConfiguration implements ClassRelations
         for(int i = 0; i < conditions.size(); i++)
             checkConditions(tables.get(i), conditions.get(i));
 
-        checkColumnCollations(tables, subject, predicate, object);
+        checkColumnCollations(tables, graph, subject, predicate, object);
 
         mappings.get(serviceIri).add(new JoinTableQuadMapping(tables, joinColumnsPairs, graph, subject, predicate,
                 object, conditions, distinct));
@@ -1066,7 +1070,7 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * @param object the object mapping
      * @param conditions the conditions
      */
-    public void addQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
+    public void addQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions)
     {
         addQuadMapping(tables, joinColumnsPairs, graph, subject, predicate, object, conditions,
@@ -1084,7 +1088,7 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * @param predicate the predicate mapping
      * @param object the object mapping
      */
-    public void addQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
+    public void addQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object)
     {
         addQuadMapping(tables, joinColumnsPairs, graph, subject, predicate, object,
@@ -1106,7 +1110,7 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * @param object the object mapping
      */
     public void addQuadMapping(SourceTable subjectTable, SourceTable objectTable, String subjectTableJoinColumn,
-            String objectTableJoinColumn, ConstantIriMapping graph, TermMapping subject, ConstantIriMapping predicate,
+            String objectTableJoinColumn, TermMapping graph, TermMapping subject, ConstantIriMapping predicate,
             TermMapping object)
     {
         addQuadMapping(List.of(subjectTable, objectTable),
@@ -1132,7 +1136,7 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * @param objectCondition conditions on the object table
      */
     public void addQuadMapping(SourceTable subjectTable, SourceTable objectTable, String subjectTableJoinColumn,
-            String objectTableJoinColumn, ConstantIriMapping graph, TermMapping subject, ConstantIriMapping predicate,
+            String objectTableJoinColumn, TermMapping graph, TermMapping subject, ConstantIriMapping predicate,
             TermMapping object, Conditions subjectCondition, Conditions objectCondition)
     {
         addQuadMapping(List.of(subjectTable, objectTable),

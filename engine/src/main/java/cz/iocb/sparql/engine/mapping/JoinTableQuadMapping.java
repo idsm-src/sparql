@@ -264,7 +264,7 @@ public class JoinTableQuadMapping extends QuadMapping
      * @param predicate the predicate mapping
      * @param object the object mapping
      */
-    public JoinTableQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
+    public JoinTableQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object)
     {
         this(tables, joinColumnsPairs, graph, subject, predicate, object,
@@ -402,6 +402,10 @@ public class JoinTableQuadMapping extends QuadMapping
         JoinTableQuadMapping mapping = (JoinTableQuadMapping) object;
 
         if(!tables.equals(mapping.tables))
+            return false;
+
+        if(graphTableIdx != mapping.graphTableIdx || subjectTableIdx != mapping.subjectTableIdx
+                || predicateTableIdx != mapping.predicateTableIdx || objectTableIdx != mapping.objectTableIdx)
             return false;
 
         if(!joinColumnsPairs.equals(mapping.joinColumnsPairs))

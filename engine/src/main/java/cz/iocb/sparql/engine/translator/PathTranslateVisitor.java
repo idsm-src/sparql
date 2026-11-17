@@ -656,7 +656,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             {
                 List<MappedTerm> maps = new ArrayList<>();
 
-                if(i == 0)
+                if(i == mapping.getGraphTableIdx())
                     maps.add(new MappedTerm(graph, mapping.getGraph()));
 
                 if(i == mapping.getSubjectTableIdx())
