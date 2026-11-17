@@ -68,6 +68,7 @@ import cz.iocb.sparql.engine.database.DeclaredTable;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
+import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.database.VirtualTableDefinition;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
@@ -767,7 +768,8 @@ public final class SqlSelect extends SqlIntercode
                 SqlIntercode branch = union.getChilds().get(i);
 
                 builder.append("SELECT ");
-                builder.append(translateSelectVariables(relations, description, branch.getVariableBindings()));
+                builder.append(translateSelectVariables(relations, request.getColumnMap(), description,
+                        branch.getVariableBindings()));
                 builder.append(" FROM (");
                 builder.append(branch.translate(request, scope));
                 builder.append(") AS tab");
@@ -776,7 +778,8 @@ public final class SqlSelect extends SqlIntercode
         else
         {
             builder.append("SELECT ");
-            builder.append(translateSelectVariables(relations, description, child.getVariableBindings()));
+            builder.append(translateSelectVariables(relations, request.getColumnMap(), description,
+                    child.getVariableBindings()));
 
             if(distinct)
             {
@@ -818,19 +821,21 @@ public final class SqlSelect extends SqlIntercode
 
     /**
      * SELECT list of a top-level select: for each variable, one column group per result class (NULL for classes it
-     * cannot take), named by the class.
+     * cannot take), named by the class ({@code <variable>#<class label>_res<i>}). The names differ from those of the
+     * columns of the classes of the subqueries ({@code _par<i>}, see {@link ResourceClass#createColumns}), as the keys
+     * of ORDER BY address the columns of the subqueries by their names, which PostgreSQL would take for the output
+     * columns of the same names; the result reads the columns by their positions.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
+     * @param columnMap the column names of the request
      * @param description result classes of each projected variable
      * @param bindings the variable bindings
      * @return SELECT list of a top-level select: for each variable, one column group per result class (NULL for classes
      *         it cannot take), named by the class
      */
-    private static SqlCode translateSelectVariables(ClassRelations relations,
+    private static SqlCode translateSelectVariables(ClassRelations relations, ColumnMap columnMap,
             Map<Variable, List<ResourceClass>> description, VariableBindings bindings)
     {
-        ColumnMap columnMap = new ColumnMap();
-
         SqlBuilder builder = new SqlBuilder();
         boolean hasSelect = false;
 
@@ -844,7 +849,7 @@ public final class SqlSelect extends SqlIntercode
 
             for(ResourceClass resClass : entry.getValue())
             {
-                List<Column> colNames = resClass.createColumns(columnMap, var);
+                String label = columnMap.getLabel(resClass);
                 List<Column> cols = binding.deriveMapping(relations, resClass);
 
                 for(int i = 0; i < cols.size(); i++)
@@ -854,7 +859,8 @@ public final class SqlSelect extends SqlIntercode
 
                     builder.append(cols.get(i));
                     builder.append(" AS ");
-                    builder.append(colNames.get(i));
+                    builder.append(new TableColumn(columnMap.getSafeName(var.getName() + "#" + label + "_res" + i),
+                            resClass.getSqlTypes().get(i)));
                 }
             }
         }

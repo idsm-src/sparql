@@ -28,7 +28,7 @@ import cz.iocb.sparql.engine.request.Request;
 public sealed abstract class ResourceClass permits PrimitiveResourceClass, DerivedClass
 {
     /**
-     * Unique name of the class.
+     * Name of the class (see {@link #getResourceName}).
      */
     protected final String name;
 
@@ -414,33 +414,36 @@ public sealed abstract class ResourceClass permits PrimitiveResourceClass, Deriv
 
     /**
      * Creates the column names under which a value of this class of the variable is exposed by a generated subquery
-     * ({@code <variable>#<class>_par<i>}), shortened through the column map when too long for PostgreSQL.
+     * ({@code <variable>#<class label>_par<i>}), shortened through the column map when too long for PostgreSQL. The
+     * names of two variables differ, as the name of a variable holds neither {@code #} nor {@code @}, an internal
+     * variable starts with {@code @} and no table alias holds {@code #}; the names of two classes of a variable differ,
+     * as the column map gives an unequal class of the same name another label (see {@link ColumnMap#getLabel}); and the
+     * column map keeps the shortened names unique within the request.
      *
-     * @param map map shortening long column names
+     * @param map the column names of the request
      * @param variable the variable
      * @return the column names
      */
     public List<Column> createColumns(ColumnMap map, Variable variable)
     {
-        //FIXME: consider whether there might be a collision of names with those generated in another part of the query
-
         int count = getColumnCount();
+        String label = map.getLabel(this);
 
         List<Column> columns = new ArrayList<>(count);
 
         for(int i = 0; i < count; i++)
-            columns.add(
-                    new TableColumn(map.getSafeName(variable.getName() + "#" + name + (count > 0 ? "_par" + i : "")),
-                            getSqlTypes().get(i)));
+            columns.add(new TableColumn(map.getSafeName(variable.getName() + "#" + label + "_par" + i),
+                    getSqlTypes().get(i)));
 
         return columns;
     }
 
 
     /**
-     * Unique name of the class, also used in generated column names.
+     * Name of the class, which identifies it among the classes of a configuration by convention only (a user class may
+     * take the name of a built-in one), labelling the generated column names (see {@link ColumnMap#getLabel}).
      *
-     * @return unique name of the class, also used in generated column names
+     * @return name of the class
      */
     public final String getResourceName()
     {
