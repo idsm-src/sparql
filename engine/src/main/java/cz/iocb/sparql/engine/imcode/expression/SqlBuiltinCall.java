@@ -174,8 +174,12 @@ import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeClass;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
+import cz.iocb.sparql.engine.mapping.datatypes.DirLangStringDatatype;
+import cz.iocb.sparql.engine.mapping.datatypes.LangStringDatatype;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral;
 import cz.iocb.sparql.engine.rdf.DirLangStringLiteral.Direction;
 import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.rdf.LangStringLiteral;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBindings;
@@ -1452,9 +1456,14 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                 if(type instanceof SqlIri iri)
                 {
-                    // TODO: add a variant for case the argument is a constant
-
                     Datatype datatype = request.getConfiguration().getDatatype(iri.getIri());
+
+                    // a constant string makes the literal written so, classified as any written literal
+                    if(argument instanceof SqlLiteral constant && constant.getString() != null
+                            && !(datatype instanceof LangStringDatatype)
+                            && !(datatype instanceof DirLangStringDatatype))
+                        return SqlLiteral.create(request, new TypedLiteral(constant.getString(), iri.getIri()));
+
                     ResourceClass resourceClass = datatype == null ? null : datatype.getBaseLiteralClass();
 
                     boolean argumentIsString = argument.getResourceClasses().stream().allMatch(r -> isString(r));
@@ -1530,7 +1539,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     if(!languageTagPattern.matcher(tag).matches())
                         return SqlNull.get();
 
-                    // TODO: add a variant for case the argument is a constant
+                    // a constant string makes the literal written so
+                    if(argument instanceof SqlLiteral constant && constant.getString() != null)
+                        return SqlLiteral.create(request, new LangStringLiteral(constant.getString(), tag));
 
                     boolean canBeNull = argument.canBeNull()
                             || argument.getResourceClasses().stream().anyMatch(r -> !isString(r));
@@ -1580,7 +1591,10 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     if(!languageTagPattern.matcher(tag).matches() || direction == null)
                         return SqlNull.get();
 
-                    // TODO: add a variant for case the argument is a constant
+                    // a constant string makes the literal written so
+                    if(argument instanceof SqlLiteral constant && constant.getString() != null)
+                        return SqlLiteral.create(request,
+                                new DirLangStringLiteral(constant.getString(), tag, direction));
 
                     boolean canBeNull = argument.canBeNull()
                             || argument.getResourceClasses().stream().anyMatch(r -> !isString(r));
