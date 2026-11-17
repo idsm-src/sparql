@@ -23,10 +23,12 @@ import org.junit.jupiter.api.Test;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
+import cz.iocb.sparql.engine.database.UserType;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.imcode.SqlSelect;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.classes.IntegerUserIriClass;
+import cz.iocb.sparql.engine.mapping.datatypes.UserDatatype;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.request.Engine;
@@ -52,6 +54,35 @@ import cz.iocb.sparql.testing.Database;
  */
 public class DatatypeTest
 {
+    /**
+     * A user datatype of int4 values whose IRI holds an apostrophe, which a string constant of SQL has to double.
+     */
+    private static final class QuotedDatatype extends UserDatatype
+    {
+        /**
+         * Creates the datatype.
+         */
+        QuotedDatatype()
+        {
+            super(new Iri("http://example.org/it's#int"), "quoted", new UserType("int4"));
+        }
+
+
+        @Override
+        public boolean isValidForm(String value)
+        {
+            return value.matches("[0-9]{1,9}");
+        }
+
+
+        @Override
+        public String getCanonicalLexicalForm(String value)
+        {
+            return Integer.toString(Integer.parseInt(value));
+        }
+    }
+
+
     /**
      * Prefix declarations prepended to every query.
      */
@@ -123,6 +154,7 @@ public class DatatypeTest
         config = new SparqlDatabaseConfiguration(null, connectionPool, schema, true);
         config.addPrefix("ex", "http://example.org/");
         config.addIriClass(new IntegerUserIriClass("item", INT4, "http://example.org/item/"));
+        config.addDatatype(new QuotedDatatype());
 
         DatabaseTable table = new DatabaseTable("datatype_test", "item");
         ConstantIriMapping graph = config.createIriMapping("<http://example.org/graph>");
@@ -315,5 +347,16 @@ public class DatatypeTest
         // the labels are strings, and the numbers need no test
         assertThat(translate(query), not(containsString("\"label\"")));
         assertThat(translate(query), not(containsString("XMLSchema#string")));
+    }
+
+
+    @Test
+    @DisplayName("the datatype IRI of a class is a string constant of SQL whatever characters it holds")
+    void quotedIri() throws Exception
+    {
+        String query = "SELECT (DATATYPE(?v) AS ?d) WHERE { VALUES ?v { \"1\"^^<http://example.org/it's#int> \"a\" "
+                + "UNDEF } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(iri("it's#int")), row(xsdStr), row((RdfTerm) null)));
     }
 }

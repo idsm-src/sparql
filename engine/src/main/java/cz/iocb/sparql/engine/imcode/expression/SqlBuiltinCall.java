@@ -1266,7 +1266,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
             case "datatype":
             {
-                //TODO: if possible, specify the return class more specifically than just iri
+                //TODO: a value that may be unbound or is bound in several classes gets the class iri, though the IRIs of
+                // its datatypes are known when every class has one; when the configuration detects them all as IRIs
+                // of one class (request.getIriClass), the result could take that class, which a join could use
 
                 SqlExpressionIntercode argument = arguments.get(0);
 
@@ -1304,13 +1306,13 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     if(argumentClass.getEffectiveClass() instanceof LiteralClass literalClass
                             && literalClass.getTypeIri() != null)
                     {
-                        String iriValue = literalClass.getTypeIri().getValue();
+                        Column value = new ValueColumn(literalClass.getTypeIri().getValue(), VARCHAR);
 
                         if(partCanBeBull)
                             builder.append(SqlCode.of("CASE WHEN ", argument.getIsNotNull(relations, argumentClass),
-                                    " THEN '", iriValue, "' END"));
+                                    " THEN ", value, " END"));
                         else
-                            builder.append(SqlCode.of("'", iriValue, "'"));
+                            builder.append(value);
                     }
                     else if(argument.canSafelyGeneralize(relations, argumentClass, unsupportedType))
                     {
