@@ -35,7 +35,8 @@ import cz.iocb.sparql.testing.Database;
 /**
  * Names with the characters above U+FFFF, which the production PN_CHARS_BASE of the SPARQL grammar includes up to
  * U+EFFFF: the prefixed names, variables and blank node labels of queries, and the prefixed names that IRIs are
- * abbreviated to.
+ * abbreviated to. The IRI a prefixed name stands for has to be an IRI by RFC 3987 as well, which holds none of the
+ * noncharacters, like U+EFFFF.
  */
 public class SupplementaryCharacterTest
 {
@@ -84,8 +85,17 @@ public class SupplementaryCharacterTest
     @DisplayName("a prefix and a local name may contain the characters above U+FFFF")
     void prefixedNames() throws Exception
     {
-        assertEquals(List.of(List.of(new Iri("http://example.org/" + first + "." + last))),
-                execute("SELECT ?x WHERE { VALUES ?x { " + fraktur + first + ":" + first + "." + last + " } }"));
+        // the last character of the range that an IRI may hold
+        String iriLast = Character.toString(0xEFFFD);
+
+        assertEquals(List.of(List.of(new Iri("http://example.org/" + first + "." + iriLast))),
+                execute("SELECT ?x WHERE { VALUES ?x { " + fraktur + first + ":" + first + "." + iriLast + " } }"));
+
+        // the grammar takes the noncharacter U+EFFFF for a character of a name, but RFC 3987 for none of an IRI
+        TranslateExceptions exception = assertThrows(TranslateExceptions.class,
+                () -> execute("SELECT ?x WHERE { VALUES ?x { " + fraktur + first + ":" + first + "." + last + " } }"));
+
+        assertEquals("IRI is malformed.", exception.getMessage());
     }
 
 

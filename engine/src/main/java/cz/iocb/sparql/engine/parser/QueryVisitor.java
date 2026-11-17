@@ -2433,7 +2433,14 @@ class IriVisitor extends BaseVisitor<IriNode>
             return new IriNode(prefixedName.getPrefix() + ":" + prefixedName.getLocalName());
         }
 
-        return new IriNode(prefix + prefixedName.getLocalName());
+        String iri = prefix + prefixedName.getLocalName();
+
+        // the IRI a prefixed name stands for is an IRI reference too (section 19.5 of SPARQL 1.2), whereas a malformed
+        // IRI of the prefix has been reported where the prefix is declared
+        if(!IriResolver.isIriReference(iri) && IriResolver.isIriReference(prefix))
+            messages.add(new TranslateMessage(MessageType.malformedIri, prefixedName.getRange()));
+
+        return new IriNode(iri);
     }
 
 

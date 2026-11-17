@@ -34,7 +34,8 @@ import cz.iocb.sparql.testing.Database;
  * base IRI in effect, as section 5.2 of RFC 3986 says: that of the last BASE declaration, and before it the IRI of the
  * service of the configuration, which is the default base IRI of its queries. When there is neither, a relative IRI is
  * an error of the query and the function IRI gives nothing for a relative reference, because it has to result in an
- * absolute IRI.
+ * absolute IRI. An IRI of a query, the one a prefixed name stands for included, has to be an IRI reference by the
+ * syntax of RFC 3987, and a malformed one is an error.
  */
 public class BaseIriTest
 {
@@ -268,6 +269,32 @@ public class BaseIriTest
         assertEquals(List.of("IRI is malformed."),
                 errors(plain, "SELECT (<http://example.org/" + Character.toString(0x85) + "> AS ?a) WHERE { }"));
         assertEquals(List.of("IRI is malformed."), errors(plain, "BASE <http://example.org/a##b> SELECT * WHERE { }"));
+    }
+
+
+    @Test
+    @DisplayName("the IRI a prefixed name stands for has to be well-formed")
+    void prefixedNameSyntax() throws Exception
+    {
+        // a local name may hold escaped delimiters, as far as the IRI stays well-formed
+        assertThat(
+                execute(plain,
+                        "PREFIX p: <http://example.org/a#> PREFIX q: <http://example.org/> "
+                                + "SELECT (p:b\\?c AS ?a) (p:b\\/c AS ?b) (q:b\\#c AS ?c) (q:b\\%41 AS ?d) WHERE { }"),
+                contains(iris("http://example.org/a#b?c", "http://example.org/a#b/c", "http://example.org/b#c",
+                        "http://example.org/b%41")));
+
+        // two fragments, and a percent sign that encodes no octet
+        assertEquals(List.of("IRI is malformed."),
+                errors(plain, "PREFIX p: <http://example.org/a#> SELECT (p:b\\#c AS ?a) WHERE { }"));
+        assertEquals(List.of("IRI is malformed."),
+                errors(plain, "PREFIX q: <http://example.org/> SELECT (q:b\\#c\\#d AS ?a) WHERE { }"));
+        assertEquals(List.of("IRI is malformed."),
+                errors(plain, "PREFIX q: <http://example.org/> SELECT (q:b\\%zz AS ?a) WHERE { }"));
+
+        // a malformed IRI of a prefix is reported where it is declared
+        assertEquals(List.of("IRI is malformed."),
+                errors(plain, "PREFIX p: <http://example.org/a##> SELECT (p:b AS ?a) (p:c AS ?b) WHERE { }"));
     }
 
 
