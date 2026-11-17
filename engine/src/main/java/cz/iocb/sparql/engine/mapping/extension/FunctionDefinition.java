@@ -56,15 +56,20 @@ public class FunctionDefinition
      *
      * @param functionName IRI of the SPARQL function
      * @param sqlFunction the implementing SQL function
-     * @param result class of the result
+     * @param result class of the result, which has to have a single column, the value the SQL function returns
      * @param arguments classes of the arguments
      * @param requiredArgumentCount number of mandatory leading arguments
      * @param canBeNull whether the value may be null
      * @param isDeterministic whether the node is deterministic
+     * @throws IllegalArgumentException if the result class has more than one column
      */
     public FunctionDefinition(String functionName, Function sqlFunction, ResourceClass result,
             List<ResourceClass> arguments, int requiredArgumentCount, boolean canBeNull, boolean isDeterministic)
     {
+        if(result.getColumnCount() != 1)
+            throw new IllegalArgumentException(
+                    "the result class of function " + functionName + " has to have a single column");
+
         this.functionName = functionName;
         this.sqlFunction = sqlFunction;
         this.result = result;
@@ -80,10 +85,11 @@ public class FunctionDefinition
      *
      * @param functionName IRI of the SPARQL function
      * @param sqlFunction the implementing SQL function
-     * @param result class of the result
+     * @param result class of the result, which has to have a single column, the value the SQL function returns
      * @param arguments classes of the arguments
      * @param canBeNull whether the value may be null
      * @param isDeterministic whether the node is deterministic
+     * @throws IllegalArgumentException if the result class has more than one column
      */
     public FunctionDefinition(String functionName, Function sqlFunction, ResourceClass result,
             List<ResourceClass> arguments, boolean canBeNull, boolean isDeterministic)
