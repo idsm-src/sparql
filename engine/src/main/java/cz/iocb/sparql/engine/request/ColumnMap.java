@@ -59,7 +59,9 @@ public class ColumnMap
 
     /**
      * The name itself if short enough, otherwise its unique shortened form: its longest beginning of at most
-     * {@code limit - numpart} bytes that ends at the boundary of a character, followed by a hexadecimal counter.
+     * {@code limit - numpart} bytes that ends at the boundary of a character, padded by underscores to that size and
+     * followed by a hexadecimal counter, so that a shortened name has the size of the limit and never equals a name
+     * kept as it is.
      *
      * @param name the name
      * @return the name itself if short enough, otherwise its unique shortened form
@@ -72,7 +74,8 @@ public class ColumnMap
         if(map.containsKey(name))
             return map.get(name);
 
-        String shortName = getBeginning(name, limit - numpart);
+        String beginning = getBeginning(name, limit - numpart);
+        String shortName = beginning + "_".repeat(limit - numpart - getSize(beginning));
 
         for(int i = 0;; i++)
         {

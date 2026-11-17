@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.request;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import cz.iocb.sparql.engine.mapping.classes.StringUserIriClass;
@@ -39,15 +40,21 @@ public class ColumnMapTest
         String d = Character.toString(0x1D400);
 
         assertThat(map.getSafeName(c.repeat(15)), is(c.repeat(15)));
-        assertThat(map.getSafeName(c.repeat(16)), is(c.repeat(13) + "00000000"));
-        assertThat(map.getSafeName(c.repeat(17)), is(c.repeat(13) + "00000001"));
-        assertThat(map.getSafeName("x" + c.repeat(16)), is("x" + c.repeat(13) + "00000000"));
+        assertThat(map.getSafeName(c.repeat(16)), is(c.repeat(13) + "___00000000"));
+        assertThat(map.getSafeName(c.repeat(17)), is(c.repeat(13) + "___00000001"));
+        assertThat(map.getSafeName("x" + c.repeat(16)), is("x" + c.repeat(13) + "__00000000"));
 
         // a surrogate pair stays whole
         assertThat(map.getSafeName(d.repeat(15)), is(d.repeat(15)));
-        assertThat(map.getSafeName(d.repeat(16)), is(d.repeat(13) + "00000000"));
-        assertThat(map.getSafeName("xx" + d.repeat(16)), is("xx" + d.repeat(13) + "00000000"));
+        assertThat(map.getSafeName(d.repeat(16)), is(d.repeat(13) + "___00000000"));
+        assertThat(map.getSafeName("xx" + d.repeat(16)), is("xx" + d.repeat(13) + "_00000000"));
         assertThat(map.getSafeName("xxx" + d.repeat(16)), is("xxx" + d.repeat(13) + "00000000"));
+
+        // a name kept as it is never equals a shortened one, which is padded to the limit
+        String kept = c.repeat(13) + "00000000";
+
+        assertThat(map.getSafeName(kept), is(kept));
+        assertThat(map.getSafeName(c.repeat(16)), not(kept));
     }
 
 

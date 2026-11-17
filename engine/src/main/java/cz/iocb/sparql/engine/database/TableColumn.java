@@ -39,7 +39,6 @@ public final class TableColumn extends Column
      */
     public TableColumn(String value, SqlType type, boolean canBeNull)
     {
-        //TODO: check whether the parameter is a valid SQL column name
         super(value, type);
         this.canBeNull = canBeNull;
     }
