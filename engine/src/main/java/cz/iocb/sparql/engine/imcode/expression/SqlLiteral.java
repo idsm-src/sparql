@@ -1,8 +1,10 @@
 package cz.iocb.sparql.engine.imcode.expression;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdBooleanIri;
 import static java.util.Collections.singletonMap;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -11,7 +13,13 @@ import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
+import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.mapping.datatypes.BooleanDatatype;
+import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
+import cz.iocb.sparql.engine.mapping.datatypes.DecimalDatatype;
+import cz.iocb.sparql.engine.mapping.datatypes.GenericIntegerDataType;
+import cz.iocb.sparql.engine.mapping.datatypes.StringDatatype;
 import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.Request;
@@ -120,6 +128,76 @@ public final class SqlLiteral extends SqlExpressionIntercode
     public Literal getLiteral()
     {
         return literal;
+    }
+
+
+    /**
+     * True if the literal is of an unknown datatype or of an invalid lexical form, which the class of the unsupported
+     * literals holds.
+     *
+     * @return true if the literal is of an unknown datatype or of an invalid lexical form, false otherwise
+     */
+    public boolean isUnsupported()
+    {
+        return getMappings().containsKey(unsupportedType);
+    }
+
+
+    /**
+     * The datatype of the literal, by its class: null for a literal of an unknown datatype or of an invalid lexical
+     * form, whose class is that of the unsupported literals.
+     *
+     * @return the datatype of the literal, or null
+     */
+    public Datatype getDatatype()
+    {
+        PrimitiveResourceClass resClass = getMappings().keySet().iterator().next().getEffectiveClass();
+
+        return resClass instanceof LiteralClass literalClass ? literalClass.getDatatype() : null;
+    }
+
+
+    /**
+     * The value of a literal of an exact numeric datatype (xsd:decimal, xsd:integer and the datatypes derived from
+     * them), by its canonical lexical form, so that the values of literals of different datatypes compare as numbers.
+     *
+     * @return the value of a literal of an exact numeric datatype, or null for another literal
+     */
+    public BigDecimal getExactNumber()
+    {
+        Datatype datatype = getDatatype();
+
+        if(!(datatype instanceof GenericIntegerDataType || datatype instanceof DecimalDatatype))
+            return null;
+
+        return new BigDecimal(datatype.getCanonicalLexicalForm(literal.getValue()));
+    }
+
+
+    /**
+     * The value of an xsd:boolean literal, by its canonical lexical form.
+     *
+     * @return the value of an xsd:boolean literal, or null for another literal
+     */
+    public Boolean getBoolean()
+    {
+        Datatype datatype = getDatatype();
+
+        if(!(datatype instanceof BooleanDatatype))
+            return null;
+
+        return Boolean.valueOf(datatype.getCanonicalLexicalForm(literal.getValue()));
+    }
+
+
+    /**
+     * The value of an xsd:string literal.
+     *
+     * @return the value of an xsd:string literal, or null for another literal
+     */
+    public String getString()
+    {
+        return getDatatype() instanceof StringDatatype ? literal.getValue() : null;
     }
 
 

@@ -397,6 +397,68 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
 
 
     /**
+     * The comparison of two constant literals decided at translation where their values decide it alike in every
+     * datatype the extension would compare them in: exact numbers of any of their datatypes by their values and
+     * booleans by every operator, two xsd:strings by equality, and two literals of unknown datatypes or of invalid
+     * lexical forms by equality, which is true for one term and an error otherwise. Floating-point numbers, temporal
+     * values, durations, user literals and the order of strings, which the database decides by its rules, are left to
+     * SQL, as are pairs of other datatypes.
+     *
+     * @param operator the operator
+     * @param left the left literal
+     * @param right the right literal
+     * @return the constant result of the comparison, or null when SQL compares the literals
+     */
+    private static SqlExpressionIntercode compareConstants(ComparisonOperator operator, SqlLiteral left,
+            SqlLiteral right)
+    {
+        boolean equality = operator == EQUAL || operator == NOT_EQUAL;
+
+        if(left.isUnsupported() && right.isUnsupported())
+        {
+            if(!equality)
+                return null;
+
+            return left.getLiteral().equals(right.getLiteral()) ? decide(operator, 0) : SqlNull.get();
+        }
+
+        if(left.getExactNumber() != null && right.getExactNumber() != null)
+            return decide(operator, left.getExactNumber().compareTo(right.getExactNumber()));
+
+        if(left.getBoolean() != null && right.getBoolean() != null)
+            return decide(operator, left.getBoolean().compareTo(right.getBoolean()));
+
+        if(equality && left.getString() != null && right.getString() != null)
+            return decide(operator, left.getString().equals(right.getString()) ? 0 : 1);
+
+        return null;
+    }
+
+
+    /**
+     * The constant result of the operator over operands of the given order.
+     *
+     * @param operator the operator
+     * @param order negative, zero or positive when the left operand is less than, equal to or greater than the other
+     * @return the constant result of the operator
+     */
+    private static SqlExpressionIntercode decide(ComparisonOperator operator, int order)
+    {
+        boolean value = switch(operator)
+        {
+            case EQUAL -> order == 0;
+            case NOT_EQUAL -> order != 0;
+            case LESS_THAN -> order < 0;
+            case GREATER_THAN -> order > 0;
+            case LESS_THAN_OR_EQUAL -> order <= 0;
+            case GREATER_THAN_OR_EQUAL -> order >= 0;
+        };
+
+        return value ? trueValue : falseValue;
+    }
+
+
+    /**
      * Comparison materialising only the needed result; constant when the classes decide it.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
@@ -425,7 +487,13 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
         if(same != null)
             return same == (operator == EQUAL) ? trueValue : falseValue;
 
-        //TODO: add compile-time evaluation for literals
+        if(left instanceof SqlLiteral a && right instanceof SqlLiteral b)
+        {
+            SqlExpressionIntercode decided = compareConstants(operator, a, b);
+
+            if(decided != null)
+                return decided;
+        }
 
         Map<ResourceClass, Set<List<ResourceClass>>> map = new HashMap<>();
         Set<List<ResourceClass>> set = new HashSet<>();

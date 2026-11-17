@@ -15,6 +15,7 @@ import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import static java.util.Collections.singletonMap;
 import static java.util.stream.Collectors.toSet;
+import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +30,7 @@ import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.mapping.datatypes.FloatPointDatatype;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBindings;
 
@@ -82,6 +84,37 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
 
 
     /**
+     * The effective boolean value of a constant literal decided at translation: a boolean is its value, an exact or a
+     * floating-point number is false when it is zero or NaN, and an xsd:string is false when it is empty, the values
+     * taken from the canonical lexical forms; null for any other literal, which keeps the way through the classes, an
+     * error for most of them.
+     *
+     * @param literal the literal
+     * @return the effective boolean value of the literal, or null when it is not decided at translation
+     */
+    private static Boolean getConstantValue(SqlLiteral literal)
+    {
+        if(literal.getBoolean() != null)
+            return literal.getBoolean();
+
+        if(literal.getExactNumber() != null)
+            return literal.getExactNumber().signum() != 0;
+
+        if(literal.getString() != null)
+            return !literal.getString().isEmpty();
+
+        if(literal.getDatatype() instanceof FloatPointDatatype datatype)
+        {
+            String form = datatype.getCanonicalLexicalForm(literal.getLiteral().getValue());
+
+            return !form.equals("NaN") && (form.endsWith("INF") || new BigDecimal(form).signum() != 0);
+        }
+
+        return null;
+    }
+
+
+    /**
      * Effective boolean value materialising only when needed; constants and NULL pass through.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
@@ -98,7 +131,13 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
         if(operand.equals(trueValue) || operand.equals(falseValue))
             return operand;
 
-        //TODO: add compile-time evaluation for literals
+        if(operand instanceof SqlLiteral literal)
+        {
+            Boolean value = getConstantValue(literal);
+
+            if(value != null)
+                return value ? trueValue : falseValue;
+        }
 
         if(operand.getMappings().keySet().stream().noneMatch(r -> !areDisjunct(relations, r, operandClass)))
             return SqlNull.get();
