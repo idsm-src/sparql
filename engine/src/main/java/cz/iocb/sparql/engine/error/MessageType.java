@@ -47,9 +47,9 @@ public enum MessageType
     invalidMultiProcedureCallSubject(ERROR, "The procedure '%s' requires an blank node syntax as its result."),
 
     /**
-     * The predicate of a procedure call is a property path.
+     * The predicate of a procedure call is a property path (other than a negated property set, which calls nothing).
      */
-    invalidProcedureCallPropertyPathCombinaion(ERROR, "Cannot combine procedure call with property paths."),
+    invalidProcedureCallPropertyPathCombination(ERROR, "Cannot combine procedure call with property paths."),
 
     /**
      * A parameter of a procedure call is named by something other than an IRI.

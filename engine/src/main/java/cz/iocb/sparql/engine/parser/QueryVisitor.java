@@ -124,6 +124,7 @@ import cz.iocb.sparql.engine.model.triple.BlankNodePropertyList;
 import cz.iocb.sparql.engine.model.triple.ComplexNode;
 import cz.iocb.sparql.engine.model.triple.ComplexTriple;
 import cz.iocb.sparql.engine.model.triple.ComplexTripleTerm;
+import cz.iocb.sparql.engine.model.triple.NegatedPath;
 import cz.iocb.sparql.engine.model.triple.Node;
 import cz.iocb.sparql.engine.model.triple.Property;
 import cz.iocb.sparql.engine.model.triple.RdfCollection;
@@ -1356,15 +1357,26 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
             }
             else
             {
+                /* NOTE: A path cannot call a procedure: an alternative or a repetition names no call, and brackets, an
+                 * inverse or a sequence would add nothing to the plain syntax of a call. A negated property set names
+                 * only the properties a triple must not have, so it calls nothing and is a path like any other.
+                 */
                 new ElementVisitor<Void>()
                 {
                     @Override
                     public Void visit(IriNode iri)
                     {
                         if(config.getProcedures(service).get(iri.getValue()) != null)
-                            messages.add(new TranslateMessage(MessageType.invalidProcedureCallPropertyPathCombinaion,
-                                    iri.getRange())); //TODO: could be supported in a future version
+                            messages.add(new TranslateMessage(MessageType.invalidProcedureCallPropertyPathCombination,
+                                    iri.getRange()));
 
+                        return null;
+                    }
+
+
+                    @Override
+                    public Void visit(NegatedPath negatedPath)
+                    {
                         return null;
                     }
                 }.visitElement(predicate);
