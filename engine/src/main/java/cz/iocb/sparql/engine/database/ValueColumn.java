@@ -23,8 +23,25 @@ public final class ValueColumn extends ConstantColumn
      */
     public ValueColumn(String literal, SqlType type)
     {
-        super("'" + Objects.requireNonNull(literal).replaceAll("'", "''") + "'::" + type, type);
+        super(quote(Objects.requireNonNull(literal)) + "::" + type, type);
         this.literal = literal;
+    }
+
+
+    /**
+     * The SQL string constant of the text, which stands for the text whatever the setting
+     * {@code standard_conforming_strings} of the server is: the quotes are doubled, and a text holding a backslash is
+     * written as an escape string constant ({@code E'...'}) with its backslashes doubled, as a backslash in a plain
+     * constant escapes the next character when the setting is off.
+     *
+     * @param text the text
+     * @return the SQL string constant of the text
+     */
+    public static String quote(String text)
+    {
+        String quoted = text.replace("'", "''");
+
+        return quoted.indexOf('\\') < 0 ? "'" + quoted + "'" : "E'" + quoted.replace("\\", "\\\\") + "'";
     }
 
 

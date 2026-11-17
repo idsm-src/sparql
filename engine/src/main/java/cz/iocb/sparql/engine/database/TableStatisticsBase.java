@@ -278,13 +278,14 @@ public abstract class TableStatisticsBase implements TableStatistics
 
 
     /**
-     * SQL string literal of the text.
+     * SQL string literal of the text, which stands for the text whatever the setting
+     * {@code standard_conforming_strings} of the server is (see {@link ValueColumn#quote}).
      *
      * @param text the text
      * @return SQL string literal of the text
      */
     protected static String literal(String text)
     {
-        return "'" + text.replace("'", "''") + "'";
+        return ValueColumn.quote(text);
     }
 }

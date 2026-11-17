@@ -22,14 +22,15 @@ public class CodeHelper
 
 
     /**
-     * Single-quoted SQL string literal of the object's text.
+     * SQL string literal of the object's text, which stands for the text whatever the setting
+     * {@code standard_conforming_strings} of the server is (see {@link ValueColumn#quote}).
      *
      * @param object the value to quote
-     * @return single-quoted SQL string literal of the object's text
+     * @return SQL string literal of the object's text
      */
     public static String string(Object object)
     {
-        return "'" + object.toString().replaceAll("'", "''") + "'";
+        return ValueColumn.quote(object.toString());
     }
 
 
