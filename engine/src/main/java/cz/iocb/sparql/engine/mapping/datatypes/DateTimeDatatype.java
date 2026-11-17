@@ -13,7 +13,7 @@ import java.time.format.SignStyle;
 import java.time.temporal.ChronoField;
 import java.util.Locale;
 import java.util.Map;
-import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.mapping.classes.DateTimeInZoneBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DateTimeInZoneClass;
@@ -75,6 +75,17 @@ public final class DateTimeDatatype extends TemporalDatatype
     private static final OffsetDateTime MAX_VALUE = OffsetDateTime.parse("294276-12-31T23:59:59.999999Z",
             inputFormatter);
 
+    /**
+     * The date and time of a lexical form, which precede its timezone offset.
+     */
+    private static final Pattern dateTimePattern = Pattern.compile(DATETIME);
+
+    /**
+     * The classes of the values of an offset in other than the canonical form, by the offset, each computed on its
+     * first use (see {@link #getResourceClass}).
+     */
+    private final Map<Integer, ResourceClass> otherFormClasses = new ConcurrentHashMap<>();
+
 
     /**
      * Creates the datatype.
@@ -107,12 +118,15 @@ public final class DateTimeDatatype extends TemporalDatatype
         if(!isValidForm(literal.getValue()))
             return unsupportedType;
 
+        int zone = getZone(literal);
+
         // the values of the offset in other than the canonical form: the base class of the offset overlaps every
         // canonical class not bound to another offset, so it is taken without the canonical class of all offsets
         if(!isCanonicalForm(literal.getValue()))
-            return subtract(DateTimeInZoneBaseClass.get(getZone(literal)), getCanonicalLiteralClass()); //TODO use cache
+            return otherFormClasses.computeIfAbsent(zone,
+                    z -> subtract(DateTimeInZoneBaseClass.get(z), getCanonicalLiteralClass()));
 
-        return DateTimeInZoneClass.get(getZone(literal));
+        return DateTimeInZoneClass.get(zone);
     }
 
 
@@ -181,7 +195,7 @@ public final class DateTimeDatatype extends TemporalDatatype
      */
     public static int getZone(Literal literal)
     {
-        String zone = Datatype.getCollapsedForm(literal.getValue()).replaceFirst(TemporalDatatype.DATETIME, "");
+        String zone = dateTimePattern.matcher(Datatype.getCollapsedForm(literal.getValue())).replaceFirst("");
 
         if(zone.equals("Z"))
             return 0;
@@ -189,6 +203,6 @@ public final class DateTimeDatatype extends TemporalDatatype
         if(zone.isEmpty())
             return Integer.MIN_VALUE;
 
-        return TimeZone.getTimeZone("GMT" + zone).getRawOffset() / 1000;
+        return ZoneOffset.of(zone).getTotalSeconds();
     }
 }

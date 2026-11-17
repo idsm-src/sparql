@@ -6,13 +6,14 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDate
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.subtract;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateIri;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.SignStyle;
 import java.time.temporal.ChronoField;
 import java.util.Locale;
 import java.util.Map;
-import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.mapping.classes.DateInZoneBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DateInZoneClass;
@@ -65,6 +66,17 @@ public final class DateDatatype extends TemporalDatatype
      */
     private static final LocalDate MAX_VALUE = LocalDate.parse("5874897-12-31Z", inputFormatter);
 
+    /**
+     * The date of a lexical form, which precedes its timezone offset.
+     */
+    private static final Pattern datePattern = Pattern.compile(DATE);
+
+    /**
+     * The classes of the values of an offset in other than the canonical form, by the offset, each computed on its
+     * first use (see {@link #getResourceClass}).
+     */
+    private final Map<Integer, ResourceClass> otherFormClasses = new ConcurrentHashMap<>();
+
 
     /**
      * Creates the datatype.
@@ -97,12 +109,15 @@ public final class DateDatatype extends TemporalDatatype
         if(!isValidForm(literal.getValue()))
             return unsupportedType;
 
+        int zone = getZone(literal);
+
         // the values of the offset in other than the canonical form: the base class of the offset overlaps every
         // canonical class not bound to another offset, so it is taken without the canonical class of all offsets
         if(!isCanonicalForm(literal.getValue()))
-            return subtract(DateInZoneBaseClass.get(getZone(literal)), getCanonicalLiteralClass()); //TODO use cache
+            return otherFormClasses.computeIfAbsent(zone,
+                    z -> subtract(DateInZoneBaseClass.get(z), getCanonicalLiteralClass()));
 
-        return DateInZoneClass.get(getZone(literal));
+        return DateInZoneClass.get(zone);
     }
 
 
@@ -163,7 +178,7 @@ public final class DateDatatype extends TemporalDatatype
      */
     public static int getZone(Literal literal)
     {
-        String zone = Datatype.getCollapsedForm(literal.getValue()).replaceFirst(TemporalDatatype.DATE, "");
+        String zone = datePattern.matcher(Datatype.getCollapsedForm(literal.getValue())).replaceFirst("");
 
         if(zone.equals("Z"))
             return 0;
@@ -171,6 +186,6 @@ public final class DateDatatype extends TemporalDatatype
         if(zone.isEmpty())
             return Integer.MIN_VALUE;
 
-        return TimeZone.getTimeZone("GMT" + zone).getRawOffset() / 1000;
+        return ZoneOffset.of(zone).getTotalSeconds();
     }
 }
