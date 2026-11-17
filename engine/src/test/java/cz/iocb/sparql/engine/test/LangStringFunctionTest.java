@@ -6,6 +6,9 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntege
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.is;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -22,6 +25,7 @@ import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
+import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
@@ -38,7 +42,8 @@ import cz.iocb.sparql.testing.Database;
  * String functions over a language-tagged string whose tag comes from a column of its own (the general language string
  * class of two columns): the functions preserving the string type keep the tag column next to the new value. REPLACE
  * may fail whatever its arguments are, and the tag column could not tell that its result is unbound, so the result of
- * REPLACE is boxed.
+ * REPLACE is boxed. A computed language-tagged string is compared with such a string as a box, also by {@code !=}, for
+ * which the box has an operator of the extension of its own.
  */
 public class LangStringFunctionTest
 {
@@ -145,6 +150,30 @@ public class LangStringFunctionTest
                 execute("SELECT ?r (LANG(?r) AS ?t) (BOUND(?r) AS ?b) WHERE { ?x ex:label ?l "
                         + "BIND(REPLACE(?l, \"(\", \"o\") AS ?r) }"),
                 contains(row(null, null, new TypedLiteral("false", xsdBooleanIri))));
+    }
+
+
+    @Test
+    @DisplayName("the inequality of a computed language-tagged string and one with a tag column")
+    void inequality() throws Exception
+    {
+        Object[] item = { row(new Iri("http://example.org/item/1")) };
+
+        assertThat(execute("SELECT ?x WHERE { ?x ex:label ?l FILTER(LCASE(?l) != ?l) }"), is(empty()));
+        assertThat(execute("SELECT ?x WHERE { ?x ex:label ?l FILTER(UCASE(?l) != ?l) }"), contains(item));
+        assertThat(execute("SELECT ?x WHERE { ?x ex:label ?l FILTER(STRLANG(STR(?l), \"en\") != ?l) }"), is(empty()));
+        assertThat(execute("SELECT ?x WHERE { ?x ex:label ?l FILTER(STRLANG(STR(?l), \"cs\") != ?l) }"),
+                contains(item));
+
+        // the equality that the inequality negates
+        assertThat(execute("SELECT ?x WHERE { ?x ex:label ?l FILTER(STRLANG(STR(?l), \"en\") = ?l) }"), contains(item));
+
+        // terms of inline data, compared as boxes as well
+        assertThat(
+                execute("SELECT ?t ?r WHERE { VALUES (?t ?r) { (\"cs\" \"a\"@en) (\"en\" \"a\"@en) (\"en\" \"b\"@en) } "
+                        + "FILTER(STRLANG(\"a\", ?t) != ?r) }"),
+                containsInAnyOrder(row(new TypedLiteral("cs", xsdStringIri), new LangStringLiteral("a", "en")),
+                        row(new TypedLiteral("en", xsdStringIri), new LangStringLiteral("b", "en"))));
     }
 
 

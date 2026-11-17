@@ -300,7 +300,10 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
         LITERAL,
 
         /**
-         * Direct SQL comparison of the columns (strings, references, literals of one handled datatype).
+         * Comparison of the columns: the equality operators by the identity of the types of the columns, which is the
+         * equality of the values for the classes whose equal values are the same terms (IRIs, blank nodes, strings,
+         * language-tagged strings, the literals of one canonical class), the ordering operators of strings by the
+         * operators of their type.
          */
         DIRECT,
 
@@ -1068,15 +1071,20 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                 if(left.hasExpressionColumn(relations, lset) || right.hasExpressionColumn(relations, rset))
                     cmp = getExpressionClass(classes);
 
-                //FIXME: use correct compare operator, when unionClass is rdfbox
-
                 List<Column> cl = left.get(relations, cmp);
                 List<Column> cr = right.get(relations, cmp);
 
                 if(operator == EQUAL)
                     yield getIdentityConditions(cmp, cl, cr).stream().collect(SqlCode.joining(" AND ", "(", ")"));
-                else if(operator == NOT_EQUAL && cmp.getColumnCount() > 1)
-                    yield getNonIdentityConditions(cmp, cl, cr).stream().collect(SqlCode.joining(" OR ", "(", ")"));
+
+                if(operator == NOT_EQUAL)
+                {
+                    // the operator of the type, which a box or another type of the extension has of its own
+                    List<SqlCode> conditions = getNonIdentityConditions(cmp, cl, cr);
+
+                    yield conditions.size() == 1 ? conditions.get(0) :
+                            conditions.stream().collect(SqlCode.joining(" OR ", "(", ")"));
+                }
 
                 yield IntStream.range(0, cmp.getColumnCount())
                         .mapToObj(i -> SqlCode.of(cl.get(i), " ", operator.getText(), " ", cr.get(i)))
