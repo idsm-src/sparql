@@ -493,7 +493,9 @@ public class Request implements AutoCloseable
             ResultType type = query.getResultType();
 
 
-            int border = syntaxTree instanceof ConstructQuery cnst ? fetchSize / cnst.getTemplates().size() : fetchSize;
+            // the solutions whose triples fill one fetch (a template of no triple constructs none)
+            int border = syntaxTree instanceof ConstructQuery cnst ?
+                    fetchSize / Math.max(1, cnst.getTemplates().size()) : fetchSize;
             Select select = syntaxTree.getSelect();
 
             if(syntaxTree instanceof AskQuery)
