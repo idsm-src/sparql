@@ -4,7 +4,6 @@ import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -458,6 +457,7 @@ public sealed abstract class ResourceClass permits PrimitiveResourceClass, Deriv
      * @param resClasses the resource classes
      * @return class in which an expression over values of the given classes is evaluated: their union, stored in the
      *         single-column superclass selected by {@link #getExpressionClass(ResourceClass)}
+     * @throws IllegalArgumentException if the union has several columns and no single-column superclass
      */
     public static ResourceClass getExpressionClass(Set<ResourceClass> resClasses)
     {
@@ -467,11 +467,14 @@ public sealed abstract class ResourceClass permits PrimitiveResourceClass, Deriv
 
     /**
      * The most specific single-column primitive superclass of the (effective) class, i.e. the narrowest type able to
-     * hold its values in one SQL expression; the class itself when it has a single column.
+     * hold its values in one SQL expression; the class itself when it has a single column. Of several minimal
+     * single-column superclasses, the one {@link PrimitiveResourceClass#getCommonSuperclass} would choose: the first by
+     * name.
      *
      * @param resClass the resource class
      * @return the most specific single-column primitive superclass of the (effective) class, i.e. the narrowest type
      *         able to hold its values in one SQL expression; the class itself when it has a single column
+     * @throws IllegalArgumentException if the class has several columns and no single-column superclass
      */
     public static ResourceClass getExpressionClass(ResourceClass resClass)
     {
@@ -481,23 +484,15 @@ public sealed abstract class ResourceClass permits PrimitiveResourceClass, Deriv
         if(resClass.getColumnCount() == 1)
             return resClass;
 
-        Set<ResourceClass> candidates = ((PrimitiveResourceClass) resClass).getSuperClasses().stream()
+        Set<PrimitiveResourceClass> candidates = ((PrimitiveResourceClass) resClass).getSuperClasses().stream()
                 .filter(r -> r.getColumnCount() == 1).collect(toSet());
 
-        //FIXME: modify to work correctly even in case of multiple or cyclic inheritance
+        PrimitiveResourceClass expressionClass = DerivedClass.select(DerivedClass.reduceSuperclasses(candidates));
 
-        Iterator<ResourceClass> it = candidates.iterator();
-        ResourceClass effectiveClass = it.next();
+        if(expressionClass == null)
+            throw new IllegalArgumentException("class " + resClass + " has no single-column superclass");
 
-        while(it.hasNext())
-        {
-            ResourceClass next = it.next();
-
-            if(next.isSubclassOf(effectiveClass))
-                effectiveClass = next;
-        }
-
-        return effectiveClass;
+        return expressionClass;
     }
 
 

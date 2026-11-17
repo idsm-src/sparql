@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -101,13 +102,13 @@ public sealed abstract class PrimitiveResourceClass extends ResourceClass
 
 
     /**
-     * Primitive classes this class can be converted to (the class itself excluded).
+     * Primitive classes this class can be converted to (the class itself excluded), as an unmodifiable view.
      *
      * @return primitive classes this class can be converted to (the class itself excluded)
      */
     public Set<PrimitiveResourceClass> getSuperClasses()
     {
-        return superClasses;
+        return Collections.unmodifiableSet(superClasses);
     }
 
 
