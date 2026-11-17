@@ -2,10 +2,12 @@ package cz.iocb.sparql.engine.imcode;
 
 import static cz.iocb.sparql.engine.database.SqlType.CHAR;
 import static cz.iocb.sparql.engine.database.SqlType.TEXT;
+import static cz.iocb.sparql.engine.database.SqlType.TIMESTAMPTZ;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.determineResultClass;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDayTimeDuration;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDateTime;
@@ -36,7 +38,6 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.strScalarBlan
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.tripleTerm;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.userType;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
@@ -1101,14 +1102,17 @@ public final class SqlSelect extends SqlIntercode
                     addOrderKey(keys, binding.deriveMapping(relations, genScalarDate).get(0), codepoints);
             }
 
-            // order xsd:dateTimes
+            // order xsd:dateTimes: by the instant alone when every class holds it in a column of its own (the composite
+            // classes and the classes of an offset), as the values of one instant are equal, and by the scalar value
+            // otherwise
             if(sortSet.get(genScalarDateTime) != null)
             {
                 Set<ResourceClass> dateTimes = sortSet.get(genScalarDateTime);
 
-                //FIXME: should be optimized
-                ResourceClass sortClass = dateTimes.stream().allMatch(r -> r.isSubclassOf(xsdDateTime)) ? xsdDateTime :
-                        genScalarDateTime;
+                // NOTE: a variable of scalar and composite classes still converts the composite values row by row
+                ResourceClass sortClass = dateTimes.stream()
+                        .allMatch(r -> r.getEffectiveClass().getSqlTypes().get(0) == TIMESTAMPTZ) ? genDateTime :
+                                genScalarDateTime;
 
                 addOrderKey(keys, binding.deriveMapping(relations, sortClass).get(0), codepoints);
             }
