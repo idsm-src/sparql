@@ -4,6 +4,7 @@ import java.math.BigInteger;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLTimeoutException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -560,18 +561,26 @@ public class Request implements AutoCloseable
 
             logger.trace("query evaluation");
 
-            if(config.isJoinOptimizerEnabled())
+            try
             {
-                // the joins are written in the order and with the methods the engine has chosen: the planner must keep
-                // the order of the explicit joins and hash them (a merge join would sort the values, which is slow for
-                // boxes), the index lookups being forced by lateral subqueries (see JoinOptimizer); the settings last
-                // until the end of the transaction of the request
-                getStatement().execute("SET LOCAL join_collapse_limit = 1; SET LOCAL enable_nestloop = off; "
-                        + "SET LOCAL enable_mergejoin = off");
-            }
+                if(config.isJoinOptimizerEnabled())
+                {
+                    // the joins are written in the order and with the methods the engine has chosen: the planner must
+                    // keep the order of the explicit joins and hash them (a merge join would sort the values, which is
+                    // slow for boxes), the index lookups being forced by lateral subqueries (see JoinOptimizer); the
+                    // settings last until the end of the transaction of the request
+                    getStatement().execute("SET LOCAL join_collapse_limit = 1; SET LOCAL enable_nestloop = off; "
+                            + "SET LOCAL enable_mergejoin = off");
+                }
 
-            return new Result(type, imcode.getResultDescription(), getStatement(fetchSize).executeQuery(code), begin,
-                    timeout);
+                return new Result(type, imcode.getResultDescription(), getStatement(fetchSize).executeQuery(code),
+                        begin, timeout);
+            }
+            catch(SQLRuntimeException e)
+            {
+                // a statement of an elapsed or cancelled request
+                throw(SQLException) e.getCause();
+            }
         }
         catch(SQLException e)
         {
@@ -820,22 +829,34 @@ public class Request implements AutoCloseable
 
 
     /**
-     * Remaining time of the timeout in whole seconds for the statement; 0 for no timeout, 1 when already elapsed.
+     * Remaining time of the timeout for a statement, in whole seconds rounded up, so that a statement is never
+     * cancelled before the time limit, though it may run less than a second past it; 0 for no timeout.
      *
-     * @return remaining time of the timeout in whole seconds for the statement; 0 for no timeout, 1 when already
-     *         elapsed
+     * @return remaining time of the timeout for a statement in whole seconds rounded up; 0 for no timeout
+     * @throws SQLTimeoutException with the SQL state 57014 of a cancelled statement if the time limit has elapsed
      */
-    private int getStatementTimeout()
+    private int getStatementTimeout() throws SQLTimeoutException
     {
         if(timeout == 0)
             return 0;
 
-        int restTime = (int) ((timeout - (System.nanoTime() - begin)) / 1000000000);
+        long rest = timeout - (System.nanoTime() - begin);
 
-        if(restTime <= 0)
-            return 1; //FIXME: throw exception
+        if(rest <= 0)
+            throw new SQLTimeoutException("query timeout", "57014", 0);
 
-        return restTime;
+        return (int) Math.min(Integer.MAX_VALUE, Math.ceilDiv(rest, 1_000_000_000L));
+    }
+
+
+    /**
+     * True if the request has been cancelled (see {@link #cancel}).
+     *
+     * @return true if the request has been cancelled, false otherwise
+     */
+    public synchronized boolean isCanceled()
+    {
+        return canceled;
     }
 
 
@@ -846,6 +867,9 @@ public class Request implements AutoCloseable
      * @param fetchSize the JDBC fetch size
      * @return the statement of the request (created on first use) with the given fetch size and the remaining part of
      *         the timeout set
+     * @throws SQLRuntimeException wrapping a {@link SQLTimeoutException} with the SQL state 57014 if the time limit of
+     *             the request has elapsed, or another {@link SQLException} if the request has been cancelled or the
+     *             statement cannot be created
      */
     public synchronized Statement getStatement(int fetchSize)
     {
@@ -873,6 +897,7 @@ public class Request implements AutoCloseable
      * The statement of the request with no fetch size limit.
      *
      * @return the statement of the request with no fetch size limit
+     * @throws SQLRuntimeException as {@link #getStatement(int)} does
      */
     public synchronized Statement getStatement()
     {

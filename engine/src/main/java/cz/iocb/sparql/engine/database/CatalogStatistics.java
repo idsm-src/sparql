@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.database;
 
+import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -113,12 +114,13 @@ public final class CatalogStatistics extends TableStatisticsBase
      * Reads the frequency of the value in the column from the list of the most common values of the catalog, the value
      * and the values of the list being compared by their text forms (so that a value whose text form the input of the
      * type does not take back cannot fail the lookup); a failing lookup counts as the value not being among the most
-     * common ones.
+     * common ones, but for the lookup of a request that is out of time or cancelled, which is no answer at all.
      *
      * @param request the current request
      * @param column the column
      * @param value SQL expression of the value
      * @return frequency of the value, or {@code NaN} if it is not among the most common values
+     * @throws SQLRuntimeException if the request is out of time (SQL state 57014) or cancelled
      */
     private double readFrequency(Request request, TableColumn column, Column value)
     {
@@ -139,6 +141,12 @@ public final class CatalogStatistics extends TableStatisticsBase
         }
         catch(SQLRuntimeException e)
         {
+            // a request out of time or cancelled has not looked the value up, and the frequency, which the statistics
+            // keep for the following requests, must not be taken for the value not being among the most common ones
+            if(request.isCanceled()
+                    || e.getCause() instanceof SQLException cause && "57014".equals(cause.getSQLState()))
+                throw e;
+
             return Double.NaN;
         }
     }
