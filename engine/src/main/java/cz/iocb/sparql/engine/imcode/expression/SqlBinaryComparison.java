@@ -33,6 +33,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasTripleTerm;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasUnsupportedLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasUserLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDate;
@@ -91,10 +92,13 @@ import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
 import cz.iocb.sparql.engine.mapping.classes.DateInZoneClass;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
+import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.TripleTermClass;
 import cz.iocb.sparql.engine.mapping.classes.TripleTermClass.Component;
+import cz.iocb.sparql.engine.mapping.classes.UserLiteralBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
@@ -302,6 +306,12 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
          * SPARQL has no row in its operator mapping, compare them as the box does.
          */
         DURATION,
+
+        /**
+         * Equality of the values of literals of one user datatype, whatever their lexical forms are: the value column
+         * of the base class of the datatype compared by the equality of its type.
+         */
+        USER_VALUE,
 
         /**
          * Equality of literals of the unsupported class: the same term is equal, anything else is an error.
@@ -559,6 +569,10 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
         if(isDayTimeDuration(l) && isDayTimeDuration(r))
             return ComparisonType.NOT_NULL;
 
+        // so do the literals of one user datatype, which the box orders by the comparison of their type, if it has one
+        if(areOfOneUserDatatype(l, r))
+            return equalityComparison ? ComparisonType.NOT_NULL : ComparisonType.FULL;
+
         if(hasNumeric(l) && hasNumeric(r))
             return ComparisonType.FULL;
 
@@ -575,6 +589,9 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             return ComparisonType.FULL;
 
         if(hasDayTimeDuration(l) && hasDayTimeDuration(r))
+            return ComparisonType.FULL;
+
+        if(!equalityComparison && hasUserLiteral(l) && hasUserLiteral(r))
             return ComparisonType.FULL;
 
         if(!equalityComparison)
@@ -819,6 +836,8 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             return ComparisonMode.DATE;
         else if(isDayTimeDuration(left) && isDayTimeDuration(right))
             return ComparisonMode.DURATION;
+        else if(areOfOneUserDatatype(left, right))
+            return operator == EQUAL || operator == NOT_EQUAL ? ComparisonMode.USER_VALUE : ComparisonMode.BOX;
         else if(isBoolean(left) && isBoolean(right))
             return ComparisonMode.BOOLEAN;
         else if(isString(left) && isString(right))
@@ -835,6 +854,8 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             return ComparisonMode.BOX;
         else if(hasString(left) && hasString(right))
             return ComparisonMode.BOX;
+        else if(operator != EQUAL && operator != NOT_EQUAL && hasUserLiteral(left) && hasUserLiteral(right))
+            return ComparisonMode.BOX;
         else if(operator != EQUAL && operator != NOT_EQUAL)
             return ComparisonMode.NULL;
         else if(left.getEffectiveClass() instanceof TripleTermClass
@@ -850,6 +871,44 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             return ResourceClass.areDisjunct(relations, left, right) ? ComparisonMode.DIFF : ComparisonMode.DIRECT;
         else
             return ComparisonMode.BOX;
+    }
+
+
+    /**
+     * The base class of the user datatype all literals of the class are of: the class of the valid literals of the
+     * datatype, which holds the value of a literal in its first column and the lexical form of a literal in another
+     * than the canonical form in the second one.
+     *
+     * @param resClass the class
+     * @return the base class of the user datatype, or null if the class holds no literals of a single user datatype
+     */
+    private static LiteralClass getUserDatatypeBase(ResourceClass resClass)
+    {
+        ResourceClass effective = resClass.getEffectiveClass();
+
+        if(effective instanceof UserLiteralClass canonical)
+            return canonical.getBaseClass();
+
+        if(effective instanceof UserLiteralBaseClass base)
+            return base;
+
+        return null;
+    }
+
+
+    /**
+     * True if all literals of both classes are of one user datatype, whose canonical and other lexical forms are held
+     * by classes of their own.
+     *
+     * @param left one class
+     * @param right the other class
+     * @return true if all literals of both classes are of one user datatype, false otherwise
+     */
+    private static boolean areOfOneUserDatatype(ResourceClass left, ResourceClass right)
+    {
+        LiteralClass base = getUserDatatypeBase(left);
+
+        return base != null && base.equals(getUserDatatypeBase(right));
     }
 
 
@@ -993,6 +1052,16 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                 Column cl = left.get(relations, genDayTimeDuration).get(0);
                 Column cr = right.get(relations, genDayTimeDuration).get(0);
                 yield SqlCode.of("(", cl, " ", operator.getText(), " ", cr, ")");
+            }
+
+            case USER_VALUE ->
+            {
+                // every class compared so is of the one datatype, a class of another one making the mode the box
+                LiteralClass base = getUserDatatypeBase(lset.iterator().next());
+                Column cl = left.get(relations, base).get(0);
+                Column cr = right.get(relations, base).get(0);
+                SqlType type = base.getSqlTypes().get(0);
+                yield operator == EQUAL ? type.equal(cl, cr) : type.notEqual(cl, cr);
             }
 
             case DATE_SAME_TZ ->

@@ -605,6 +605,18 @@ public class BuiltinClasses
 
 
     /**
+     * True if some value of the class may be a literal of a user datatype.
+     *
+     * @param resClass the resource class
+     * @return true if some value of the class may be a literal of a user datatype, false otherwise
+     */
+    public static boolean hasUserLiteral(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, genUserType);
+    }
+
+
+    /**
      * True if every value of the class is a triple term.
      *
      * @param resClass the resource class
