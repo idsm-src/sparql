@@ -52,7 +52,7 @@ public final class DoubleDatatype extends FloatPointDatatype
 
         value = getCollapsedForm(value);
 
-        if(value.equals("INF"))
+        if(value.equals("INF") || value.equals("+INF"))
             return "INF";
         else if(value.equals("-INF"))
             return "-INF";
