@@ -47,7 +47,10 @@ import cz.iocb.sparql.testing.Database;
  * {@link SparqlDatabaseConfiguration#addService}), is evaluated by the named service: its patterns are matched against
  * all mappings of that service, which the dataset clauses of the query do not restrict, its named graphs are the graphs
  * of these mappings and its procedures are those of that service. After the pattern, the mappings of the query are in
- * effect again.
+ * effect again. The pattern is evaluated by itself and joined, as the endpoint of the service would evaluate it: its
+ * expressions and OPTIONAL do not see the variables bound outside it, nor inside an EXISTS pattern the current
+ * solution, and only the procedure calls that are its direct members take the values of their parameters from the
+ * solutions outside, as from the VALUES clause sent to an endpoint.
  */
 public class LocalServiceTest
 {
@@ -338,5 +341,63 @@ public class LocalServiceTest
         // the queried service has neither the procedure nor the mapping
         assertThat(execute("SELECT * WHERE { ?t ex:search [ ex:query \"red\" ] }"), empty());
         assertThat(execute("SELECT * WHERE { ?t ex:tag ?tag }"), empty());
+    }
+
+
+    @Test
+    @DisplayName("the pattern of a SERVICE does not see the variables bound outside it")
+    void independentPattern() throws Exception
+    {
+        assertThat(execute("SELECT ?s WHERE { ?s ex:v ?v SERVICE service:other { ?s ex:w ?w FILTER(?v = 1) } }"),
+                empty());
+
+        assertThat(execute("SELECT ?s ?z WHERE { ?s ex:v ?v SERVICE service:other { ?s ex:w ?w BIND(?v AS ?z) } }"),
+                containsInAnyOrder(row(node(1), null)));
+
+        // the OPTIONAL binds the variable the solution outside binds to another value
+        String optional = "SELECT ?s ?v WHERE { ?s ex:v ?v SERVICE service:other { ?s ex:w ?w "
+                + "OPTIONAL { ?s ex:w ?v } } }";
+
+        assertThat(execute(optional), empty());
+    }
+
+
+    @Test
+    @DisplayName("the pattern of a SERVICE in an EXISTS pattern does not see the current solution")
+    void independentPatternInExists() throws Exception
+    {
+        assertThat(execute("SELECT ?s WHERE { ?s ex:v ?v FILTER EXISTS { SERVICE service:other { ?s ex:w ?w } } }"),
+                containsInAnyOrder(row(node(1))));
+
+        String filter = "SELECT ?s WHERE { ?s ex:v ?v FILTER EXISTS { SERVICE service:other { ?s ex:w ?w "
+                + "FILTER(?v = 1) } } }";
+
+        assertThat(execute(filter), empty());
+
+        // the OPTIONAL binds the variable the current solution binds to another value
+        String optional = "SELECT ?s WHERE { ?s ex:v ?v FILTER EXISTS { SERVICE service:other { ?s ex:w ?w "
+                + "OPTIONAL { ?s ex:w ?v } } } }";
+
+        assertThat(execute(optional), empty());
+    }
+
+
+    @Test
+    @DisplayName("a procedure call that is a direct member of the pattern of a SERVICE takes its parameters from outside")
+    void procedureParameters() throws Exception
+    {
+        TypedLiteral blue = new TypedLiteral("blue", xsdStringIri);
+
+        String direct = "SELECT ?q ?t WHERE { VALUES ?q { \"red\" \"blue\" } "
+                + "SERVICE service:other { ?t ex:search [ ex:query ?q ] } }";
+
+        assertThat(execute(direct),
+                containsInAnyOrder(row(red, thing("a")), row(red, thing("b")), row(blue, thing("c"))));
+
+        // a call nested in the pattern does not, as a call nested in the pattern sent to an endpoint
+        String nested = "SELECT ?t WHERE { VALUES ?q { \"red\" } "
+                + "SERVICE service:other { { ?t ex:search [ ex:query ?q ] } UNION { ?t ex:tag \"none\" } } }";
+
+        assertThat(execute(nested), empty());
     }
 }

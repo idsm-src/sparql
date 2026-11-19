@@ -105,6 +105,25 @@ public final class Scope
 
 
     /**
+     * The scope of the nodes of a pattern evaluated independently of the current solutions of the patterns of
+     * expressions this scope lies in, like the pattern of a SERVICE call of a service of the configuration, which a
+     * remote call would not see either (see {@link SqlIsolated}): the nodes lie at the depth of this scope, but no
+     * current solution is in effect for them.
+     *
+     * @return the scope of the nodes of an independent pattern
+     */
+    public Scope isolate()
+    {
+        List<VariableBindings> solutions = new ArrayList<>();
+
+        for(int i = 0; i < currentSolutions.size(); i++)
+            solutions.add(null);
+
+        return new Scope(solutions, lateralSolutions);
+    }
+
+
+    /**
      * The scope of the right side of a lateral join of this scope that reads the current solution of the left side as
      * the left side provides it at the moment (see {@link SqlLateralJoin}): the expressions of the right side referring
      * to that solution take its classes and columns from the given bindings (see {@link SqlLateralVariable}). Unlike

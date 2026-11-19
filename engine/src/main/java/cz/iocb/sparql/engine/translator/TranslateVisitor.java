@@ -14,6 +14,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -46,6 +47,7 @@ import cz.iocb.sparql.engine.imcode.SqlEmptySolution;
 import cz.iocb.sparql.engine.imcode.SqlFilter;
 import cz.iocb.sparql.engine.imcode.SqlIntercode;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
+import cz.iocb.sparql.engine.imcode.SqlIsolated;
 import cz.iocb.sparql.engine.imcode.SqlJoin;
 import cz.iocb.sparql.engine.imcode.SqlLateralJoin;
 import cz.iocb.sparql.engine.imcode.SqlLeftJoin;
@@ -210,6 +212,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      * the clauses refer to (see {@link #restrictToCurrentSolution}), not the current solution itself.
      */
     private boolean aboveWhereClause = false;
+
+    /**
+     * Contexts of the procedure calls that are direct members of the pattern of a SERVICE call of a service of the
+     * configuration being translated: the solutions the SERVICE call is evaluated for, which give such a call the
+     * values of its parameters (see {@link #translateService}). A call takes its context out when it is translated.
+     */
+    private final Map<ProcedureCallBase, SqlIntercode> serviceContexts = new IdentityHashMap<>();
 
     /**
      * Configuration of the endpoint.
@@ -1732,6 +1741,22 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      */
     private SqlIntercode translateProcedureCall(ProcedureCallBase procedureCallBase, SqlIntercode context)
     {
+        // a direct member of the pattern of a SERVICE call of a service of the configuration takes the values of the
+        // parameters that the context of the SERVICE call binds from that context, as it would take them from the
+        // VALUES clause sent to the endpoint, which the endpoint places before such a call (see translateSelect)
+        SqlIntercode serviceContext = serviceContexts.remove(procedureCallBase);
+
+        if(serviceContext != null)
+        {
+            Set<Variable> variables = procedureCallBase.getParameters().stream()
+                    .filter(p -> p.getValue() instanceof VariableNode)
+                    .map(p -> getVariable((VariableNode) p.getValue()))
+                    .filter(v -> serviceContext.getVariableBindings().get(v) != null).collect(toSet());
+
+            if(!variables.isEmpty())
+                context = SqlJoin.join(request, context, SqlDistinct.create(request, serviceContext, variables));
+        }
+
         if(!(context instanceof SqlEmptySolution) && !usesContext(procedureCallBase, context))
             return SqlJoin.join(request, context, translateProcedureCall(procedureCallBase, SqlEmptySolution.get()));
 
@@ -1874,11 +1899,16 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     /**
-     * Translates a SERVICE pattern: a service known to the configuration is translated in place, with its own
-     * procedures and functions and over all its own mappings, which the dataset clauses of the query do not restrict,
-     * as they would not restrict a call of the endpoint of that service; any other service becomes a
-     * {@link SqlServiceStub} evaluated later against the remote endpoint, which knows the lateral joins of the
-     * evaluations per graph it lies in (see {@link #enclosures}).
+     * Translates a SERVICE pattern. A service known to the configuration is evaluated as its endpoint would evaluate
+     * the call, so that the results do not tell that it is evaluated locally: its pattern is evaluated by itself, with
+     * the procedures and functions of the service and over all its mappings, which the dataset clauses of the query do
+     * not restrict, and joined with the context. Like the VALUES clause sent to an endpoint, the context gives the
+     * values of their parameters to the procedure calls that are direct members of the pattern (see
+     * {@link #translateProcedureCall}), except inside an EXISTS pattern, where a remote call gets no context either;
+     * there the pattern does not see the current solution of the EXISTS pattern, neither when it is translated nor when
+     * it is optimised (see {@link SqlIsolated}). Any other service becomes a {@link SqlServiceStub} evaluated later
+     * against the remote endpoint, which knows the lateral joins of the evaluations per graph it lies in (see
+     * {@link #enclosures}).
      *
      * @param service the SERVICE pattern
      * @param context solutions the call is evaluated for
@@ -1905,17 +1935,36 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             Pattern pattern = service.getPattern();
             List<Pattern> patterns = pattern instanceof GroupGraph group ? group.getPatterns() : List.of(pattern);
 
-            //FIXME: passing context in this way may cause conflicts with the standard
-            SqlIntercode result = translatePatternList(patterns, context);
+            Scope enclosingScope = scope;
+            boolean isolated = scope.getCurrentSolution() != null;
+            scope = enclosingScope.isolate();
 
-            graphRestrictions.pop();
-            serviceRestrictions.pop();
+            if(!isolated)
+                for(Pattern member : patterns)
+                    if(member instanceof ProcedureCallBase call)
+                        serviceContexts.put(call, context);
 
-            mappings = enclosingMappings;
-            graphEnumerations = enclosingGraphEnumerations;
-            namedGraphs = enclosingNamedGraphs;
+            SqlIntercode result;
 
-            return result;
+            try
+            {
+                result = translatePatternList(patterns, getGroupStart(patterns));
+            }
+            finally
+            {
+                scope = enclosingScope;
+                graphRestrictions.pop();
+                serviceRestrictions.pop();
+
+                mappings = enclosingMappings;
+                graphEnumerations = enclosingGraphEnumerations;
+                namedGraphs = enclosingNamedGraphs;
+            }
+
+            if(isolated)
+                result = SqlIsolated.create(result);
+
+            return SqlJoin.join(request, context, result);
         }
 
         String serviceCode = (new ServiceTranslateVisitor()).getResultCode(service.getPattern());
