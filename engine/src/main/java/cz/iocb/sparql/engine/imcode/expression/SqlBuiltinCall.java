@@ -1270,10 +1270,6 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
             case "datatype":
             {
-                //TODO: a value that may be unbound or is bound in several classes gets the class iri, though the IRIs of
-                // its datatypes are known when every class has one; when the configuration detects them all as IRIs
-                // of one class (request.getIriClass), the result could take that class, which a join could use
-
                 SqlExpressionIntercode argument = arguments.get(0);
 
                 if(argument.getResourceClasses().stream().noneMatch(r -> hasLiteral(r)))
@@ -1295,11 +1291,57 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 if(!canBeNull && datatypes.size() == 1 && !datatypes.contains(null))
                     return SqlIri.create(request, datatypes.iterator().next());
 
+                boolean partCanBeBull = argument.canBeNull() || argument.getResourceClasses().size() > 1;
+
+
+                // a value that may be unbound or is bound in several classes, each of them a class of literals of one
+                // datatype (or of no literals), whose IRIs the configuration detects all as IRIs of one class: the
+                // result has that class, which a join can use, as the IRI of a constant has
+                Set<ResourceClass> literalClasses = argument.getResourceClasses().stream().filter(r -> hasLiteral(r))
+                        .collect(toSet());
+
+                if(literalClasses.stream()
+                        .allMatch(r -> r.getEffectiveClass() instanceof LiteralClass l && l.getTypeIri() != null))
+                {
+                    Set<ResourceClass> resultClasses = literalClasses.stream()
+                            .map(r -> request.getIriClass(((LiteralClass) r.getEffectiveClass()).getTypeIri()))
+                            .collect(toSet());
+
+                    if(resultClasses.size() == 1)
+                    {
+                        ResourceClass resultClass = resultClasses.iterator().next();
+
+                        if(!restriction.contains(relations, resultClass))
+                            return new SqlBuiltinCall(function, distinct, arguments, singletonMap(resultClass, null),
+                                    canBeNull);
+
+                        List<Set<Column>> parts = new ArrayList<>();
+
+                        for(int i = 0; i < resultClass.getColumnCount(); i++)
+                            parts.add(new HashSet<>());
+
+                        for(ResourceClass argumentClass : literalClasses)
+                        {
+                            Iri type = ((LiteralClass) argumentClass.getEffectiveClass()).getTypeIri();
+                            List<Column> columns = request.getColumns(resultClass, type);
+
+                            for(int i = 0; i < columns.size(); i++)
+                                parts.get(i).add(!partCanBeBull ? columns.get(i) :
+                                        new ExpressionColumn(SqlCode.of("CASE WHEN ",
+                                                argument.getIsNotNull(relations, argumentClass), " THEN ",
+                                                columns.get(i), " END"), columns.get(i).getType()));
+                        }
+
+                        List<Column> result = parts.stream().map(Column::coalesce).toList();
+
+                        return new SqlBuiltinCall(function, distinct, arguments, singletonMap(resultClass, result),
+                                canBeNull);
+                    }
+                }
+
 
                 if(!restriction.contains(relations, iri))
                     return new SqlBuiltinCall(function, distinct, arguments, singletonMap(iri, null), canBeNull);
-
-                boolean partCanBeBull = argument.canBeNull() || argument.getResourceClasses().size() > 1;
 
                 Set<Column> variants = new HashSet<>();
 
