@@ -136,6 +136,7 @@ import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -147,7 +148,9 @@ import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
@@ -764,7 +767,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         restriction);
 
                 Set<SqlCode> variants = new HashSet<>();
+                Set<SqlCode> testedVariants = new HashSet<>();
                 boolean decisive = resMap.get(xsdBoolean).size() == 1;
+                boolean testable = true;
 
                 for(List<Set<ResourceClass>> v : resMap.get(xsdBoolean))
                 {
@@ -775,14 +780,17 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     ResourceClass unionClass = unionize(classes);
 
                     //NOTE: to ensure that the expression column is not used more than once during conversion
-                    if(left.hasExpressionColumn(relations, v.get(0)) || right.hasExpressionColumn(relations, v.get(1)))
+                    boolean expression = left.hasExpressionColumn(relations, v.get(0))
+                            || right.hasExpressionColumn(relations, v.get(1));
+
+                    if(expression)
                         unionClass = getExpressionClass(classes);
 
                     List<Column> lcols = left.get(relations, unionClass);
                     List<Column> rcols = right.get(relations, unionClass);
 
-                    variants.add(getIdentityConditions(unionClass, lcols, rcols).stream()
-                            .collect(SqlCode.joining(" AND ", "(", ")")));
+                    List<SqlCode> identity = getIdentityConditions(unionClass, lcols, rcols);
+                    variants.add(identity.stream().collect(SqlCode.joining(" AND ", "(", ")")));
 
                     // a variant taking every class of both operands compares every two bound terms, and it is no
                     // null for them unless a column of the common class is optional, which may be null in a term
@@ -791,6 +799,21 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     decisive &= !optional && v.get(0).containsAll(left.getMappings().keySet())
                             && v.get(1).containsAll(right.getMappings().keySet());
+
+                    // the variant tested for the terms of its classes: the columns of an operand compared as they are,
+                    // without a conversion, are those of its class, whose leading column is never null in a term of the
+                    // class and null otherwise; a converted column would be evaluated once more by the test
+                    testable &= !optional && !expression && Stream.concat(lcols.stream(), rcols.stream())
+                            .noneMatch(c -> c instanceof ExpressionColumn);
+
+                    Set<SqlCode> tested = new LinkedHashSet<>();
+
+                    for(Column column : List.of(lcols.get(0), rcols.get(0)))
+                        if(!(column instanceof ConstantColumn) || column instanceof NullColumn)
+                            tested.add(SqlCode.of("(", column, " IS NOT NULL)"));
+
+                    tested.addAll(identity);
+                    testedVariants.add(tested.stream().collect(SqlCode.joining(" AND ", "(", ")")));
                 }
 
                 // the only variant, when it decides the identity of every two bound terms, is the result by itself: a
@@ -803,10 +826,25 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                             canBeNull);
                 }
 
-                //TODO: operands bound in several classes get a variant for every pair of the classes (unless a column
-                // computed by an expression joins the pairs), so they keep the fallback below, which hides the
-                // comparisons from the planner of the database
+                // operands bound in several classes get a variant for every group of their classes, which is null for
+                // two terms not both of its classes; tested for the terms of its classes, a variant without an optional
+                // column is true or false for every two bound terms, so the disjunction of the tested variants decides
+                // their identity by plain comparisons, which the database can estimate and look up by an index, and a
+                // missing term makes it null
+                if(testable)
+                {
+                    SqlCode identity = testedVariants.stream().sorted().collect(SqlCode.joining(" OR ", "(", ")"));
 
+                    if(canBeNull)
+                        identity = SqlCode.of("(", identity, " OR ", absent, ")");
+
+                    List<Column> result = List.of(new ExpressionColumn(identity, BOOL, canBeNull));
+
+                    return new SqlBuiltinCall(function, distinct, arguments, singletonMap(xsdBoolean, result),
+                            canBeNull);
+                }
+
+                // the other variants are compared as they are, and two bound terms that no variant takes are different
                 List<Column> result = List.of(new ExpressionColumn(SqlCode.of("COALESCE((",
                         variants.stream().collect(SqlCode.joining(" OR ")), "), ", absent, ")"), BOOL, canBeNull));
 

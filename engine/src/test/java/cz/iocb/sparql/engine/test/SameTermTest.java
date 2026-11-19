@@ -44,7 +44,8 @@ import cz.iocb.sparql.testing.Database;
  * The function sameTerm: true for the same terms, false for different ones, also for terms of classes that share no
  * term, and an error when an operand is unbound, whether the terms are held in one class, in a box or in several
  * classes. Operands that are compared in one class in every solution are compared by a plain condition on their
- * columns, which the database can use for an index or a join.
+ * columns, which the database can use for an index or a join, and operands of several classes held without a conversion
+ * by a disjunction of the comparisons in each class, each tested for the terms of its class.
  *
  * The table {@code item} holds the items 1 to 6 with an optional reference to an item (5, 1, none, 5, 3, none), a term
  * in a box (the integer 1, the string abc, the item 5, the xsd:int 50, the xsd:int 5, the decimal 1.0) and an optional
@@ -309,6 +310,20 @@ public class SameTermTest
 
         assertThat(execute(boxed), containsInAnyOrder(row(item(3))));
         assertThat(translate(boxed), not(containsString("COALESCE")));
+    }
+
+
+    @Test
+    @DisplayName("operands of several classes are compared in each class, tested for the terms of the class")
+    void comparisonInSeveralClasses() throws Exception
+    {
+        String query = """
+                SELECT ?id (sameTerm(?a, ?b) AS ?r) (!sameTerm(?a, ?b) AS ?d) WHERE { VALUES (?id ?a ?b) { \
+                (item:1 1 1) (item:2 'a' 1) (item:3 item:5 item:5) (item:4 UNDEF 1) (item:5 1.0 'a') } } \
+                ORDER BY ?id""";
+
+        assertThat(execute(query), contains(row(1, true), row(2, false), row(3, true), row(4, null), row(5, false)));
+        assertThat(translate(query), not(containsString("COALESCE")));
     }
 
 
