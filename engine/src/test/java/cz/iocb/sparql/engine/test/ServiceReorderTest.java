@@ -57,7 +57,9 @@ import cz.iocb.sparql.testing.Database;
  * limit asks the pattern without the variable instead of failing. The endpoint is a server on the loopback interface
  * answering the pattern {@code ?s :q ?x} from the remote subjects {@code :i2}, {@code :i4}, {@code :i6} and
  * {@code :i30}, each with the string {@code x} followed by its number; the analysed table {@code item} holds the local
- * subjects {@code :i1} to {@code :i20}, mapped by :p to their numbers; the context limit of the endpoint is 5.
+ * subjects {@code :i1} to {@code :i20}, mapped by :p to their numbers; the context limit of the endpoint is 5. Of
+ * several calls, the one leaving out the fewest shared variables is evaluated first; the variables of its pattern that
+ * no sibling binds do not count.
  */
 public class ServiceReorderTest
 {
@@ -295,5 +297,18 @@ public class ServiceReorderTest
 
         assertThat(queries.size(), is(2));
         assertThat(queries, everyItem(containsString("values")));
+    }
+
+
+    @Test
+    @DisplayName("the call leaving out the fewest shared variables is evaluated first, whatever its own variables are")
+    void privateVariables() throws Exception
+    {
+        execute("SELECT * WHERE { VALUES ?s { :i2 :i3 } ?s :p ?v . ?t :p ?w SERVICE <" + endpoint
+                + "> { ?s :q ?x . ?x :r ?y } SERVICE <" + endpoint + "> { ?s :q ?w } }");
+
+        // the first call leaves out no variable the siblings bind, the second one leaves out ?w, as the siblings give
+        // more combinations of ?s and ?w than the limit
+        assertThat(queries.get(0), containsString(iri("r").getValue()));
     }
 }

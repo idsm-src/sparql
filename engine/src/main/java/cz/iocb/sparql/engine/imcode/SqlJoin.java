@@ -368,7 +368,9 @@ public final class SqlJoin extends SqlIntercode
                     count = estimator.estimateDistinct(request, scope, join, set);
                 }
 
-                stats.put(service, new Stats(set, count, vars.size() - set.size()));
+                // the variables of the pattern that no sibling binds are not asked about by any call, so only the
+                // shared variables left out count
+                stats.put(service, new Stats(set, count, basic.size() - order.size()));
             }
 
             // no sibling names the endpoint of any call left, so none of them is asked
