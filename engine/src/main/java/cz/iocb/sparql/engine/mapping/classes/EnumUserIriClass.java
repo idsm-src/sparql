@@ -6,9 +6,11 @@ import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
 import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.SqlType;
@@ -69,6 +71,17 @@ public class EnumUserIriClass extends SimpleUserIriClass
 
         this.regexp = values.keySet().stream().map(i -> Pattern.quote(i.getValue())).collect(joining("|"));
         this.pattern = Pattern.compile(regexp);
+    }
+
+
+    /**
+     * The member IRIs.
+     *
+     * @return the member IRIs
+     */
+    public Set<Iri> getMembers()
+    {
+        return Collections.unmodifiableSet(values.keySet());
     }
 
 

@@ -90,6 +90,7 @@ import cz.iocb.sparql.engine.mapping.SingleTableQuadMapping;
 import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
+import cz.iocb.sparql.engine.mapping.classes.EnumUserIriClass;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -1264,27 +1265,104 @@ public class SparqlDatabaseConfiguration implements ClassRelations
         }
 
 
-        Set<String> propertyIris = new HashSet<>();
-
-        for(ProcedureDefinition def : getProcedures(getServiceIri()).values())
-        {
-            propertyIris.add(def.getProcedureName());
-
-            for(ParameterDefinition parameter : def.getParameters())
-                if(!parameter.getParamName().startsWith("#"))
-                    propertyIris.add(parameter.getParamName());
-
-            if(!def.isSimple())
-                for(ResultDefinition result : def.getResults())
-                    propertyIris.add(result.getResultName());
-        }
-
-        for(String iri : propertyIris)
+        for(String iri : getProcedureProperties())
         {
             ConstantIriMapping procedure = createIriMapping(new Iri(iri));
             addQuadMapping(graph, endpoint, sd("propertyFeature"), procedure);
             addQuadMapping(graph, procedure, type, sd("Feature"));
         }
+    }
+
+
+    /**
+     * IRIs of the properties of the procedures of the service: the names of the procedures, the names of their
+     * parameters that do not start with {@code #}, and the names of the results of the procedures that are not simple.
+     *
+     * @return IRIs of the properties of the procedures of the service
+     */
+    private Set<String> getProcedureProperties()
+    {
+        Set<String> properties = new HashSet<>();
+
+        for(ProcedureDefinition def : getProcedures(serviceIri).values())
+        {
+            properties.add(def.getProcedureName());
+
+            for(ParameterDefinition parameter : def.getParameters())
+                if(!parameter.getParamName().startsWith("#"))
+                    properties.add(parameter.getParamName());
+
+            if(!def.isSimple())
+                for(ResultDefinition result : def.getResults())
+                    properties.add(result.getResultName());
+        }
+
+        return properties;
+    }
+
+
+    /**
+     * IRIs of the properties that a query editor offers to complete, which the endpoint lists for its {@code info}
+     * request: the predicates of the quad mappings of the service that are known without reading the data (the constant
+     * ones and the members of an enumerated IRI class taken from a column) and the properties of the procedures of the
+     * service. A deployment that knows the other predicates, like from the statistics of its data, overrides the
+     * method; the endpoint asks for the hints once.
+     *
+     * @return IRIs of the properties that a query editor offers to complete
+     */
+    public Set<Iri> getPropertyHints()
+    {
+        Set<Iri> properties = new HashSet<>();
+
+        for(QuadMapping mapping : getMappings(serviceIri))
+            properties.addAll(getHints(mapping.getPredicate()));
+
+        for(String iri : getProcedureProperties())
+            properties.add(new Iri(iri));
+
+        return properties;
+    }
+
+
+    /**
+     * IRIs of the classes that a query editor offers to complete, which the endpoint lists for its {@code info}
+     * request: the objects of the quad mappings of the service with the constant predicate {@code rdf:type} that are
+     * known without reading the data (the constant ones and the members of an enumerated IRI class taken from a
+     * column). A deployment that knows the other classes, like from the statistics of its data, overrides the method;
+     * the endpoint asks for the hints once.
+     *
+     * @return IRIs of the classes that a query editor offers to complete
+     */
+    public Set<Iri> getClassHints()
+    {
+        Iri type = new Iri(Rdf.TYPE);
+        Set<Iri> classes = new HashSet<>();
+
+        for(QuadMapping mapping : getMappings(serviceIri))
+            if(mapping.getPredicate() instanceof ConstantIriMapping predicate && type.equals(predicate.getValue()))
+                classes.addAll(getHints(mapping.getObject()));
+
+        return classes;
+    }
+
+
+    /**
+     * IRIs that a term mapping gives without reading the data: the IRI of a constant mapping and the members of the
+     * enumerated IRI class of a mapping of columns.
+     *
+     * @param mapping the term mapping
+     * @return IRIs that the term mapping gives without reading the data
+     */
+    private static Set<Iri> getHints(TermMapping mapping)
+    {
+        if(mapping instanceof ConstantIriMapping constant && constant.getValue() instanceof Iri iri)
+            return Set.of(iri);
+
+        if(mapping instanceof ParametrisedIriMapping parametrised
+                && parametrised.getResourceClass() instanceof EnumUserIriClass enumeration)
+            return enumeration.getMembers();
+
+        return Set.of();
     }
 
 

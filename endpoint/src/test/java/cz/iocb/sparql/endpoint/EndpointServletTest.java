@@ -1,6 +1,8 @@
 package cz.iocb.sparql.endpoint;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static java.util.stream.Collectors.joining;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -13,7 +15,9 @@ import java.io.StringWriter;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -39,7 +43,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.DatabaseTable;
+import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
+import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
+import cz.iocb.sparql.engine.mapping.classes.EnumUserIriClass;
+import cz.iocb.sparql.engine.mapping.classes.IntegerUserIriClass;
+import cz.iocb.sparql.engine.mapping.extension.ParameterDefinition;
+import cz.iocb.sparql.engine.mapping.extension.ProcedureDefinition;
+import cz.iocb.sparql.engine.mapping.extension.ResultDefinition;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.Engine;
@@ -55,7 +67,8 @@ import cz.iocb.sparql.testing.Database;
  * checked to escape the characters of a literal that a JSON string cannot hold as they are, the XML formats to write
  * the white space and the markup of a term so that an XML parser reads them back, the RDF languages to write an IRI
  * with the characters that their syntax excludes escaped, and the TSV and CSV formats to write the header and the ends
- * of the lines as their specification says.
+ * of the lines as their specification says. The {@code info} request is checked over a configuration of its own to list
+ * the properties and the classes known without the data, written as JSON strings.
  */
 public class EndpointServletTest
 {
@@ -771,5 +784,81 @@ public class EndpointServletTest
         assertEquals(HttpServletResponse.SC_OK, response.status);
         assertEquals(ntriples, response.contentType);
         assertEquals("", response.getBody());
+    }
+
+
+    @Test
+    @DisplayName("info lists the properties and the classes known without the data, written as JSON strings")
+    void info() throws Exception
+    {
+        DataSource connectionPool = Database.getPool();
+
+        try(Connection connection = connectionPool.getConnection(); Statement statement = connection.createStatement())
+        {
+            statement.execute("create schema endpoint_info_test");
+            statement.execute("create table endpoint_info_test.item (id int4 primary key, property int4 not null, "
+                    + "kind int4 not null, other varchar not null)");
+        }
+
+        SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool,
+                new DatabaseSchema(connectionPool), false);
+        config.addPrefix("ex", "http://example.org/");
+        config.addIriClass(new IntegerUserIriClass("item", INT4, "http://example.org/item/"));
+        config.addIriClass(new EnumUserIriClass("property", INT4,
+                Map.of(new Iri("http://example.org/p1"), "1", new Iri("http://example.org/p2"), "2")));
+        config.addIriClass(new EnumUserIriClass("kind", INT4,
+                Map.of(new Iri("http://example.org/A"), "1", new Iri("http://example.org/B"), "2")));
+
+        ConstantIriMapping iri = new ConstantIriMapping(new Iri(markupIri));
+        ConstantIriMapping type = new ConstantIriMapping(new Iri(rdfNamespace + "type"));
+        DatabaseTable table = new DatabaseTable("endpoint_info_test", "item");
+
+        config.addQuadMapping(null, iri, type, iri);
+        config.addQuadMapping(table, null, config.createIriMapping("item", "id"),
+                config.createIriMapping("property", "property"), iri);
+        config.addQuadMapping(table, null, config.createIriMapping("item", "id"), type,
+                config.createIriMapping("kind", "kind"));
+
+        // the IRIs of columns of other classes are unknown without the data
+        config.addQuadMapping(table, null, config.createIriMapping("item", "id"),
+                config.createIriMapping(BuiltinClasses.iri, "other"), iri);
+        config.addQuadMapping(table, null, config.createIriMapping("item", "id"), type,
+                config.createIriMapping(BuiltinClasses.iri, "other"));
+
+        ProcedureDefinition search = new ProcedureDefinition("http://example.org/search",
+                new Function("endpoint_info_test", "search"));
+        search.addParameter(new ParameterDefinition("http://example.org/query", xsdString, null));
+        search.addResult(new ResultDefinition(BuiltinClasses.iri));
+        config.addProcedure(search);
+
+        EndpointServlet infoServlet = new EndpointServlet(new Engine(config));
+        Response response = new Response();
+        infoServlet.doGet(request("GET", parameters("info", ""), "application/json", null, null), response.stub);
+
+        assertEquals("application/json", response.contentType);
+
+        JsonNode info = json(response);
+
+        assertEquals("http://example.org/", info.get("prefixes").get("ex").asText());
+        assertEquals(List.of("http://example.org/p1", "http://example.org/p2", "http://example.org/query",
+                "http://example.org/search", rdfNamespace + "type"), texts(info.get("properties")));
+        assertEquals(List.of(markupIri, "http://example.org/A", "http://example.org/B"), texts(info.get("classes")));
+    }
+
+
+    /**
+     * Texts of the strings of a JSON array.
+     *
+     * @param array the JSON array
+     * @return texts of the strings of the array
+     */
+    private static List<String> texts(JsonNode array)
+    {
+        List<String> texts = new ArrayList<>();
+
+        for(JsonNode element : array)
+            texts.add(element.asText());
+
+        return texts;
     }
 }

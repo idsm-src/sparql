@@ -4,14 +4,15 @@ import static cz.iocb.sparql.endpoint.EndpointServlet.OutputType.RDF_JSON;
 import static cz.iocb.sparql.engine.imcode.SqlConstruct.ConstructColumn.PREDICATE;
 import static cz.iocb.sparql.engine.imcode.SqlConstruct.ConstructColumn.SUBJECT;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.stream.Collectors.joining;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -32,7 +33,6 @@ import org.slf4j.MDC;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.error.TranslateMessage;
-import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.model.DataSet;
 import cz.iocb.sparql.engine.model.IriNode;
 import cz.iocb.sparql.engine.rdf.BlankNode;
@@ -248,6 +248,11 @@ public class EndpointServlet extends HttpServlet
      * Configuration of the endpoint.
      */
     private SparqlDatabaseConfiguration sparqlConfig;
+
+    /**
+     * The JSON summary that the {@code info} request serves, made on its first use.
+     */
+    private String info = null;
 
     /**
      * JDBC fetch size ({@code fetch-size} init parameter).
@@ -924,7 +929,8 @@ public class EndpointServlet extends HttpServlet
 
 
     /**
-     * Serves the JSON summary of prefixes, predicates and classes known from constant mappings.
+     * Serves the JSON summary of the prefixes, the properties and the classes that a query editor offers to complete
+     * (see {@link SparqlDatabaseConfiguration#getPropertyHints} and {@link SparqlDatabaseConfiguration#getClassHints}).
      *
      * @param res the HTTP response
      * @throws IOException on output errors
@@ -932,42 +938,77 @@ public class EndpointServlet extends HttpServlet
     private void processInfoRequest(HttpServletResponse res) throws IOException
     {
         res.setContentType("application/json");
+        res.getWriter().append(getInfo());
+    }
 
-        final Iri type = new Iri("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
 
-        PrintWriter out = res.getWriter();
+    /**
+     * The JSON summary that the {@code info} request serves, made on its first use, as the hints of the configuration
+     * are asked for once.
+     *
+     * @return the JSON summary that the {@code info} request serves
+     * @throws IOException on output errors
+     */
+    private synchronized String getInfo() throws IOException
+    {
+        if(info == null)
+        {
+            StringWriter text = new StringWriter();
+            PrintWriter out = new PrintWriter(text);
 
-        out.append("{\n");
-        out.append("  \"prefixes\": {\n");
+            out.append("{\n");
+            out.append("  \"prefixes\": {");
 
-        out.append(sparqlConfig.getPrefixes().entrySet().stream()
-                .map(e -> "    \"" + e.getKey() + "\": \"" + e.getValue() + "\"").collect(joining(",\n")));
+            String separator = "\n";
 
-        out.append("\n");
-        out.append("  },\n");
-        out.append("  \"properties\": [\n");
+            for(Entry<String, String> prefix : sparqlConfig.getPrefixes().entrySet())
+            {
+                out.append(separator).append("    \"");
+                writeJsonValue(out, prefix.getKey());
+                out.append("\": \"");
+                writeJsonValue(out, prefix.getValue());
+                out.append("\"");
+                separator = ",\n";
+            }
 
-        //TODO: include predicates and classes not only from constant iri mappings
+            out.append("\n");
+            out.append("  },\n");
+            out.append("  \"properties\": [");
+            writeJsonIris(out, sparqlConfig.getPropertyHints());
+            out.append("\n");
+            out.append("  ],\n");
+            out.append("  \"classes\": [");
+            writeJsonIris(out, sparqlConfig.getClassHints());
+            out.append("\n");
+            out.append("  ]\n");
+            out.append("}");
+            out.flush();
 
-        out.append(sparqlConfig.getMappings(sparqlConfig.getServiceIri()).stream()
-                .filter(m -> m.getPredicate() instanceof ConstantIriMapping)
-                .map(m -> ((Iri) ((ConstantIriMapping) m.getPredicate()).getValue()).getValue()).distinct().sorted()
-                .map(i -> "    \"" + i + "\"").collect(joining(",\n")));
+            info = text.toString();
+        }
 
-        out.append("\n");
-        out.append("  ],\n");
-        out.append("  \"classes\": [\n");
+        return info;
+    }
 
-        out.append(sparqlConfig.getMappings(sparqlConfig.getServiceIri()).stream()
-                .filter(m -> m.getPredicate() instanceof ConstantIriMapping
-                        && ((ConstantIriMapping) m.getPredicate()).getValue().equals(type)
-                        && m.getObject() instanceof ConstantIriMapping)
-                .map(m -> ((Iri) ((ConstantIriMapping) m.getObject()).getValue()).getValue()).distinct().sorted()
-                .map(i -> "    \"" + i + "\"").collect(joining(",\n")));
 
-        out.append("\n");
-        out.append("  ]\n");
-        out.append("}");
+    /**
+     * Writes the elements of a JSON array of the IRIs, sorted by their texts, each on a line of its own.
+     *
+     * @param out the output writer
+     * @param iris the IRIs
+     * @throws IOException on output errors
+     */
+    private static void writeJsonIris(PrintWriter out, Collection<Iri> iris) throws IOException
+    {
+        String separator = "\n";
+
+        for(String iri : iris.stream().map(Iri::getValue).sorted().toList())
+        {
+            out.append(separator).append("    \"");
+            writeJsonValue(out, iri);
+            out.append("\"");
+            separator = ",\n";
+        }
     }
 
 
