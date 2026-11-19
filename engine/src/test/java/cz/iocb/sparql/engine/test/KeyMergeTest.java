@@ -42,7 +42,9 @@ import cz.iocb.sparql.testing.Database;
  * implied by a key. The decisions must only count on equalities holding in every disjunct of the conditions, a parent
  * condition equating a key column with another column cannot be moved onto the child row, and a child row with a null
  * in any column of a foreign key references no parent row. A constant that another member of a join binds a variable to
- * becomes a condition only of an access binding the variable always, because an unbound value agrees with it.
+ * becomes a condition only of an access binding the variable always, because an unbound value agrees with it. Two
+ * accesses joined on the key are merged also when a side may leave a shared variable unbound, as long as both sides
+ * take it from the same column of the row.
  *
  * The table {@code parent} holds the items 1 to 4 of the kinds 1, 2, 2 and 3, so only the items 1 and 2 are of their
  * own kind; the table {@code child} references the items 3, 4 and 1. The table {@code item} holds the rows (id, a, b)
@@ -378,6 +380,31 @@ public class KeyMergeTest
         assertThat(execute(query),
                 containsInAnyOrder(optional(1, null), optional(2, 5), optional(3, 7), optional(4, 1)));
         assertThat(reads(translate(query), "optional"), is(1));
+    }
+
+
+    @Test
+    @DisplayName("two accesses on the key taking a variable from the same column are merged, one may leave it unbound")
+    void sameColumnWithUnboundVariable() throws Exception
+    {
+        // the access binding the variable always restricts the merged rows to those binding it
+        String inner = "SELECT ?x ?o WHERE { ?x ex:opt ?o . { ?x a ex:Optional OPTIONAL { ?x ex:opt ?o } } }";
+
+        assertThat(execute(inner), containsInAnyOrder(optional(2, 5), optional(3, 7), optional(4, 1)));
+        assertThat(reads(translate(inner), "optional"), is(1));
+
+        // a repeated OPTIONAL adds nothing to the rows of the first one
+        String repeated = "SELECT ?x ?o WHERE { ?x a ex:Optional OPTIONAL { ?x ex:opt ?o } OPTIONAL { ?x ex:opt ?o } }";
+
+        assertThat(execute(repeated),
+                containsInAnyOrder(optional(1, null), optional(2, 5), optional(3, 7), optional(4, 1)));
+        assertThat(reads(translate(repeated), "optional"), is(1));
+
+        // the left side keeps the variable unbound where it is
+        String unbound = "SELECT ?x WHERE { { ?x a ex:Optional OPTIONAL { ?x ex:opt ?o } } OPTIONAL { ?x ex:opt ?o } "
+                + "FILTER(!BOUND(?o)) }";
+
+        assertThat(execute(unbound), containsInAnyOrder(items(1)));
     }
 
 

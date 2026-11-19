@@ -784,8 +784,9 @@ public final class SqlTableAccess extends SqlIntercode
     /**
      * Columns on which two accesses to the same table are equated through their shared variables; empty if the tables
      * differ or the variables are not joined in a single class. A shared variable that may be unbound on a side equates
-     * no columns, because an unbound value is compatible with any value: when its bindings on the two sides are the
-     * same, it contributes nothing, otherwise the result is empty as well.
+     * no columns, because an unbound value is compatible with any value: when both sides take it from the same columns
+     * of a row (see {@link #isHeldAlike}), it contributes nothing, as the variable is compatible in the rows that the
+     * other columns make one row (a key of the table), and otherwise the result is empty as well.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param left the left access
@@ -814,7 +815,7 @@ public final class SqlTableAccess extends SqlIntercode
 
             if(leftBinding.canBeNull() || rightBinding.canBeNull())
             {
-                if(!leftBinding.equals(rightBinding)) // TODO: take representatives into account
+                if(!isHeldAlike(left, right, pair))
                     return Set.of();
 
                 // an unbound value is compatible with any value, so the columns of the variable are not equated
@@ -852,6 +853,47 @@ public final class SqlTableAccess extends SqlIntercode
         }
 
         return columns;
+    }
+
+
+    /**
+     * True if the two accesses to the same table take the shared variable from the same columns of a row in a single
+     * class, whether a side may leave it unbound or not: each column is the same on both sides or equal to the other
+     * one by the conditions of a side in all its disjuncts (the null-safe equalities included), so that in a row both
+     * sides read the variable either holds the same value on both sides or is unbound on a side, which is compatible
+     * with any value. Bindings of no columns are alike only when they are the same.
+     *
+     * @param left the left access
+     * @param right the right access
+     * @param pair the bindings of the shared variable on the two sides, paired in a single pair of classes
+     * @return true if the two accesses take the variable from the same columns of a row, false otherwise
+     */
+    private static boolean isHeldAlike(SqlTableAccess left, SqlTableAccess right, VariableBindingPair pair)
+    {
+        VariableBinding leftBinding = pair.getLeftVariableBinding();
+        VariableBinding rightBinding = pair.getRightVariableBinding();
+
+        if(pair.getClasses().size() != 1)
+            return false;
+
+        ResourceClassPair pairedClass = pair.getClasses().iterator().next();
+
+        if(!Objects.equals(pairedClass.getLeftClass(), pairedClass.getRightClass()))
+            return false;
+
+        List<Column> leftCols = leftBinding.getMapping(pairedClass.getLeftClass());
+        List<Column> rightCols = rightBinding.getMapping(pairedClass.getRightClass());
+
+        if(leftCols == null || rightCols == null)
+            return leftBinding.equals(rightBinding);
+
+        for(int i = 0; i < leftCols.size(); i++)
+            if(!leftCols.get(i).equals(rightCols.get(i))
+                    && !left.conditions.getEqualColumns(leftCols.get(i)).contains(rightCols.get(i))
+                    && !right.conditions.getEqualColumns(rightCols.get(i)).contains(leftCols.get(i)))
+                return false;
+
+        return true;
     }
 
 
@@ -1346,6 +1388,11 @@ public final class SqlTableAccess extends SqlIntercode
         {
             VariableBinding leftBinding = pair.getLeftVariableBinding();
             VariableBinding rightBinding = pair.getRightVariableBinding();
+
+            // a variable the left side may leave unbound and the right side binds always in the row they share (see
+            // isHeldAlike) is bound always in the merged row, which the conditions of the right side hold for
+            if(leftBinding.canBeNull() && !rightBinding.canBeNull())
+                bindings.add(rightBinding);
 
             if(!leftBinding.canBeNull() && !rightBinding.canBeNull())
             {
