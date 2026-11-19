@@ -184,6 +184,19 @@ public abstract sealed class Datatype permits BooleanDatatype, GenericIntegerDat
     }
 
 
+    /**
+     * True if the IRI of the datatype names a cast to it, a constructor function: every datatype but a user datatype
+     * without a lexical parser (see {@link UserDatatype#getLexicalParser}), whose IRI may name an extension function
+     * instead. A cast to a language-tagged string is accepted, and it gives no value.
+     *
+     * @return true if the IRI of the datatype names a cast to it, false otherwise
+     */
+    public final boolean isCastTarget()
+    {
+        return !(this instanceof UserDatatype user) || user.getLexicalParser() != null;
+    }
+
+
     @Override
     public boolean equals(Object object)
     {

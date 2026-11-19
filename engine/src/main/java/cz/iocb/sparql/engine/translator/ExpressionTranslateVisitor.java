@@ -37,7 +37,6 @@ import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
-import cz.iocb.sparql.engine.mapping.datatypes.UserDatatype;
 import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
 import cz.iocb.sparql.engine.model.IriNode;
 import cz.iocb.sparql.engine.model.Prologue;
@@ -225,9 +224,8 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
 
         Datatype datatype = request.getConfiguration().getDatatype(iri);
 
-        //TODO: add support for casting to user literals
-
-        if(datatype != null && !(datatype instanceof UserDatatype))
+        // a cast takes precedence over an extension function of the same IRI
+        if(datatype != null && datatype.isCastTarget())
         {
             // there is no cast to a language-tagged string (rdf:langString, rdf:dirLangString)
             if(!(datatype.getCanonicalLiteralClass() instanceof LiteralClass literalClass)

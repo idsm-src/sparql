@@ -86,9 +86,11 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedIn
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedLong;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedShort;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import static java.util.Collections.singletonMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -96,7 +98,9 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.database.SqlBuilder;
+import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.imcode.Scope;
 import cz.iocb.sparql.engine.mapping.classes.CanonicalLiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
@@ -106,6 +110,8 @@ import cz.iocb.sparql.engine.mapping.classes.DateTimeInZone;
 import cz.iocb.sparql.engine.mapping.classes.DateTimeInZoneClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
+import cz.iocb.sparql.engine.mapping.datatypes.UserDatatype;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBindings;
@@ -114,13 +120,15 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 /**
  * Cast of a value to an XSD datatype by its constructor function ({@code xsd:integer(...)} etc.), implemented by the
- * {@code sparql.cast_as_*_from_*} functions of the extension; a source class that cannot be cast is an error. The
- * result is the literal of the cast value in the canonical form, also for a literal that has the datatype already.
+ * {@code sparql.cast_as_*_from_*} functions of the extension, or to a user datatype with a lexical parser (see
+ * {@link UserDatatype#getLexicalParser}) by the function named by its IRI, which takes a literal of the datatype in any
+ * storage and an {@code xsd:string} parsed by the parser; a source class that cannot be cast is an error. The result is
+ * the literal of the cast value in the canonical form, also for a literal that has the datatype already.
  */
 public final class SqlCast extends SqlUnary
 {
     /**
-     * Literal classes that can be cast to.
+     * Literal classes of the XSD datatypes that can be cast to and from by the functions of the extension.
      */
     private static final Set<LiteralClass> supportedClasses = Set.of(genBoolean, genByte, genUnsignedByte, genShort,
             genUnsignedShort, genInt, genUnsignedInt, genLong, genUnsignedLong, genInteger, genNonPositiveInteger,
@@ -182,8 +190,6 @@ public final class SqlCast extends SqlUnary
     public static SqlExpressionIntercode create(ClassRelations relations, LiteralClass castClass,
             SqlExpressionIntercode operand, Restriction restriction)
     {
-        //TODO: add support for casting to user literals
-
         if(operand.equals(SqlNull.get()))
             return SqlNull.get();
 
@@ -331,7 +337,12 @@ public final class SqlCast extends SqlUnary
      */
     private static boolean isCastable(ResourceClass from, ResourceClass to)
     {
-        if(isString(to))
+        // a literal of the datatype in any storage, the result class userType included, which the algebra of the
+        // classes takes for disjoint with the base class, and a string if the datatype has a parser
+        if(to instanceof UserLiteralClass user)
+            return hasString(from) && getLexicalParser(user) != null || !areDisjunct(from, user.getBaseClass())
+                    || !areDisjunct(from, user);
+        else if(isString(to))
             return hasIri(from) || hasString(from) || hasNumeric(from) || hasBoolean(from) || hasTemporalClass(from);
         else if(isNumeric(to) || isBoolean(to))
             return hasString(from) || hasNumeric(from) || hasBoolean(from);
@@ -354,6 +365,9 @@ public final class SqlCast extends SqlUnary
      */
     private static boolean canBeNull(ResourceClass from, ResourceClass to)
     {
+        if(to instanceof UserLiteralClass user)
+            return !from.isSubclassOf(user.getBaseClass());
+
         if(isString(to))
             return !from.isSubclassOf(unionize(xsdString, genBoolean, temporal, numeric, iri));
 
@@ -445,6 +459,14 @@ public final class SqlCast extends SqlUnary
         {
             // the base class keeps the value in the leading columns, which are those of the canonical class
             builder.append(columns.get(0));
+        }
+
+
+        /* casts to user datatypes */
+
+        else if(castClass instanceof UserLiteralClass user)
+        {
+            builder.append(translateToUserLiteral(columns, effClass, user, partCanBeNull));
         }
 
 
@@ -603,6 +625,62 @@ public final class SqlCast extends SqlUnary
         }
 
         return new ExpressionColumn(builder.toCode(), castClass.getSqlTypes().get(0));
+    }
+
+
+    /**
+     * SQL expression casting a value of a class that is no subclass of the canonical class of a user datatype held in
+     * the columns to that class: the value of a literal of the datatype (stored with its lexical form, in a box or in
+     * the result classes of user literals), and the value the lexical parser of the datatype makes of a string, which
+     * exclude each other.
+     *
+     * @param columns the columns
+     * @param effClass the effective class of the value
+     * @param user the canonical class of the user datatype
+     * @param partCanBeNull whether the source columns may be null
+     * @return SQL expression casting the value to the canonical class of the user datatype
+     * @throws IllegalArgumentException if the class holds neither a literal of the datatype nor a string to parse
+     */
+    private static Column translateToUserLiteral(List<Column> columns, ResourceClass effClass, UserLiteralClass user,
+            boolean partCanBeNull)
+    {
+        LiteralClass base = user.getBaseClass();
+        Set<Column> parts = new LinkedHashSet<>();
+
+        if(effClass.isSubclassOf(base))
+            parts.add(effClass.toGeneralClass(base, columns, partCanBeNull).get(0));
+        else if(base.isSubclassOf(effClass))
+            parts.add(base.fromGeneralClass(effClass, columns, true).get(0));
+        else if(user.isSubclassOf(effClass))
+            parts.add(user.fromGeneralClass(effClass, columns, true).get(0));
+
+        Function parser = getLexicalParser(user);
+        Column string = null;
+
+        if(parser != null && effClass.isSubclassOf(xsdString))
+            string = effClass.toGeneralClass(xsdString, columns, partCanBeNull).get(0);
+        else if(parser != null && xsdString.isSubclassOf(effClass))
+            string = xsdString.fromGeneralClass(effClass, columns, true).get(0);
+
+        if(string != null)
+            parts.add(new ExpressionColumn(SqlCode.of(parser.toString(), "(", string, ")"), user.getSqlTypes().get(0)));
+
+        if(parts.isEmpty())
+            throw new IllegalArgumentException();
+
+        return coalesce(parts);
+    }
+
+
+    /**
+     * Lexical parser of the user datatype of the class.
+     *
+     * @param user the canonical class of the user datatype
+     * @return lexical parser of the user datatype, or null if the datatype has none
+     */
+    private static Function getLexicalParser(UserLiteralClass user)
+    {
+        return ((UserDatatype) user.getDatatype()).getLexicalParser();
     }
 
 

@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.mapping.datatypes;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.subtract;
+import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.database.UserType;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -84,5 +85,22 @@ public abstract non-sealed class UserDatatype extends Datatype
     public boolean isCanonicalForm(String value)
     {
         return value.equals(getCanonicalLexicalForm(value));
+    }
+
+
+    /**
+     * SQL function parsing a lexical form of the datatype, which makes the IRI of the datatype name a cast to it, like
+     * the constructor functions of the XSD datatypes name casts to theirs ({@code <datatype>(?x)}), taking precedence
+     * over an extension function of the same IRI; null, the default, for a datatype without a cast. The function takes
+     * a {@code varchar} and returns a value of the user type: for exactly the forms {@link #isValidForm} accepts, the
+     * value that {@link #getCanonicalLexicalForm} prints, and NULL for the other forms, never an error (an error ends
+     * the query). It should be STRICT, PARALLEL SAFE and at least STABLE, at best IMMUTABLE, so that the database
+     * evaluates the cast like any other expression.
+     *
+     * @return SQL function parsing a lexical form of the datatype, or null for a datatype without a cast
+     */
+    public Function getLexicalParser()
+    {
+        return null;
     }
 }
