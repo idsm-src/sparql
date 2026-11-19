@@ -2542,64 +2542,28 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 if(!restriction.contains(relations, xsdBoolean))
                     return new SqlBuiltinCall(function, distinct, arguments, singletonMap(xsdBoolean, null), true);
 
-                //TODO: group based on string vs rdfbox mode
+                // one call over the classes of the text that can hold a string literal: the box of a single class
+                // stored so, the string literal of any other classes, which every class reads by its own key
+                Set<ResourceClass> classes = argument.getResourceClasses().stream().filter(r -> hasStringLiteral(r))
+                        .collect(toSet());
+                ResourceClass single = classes.size() == 1 ? classes.iterator().next() : null;
 
-                Set<List<ResourceClass>> rawVariants = new HashSet<>();
+                SqlBuilder builder = new SqlBuilder();
 
-                for(ResourceClass resClass : argument.getResourceClasses())
-                {
-                    if(!hasStringLiteral(resClass))
-                        continue;
+                if(single != null && single.getEffectiveClass().equals(box))
+                    builder.append("sparql.regex_rdfbox(").append(argument.get(relations, single).get(0));
+                else
+                    builder.append("sparql.regex_string(").append(argument.getStringLiteral(relations, classes));
 
-                    List<ResourceClass> list = new ArrayList<>();
+                builder.append(", ").append(pattern.get(relations, xsdString).get(0));
 
-                    list.add(resClass);
-                    list.add(xsdString);
+                if(flags != null)
+                    builder.append(", ").append(flags.get(relations, xsdString).get(0));
 
-                    if(flags != null)
-                        list.add(xsdString);
+                builder.append(")");
 
-                    rawVariants.add(list);
-                }
-
-
-                Set<List<Set<ResourceClass>>> variants = processResultMap(relations, arguments,
-                        singletonMap(xsdBoolean, rawVariants), restriction, box).get(xsdBoolean);
-
-
-                Set<Column> cols = new HashSet<>();
-
-                for(List<Set<ResourceClass>> variant : variants)
-                {
-                    SqlBuilder builder = new SqlBuilder();
-
-                    if(variant.get(0).stream().anyMatch(r -> r.getEffectiveClass().equals(box)))
-                    {
-                        Column col = argument.get(relations, unionize(variant.get(0), box)).get(0);
-
-                        builder.append("sparql.regex_rdfbox(");
-                        builder.append(col);
-                    }
-                    else
-                    {
-                        Column col = argument.getStringLiteral(relations, variant.get(0));
-
-                        builder.append("sparql.regex_string(");
-                        builder.append(col);
-                    }
-
-                    builder.append(", ");
-                    builder.append(pattern.get(relations, xsdString).get(0));
-
-                    if(flags != null)
-                        builder.append(", ").append(flags.get(relations, xsdString).get(0));
-
-                    builder.append(")");
-
-                    cols.add(new ExpressionColumn(builder.toCode(), BOOL));
-                }
-
-                Map<ResourceClass, List<Column>> mappings = singletonMap(xsdBoolean, List.of(coalesce(cols)));
+                Map<ResourceClass, List<Column>> mappings = singletonMap(xsdBoolean,
+                        List.of(new ExpressionColumn(builder.toCode(), BOOL)));
 
                 // an invalid pattern, invalid flags and a matching that fails are errors, so the result may be unbound
                 // whatever the arguments are
