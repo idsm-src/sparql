@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.List;
 import cz.iocb.sparql.engine.model.IriNode;
 import cz.iocb.sparql.engine.model.VariableNode;
+import cz.iocb.sparql.engine.model.triple.Node;
 import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 
 
@@ -26,6 +27,11 @@ public class MultiProcedureCall extends ProcedureCallBase
      */
     private final List<Parameter> results;
 
+    /**
+     * Node standing for the results in the text of the call.
+     */
+    private final Node resultNode;
+
 
     /**
      * Creates the call; variables among the results and parameters become in scope.
@@ -33,11 +39,15 @@ public class MultiProcedureCall extends ProcedureCallBase
      * @param results the named results
      * @param procedure IRI of the procedure
      * @param parameters the parameters
+     * @param resultNode node standing for the results in the text of the call, or null
+     * @param parameterNode node standing for the parameters in the text of the call, or null
      */
-    public MultiProcedureCall(Collection<Parameter> results, IriNode procedure, Collection<Parameter> parameters)
+    public MultiProcedureCall(Collection<Parameter> results, IriNode procedure, Collection<Parameter> parameters,
+            Node resultNode, Node parameterNode)
     {
-        super(procedure, parameters);
+        super(procedure, parameters, parameterNode);
         this.results = Collections.unmodifiableList(new ArrayList<>(results));
+        this.resultNode = resultNode;
 
         for(Parameter result : results)
             if(result.getValue() instanceof VariableNode variable)
@@ -57,6 +67,19 @@ public class MultiProcedureCall extends ProcedureCallBase
     public List<Parameter> getResults()
     {
         return results;
+    }
+
+
+    /**
+     * Node standing for the results in the text of the call: the subject of the triple naming the procedure, a blank
+     * node or a variable that is the subject of the triples of the results. It is syntax only, so the call binds no
+     * such variable, and no visitor visits the node as a child of the call.
+     *
+     * @return node standing for the results in the text of the call, or null if the call has none
+     */
+    public Node getResultNode()
+    {
+        return resultNode;
     }
 
 

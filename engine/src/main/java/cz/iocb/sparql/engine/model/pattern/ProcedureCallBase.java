@@ -83,17 +83,24 @@ public abstract class ProcedureCallBase extends PatternElement implements BasicP
      */
     private final List<Parameter> parameters;
 
+    /**
+     * Node standing for the parameters in the text of the call.
+     */
+    private final Node parameterNode;
+
 
     /**
      * Creates the call.
      *
      * @param procedure IRI of the procedure
      * @param parameters the parameters
+     * @param parameterNode node standing for the parameters in the text of the call, or null
      */
-    protected ProcedureCallBase(IriNode procedure, Collection<Parameter> parameters)
+    protected ProcedureCallBase(IriNode procedure, Collection<Parameter> parameters, Node parameterNode)
     {
         this.procedure = procedure;
         this.parameters = Collections.unmodifiableList(new ArrayList<>(parameters));
+        this.parameterNode = parameterNode;
     }
 
 
@@ -116,5 +123,18 @@ public abstract class ProcedureCallBase extends PatternElement implements BasicP
     public List<Parameter> getParameters()
     {
         return parameters;
+    }
+
+
+    /**
+     * Node standing for the parameters in the text of the call: the object of the triple naming the procedure, a blank
+     * node or a variable that is the subject of the triples of the parameters. It is syntax only, so the call binds no
+     * such variable, and no visitor visits the node as a child of the call.
+     *
+     * @return node standing for the parameters in the text of the call, or null if the call has none
+     */
+    public Node getParameterNode()
+    {
+        return parameterNode;
     }
 }

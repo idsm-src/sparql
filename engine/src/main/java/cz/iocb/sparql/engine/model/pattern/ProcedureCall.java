@@ -31,10 +31,11 @@ public class ProcedureCall extends ProcedureCallBase
      * @param result node receiving the result
      * @param procedure IRI of the procedure
      * @param parameters the parameters
+     * @param parameterNode node standing for the parameters in the text of the call, or null
      */
-    public ProcedureCall(Node result, IriNode procedure, Collection<Parameter> parameters)
+    public ProcedureCall(Node result, IriNode procedure, Collection<Parameter> parameters, Node parameterNode)
     {
-        super(procedure, parameters);
+        super(procedure, parameters, parameterNode);
         this.result = result;
 
         if(result instanceof VariableNode variable)

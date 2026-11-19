@@ -37,14 +37,15 @@ public enum MessageType
     unknownPrefix(ERROR, "Could not resolve the prefix: '%s'"),
 
     /**
-     * The object of a procedure call triple is not a blank node property list of parameters.
+     * The object of a procedure call triple, which stands for the parameters, is neither a blank node nor a variable.
      */
-    invalidProcedureCallObject(ERROR, "The procedure '%s' requires blank node syntax for its parameters."),
+    invalidProcedureCallObject(ERROR, "The procedure '%s' requires a blank node or a variable for its parameters."),
 
     /**
-     * The subject of a multi-result procedure call is not a blank node property list of results.
+     * The subject of a multi-result procedure call, which stands for the results, is neither a blank node nor a
+     * variable.
      */
-    invalidMultiProcedureCallSubject(ERROR, "The procedure '%s' requires an blank node syntax as its result."),
+    invalidMultiProcedureCallSubject(ERROR, "The procedure '%s' requires a blank node or a variable for its results."),
 
     /**
      * The predicate of a procedure call is a property path (other than a negated property set, which calls nothing).
@@ -218,11 +219,6 @@ public enum MessageType
      * A variable is projected twice.
      */
     repeatOfProjectionVariable(ERROR, "Projection variable '%s' cannot be used twice."),
-
-    /**
-     * A procedure parameter is given by a variable that cannot be bound at that point.
-     */
-    unboundedParameterValue(ERROR, "Procedure parameter '%s' uses unbounded value."),
 
     /**
      * A procedure is called inside a SERVICE pattern of a foreign endpoint.

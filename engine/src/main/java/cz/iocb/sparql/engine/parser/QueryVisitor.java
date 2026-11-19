@@ -10,7 +10,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
@@ -485,8 +484,77 @@ public class QueryVisitor extends BaseVisitor<Query>
                     new TranslateMessage(MessageType.unsupportedUpdateCommand, Range.compute(ctx.updateCommand())));
         }
 
+        if(result != null)
+            checkProcedureCallVariables(result.getSelect());
+
         prologue = null;
         return result;
+    }
+
+
+    /**
+     * Reports the other occurrences of a variable standing for the parameters or the results of a procedure call: the
+     * call binds no such variable, so another occurrence would join it unbound. The patterns are searched at any depth,
+     * with the triple terms, the expressions, the inline data and the patterns of sub-selects; the projections and the
+     * solution modifiers are not, as the clients that replace the blank nodes of a pattern by variables (Virtuoso
+     * forwarding the pattern of a SERVICE call) project them, and a variable of another scope, like one that a
+     * sub-select does not project, is another variable. The blank nodes are checked when the calls are assembled (see
+     * {@link GraphPatternVisitor#assembleProcedureCalls}), as their labels cannot occur in another basic graph pattern.
+     *
+     * @param select the select of the query
+     */
+    private void checkProcedureCallVariables(Select select)
+    {
+        Map<VariableNode, MessageType> nodes = new HashMap<>();
+
+        new ElementVisitor<Void>()
+        {
+            @Override
+            public Void visit(ProcedureCall call)
+            {
+                if(call.getParameterNode() instanceof VariableNode variable)
+                    nodes.put(variable, MessageType.invalidParameterVariableOccurence);
+
+                return super.visit(call);
+            }
+
+
+            @Override
+            public Void visit(MultiProcedureCall call)
+            {
+                if(call.getParameterNode() instanceof VariableNode variable)
+                    nodes.put(variable, MessageType.invalidParameterVariableOccurence);
+
+                if(call.getResultNode() instanceof VariableNode variable)
+                    nodes.put(variable, MessageType.invalidResultVariableOccurence);
+
+                return super.visit(call);
+            }
+        }.visitElement(select);
+
+        if(nodes.isEmpty())
+            return;
+
+        new ElementVisitor<Void>()
+        {
+            @Override
+            public Void visit(Select select)
+            {
+                return aggregateResult(visitElement(select.getPattern()), visitElement(select.getValues()));
+            }
+
+
+            @Override
+            public Void visit(VariableNode variable)
+            {
+                MessageType type = nodes.get(variable);
+
+                if(type != null)
+                    messages.add(new TranslateMessage(type, variable.getRange(), variable.getName()));
+
+                return null;
+            }
+        }.visitElement(select);
     }
 
 
@@ -1292,8 +1360,8 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
         Map<Node, List<Parameter>> parameterNodeMap = new HashMap<>();
         Map<Node, List<Parameter>> resultNodeMap = new HashMap<>();
 
-        Map<Node, Set<Range>> parameterNodeOccurences = new HashMap<>();
-        Map<Node, Set<Range>> resultNodeOccurences = new HashMap<>();
+        Set<Node> parameterNodes = new HashSet<>();
+        Set<Node> resultNodes = new HashSet<>();
 
 
         for(Pattern pattern : patterns)
@@ -1318,9 +1386,8 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
                     {
                         parameterNodeMap.put(parameterNode, new ArrayList<>());
 
-                        if(!parameterNodeOccurences.containsKey(parameterNode)
-                                && !resultNodeOccurences.containsKey(parameterNode))
-                            parameterNodeOccurences.put(parameterNode, new LinkedHashSet<>());
+                        if(!parameterNodes.contains(parameterNode) && !resultNodes.contains(parameterNode))
+                            parameterNodes.add(parameterNode);
                         else
                             messages.add(new TranslateMessage(MessageType.reuseOfParameterNode,
                                     parameterNode.getRange(), procedureName.toString(prologue)));
@@ -1340,9 +1407,8 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
                         {
                             resultNodeMap.put(resultNode, new ArrayList<>());
 
-                            if(!parameterNodeOccurences.containsKey(resultNode)
-                                    && !resultNodeOccurences.containsKey(resultNode))
-                                resultNodeOccurences.put(resultNode, new LinkedHashSet<>());
+                            if(!parameterNodes.contains(resultNode) && !resultNodes.contains(resultNode))
+                                resultNodes.add(resultNode);
                             else
                                 messages.add(new TranslateMessage(MessageType.reuseOfResultNode, resultNode.getRange(),
                                         procedureName.toString(prologue)));
@@ -1407,7 +1473,6 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
             if(parameters != null)
             {
                 iterator.remove();
-                parameterNodeOccurences.get(triple.getSubject()).add(triple.getSubject().getRange());
 
                 if(triple.getPredicate() instanceof IriNode iri)
                     parameters.add(new Parameter(iri, triple.getObject()));
@@ -1422,7 +1487,6 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
             if(results != null)
             {
                 iterator.remove();
-                resultNodeOccurences.get(triple.getSubject()).add(triple.getSubject().getRange());
 
                 if(triple.getPredicate() instanceof IriNode iri)
                     results.add(new Parameter(iri, triple.getObject()));
@@ -1433,24 +1497,30 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
         }
 
 
-        for(Pattern pattern : resultPatterns)
+        // the labels of blank nodes cannot occur in another basic graph pattern, so the other occurrences of a blank
+        // node standing for parameters or results are objects of the remaining triples, or components of their triple
+        // terms, like the one that an annotation of the call reifies; the variables are checked after the whole query
+        // is parsed (see checkProcedureCallVariables)
+        ElementVisitor<Void> blankNodeChecker = new ElementVisitor<>()
         {
-            if(pattern instanceof Triple && !callPatterns.contains(pattern))
+            @Override
+            public Void visit(BlankNode bnode)
             {
-                Node object = ((Triple) pattern).getObject();
+                if(parameterNodes.contains(bnode))
+                    messages.add(new TranslateMessage(MessageType.invalidParameterBlankNodeOccurence, bnode.getRange(),
+                            bnode.getName()));
 
-                if(object instanceof BlankNode bnode)
-                {
-                    if(parameterNodeOccurences.containsKey(object))
-                        messages.add(new TranslateMessage(MessageType.invalidParameterBlankNodeOccurence,
-                                object.getRange(), bnode.getName()));
+                if(resultNodes.contains(bnode))
+                    messages.add(new TranslateMessage(MessageType.invalidResultBlankNodeOccurence, bnode.getRange(),
+                            bnode.getName()));
 
-                    if(resultNodeOccurences.containsKey(object))
-                        messages.add(new TranslateMessage(MessageType.invalidResultBlankNodeOccurence,
-                                object.getRange(), bnode.getName()));
-                }
+                return null;
             }
-        }
+        };
+
+        for(Pattern pattern : resultPatterns)
+            if(pattern instanceof Triple triple && !callPatterns.contains(triple))
+                blankNodeChecker.visitElement(triple.getObject());
 
 
         ListIterator<Pattern> listIterator = resultPatterns.listIterator();
@@ -1473,9 +1543,11 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
                 parameters = new ArrayList<>();
 
 
+            Node parameterNode = triple.getObject() instanceof VariableOrBlankNode ? triple.getObject() : null;
+
             if(definition.isSimple())
             {
-                ProcedureCall call = new ProcedureCall(triple.getSubject(), name, parameters);
+                ProcedureCall call = new ProcedureCall(triple.getSubject(), name, parameters, parameterNode);
                 checkProcedureCall(call, service);
                 listIterator.set(call);
             }
@@ -1486,7 +1558,8 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
                 if(results == null)
                     results = new ArrayList<>();
 
-                MultiProcedureCall call = new MultiProcedureCall(results, name, parameters);
+                Node resultNode = triple.getSubject() instanceof VariableOrBlankNode ? triple.getSubject() : null;
+                MultiProcedureCall call = new MultiProcedureCall(results, name, parameters, resultNode, parameterNode);
                 checkProcedureCall(call, service);
                 listIterator.set(call);
             }

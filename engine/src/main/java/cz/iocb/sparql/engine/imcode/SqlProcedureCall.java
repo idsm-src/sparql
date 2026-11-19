@@ -39,19 +39,17 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
-//TODO: add support for binding parameter and result variables
-
-
-
 /**
  * Call of a procedure (a set-returning SQL function) for every solution of the child: the parameters are expressions
- * over the child's variables, the results are bound to variables (joined with the child when a result variable is
- * already bound). The function takes the values of the parameters in the columns of their declared classes (see
- * {@link ParameterDefinition}), so a literal of the datatype of a canonical declared class supplies its value in every
- * valid lexical form and a numeric declared class takes the value of every numeric XPath substitutes or promotes to its
- * datatype (see {@link SqlExpressionIntercode#getValue}), and a parameter supplying no value of its class gives no
- * solution. A call of a deterministic procedure (see {@link ProcedureDefinition#setDeterministic}) over the empty
- * solution, which takes nothing from any context, is evaluated by a common table expression (see
+ * over the child's variables, the results are bound to fresh variables, as the translator renames a result variable
+ * that the child binds already and merges it with the result (see {@link SqlMerge}), so the node makes no join
+ * condition. The nodes standing for the parameters and the results in the text of the call bind nothing, and the parser
+ * refuses their other occurrences. The function takes the values of the parameters in the columns of their declared
+ * classes (see {@link ParameterDefinition}), so a literal of the datatype of a canonical declared class supplies its
+ * value in every valid lexical form and a numeric declared class takes the value of every numeric XPath substitutes or
+ * promotes to its datatype (see {@link SqlExpressionIntercode#getValue}), and a parameter supplying no value of its
+ * class gives no solution. A call of a deterministic procedure (see {@link ProcedureDefinition#setDeterministic}) over
+ * the empty solution, which takes nothing from any context, is evaluated by a common table expression (see
  * {@link Request#getCommonTableExpression}), so that the statement evaluates it once even when it occurs several times,
  * e.g. in every branch of a union a join above it was distributed over, or in the pattern of an EXISTS evaluated for
  * every current solution; PostgreSQL folds a common table expression referenced once into the query unless the function
