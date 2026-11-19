@@ -9,6 +9,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -37,6 +38,7 @@ import org.junit.jupiter.api.Test;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import cz.iocb.sparql.engine.config.ServiceSettings;
+import cz.iocb.sparql.engine.config.ServiceSettings.ContextOverflow;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -61,10 +63,11 @@ import cz.iocb.sparql.testing.Database;
  * shared variables are sent in the VALUES clause of a call and a literal value constrains the received solutions
  * locally, the received literals are brought to their canonical forms, and the context solutions asking the same query
  * of the same endpoint share one request; the settings can send the literals too, keep the received lexical forms, and
- * limit the context solutions, the results and the followed redirects, for all endpoints or for one. The endpoint is a
- * server on the loopback interface answering the pattern {@code ?s :p ?o} from a few fixed remote triples, some of them
- * with non-canonical literals, matching a VALUES clause by the lexical forms, as a store keeping the literals as given
- * does. The local data is one table (so that the context of a call is one table access, not a union evaluated per
+ * limit the context solutions, the results and the followed redirects, for all endpoints or for one, and a context of
+ * more solutions than its limit may make the call be evaluated independently of it instead of failing. The endpoint is
+ * a server on the loopback interface answering the pattern {@code ?s :p ?o} from a few fixed remote triples, some of
+ * them with non-canonical literals, matching a VALUES clause by the lexical forms, as a store keeping the literals as
+ * given does. The local data is one table (so that the context of a call is one table access, not a union evaluated per
  * member) and one constant quad.
  */
 public class ServiceSettingsTest
@@ -458,10 +461,14 @@ public class ServiceSettingsTest
         assertThrows(IllegalArgumentException.class, () -> ServiceSettings.DEFAULT.withResultLimit(0));
         assertThrows(IllegalArgumentException.class, () -> ServiceSettings.DEFAULT.withRedirectLimit(-1));
 
-        ServiceSettings settings = ServiceSettings.DEFAULT.withSendLiterals(true).withCanonicalizeLiterals(false)
-                .withContextLimit(1).withResultLimit(2).withRedirectLimit(0);
+        assertThrows(NullPointerException.class, () -> ServiceSettings.DEFAULT.withContextOverflow(null));
 
-        assertThat(settings, is(new ServiceSettings(true, false, 1, 2, 0)));
+        ServiceSettings settings = ServiceSettings.DEFAULT.withSendLiterals(true).withCanonicalizeLiterals(false)
+                .withContextLimit(1).withResultLimit(2).withRedirectLimit(0)
+                .withContextOverflow(ContextOverflow.INDEPENDENT);
+
+        assertThat(settings, is(new ServiceSettings(true, false, 1, 2, 0, ContextOverflow.INDEPENDENT)));
+        assertThat(ServiceSettings.DEFAULT.contextOverflow(), is(ContextOverflow.FAIL));
     }
 
 
@@ -584,6 +591,41 @@ public class ServiceSettingsTest
                 () -> execute(engine(ServiceSettings.DEFAULT.withContextLimit(2)), query));
 
         assertThat(e.getMessage(), is(MessageType.serviceContextLimitExceeded.getText()));
+    }
+
+
+    @Test
+    @DisplayName("a context beyond the limit makes the call be evaluated independently of it when the settings say so")
+    void independentEvaluation() throws Exception
+    {
+        ServiceSettings independent = ServiceSettings.DEFAULT.withContextLimit(2)
+                .withContextOverflow(ContextOverflow.INDEPENDENT);
+
+        // the pattern is asked once without the values, and the received solutions are joined with the context
+        assertThat(execute(engine(independent), "SELECT ?s WHERE { ?s :v ?o " + service() + "}"),
+                containsInAnyOrder(row(a), row(b)));
+        assertThat(queries.size(), is(1));
+        assertThat(queries.get(0), not(containsString("values")));
+
+        // an endpoint named by a variable is asked once for every endpoint the context names
+        String variable = "SELECT ?x ?s WHERE { ?x :e ?endpoint . ?x :v ?o " + service("?endpoint") + "}";
+
+        reset();
+        assertThat(execute(engine(independent), variable), containsInAnyOrder(row(a, a), row(b, b)));
+        assertThat(queries.size(), is(2));
+        assertThat(queries, everyItem(not(containsString("values"))));
+
+        // the distinct endpoints have to fit into the limit
+        ServiceException e = assertThrows(ServiceException.class,
+                () -> execute(engine(independent.withContextLimit(1)), variable));
+
+        assertThat(e.getMessage(), is(MessageType.serviceContextLimitExceeded.getText()));
+
+        // a failing SILENT call leaves the context as it is
+        String silent = "SELECT ?s ?y WHERE { ?s :v ?o SERVICE SILENT <http://127.0.0.1:1/x> { ?s :p ?y } }";
+
+        assertThat(execute(engine(independent), silent),
+                containsInAnyOrder(row(a, null), row(b, null), row(iri("c"), null)));
     }
 
 

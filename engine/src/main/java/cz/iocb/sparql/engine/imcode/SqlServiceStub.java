@@ -42,6 +42,7 @@ import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import cz.iocb.sparql.engine.config.ServiceSettings;
+import cz.iocb.sparql.engine.config.ServiceSettings.ContextOverflow;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.LateralTable;
@@ -1014,10 +1015,11 @@ public final class SqlServiceStub extends SqlIntercode
      * endpoint, so a failing endpoint leaves only the context solutions naming it as they are, whatever it has answered
      * to other requests of the call, and the solutions naming the other endpoints are merged with what those answer.
      * The context and result limits are those of the endpoint when the call names it, and the defaults of the
-     * configuration when the endpoint is a variable; the other settings are those of the endpoint of each request. A
-     * context referring to the current solutions of enclosing lateral joins (see {@link Enclosure}) is evaluated for
-     * all their solutions at once, joined laterally with their left sides, and the result keeps the received solutions
-     * computed for the current ones; the limits then apply to the solutions of all of them.
+     * configuration when the endpoint is a variable, as is what a context of more solutions than the limit does (see
+     * {@link ContextOverflow}); the other settings are those of the endpoint of each request. A context referring to
+     * the current solutions of enclosing lateral joins (see {@link Enclosure}) is evaluated for all their solutions at
+     * once, joined laterally with their left sides, and the result keeps the received solutions computed for the
+     * current ones; the limits then apply to the solutions of all of them.
      *
      * @param request the current request
      * @param scope the scope of the call
@@ -1026,6 +1028,26 @@ public final class SqlServiceStub extends SqlIntercode
      * @return the received solutions joined with the context
      */
     public SqlIntercode eval(Request request, Scope scope, SqlIntercode context, Restrictions restrictions)
+    {
+        return eval(request, scope, context, restrictions, false);
+    }
+
+
+    /**
+     * Evaluates the call for the solutions of {@code context} (see
+     * {@link #eval(Request, Scope, SqlIntercode, Restrictions)}); a context of more solutions than the limit fails the
+     * query, or makes the call be evaluated independently of it when the settings say so (see
+     * {@link ContextOverflow#INDEPENDENT}) and the context is not the reduced one of such an evaluation already.
+     *
+     * @param request the current request
+     * @param scope the scope of the call
+     * @param context solutions the call is evaluated for
+     * @param restrictions what the parent needs of the variables
+     * @param overflowFails whether a context of more solutions than the limit fails the query in any case
+     * @return the received solutions joined with the context
+     */
+    private SqlIntercode eval(Request request, Scope scope, SqlIntercode context, Restrictions restrictions,
+            boolean overflowFails)
     {
         restrictions = getEvaluationRestrictions(context, restrictions);
 
@@ -1102,6 +1124,7 @@ public final class SqlServiceStub extends SqlIntercode
             }
 
             String statement = SqlSelect.translateStatement(request, code);
+            boolean overflow = false;
 
             try(Result result = new Result(ResultType.SELECT, query.getResultDescription(),
                     request.getStatement().executeQuery(statement), request.getBegin(), request.getTimeout()))
@@ -1114,8 +1137,11 @@ public final class SqlServiceStub extends SqlIntercode
 
                     if(rows.size() > settings.contextLimit())
                     {
-                        //TODO: use failback variant
-                        throw new ServiceException(MessageType.serviceContextLimitExceeded.getText());
+                        if(overflowFails || settings.contextOverflow() == ContextOverflow.FAIL)
+                            throw new ServiceException(MessageType.serviceContextLimitExceeded.getText());
+
+                        overflow = true;
+                        break;
                     }
                 }
             }
@@ -1126,6 +1152,16 @@ public final class SqlServiceStub extends SqlIntercode
             catch(SQLException e)
             {
                 throw new SQLRuntimeException(e);
+            }
+
+            if(overflow)
+            {
+                SqlIntercode result = evalIndependently(request, scope, local, restrictions);
+
+                if(context.isDeterministic())
+                    evaluations.add(new Evaluation(new Restrictions(restrictions), result));
+
+                return result;
             }
         }
 
@@ -1331,6 +1367,57 @@ public final class SqlServiceStub extends SqlIntercode
                 throw new SQLRuntimeException(e);
             }
         }
+    }
+
+
+    /**
+     * Evaluates the call independently of its context, whose solutions are more than the context limit allows (see
+     * {@link ContextOverflow#INDEPENDENT}): the pattern is asked without the values of the context, once for every
+     * distinct endpoint the context names when a variable names the endpoint, and the received solutions are joined
+     * with the context. A context solution leaving the variable that names the endpoint unbound asks no endpoint, as in
+     * the evaluation for the context solutions, so it takes no part in the join, where it would agree with the
+     * solutions received from every endpoint.
+     *
+     * @param request the current request
+     * @param scope the scope of the call
+     * @param local the context with its earlier calls evaluated
+     * @param restrictions what the parent needs of the variables
+     * @return the received solutions joined with the context
+     */
+    private SqlIntercode evalIndependently(Request request, Scope scope, SqlIntercode local, Restrictions restrictions)
+    {
+        ClassRelations relations = request.getConfiguration();
+        Restrictions received = new Restrictions(restrictions);
+
+        // the join takes the shared variables and the endpoint from the received solutions
+        for(Variable variable : serviceVariables.values())
+            if(local.getVariable(variable) != null)
+                received.add(variable);
+
+        SqlIntercode reduced = SqlEmptySolution.get();
+
+        if(name instanceof Variable variable)
+        {
+            VariableBinding binding = local.getVariable(variable);
+
+            if(binding == null)
+                return SqlNoSolution.get();
+
+            if(binding.canBeNull())
+            {
+                SqlExpressionIntercode bound = SqlBuiltinCall.create(request, "bound", false,
+                        List.of(SqlVariable.create(relations, binding)));
+
+                local = SqlFilter.filter(request, List.of(SqlEffectiveBooleanValue.create(relations, bound)), local);
+            }
+
+            received.add(variable);
+            reduced = SqlDistinct.create(request, local, Set.of(variable));
+        }
+
+        SqlIntercode result = eval(request, scope, reduced, received, true);
+
+        return SqlJoin.join(request, local, result).optimize(request, scope, restrictions, false, true);
     }
 
 
