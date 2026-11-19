@@ -260,7 +260,7 @@ public final class SqlJoin extends SqlIntercode
             List<SqlIntercode> optimized = optimize(request, scope, optChilds, newRestrictions, reduced, evalServices,
                     settlement.getClasses());
             List<SqlIntercode> newChilds = reduceDistinctUnion(relations,
-                    reduceJoin(relations, optimized, newRestrictions, schema), schema);
+                    reduceJoin(request, optimized, newRestrictions), schema);
 
             newChilds = expandLeadingOptionals(request, scope, newChilds, evalServices);
             newChilds = seedWalks(request, scope, newChilds, newRestrictions);
@@ -679,15 +679,16 @@ public final class SqlJoin extends SqlIntercode
      * Simplifies the children: propagates no-solution, drops empty solutions, detects unjoinable children, pushes
      * constants and VALUES into table accesses and merges table accesses joined along keys.
      *
-     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param request the current request
      * @param childs the child nodes
      * @param restrictions what the parent needs of the variables
-     * @param schema the database schema
      * @return the simplified children
      */
-    private static List<SqlIntercode> reduceJoin(ClassRelations relations, List<SqlIntercode> childs,
-            Restrictions restrictions, DatabaseSchema schema)
+    private static List<SqlIntercode> reduceJoin(Request request, List<SqlIntercode> childs, Restrictions restrictions)
     {
+        ClassRelations relations = request.getConfiguration();
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+
         if(childs.stream().anyMatch(c -> c.equals(SqlNoSolution.get())))
             return List.of(SqlNoSolution.get());
 
@@ -801,8 +802,7 @@ public final class SqlJoin extends SqlIntercode
                 {
                     if(optChilds.get(j) instanceof SqlTableAccess right)
                     {
-                        SqlIntercode merged = SqlTableAccess.tryReduceJoinWithValues(relations, schema, right, left,
-                                null);
+                        SqlIntercode merged = SqlTableAccess.tryReduceJoinWithValues(request, right, left, null);
 
                         if(Objects.equals(merged, SqlNoSolution.get()))
                             return List.of(SqlNoSolution.get());

@@ -35,10 +35,10 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 /**
  * Inline table of constant solutions (VALUES, or small SERVICE results). Every variable has fixed columns per resource
  * class; {@code data} holds the column values row by row and {@code resourceClasses} the class of each variable in each
- * row (null when unbound). The table is written as a common table expression (see
- * {@link Request#getCommonTableExpression}), so that the statement evaluates it once however many times the
- * optimisation has copied it, into the branches of a union, the sources of the nodes seeding a walk or the patterns of
- * expressions.
+ * row (null when unbound), and {@code terms} the term of each variable in each row when the node is made of terms. The
+ * table is written as a common table expression (see {@link Request#getCommonTableExpression}), so that the statement
+ * evaluates it once however many times the optimisation has copied it, into the branches of a union, the sources of the
+ * nodes seeding a walk or the patterns of expressions.
  */
 public final class SqlValues extends SqlIntercode
 {
@@ -57,6 +57,13 @@ public final class SqlValues extends SqlIntercode
      */
     private final int size;
 
+    /**
+     * Term of each variable in each row (null when unbound), which lets the rows be converted to other classes than
+     * those of their columns (see {@link #asConditions}); null when the node is not made of terms. The terms are given
+     * by the data, so the equality of the nodes does not compare them.
+     */
+    private final Map<Variable, List<RdfTerm>> terms;
+
 
     /**
      * Creates the node.
@@ -65,20 +72,22 @@ public final class SqlValues extends SqlIntercode
      * @param resourceClasses class of each variable in each row
      * @param data the column values row by row
      * @param size the number of rows
+     * @param terms term of each variable in each row, or null
      */
     protected SqlValues(VariableBindings bindings, Map<Variable, List<ResourceClass>> resourceClasses,
-            LinkedHashMap<Column, List<Column>> data, int size)
+            LinkedHashMap<Column, List<Column>> data, int size, Map<Variable, List<RdfTerm>> terms)
     {
         super(bindings, true);
 
         this.data = data;
         this.resourceClasses = resourceClasses;
         this.size = size;
+        this.terms = terms;
     }
 
 
     /**
-     * Values node over the given bindings and data.
+     * Values node over the given bindings and data, not made of terms.
      *
      * @param bindings the variable bindings
      * @param resourceClasses class of each variable in each row
@@ -89,7 +98,7 @@ public final class SqlValues extends SqlIntercode
     public static SqlIntercode create(VariableBindings bindings, Map<Variable, List<ResourceClass>> resourceClasses,
             LinkedHashMap<Column, List<Column>> data, int size)
     {
-        return new SqlValues(bindings, resourceClasses, data, size);
+        return new SqlValues(bindings, resourceClasses, data, size, null);
     }
 
 
@@ -109,6 +118,7 @@ public final class SqlValues extends SqlIntercode
 
 
         Map<Variable, List<ResourceClass>> resourceClasses = new HashMap<>();
+        Map<Variable, List<RdfTerm>> terms = new HashMap<>();
         LinkedHashMap<Column, List<Column>> data = new LinkedHashMap<>();
         Map<List<Column>, Column> revData = new HashMap<>();
         VariableBindings bindings = new VariableBindings();
@@ -152,6 +162,9 @@ public final class SqlValues extends SqlIntercode
             resClasses = new LinkedHashSet<>(merged.values());
 
             resourceClasses.put(variables.get(i), nodeResourceClasses);
+
+            int index = i;
+            terms.put(variables.get(i), lines.stream().map(line -> line.get(index)).toList());
 
             VariableBinding binding = new VariableBinding(variables.get(i), canBeNull);
 
@@ -211,7 +224,7 @@ public final class SqlValues extends SqlIntercode
             bindings.add(binding);
         }
 
-        return create(bindings, resourceClasses, data, lines.size());
+        return new SqlValues(bindings, resourceClasses, data, lines.size(), terms);
     }
 
 
@@ -241,7 +254,7 @@ public final class SqlValues extends SqlIntercode
         for(Column column : optimizedBindings.getNonConstantColumns())
             optimizedData.put(column, data.get(column));
 
-        return create(optimizedBindings, resourceClasses, optimizedData, size);
+        return new SqlValues(optimizedBindings, resourceClasses, optimizedData, size, terms);
     }
 
 
@@ -329,19 +342,36 @@ public final class SqlValues extends SqlIntercode
 
 
     /**
-     * The rows as a disjunction of equality conditions on the given outer bindings, used to merge the values into a
-     * table access.
+     * True if the term of every row of the variable is known (see {@link #terms}).
      *
+     * @param variable the variable
+     * @return true if the term of every row of the variable is known, false otherwise
+     */
+    public boolean hasTerms(Variable variable)
+    {
+        return terms != null && terms.containsKey(variable);
+    }
+
+
+    /**
+     * The rows as a disjunction of equality conditions on the given outer bindings, used to merge the values into a
+     * table access. A value of a class the outer binding has columns of is compared as it is; any other value is
+     * converted to the single class the outer binding has (see {@link #hasTerms}), and a row whose term that class
+     * cannot hold is left out, so that the disjunction is false when no row is left.
+     *
+     * @param request the current request
      * @param schema the database schema of the access to merge into
      * @param table the table of the access to merge into
      * @param outerBindings bindings of the access to merge into, in terms of the columns and expressions of its table
      * @return the rows as a disjunction of equality conditions on the given outer bindings, used to merge the values
      *         into a table access
      */
-    public Conditions asConditions(DatabaseSchema schema, SourceTable table, VariableBindings outerBindings)
+    public Conditions asConditions(Request request, DatabaseSchema schema, SourceTable table,
+            VariableBindings outerBindings)
     {
         Conditions conditions = new Conditions(false);
 
+        rows:
         for(int i = 0; i < size; i++)
         {
             Condition condition = new Condition();
@@ -349,27 +379,30 @@ public final class SqlValues extends SqlIntercode
             for(VariableBinding binding : bindings.getValues())
             {
                 VariableBinding outerBinding = outerBindings.get(binding.getVariable());
+                ResourceClass resClass = resourceClasses.get(binding.getVariable()).get(i);
+                List<Column> columns = binding.getMapping(resClass);
+                List<Column> outerColumns = outerBinding.getMapping(resClass);
+                List<Column> values = new ArrayList<>();
 
-                //TODO: support multiple resource class ...
-                assert binding.getMappings().size() == 1;
-
-                for(Entry<ResourceClass, List<Column>> mapping : binding.getMappings().entrySet())
+                if(columns != null && outerColumns != null)
                 {
-                    List<Column> outerCollumns = outerBinding.getMapping(mapping.getKey());
-
-                    List<Column> values = new ArrayList<>(outerCollumns.size());
-
-                    for(int j = 0; j < outerCollumns.size(); j++)
-                    {
-                        if(mapping.getValue().get(j) instanceof ConstantColumn)
-                            values.add(mapping.getValue().get(j));
-                        else
-                            values.add(data.get(mapping.getValue().get(j)).get(i));
-                    }
-
-                    condition.addAreEqual(outerCollumns, values, SqlTableAccess.needsNullSafeEquality(schema, table,
-                            mapping.getKey(), outerCollumns, values));
+                    for(Column column : columns)
+                        values.add(column instanceof ConstantColumn ? column : data.get(column).get(i));
                 }
+                else
+                {
+                    RdfTerm term = terms.get(binding.getVariable()).get(i);
+                    resClass = outerBinding.getClasses().iterator().next();
+
+                    if(!request.match(resClass, term))
+                        continue rows;
+
+                    outerColumns = outerBinding.getMapping(resClass);
+                    values = request.getColumns(resClass, term);
+                }
+
+                condition.addAreEqual(outerColumns, values,
+                        SqlTableAccess.needsNullSafeEquality(schema, table, resClass, outerColumns, values));
             }
 
             conditions.add(condition);
@@ -632,6 +665,9 @@ public final class SqlValues extends SqlIntercode
                 .filter(e -> nonConstCols.contains(e.getKey()))
                 .collect(toMap(Entry::getKey, Entry::getValue, (a, _) -> a, LinkedHashMap::new));
 
-        return create(newBindings, filteredResourceClasses, refilteredData, newSize);
+        Map<Variable, List<RdfTerm>> filteredTerms = terms == null ? null : terms.entrySet().stream()
+                .collect(toMap(Entry::getKey, e -> filterByMask(e.getValue(), mask), (a, _) -> a, HashMap::new));
+
+        return new SqlValues(newBindings, filteredResourceClasses, refilteredData, newSize, filteredTerms);
     }
 }

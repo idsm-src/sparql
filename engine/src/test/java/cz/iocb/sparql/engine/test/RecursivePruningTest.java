@@ -914,10 +914,11 @@ public class RecursivePruningTest
     @DisplayName("an inline table copied into the sources of the nodes is evaluated once by the statement")
     void valuesSeedShared() throws Exception
     {
-        String query = "SELECT ?x ?y WHERE { VALUES ?x { <http://other.org/thing> <http://other.org/nothing> } "
-                + "?x ex:next* ?y }";
+        // the projected variable ?z, which the sources do not bind, keeps the table from being merged into them
+        String query = "SELECT ?x ?y ?z WHERE { VALUES (?x ?z) { (<http://other.org/thing> <http://other.org/a>) "
+                + "(<http://other.org/nothing> <http://other.org/b>) } ?x ex:next* ?y }";
 
-        assertThat(execute(query), containsInAnyOrder(row(thing, thing)));
+        assertThat(execute(query), containsInAnyOrder(row(thing, thing, new Iri("http://other.org/a"))));
         // every source of the nodes joins the inline table, written once as a common table expression of the statement
         String sql = translate(query);
         assertThat(sql, containsString("\"cte0\" AS (SELECT * FROM (VALUES"));

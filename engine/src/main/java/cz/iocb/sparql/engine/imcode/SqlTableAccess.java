@@ -738,16 +738,17 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * True if the VALUES can be merged into the access: distinct rows, every variable bound in one class also bound in
-     * the access and never null on either side, and few enough rows to keep the conditions of the access small (see
-     * {@link #disjunctLimit}; a single row adds no disjunct, so it is always few enough).
+     * True if the VALUES can be merged into the access: distinct rows, every variable bound also in the access and
+     * never null on either side, and few enough rows to keep the conditions of the access small (see
+     * {@link #disjunctLimit}; a single row adds no disjunct, so it is always few enough). The access has to bind a
+     * variable in every class of the VALUES, or, when the VALUES is made of terms (see {@link SqlValues#hasTerms}), in
+     * a single class with columns, to which its terms are converted (see {@link SqlValues#asConditions}).
      *
-     * @param schema the database schema
      * @param left the left access
      * @param right the VALUES node
      * @return true if the VALUES can be merged into the access, false otherwise
      */
-    private static boolean canBeJoinedWithValues(DatabaseSchema schema, SqlTableAccess left, SqlValues right)
+    private static boolean canBeJoinedWithValues(SqlTableAccess left, SqlValues right)
     {
         // asked first, because the test of distinct rows compares every two of them
         if(right.getSize() > 1 && (long) left.conditions.getConditions().size() * right.getSize() > disjunctLimit)
@@ -761,20 +762,18 @@ public final class SqlTableAccess extends SqlIntercode
             if(binding.canBeNull())
                 return false;
 
-            //TODO: support multiple resource class ...
-            if(binding.getMappings().size() != 1)
-                return false;
-
             VariableBinding tableBinding = left.getVariableBindings().get(binding.getVariable());
 
-            if(tableBinding == null)
+            if(tableBinding == null || tableBinding.canBeNull())
                 return false;
 
-            //TODO: support resource class generalization
-            if(tableBinding.getMapping(binding.getClasses().iterator().next()) == null)
-                return false;
+            boolean held = binding.getClasses().stream()
+                    .allMatch(c -> binding.getMapping(c) != null && tableBinding.getMapping(c) != null);
 
-            if(tableBinding.canBeNull() /*&& right.getSize() > 1*/)
+            boolean convertible = right.hasTerms(binding.getVariable()) && tableBinding.getClasses().size() == 1
+                    && tableBinding.getMapping(tableBinding.getClasses().iterator().next()) != null;
+
+            if(!held && !convertible)
                 return false;
         }
 
@@ -1206,23 +1205,28 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * Merges the VALUES into the access as conditions.
+     * Merges the VALUES into the access as conditions; the access keeps the classes it binds the variables in, and no
+     * solution is left when it can hold the values of no row.
      *
-     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param request the current request
      * @param left the left access
      * @param right the VALUES node
      * @param restrictions what the parent needs of the variables
      * @return the merged access
      */
-    private static SqlIntercode joinWithValues(ClassRelations relations, SqlTableAccess left, SqlValues right,
+    private static SqlIntercode joinWithValues(Request request, SqlTableAccess left, SqlValues right,
             Restrictions restrictions)
     {
         // the conditions are evaluated inside the access, so they refer to the table's own columns and expressions,
         // not to the aliases under which the access exposes them
-        Conditions conditions = Conditions.and(left.conditions,
-                right.asConditions(left.schema, left.table, left.internal));
+        Conditions values = right.asConditions(request, left.schema, left.table, left.internal);
 
-        return left.with(conditions, left.internal.restrict(relations, restrictions));
+        if(values.isFalse())
+            return SqlNoSolution.get();
+
+        Conditions conditions = Conditions.and(left.conditions, values);
+
+        return left.with(conditions, left.internal.restrict(request.getConfiguration(), restrictions));
     }
 
 
@@ -1574,21 +1578,20 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * Merges a VALUES node into the access as conditions when its rows are distinct, bound in a single class and few
-     * enough (see {@link #disjunctLimit}), or returns null.
+     * Merges a VALUES node into the access as conditions when its rows are distinct, bound in classes the access binds
+     * the variables in or convertible to them, and few enough (see {@link #canBeJoinedWithValues}), or returns null.
      *
-     * @param relations declarations which unrelated user IRI classes may overlap
-     * @param schema the database schema
+     * @param request the current request
      * @param left the left access
      * @param right the VALUES node
      * @param mergeRestrictions what the parent needs of the variables
      * @return the merged access, or null
      */
-    public static SqlIntercode tryReduceJoinWithValues(ClassRelations relations, DatabaseSchema schema,
-            SqlTableAccess left, SqlValues right, Restrictions mergeRestrictions)
+    public static SqlIntercode tryReduceJoinWithValues(Request request, SqlTableAccess left, SqlValues right,
+            Restrictions mergeRestrictions)
     {
-        if(SqlTableAccess.canBeJoinedWithValues(schema, left, right))
-            return joinWithValues(relations, left, right, mergeRestrictions);
+        if(SqlTableAccess.canBeJoinedWithValues(left, right))
+            return joinWithValues(request, left, right, mergeRestrictions);
 
         return null;
     }
