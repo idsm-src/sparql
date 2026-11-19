@@ -246,4 +246,44 @@ public class ConditionTest
         assertEquals(Set.of(b), condition.getIsNull());
         assertFalse(condition.isFalse());
     }
+
+
+    @Test
+    void classesAreSpannedByTheirLeastMembers()
+    {
+        Condition columns = new Condition();
+        columns.addAreEqual(a, b);
+        columns.addAreEqual(b, c);
+
+        assertEquals(Set.of(pair(a, b), pair(a, c)), columns.getSpanningEqualities());
+
+        // a constant is the least member
+        Condition constant = new Condition();
+        constant.addAreEqual(a, b);
+        constant.addAreEqual(b, one);
+
+        assertEquals(Set.of(pair(one, a), pair(one, b)), constant.getSpanningEqualities());
+
+        // two constants of one class keep their contradiction
+        Condition constants = new Condition();
+        constants.addAreEqual(a, one);
+        constants.addAreEqual(a, two);
+
+        assertEquals(Set.of(pair(one, a), pair(one, two)), constants.getSpanningEqualities());
+        assertTrue(constants.isFalse());
+
+        Condition nullSafe = new Condition();
+        nullSafe.addAreNotDistinct(a, b);
+        nullSafe.addAreNotDistinct(b, c);
+
+        assertEquals(Set.of(pair(a, b), pair(a, c)), nullSafe.getSpanningNotDistinct());
+        assertEquals(Set.of(), nullSafe.getSpanningEqualities());
+
+        // an equality with a NULL constant belongs to no class
+        Condition nullConstant = new Condition();
+        nullConstant.addAreEqual(a, b);
+        nullConstant.addAreEqual(b, nul);
+
+        assertTrue(nullConstant.getSpanningEqualities().containsAll(Set.of(pair(a, b), pair(b, nul))));
+    }
 }

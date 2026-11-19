@@ -1,8 +1,10 @@
 package cz.iocb.sparql.engine.database;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.IntPredicate;
 
@@ -13,14 +15,15 @@ import java.util.function.IntPredicate;
  * {@code IS NOT DISTINCT FROM} and {@code !=}.
  *
  * Columns compared by {@code =} or {@code IS NOT DISTINCT FROM} form equivalence classes that are kept transitively
- * closed. Whether a pair of a class is rendered as the strict {@code =} or as the null-safe
- * {@code IS NOT DISTINCT FROM} is not a property of the pair but of the class: as soon as some member of a class is
- * known to be not null (it is required to be not null, it is compared by {@code =} or {@code !=}, or it is a non-null
- * constant), all members are not null and every pair of the class is strict. A class containing a NULL constant
- * requires its members to be null instead. A column compared by {@code =} or {@code !=} drops its {@code IS NOT NULL}
- * predicate as redundant. Contradictory predicates are stored as they are and detected by {@link #isFalse()}. A
- * comparison is rendered by the operators of the SQL type of the compared columns (see {@link ColumnComparison#getType}
- * and {@link SqlType#equal}).
+ * closed, and rendered as the pairs of the least member of each class (see {@link #getSpanningEqualities()}). Whether a
+ * pair of a class is rendered as the strict {@code =} or as the null-safe {@code IS NOT DISTINCT FROM} is not a
+ * property of the pair but of the class: as soon as some member of a class is known to be not null (it is required to
+ * be not null, it is compared by {@code =} or {@code !=}, or it is a non-null constant), all members are not null and
+ * every pair of the class is strict. A class containing a NULL constant requires its members to be null instead. A
+ * column compared by {@code =} or {@code !=} drops its {@code IS NOT NULL} predicate as redundant when the comparison
+ * comes after the predicate; the predicate kept otherwise is left out when the condition is rendered. Contradictory
+ * predicates are stored as they are and detected by {@link #isFalse()}. A comparison is rendered by the operators of
+ * the SQL type of the compared columns (see {@link ColumnComparison#getType} and {@link SqlType#equal}).
  */
 public class Condition
 {
@@ -851,5 +854,90 @@ public class Condition
     public Set<ColumnComparison> getAreNotEqual()
     {
         return Collections.unmodifiableSet(areNotEqual);
+    }
+
+
+    /**
+     * The pairs required to be equal by the strict {@code =} that imply all of them: for every equivalence class, the
+     * pairs of its least member (a constant when it has one, see {@link Column#compareTo}) with its other members, as
+     * they are stored, so that a class of k members is rendered by k-1 comparisons instead of k(k-1)/2, and a pair with
+     * a NULL constant, which belongs to no class.
+     *
+     * @return the pairs required to be equal by the strict {@code =} that imply all of them
+     */
+    public Set<ColumnComparison> getSpanningEqualities()
+    {
+        return getSpanning(areEqual);
+    }
+
+
+    /**
+     * The pairs required to be equal by the null-safe {@code IS NOT DISTINCT FROM} that imply all of them, chosen as
+     * those of {@link #getSpanningEqualities()}.
+     *
+     * @return the pairs required to be equal by the null-safe {@code IS NOT DISTINCT FROM} that imply all of them
+     */
+    public Set<ColumnComparison> getSpanningNotDistinct()
+    {
+        return getSpanning(areNotDistinct);
+    }
+
+
+    /**
+     * The pairs of the equivalence classes the given pairs form that join the least member of each class with its other
+     * members, and the pairs with a NULL constant; every pair of a class that does not hold all the pairs of its least
+     * member, which a closed class does, is kept.
+     *
+     * @param pairs the pairs
+     * @return the pairs that imply all the given ones
+     */
+    private static Set<ColumnComparison> getSpanning(Set<ColumnComparison> pairs)
+    {
+        Map<Column, Set<Column>> classes = new HashMap<>();
+
+        for(ColumnComparison pair : pairs)
+        {
+            if(isNullConstant(pair.getLeft()) || isNullConstant(pair.getRight()))
+                continue;
+
+            Set<Column> left = classes.computeIfAbsent(pair.getLeft(), c -> new HashSet<>(Set.of(c)));
+            Set<Column> right = classes.computeIfAbsent(pair.getRight(), c -> new HashSet<>(Set.of(c)));
+
+            if(left != right)
+            {
+                left.addAll(right);
+                right.forEach(c -> classes.put(c, left));
+            }
+        }
+
+        Set<ColumnComparison> spanning = new HashSet<>();
+        Map<Set<Column>, Integer> counts = new HashMap<>();
+
+        for(ColumnComparison pair : pairs)
+        {
+            if(isNullConstant(pair.getLeft()) || isNullConstant(pair.getRight()))
+            {
+                spanning.add(pair);
+                continue;
+            }
+
+            Set<Column> members = classes.get(pair.getLeft());
+
+            if(pair.contains(Collections.min(members)))
+            {
+                spanning.add(pair);
+                counts.merge(members, 1, Integer::sum);
+            }
+        }
+
+        for(ColumnComparison pair : pairs)
+        {
+            Set<Column> members = classes.get(pair.getLeft());
+
+            if(members != null && counts.getOrDefault(members, 0) < members.size() - 1)
+                spanning.add(pair);
+        }
+
+        return spanning;
     }
 }

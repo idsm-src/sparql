@@ -2419,7 +2419,10 @@ public final class SqlTableAccess extends SqlIntercode
 
     /**
      * Appends the WHERE clause of the conditions and of the extra condition, nothing when the conditions always hold
-     * and there is no extra one.
+     * and there is no extra one. An equivalence class of columns is written as the comparisons of its least member with
+     * the others (see {@link Condition#getSpanningEqualities}), which imply the rest, and the null test of a column
+     * that the strict comparisons of the same disjunct compare is left out, as those reject a null; the database would
+     * count the fraction of nulls twice otherwise.
      *
      * @param builder the SQL code being built
      * @param conditions the conditions
@@ -2451,17 +2454,20 @@ public final class SqlTableAccess extends SqlIntercode
             builder.append("(");
             boolean hasCondition = false;
 
-            // TODO: do not use derivable conditions
+            // the columns a strict comparison of the disjunct rejects the nulls of
+            Set<Column> compared = new HashSet<>();
 
-            for(ColumnComparison pair : condition.getAreEqual())
+            for(ColumnComparison pair : condition.getSpanningEqualities())
             {
                 appendAnd(builder, hasCondition);
                 hasCondition = true;
 
                 builder.append(pair.getType().equal(pair.getLeft(), pair.getRight()));
+                compared.add(pair.getLeft());
+                compared.add(pair.getRight());
             }
 
-            for(ColumnComparison pair : condition.getAreNotDistinct())
+            for(ColumnComparison pair : condition.getSpanningNotDistinct())
             {
                 appendAnd(builder, hasCondition);
                 hasCondition = true;
@@ -2475,12 +2481,18 @@ public final class SqlTableAccess extends SqlIntercode
                 hasCondition = true;
 
                 builder.append(pair.getType().notEqual(pair.getLeft(), pair.getRight()));
+                compared.add(pair.getLeft());
+                compared.add(pair.getRight());
             }
 
-            // TODO: do not use derivable conditions
+            //TODO: a column compared strictly with a value of the current solution or of a lateral row (see
+            // translateValues and translateLateral) keeps its null test as well
 
             for(Column column : condition.getIsNotNull())
             {
+                if(compared.contains(column))
+                    continue;
+
                 appendAnd(builder, hasCondition);
                 hasCondition = true;
 
