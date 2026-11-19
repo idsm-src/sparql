@@ -540,6 +540,21 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         Set<Variable> groupByVars = new HashSet<>();
         Set<VariableNode> validVars = new HashSet<>();
 
+        // the variables the plain grouping variables are, and the variables the keys computed by expressions refer to
+        Set<Variable> plainVars = new HashSet<>();
+        Set<Variable> keyVars = new HashSet<>();
+
+        for(GroupCondition groupBy : select.getGroupByConditions())
+        {
+            if(groupBy.getExpression() instanceof VariableNode varNode && groupBy.getVariable() == null)
+                plainVars.add(getVariable(varNode));
+            else
+                keyVars.addAll(getMentionedVariables(groupBy.getExpression()));
+        }
+
+        // the keys bound above the aggregation
+        List<GroupCondition> derivedKeys = new ArrayList<>();
+
         for(GroupCondition groupBy : select.getGroupByConditions())
         {
             if(groupBy.getExpression() instanceof VariableNode varNode && groupBy.getVariable() == null)
@@ -552,8 +567,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 VariableNode varNode = groupBy.getVariable();
                 Variable var = varNode != null ? getVariable(varNode) : createVariable(variablePrefix);
 
-                groupByVars.add(var);
-
                 if(varNode != null)
                     validVars.add(varNode);
 
@@ -561,8 +574,21 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                         translatedWhereClause.getVariableBindings(), this);
                 SqlExpressionIntercode expression = visitor.visitElement(groupBy.getExpression());
 
-                //TODO: a key computed from grouping variables alone could be bound above the aggregation; the keys
-                // that are constants, always unbound or copies of variables are handled by the bind and the grouping
+                // a key that a deterministic expression computes from the plain grouping variables alone is the same in
+                // all solutions of a group, so it does not split the groups: it is bound above the aggregation, unless
+                // another key refers to it, and a key without a variable is left out; without a plain grouping variable
+                // the key is kept, as no solution would make no group by it but a group of no solution without it
+                if(!plainVars.isEmpty() && expression.isDeterministic() && !expression.hasPattern()
+                        && plainVars.containsAll(getMentionedVariables(groupBy.getExpression()))
+                        && (varNode == null || !keyVars.contains(var)))
+                {
+                    if(varNode != null)
+                        derivedKeys.add(groupBy);
+
+                    continue;
+                }
+
+                groupByVars.add(var);
 
                 translatedWhereClause = SqlBind.bind(request, var, expression, translatedWhereClause);
             }
@@ -626,6 +652,16 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     translatedWhereClause);
 
             translatedWhereClause = intercode;
+
+            // the keys computed from the grouping variables alone, bound to the values of the groups
+            for(GroupCondition groupBy : derivedKeys)
+            {
+                ExpressionTranslateVisitor keyVisitor = new ExpressionTranslateVisitor(request,
+                        translatedWhereClause.getVariableBindings(), this);
+
+                translatedWhereClause = SqlBind.bind(request, getVariable(groupBy.getVariable()),
+                        keyVisitor.visitElement(groupBy.getExpression()), translatedWhereClause);
+            }
 
 
             // translate having as filters
@@ -1025,6 +1061,30 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             aboveWhereClause = enclosingAboveWhereClause;
             scope = enclosingScope;
         }
+    }
+
+
+    /**
+     * The variables an expression mentions, also in the patterns of its EXISTS.
+     *
+     * @param expression the expression
+     * @return the variables the expression mentions
+     */
+    private Set<Variable> getMentionedVariables(Expression expression)
+    {
+        Set<Variable> variables = new HashSet<>();
+
+        new ElementVisitor<Void>()
+        {
+            @Override
+            public Void visit(VariableNode variable)
+            {
+                variables.add(getVariable(variable));
+                return null;
+            }
+        }.visitElement(expression);
+
+        return variables;
     }
 
 
