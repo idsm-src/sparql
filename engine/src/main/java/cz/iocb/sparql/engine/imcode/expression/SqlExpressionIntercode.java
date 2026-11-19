@@ -1,6 +1,8 @@
 package cz.iocb.sparql.engine.imcode.expression;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasStringLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDouble;
@@ -45,10 +47,12 @@ import cz.iocb.sparql.engine.mapping.classes.CanonicalLiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateCompositeBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DateCompositeClass;
+import cz.iocb.sparql.engine.mapping.classes.DateInZoneClass;
 import cz.iocb.sparql.engine.mapping.classes.DateScalarBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DateScalarClass;
 import cz.iocb.sparql.engine.mapping.classes.DateTimeCompositeBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DateTimeCompositeClass;
+import cz.iocb.sparql.engine.mapping.classes.DateTimeInZoneClass;
 import cz.iocb.sparql.engine.mapping.classes.DateTimeScalarBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DateTimeScalarClass;
 import cz.iocb.sparql.engine.mapping.classes.DayTimeDurationBaseClass;
@@ -857,7 +861,9 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      * the class (see {@link #getValue}), as SPARQL takes the arguments of its own functions: for a canonical literal
      * class, the literals of its datatype in every valid lexical form (its base class) and, for a numeric class, the
      * literals of every datatype XPath substitutes or promotes to its datatype (see
-     * {@link cz.iocb.sparql.engine.mapping.classes.BuiltinClasses#promotableTo}); otherwise the class itself, which for
+     * {@link cz.iocb.sparql.engine.mapping.classes.BuiltinClasses#promotableTo}); for a class of the date-times or of
+     * the dates of one timezone offset, the date-times or the dates of any offset or of none, which the value is
+     * adjusted to the offset of (see {@link #getValue}); otherwise the class itself, which for
      * {@link cz.iocb.sparql.engine.mapping.classes.BuiltinClasses#stringLiteral} means the string literals of any kind.
      *
      * @param resClass the class the value is taken in
@@ -865,6 +871,12 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      */
     public static ResourceClass getAcceptedClass(ResourceClass resClass)
     {
+        if(resClass instanceof DateTimeInZoneClass)
+            return genDateTime;
+
+        if(resClass instanceof DateInZoneClass)
+            return genDate;
+
         if(!(resClass instanceof CanonicalLiteralClass literalClass))
             return resClass;
 
@@ -883,7 +895,10 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      * value of every literal XPath substitutes or promotes to its datatype (see {@link #getNumericValue}), and that the
      * class of the string literals ({@link cz.iocb.sparql.engine.mapping.classes.BuiltinClasses#stringLiteral}), the
      * argument kind "string literal" of SPARQL, takes the string of a string literal of any kind (plain or
-     * language-tagged, with or without a base direction) in a single {@code varchar} column, NULL for any other term.
+     * language-tagged, with or without a base direction) in a single {@code varchar} column, NULL for any other term. A
+     * class of the date-times or of the dates of one timezone offset takes a value of any offset adjusted to its own,
+     * as {@code fn:adjust-dateTime-to-timezone} and {@code fn:adjust-date-to-timezone} of XPath adjust it (see
+     * {@link #getDateTimeInZone} and {@link #getDateInZone}).
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param resClass the class the value is taken in
@@ -899,9 +914,98 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         if(resClass instanceof CanonicalLiteralClass literalClass && isNumeric(literalClass))
             return List.of(getNumericValue(relations, literalClass));
 
+        if(resClass instanceof DateTimeInZoneClass inZone)
+            return getDateTimeInZone(relations, inZone);
+
+        if(resClass instanceof DateInZoneClass inZone)
+            return getDateInZone(relations, inZone);
+
         List<Column> columns = get(relations, getAcceptedClass(resClass));
 
         return columns == null ? null : columns.subList(0, resClass.getColumnCount());
+    }
+
+
+    /**
+     * Column of the date-time class of one timezone offset holding the value of the expression adjusted to the offset,
+     * as {@code fn:adjust-dateTime-to-timezone} of XPath adjusts it: a date-time of an offset keeps its instant, and
+     * one without an offset gets the offset, keeping its local time; for the class of the date-times without an offset,
+     * a date-time of an offset keeps its local time without the offset. The values of the offset of the class itself
+     * are taken as they are, so that the database can look them up by an index of their column.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param inZone the class of the date-times of the offset
+     * @return column of the class holding the value of the expression adjusted to the offset, or null when a needed
+     *         class has no materialised columns
+     */
+    private List<Column> getDateTimeInZone(ClassRelations relations, DateTimeInZoneClass inZone)
+    {
+        if(getResourceClasses().stream().allMatch(r -> r.isSubclassOf(inZone.getBaseClass())))
+        {
+            List<Column> columns = get(relations, inZone.getBaseClass());
+
+            return columns == null ? null : columns.subList(0, 1);
+        }
+
+        // the value of a date-time with an offset is its instant, that of one without an offset its local time as UTC
+        List<Column> columns = get(relations, genDateTime);
+
+        if(columns == null)
+            return null;
+
+        Column value = columns.get(0);
+        Column offset = columns.get(1);
+        String none = "'" + Integer.MIN_VALUE + "'::int4";
+
+        SqlCode adjusted = inZone.getZone() == Integer.MIN_VALUE ?
+                SqlCode.of("(CASE WHEN ", offset, " = ", none, " THEN ", value, " ELSE ", value, " + ", offset,
+                        " * '1 second'::interval END)") :
+                SqlCode.of("(CASE WHEN ", offset, " = ", none, " THEN ", value,
+                        " - '" + inZone.getZone() + " seconds'::interval ELSE ", value, " END)");
+
+        return List.of(new ExpressionColumn(adjusted, SqlType.TIMESTAMPTZ));
+    }
+
+
+    /**
+     * Column of the date class of one timezone offset holding the value of the expression adjusted to the offset, as
+     * {@code fn:adjust-date-to-timezone} of XPath adjusts it: a date of another offset is the date, in the offset, of
+     * the midnight that begins it, so it may move by a day, and a date without an offset gets the offset; for the class
+     * of the dates without an offset, a date keeps its date without its offset. The values of the offset of the class
+     * itself are taken as they are, so that the database can look them up by an index of their column.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param inZone the class of the dates of the offset
+     * @return column of the class holding the value of the expression adjusted to the offset, or null when a needed
+     *         class has no materialised columns
+     */
+    private List<Column> getDateInZone(ClassRelations relations, DateInZoneClass inZone)
+    {
+        if(getResourceClasses().stream().allMatch(r -> r.isSubclassOf(inZone.getBaseClass())))
+        {
+            List<Column> columns = get(relations, inZone.getBaseClass());
+
+            return columns == null ? null : columns.subList(0, 1);
+        }
+
+        List<Column> columns = get(relations, genDate);
+
+        if(columns == null)
+            return null;
+
+        Column value = columns.get(0);
+        Column offset = columns.get(1);
+
+        if(inZone.getZone() == Integer.MIN_VALUE)
+            return List.of(value);
+
+        String zone = "'" + inZone.getZone() + "'::int4";
+
+        SqlCode adjusted = SqlCode.of("(CASE WHEN ", offset, " = '" + Integer.MIN_VALUE + "'::int4 OR ", offset, " = ",
+                zone, " THEN ", value, " ELSE sparql.cast_as_plain_date_from_datetime(",
+                "sparql.cast_as_plain_datetime_from_date(", value, ", ", offset, "), ", zone, ") END)");
+
+        return List.of(new ExpressionColumn(adjusted, SqlType.DATE));
     }
 
 

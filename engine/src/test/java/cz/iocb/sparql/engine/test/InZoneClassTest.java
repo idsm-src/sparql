@@ -71,7 +71,10 @@ import cz.iocb.sparql.testing.Database;
  * 13 and 23 with the other form of the value), the box ({@code box}: the items 31, 32 and 33 alike), the canonical
  * class of the offset 0 ({@code canonical}: the item 41) and the composite and the scalar canonical class of all
  * offsets ({@code composite} and {@code scalar}: the items 51 and 61 with the canonical value, 52 and 62 with the value
- * in the offset +01:00). The function {@code year} takes its argument in the canonical class of the offset 0.
+ * in the offset +01:00). The function {@code year} takes its argument in the canonical class of the offset 0, and a
+ * value of another offset or of none is adjusted to it, as XPath adjusts a value to a timezone: a date-time keeps its
+ * instant, a date may move by a day, and a value without an offset gets the offset; the function {@code localYear}
+ * takes its argument in the class of the values without an offset, which a value of an offset gets its local time in.
  */
 public class InZoneClassTest
 {
@@ -398,6 +401,12 @@ public class InZoneClassTest
             config.addFunction(new FunctionDefinition("http://example.org/" + kind.name + "/year",
                     new Function("in_zone_class_test", kind.name + "_year"), xsdInteger, List.of(kind.canonicalClass),
                     true, true));
+
+            ResourceClass local = kind == Kind.DATE ? DateInZoneClass.get(Integer.MIN_VALUE) :
+                    DateTimeInZoneClass.get(Integer.MIN_VALUE);
+
+            config.addFunction(new FunctionDefinition("http://example.org/" + kind.name + "/localYear",
+                    new Function("in_zone_class_test", kind.name + "_year"), xsdInteger, List.of(local), true, true));
         }
 
         engine = new Engine(config);
@@ -626,27 +635,49 @@ public class InZoneClassTest
 
     @ParameterizedTest(name = "{0}")
     @EnumSource(Kind.class)
-    @DisplayName("a function taking a value of an offset takes it from every class holding it")
+    @DisplayName("a function taking a value of an offset takes it from every class holding it, adjusted to the offset")
     void functionArgument(Kind kind) throws Exception
     {
         String query = "SELECT ?s ?y WHERE { ?s :%s ?d BIND(:year(?d) AS ?y) }";
+
+        // the value in the offset +01:00 is the same instant, whereas the date begins an hour before the year
+        TypedLiteral shifted = kind == Kind.DATE ? new TypedLiteral("2019", xsdIntegerIri) : year;
 
         assertThat(execute(kind, query.formatted("canonical")), contains(row(item(41), year)));
         assertThat(execute(kind, query.formatted("base")),
                 containsInAnyOrder(row(item(1), year), row(item(2), year), row(item(3), anotherYear)));
         assertThat(execute(kind, query.formatted("composite")),
-                containsInAnyOrder(row(item(51), year), row(item(52), null)));
+                containsInAnyOrder(row(item(51), year), row(item(52), shifted)));
         assertThat(execute(kind, query.formatted("scalar")),
-                containsInAnyOrder(row(item(61), year), row(item(62), null)));
+                containsInAnyOrder(row(item(61), year), row(item(62), shifted)));
         assertThat(execute(kind, query.formatted("general")),
-                containsInAnyOrder(row(item(11), year), row(item(12), null), row(item(13), year)));
+                containsInAnyOrder(row(item(11), year), row(item(12), shifted), row(item(13), year)));
         assertThat(execute(kind, query.formatted("scalarGeneral")),
-                containsInAnyOrder(row(item(21), year), row(item(22), null), row(item(23), year)));
+                containsInAnyOrder(row(item(21), year), row(item(22), shifted), row(item(23), year)));
         assertThat(execute(kind, query.formatted("box")),
-                containsInAnyOrder(row(item(31), year), row(item(32), null), row(item(33), year)));
+                containsInAnyOrder(row(item(31), year), row(item(32), shifted), row(item(33), year)));
 
         assertThat(execute(kind, "SELECT (:year($C) AS ?c) (:year($N) AS ?n) (:year($S) AS ?s) WHERE { }"),
-                contains(row(year, year, null)));
+                contains(row(year, year, shifted)));
+    }
+
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(Kind.class)
+    @DisplayName("a value of another offset is adjusted to the offset of the argument, one without an offset gets it")
+    void adjustedFunctionArgument(Kind kind) throws Exception
+    {
+        // the first moment of 2021 in the offset +01:00 is still 2020 in the offset 0, local times keep their year
+        String shifted = kind == Kind.DATE ? "2021-01-01+01:00" : "2021-01-01T00:30:00+01:00";
+        String local = kind == Kind.DATE ? "2021-01-01" : "2021-01-01T00:30:00";
+        String type = "^^<" + kind.datatype.getValue() + ">";
+
+        assertThat(execute(kind, "SELECT (:year('" + shifted + "'" + type + ") AS ?s) (:year('" + local + "'" + type
+                + ") AS ?l) WHERE { }"), contains(row(year, anotherYear)));
+
+        // the class of the values without an offset takes the local time of a value of an offset
+        assertThat(execute(kind, "SELECT (:localYear('" + shifted + "'" + type + ") AS ?s) (:localYear('" + local + "'"
+                + type + ") AS ?l) WHERE { }"), contains(row(anotherYear, anotherYear)));
     }
 
 
