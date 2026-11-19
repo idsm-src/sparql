@@ -67,6 +67,14 @@ public class ColumnSpecificationTest
         assertEquals(SqlType.of("my_type"), getColumn("((\"a\"))::my_type").getType());
 
         assertThrows(IllegalArgumentException.class, () -> getColumn("(\"a\" || \"b\")"));
+
+        // the type is that of the whole expression only, and parentheses in constants and identifiers do not count
+        assertThrows(IllegalArgumentException.class, () -> getColumn("(\"a\")::varchar || (\"b\")::varchar"));
+        assertThrows(IllegalArgumentException.class, () -> getColumn("(\"a\") || (\"b\")::varchar"));
+        assertThrows(IllegalArgumentException.class, () -> getColumn("(\"a\" || '(') || (\"b\"))::varchar"));
+        assertEquals(SqlType.VARCHAR, getColumn("(f(')') || \"x)\" || 'a''(')::varchar").getType());
+        assertEquals(SqlType.VARCHAR, getColumn("(e'\\')' || \"x\"\")\")::varchar").getType());
+        assertThrows(IllegalArgumentException.class, () -> getColumn("(type'\\')' || ')')::varchar"));
     }
 
 
@@ -83,6 +91,9 @@ public class ColumnSpecificationTest
 
         assertEquals("'1'::int4", getColumn("'1'::integer").toString());
         assertEquals("'P'::char", getColumn("'P'::bpchar").toString());
+
+        // an unescaped quote ends the constant
+        assertThrows(IllegalArgumentException.class, () -> getColumn("'a'::text || 'b'::varchar"));
     }
 
 

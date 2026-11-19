@@ -33,7 +33,6 @@ public final class ExpressionColumn extends Column
      */
     public ExpressionColumn(SqlCode code, SqlType type, boolean canBeNull)
     {
-        //TODO: check whether the parameter is a valid SQL expression
         super(code.getText(), Objects.requireNonNull(type, "type of expression " + code.getText()));
         this.code = code;
         this.canBeNull = canBeNull;

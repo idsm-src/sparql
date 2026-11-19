@@ -1380,14 +1380,19 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
     /**
      * Parses a column specification that carries its type: {@code (expression)::type} is an SQL expression of the given
-     * type, {@code 'literal'::type} a typed constant and {@code null::type} (in any letter case) a typed NULL constant.
-     * Anything else is the name of a column of a table, whose type is not part of the specification; such a name is
-     * accepted only by {@link #getColumns(ResourceClass, String...)}, which types it by the resource class of the
-     * mapped term, and by {@link #getColumn(SourceTable, String)}, which types it from the database schema.
+     * type, whose parenthesis closes right before the type, {@code 'literal'::type} a typed constant and
+     * {@code null::type} (in any letter case) a typed NULL constant. Anything else is the name of a column of a table,
+     * whose type is not part of the specification; such a name is accepted only by
+     * {@link #getColumns(ResourceClass, String...)}, which types it by the resource class of the mapped term, and by
+     * {@link #getColumn(SourceTable, String)}, which types it from the database schema. A mapping of a term checks that
+     * its columns have the SQL types of its resource class; the expression has to evaluate to its type in a collation
+     * that orders by code points, which nothing checks, as the text of an expression is not checked against the
+     * database (and neither is the SQL that a user IRI class writes for a query).
      *
      * @param value the specification text
      * @return the parsed column
-     * @throws IllegalArgumentException if an expression lacks its type, or the specification is a column name
+     * @throws IllegalArgumentException if an expression lacks its type or is not one parenthesised expression, or the
+     *             specification is a column name
      */
     public static Column getColumn(String value)
     {
@@ -1407,23 +1412,79 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      *
      * @param value the specification text
      * @return the parsed column, or null for a column name
-     * @throws IllegalArgumentException if an expression lacks its type
+     * @throws IllegalArgumentException if an expression lacks its type or is not one parenthesised expression
      */
     private static Column parseColumn(String value)
     {
         if(value.matches("(?s)\\(.*\\)::[_a-zA-Z0-9.]+"))
-            return new ExpressionColumn(new SqlCode(value),
-                    SqlType.of(value.replaceFirst("(?s)^\\(.*\\)::([_a-zA-Z0-9.]+)$", "$1")));
+        {
+            String type = value.replaceFirst("(?s)^\\(.*\\)::([_a-zA-Z0-9.]+)$", "$1");
+
+            // the type is that of the whole expression only if the parenthesis closes right before it
+            if(getClosingParenthesis(value) != value.length() - type.length() - 3)
+                throw new IllegalArgumentException(
+                        "expression column " + value + " is not one parenthesised expression: use (expression)::type");
+
+            return new ExpressionColumn(new SqlCode(value), SqlType.of(type));
+        }
         else if(value.startsWith("("))
             throw new IllegalArgumentException(
                     "expression column " + value + " lacks its type: use (expression)::type");
-        else if(value.matches("'.*'::[_a-zA-Z0-9.]+"))
-            return new ValueColumn(value.replaceFirst("^'(.*)'::[_a-zA-Z0-9.]+", "$1").replaceAll("''", "'"),
-                    SqlType.of(value.replaceFirst("^'.*'::([_a-zA-Z0-9.]+)$", "$1")));
+        else if(value.matches("(?s)'(?:[^']|'')*'::[_a-zA-Z0-9.]+"))
+            return new ValueColumn(value.replaceFirst("(?s)^'(.*)'::[_a-zA-Z0-9.]+$", "$1").replaceAll("''", "'"),
+                    SqlType.of(value.replaceFirst("(?s)^'.*'::([_a-zA-Z0-9.]+)$", "$1")));
         else if(value.matches("(?i)null::[_a-zA-Z0-9.]+"))
             return new NullColumn(SqlType.of(value.replaceFirst("^(?i)null::([_a-zA-Z0-9.]+)$", "$1")));
         else
             return null;
+    }
+
+
+    /**
+     * Index of the parenthesis that closes the one an SQL expression starts with. The string constants (also those with
+     * escapes, {@code E'...'}) and the quoted identifiers are skipped, so a parenthesis inside them does not count.
+     *
+     * @param expression the SQL expression, starting with a parenthesis
+     * @return index of the closing parenthesis, or -1 if it is not closed
+     */
+    private static int getClosingParenthesis(String expression)
+    {
+        int depth = 0;
+
+        for(int i = 0; i < expression.length(); i++)
+        {
+            char c = expression.charAt(i);
+
+            if(c == '(')
+            {
+                depth++;
+            }
+            else if(c == ')')
+            {
+                if(--depth == 0)
+                    return i;
+            }
+            else if(c == '\'' || c == '"')
+            {
+                // a constant with escapes is introduced by E standing alone, not by the end of an identifier
+                boolean escapes = c == '\'' && i > 0 && Character.toUpperCase(expression.charAt(i - 1)) == 'E'
+                        && (i == 1 || !Character.isLetterOrDigit(expression.charAt(i - 2))
+                                && expression.charAt(i - 2) != '_' && expression.charAt(i - 2) != '$');
+
+                // a doubled quote stands for itself and the quoted text goes on
+                for(i++; i < expression.length(); i++)
+                {
+                    if(escapes && expression.charAt(i) == '\\')
+                        i++;
+                    else if(expression.charAt(i) == c && i + 1 < expression.length() && expression.charAt(i + 1) == c)
+                        i++;
+                    else if(expression.charAt(i) == c)
+                        break;
+                }
+            }
+        }
+
+        return -1;
     }
 
 
@@ -1556,19 +1617,36 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
-     * Checks the columns of a term mapping against the database schema (see {@link #checkColumn}); a mapping without
-     * columns or without a table has nothing to check.
+     * Checks the columns of a term mapping: a column of the table has to be known to the database schema with the type
+     * it is declared with (see {@link #checkColumn}), and every column, an expression and a constant as well, has to
+     * have the SQL type of the resource class of the mapping at its position, as the engine reads and compares it so; a
+     * mapping without columns has nothing to check.
      *
      * @param table the table of the mapping, or null
      * @param mapping the term mapping
+     * @throws IllegalArgumentException if a column of the table is unknown to the schema or declared with another type,
+     *             or if a column has another SQL type than the resource class at its position
      */
     private void checkMapping(SourceTable table, TermMapping mapping)
     {
-        if(table == null || !(mapping instanceof ParametrisedMapping))
+        if(!(mapping instanceof ParametrisedMapping))
             return;
 
-        for(Column column : mapping.getColumns(null))
-            checkColumn(table, column);
+        ResourceClass resourceClass = mapping.getResourceClass(null);
+        List<Column> columns = mapping.getColumns(null);
+
+        for(int i = 0; i < columns.size(); i++)
+        {
+            Column column = columns.get(i);
+
+            if(table != null)
+                checkColumn(table, column);
+
+            if(!column.getType().equals(resourceClass.getSqlTypes().get(i)))
+                throw new IllegalArgumentException("column " + column + " of type " + column.getType()
+                        + " cannot represent the class " + resourceClass.getResourceName() + ", whose SQL type is "
+                        + resourceClass.getSqlTypes().get(i));
+        }
     }
 
 

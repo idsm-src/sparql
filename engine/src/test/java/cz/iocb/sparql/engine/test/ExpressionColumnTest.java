@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -19,6 +20,8 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
+import cz.iocb.sparql.engine.mapping.ParametrisedLiteralMapping;
+import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.IntegerUserIriClass;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
@@ -34,7 +37,8 @@ import cz.iocb.sparql.testing.Database;
 /**
  * Literals mapped from SQL expressions ({@code (expression)::type} specifications): a table access evaluates such an
  * expression inside its own subquery and exposes it under an alias, so the conditions merged into the access, such as
- * the rows of a VALUES clause, have to refer to the expression rather than to the alias.
+ * the rows of a VALUES clause, have to refer to the expression rather than to the alias. A column, an expression and a
+ * constant of another SQL type than the class of the mapped term are refused when the mapping is added.
  */
 public class ExpressionColumnTest
 {
@@ -150,5 +154,24 @@ public class ExpressionColumnTest
         List<List<RdfTerm>> result = execute("SELECT ?c WHERE { ?c ex:label \"compound two\" }");
 
         assertThat(result, containsInAnyOrder(row(compound(2))));
+    }
+
+
+    @Test
+    @DisplayName("a column of another SQL type than its class is refused")
+    void mismatchedType()
+    {
+        DatabaseTable compound = new DatabaseTable("expression_test", "compound");
+        ConstantIriMapping graph = config.createIriMapping("<http://example.org/graph>");
+        TermMapping subject = config.createIriMapping("compound", "id");
+        ConstantIriMapping predicate = config.createIriMapping("ex:other");
+
+        // an expression, a column typed by the schema and a constant of a mapping without a table
+        assertThrows(IllegalArgumentException.class, () -> config.addQuadMapping(compound, graph, subject, predicate,
+                config.createLiteralMapping(xsdString, "(id)::int4")));
+        assertThrows(IllegalArgumentException.class, () -> config.addQuadMapping(compound, graph, subject, predicate,
+                new ParametrisedLiteralMapping(xsdString, List.of(config.getColumn(compound, "id")))));
+        assertThrows(IllegalArgumentException.class, () -> config.addQuadMapping(graph, predicate, predicate,
+                config.createLiteralMapping(xsdString, "'1'::int4")));
     }
 }
