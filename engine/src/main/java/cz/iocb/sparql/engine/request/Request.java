@@ -530,6 +530,9 @@ public class Request implements AutoCloseable
                 // optimize
                 imcode = imcode.optimize(this, false);
 
+                // the optimisation runs in Java, which no statement timeout bounds
+                checkTimeout();
+
                 // evaluate service calls
                 imcode = imcode.optimize(this, true);
 
@@ -832,6 +835,35 @@ public class Request implements AutoCloseable
 
 
     /**
+     * Remaining time of the time limit of the request, which has one.
+     *
+     * @return remaining time of the time limit in nanoseconds, a positive number
+     * @throws SQLTimeoutException with the SQL state 57014 of a cancelled statement if the time limit has elapsed
+     */
+    private long getRemainingTime() throws SQLTimeoutException
+    {
+        long rest = timeout - (System.nanoTime() - begin);
+
+        if(rest <= 0)
+            throw new SQLTimeoutException("query timeout", "57014", 0);
+
+        return rest;
+    }
+
+
+    /**
+     * Checks that the time limit of the request has not elapsed.
+     *
+     * @throws SQLTimeoutException with the SQL state 57014 of a cancelled statement if the time limit has elapsed
+     */
+    public void checkTimeout() throws SQLTimeoutException
+    {
+        if(timeout != 0)
+            getRemainingTime();
+    }
+
+
+    /**
      * Remaining time of the timeout for a statement, in whole seconds rounded up, so that a statement is never
      * cancelled before the time limit, though it may run less than a second past it; 0 for no timeout.
      *
@@ -843,12 +875,24 @@ public class Request implements AutoCloseable
         if(timeout == 0)
             return 0;
 
-        long rest = timeout - (System.nanoTime() - begin);
+        return (int) Math.min(Integer.MAX_VALUE, Math.ceilDiv(getRemainingTime(), 1_000_000_000L));
+    }
 
-        if(rest <= 0)
-            throw new SQLTimeoutException("query timeout", "57014", 0);
 
-        return (int) Math.min(Integer.MAX_VALUE, Math.ceilDiv(rest, 1_000_000_000L));
+    /**
+     * Remaining time of the timeout for a connection to a remote endpoint, in whole milliseconds rounded up, as the
+     * connect and read timeouts of a {@link java.net.URLConnection} take it, so that a connection never times out
+     * before the time limit; 0 for no timeout.
+     *
+     * @return remaining time of the timeout for a connection in whole milliseconds rounded up; 0 for no timeout
+     * @throws SQLTimeoutException with the SQL state 57014 of a cancelled statement if the time limit has elapsed
+     */
+    public int getConnectionTimeout() throws SQLTimeoutException
+    {
+        if(timeout == 0)
+            return 0;
+
+        return (int) Math.min(Integer.MAX_VALUE, Math.ceilDiv(getRemainingTime(), 1_000_000L));
     }
 
 

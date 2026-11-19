@@ -11,15 +11,18 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedIr
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.estimateAsUnion;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigInteger;
 import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.sql.SQLException;
+import java.sql.SQLTimeoutException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -616,6 +619,67 @@ public final class SqlServiceStub extends SqlIntercode
 
 
     /**
+     * Answer of an endpoint that ends once the time limit of the request elapses. The read timeout of the connection
+     * bounds a single read by the time remaining when the connection was opened, which an endpoint sending its answer
+     * slowly never reaches, so the limit is checked before every read as well.
+     */
+    private static final class TimedInputStream extends FilterInputStream
+    {
+        /**
+         * The request whose time limit ends the answer.
+         */
+        private final Request request;
+
+
+        /**
+         * Creates the answer read within the time limit of the request.
+         *
+         * @param input the answer of the endpoint
+         * @param request the request whose time limit ends the answer
+         */
+        TimedInputStream(InputStream input, Request request)
+        {
+            super(input);
+            this.request = request;
+        }
+
+
+        @Override
+        public int read() throws IOException
+        {
+            checkTimeout();
+            return super.read();
+        }
+
+
+        @Override
+        public int read(byte[] buffer, int offset, int length) throws IOException
+        {
+            checkTimeout();
+            return super.read(buffer, offset, length);
+        }
+
+
+        /**
+         * Ends the answer if the time limit of the request has elapsed.
+         *
+         * @throws SocketTimeoutException if the time limit of the request has elapsed
+         */
+        private void checkTimeout() throws SocketTimeoutException
+        {
+            try
+            {
+                request.checkTimeout();
+            }
+            catch(SQLTimeoutException e)
+            {
+                throw new SocketTimeoutException(e.getMessage());
+            }
+        }
+    }
+
+
+    /**
      * User-Agent header sent to remote endpoints.
      */
     private static final String userAgent;
@@ -1148,7 +1212,11 @@ public final class SqlServiceStub extends SqlIntercode
 
                         for(int i = 0; i <= endpointSettings.redirectLimit() && url != null; i++)
                         {
+                            int timeout = request.getConnectionTimeout();
+
                             connection = (HttpURLConnection) (new URI(url)).toURL().openConnection();
+                            connection.setConnectTimeout(timeout);
+                            connection.setReadTimeout(timeout);
                             connection.setRequestMethod("POST");
                             connection.setRequestProperty("content-type",
                                     "application/x-www-form-urlencoded; charset=UTF-8");
@@ -1169,6 +1237,9 @@ public final class SqlServiceStub extends SqlIntercode
                     }
                     catch(IOException | URISyntaxException e)
                     {
+                        // a connection timing out ends the request, as it times out with the time limit of the request
+                        request.checkTimeout();
+
                         e.printStackTrace();
 
                         if(!silent)
@@ -1213,7 +1284,7 @@ public final class SqlServiceStub extends SqlIntercode
                                 results, call++ + "r", blankNodeClass.getSegment(),
                                 endpointSettings.canonicalizeLiterals(), settings.resultLimit());
 
-                        try(InputStream input = connection.getInputStream())
+                        try(InputStream input = new TimedInputStream(connection.getInputStream(), request))
                         {
                             SAXParserFactory factory = SAXParserFactory.newInstance();
                             factory.setNamespaceAware(true);
@@ -1223,6 +1294,8 @@ public final class SqlServiceStub extends SqlIntercode
                     }
                     catch(ParserConfigurationException | SAXException | IOException e)
                     {
+                        request.checkTimeout();
+
                         if(e instanceof SAXException && results.size() >= settings.resultLimit())
                         {
                             throw new ServiceException(
