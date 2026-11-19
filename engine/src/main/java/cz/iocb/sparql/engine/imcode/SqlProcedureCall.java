@@ -442,13 +442,26 @@ public final class SqlProcedureCall extends SqlIntercode
 
         List<SqlCode> declared = new ArrayList<>();
 
+        // a value that the class of its parameter does not hold, missing in the value column, gives no solution, whether
+        // the function is strict or not
+        List<SqlCode> tested = new ArrayList<>();
+
         for(Entry<ParameterDefinition, SqlExpressionIntercode> entry : parameters.entrySet())
         {
             ResourceClass resClass = entry.getKey().getParameterClass();
             SqlExpressionIntercode node = entry.getValue();
 
-            for(Column column : node.getValue(relations, resClass))
+            boolean mayMiss = node.canBeNull()
+                    || node.getResourceClasses().stream().anyMatch(r -> !r.isSubclassOf(resClass));
+            List<Column> columns = node.getValue(relations, resClass);
+
+            for(Column column : columns)
                 declared.add(columnMap.getOrDefault(column, column).getCode());
+
+            Column value = columnMap.getOrDefault(columns.get(0), columns.get(0));
+
+            if(mayMiss && !(value instanceof ConstantColumn))
+                tested.add(SqlCode.of(value, " IS NOT NULL"));
         }
 
         Function function = specialization == null || specialization.getSqlProcedure() == null ?
@@ -479,6 +492,9 @@ public final class SqlProcedureCall extends SqlIntercode
             builder.append(child.translate(request, scope));
             builder.append(" ) AS ");
             builder.appendAlias(scope.getInputTable());
+
+            if(!tested.isEmpty())
+                builder.append(" WHERE ").append(tested.stream().collect(SqlCode.joining(" AND ")));
         }
 
         return builder.toCode();
