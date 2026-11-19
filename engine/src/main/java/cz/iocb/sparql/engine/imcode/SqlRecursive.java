@@ -1743,7 +1743,8 @@ public final class SqlRecursive extends SqlIntercode
             SqlCode condition = access.getLookupCondition(relations, tmp, left, Map.of());
 
             builder.append(" CROSS JOIN LATERAL (");
-            builder.append(access.translateLateral(request, condition != null ? condition : SqlCode.TRUE));
+            builder.append(access.translateLateral(request, condition != null ? condition : SqlCode.TRUE,
+                    condition != null ? access.getLookupComparedColumns(relations, tmp) : Set.of()));
             builder.append(") AS ");
             builder.append(right);
         }

@@ -46,7 +46,8 @@ import cz.iocb.sparql.testing.Database;
  * those of its least member with the others, and no null test of a column that a strict comparison of the same disjunct
  * compares. The table {@code item} holds the items 1 to 4 with the numbers a, b and c (equal for the items 1 and 2) and
  * an optional kind (1, 2, none, 1), mapped by :a, :b and :c, and the kinds by :one (kind = 1, then a null test of the
- * kind) and :other (kind != 1, then a null test).
+ * kind), :other (kind != 1, then a null test) and :kind (a null test alone). A column compared strictly with a value
+ * the rows are restricted to is not tested for null either.
  */
 public class DerivableConditionTest
 {
@@ -105,6 +106,12 @@ public class DerivableConditionTest
 
         config.addQuadMapping(table, null, config.createIriMapping("item", "id"), config.createIriMapping(":other"),
                 config.createLiteralMapping(xsdInt, "kind"), new Conditions(other));
+
+        Condition any = new Condition();
+        any.addIsNotNull(kind);
+
+        config.addQuadMapping(table, null, config.createIriMapping("item", "id"), config.createIriMapping(":kind"),
+                config.createLiteralMapping(xsdInt, "kind"), new Conditions(any));
 
         engine = new Engine(config);
     }
@@ -197,5 +204,20 @@ public class DerivableConditionTest
 
         assertThat(translate("SELECT ?s ?k WHERE { ?s :one ?k }"), not(containsString("IS NOT NULL")));
         assertThat(translate("SELECT ?s ?k WHERE { ?s :other ?k }"), not(containsString("IS NOT NULL")));
+    }
+
+
+    @Test
+    @DisplayName("a column compared strictly with a value the rows are restricted to is not tested for null")
+    void valueColumns() throws Exception
+    {
+        assertThat(execute("SELECT ?s ?k WHERE { ?s :kind ?k }"), containsInAnyOrder(row(1, 1), row(2, 2), row(4, 1)));
+        assertThat(translate("SELECT ?s ?k WHERE { ?s :kind ?k }"), containsString("IS NOT NULL"));
+
+        // the filter requires the term "1"^^xsd:int, which the access compares the kind with
+        String query = "SELECT ?s ?k WHERE { ?s :kind ?k FILTER(?k = 1) }";
+
+        assertThat(execute(query), containsInAnyOrder(row(1, 1), row(4, 1)));
+        assertThat(translate(query), not(containsString("IS NOT NULL")));
     }
 }

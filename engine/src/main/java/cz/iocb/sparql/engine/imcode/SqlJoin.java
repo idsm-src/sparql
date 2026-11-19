@@ -1241,6 +1241,9 @@ public final class SqlJoin extends SqlIntercode
 
             List<SqlCode> conditions = new ArrayList<>();
 
+            // the columns of the access the conditions compare strictly, whose null tests the access leaves out
+            Set<Column> compared = new HashSet<>();
+
             for(int i = 0; i < childs.size(); i++)
             {
                 if((outerChilds >> i & 1) == 0)
@@ -1250,7 +1253,10 @@ public final class SqlJoin extends SqlIntercode
                         tables.get(i), joined);
 
                 if(condition != null)
+                {
                     conditions.add(condition);
+                    compared.addAll(access.getLookupComparedColumns(relations, childs.get(i).getVariableBindings()));
+                }
             }
 
             // the values an outer child gives a variable that a filter requires to be the variable of the access
@@ -1268,17 +1274,23 @@ public final class SqlJoin extends SqlIntercode
                 SqlCode condition = access.getLookupCondition(relations, value, tables.get(other), Map.of());
 
                 if(condition != null)
+                {
                     conditions.add(condition);
+                    compared.addAll(access.getLookupComparedColumns(relations, value));
+                }
             }
 
             SqlCode rowCondition = outer == null ? null : access.getRowCondition(relations, outer);
 
             if(rowCondition != null)
+            {
                 conditions.add(rowCondition);
+                compared.addAll(access.getRowComparedColumns(relations, outer));
+            }
 
             builder.append(" CROSS JOIN LATERAL (");
             builder.append(access.translateLateral(request, conditions.isEmpty() ? SqlCode.TRUE :
-                    conditions.stream().collect(SqlCode.joining(" AND ", "(", ")"))));
+                    conditions.stream().collect(SqlCode.joining(" AND ", "(", ")")), compared));
             builder.append(") AS ");
             builder.append(tables.get(lookup.child()));
 

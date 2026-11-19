@@ -2064,6 +2064,43 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * The columns that the condition restricting the rows to the values the access has taken (see
+     * {@link #translateValues}) compares strictly, rejecting a row whose column is null: the columns of a value
+     * compared in their class (see {@link #isComparedInClass}), except the optional ones, which the comparison takes
+     * null-safely.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @return the columns the condition restricting the rows to the values compares strictly
+     */
+    private Set<Column> getValueComparedColumns(ClassRelations relations)
+    {
+        Set<Column> compared = new HashSet<>();
+
+        for(ValueCondition condition : values)
+            if(isComparedInClass(relations, condition.resourceClass(), condition.value()))
+                addComparedColumns(compared, condition.resourceClass(), condition.columns());
+
+        return compared;
+    }
+
+
+    /**
+     * Adds the columns of the class that an equality with values of the class never null compares strictly (see
+     * {@link SqlType#equal}): all but the optional ones, which are compared null-safely, and the constants.
+     *
+     * @param compared the columns compared strictly
+     * @param resClass the class of the columns
+     * @param columns the columns
+     */
+    private static void addComparedColumns(Set<Column> compared, ResourceClass resClass, List<Column> columns)
+    {
+        for(int i = 0; i < columns.size(); i++)
+            if(!resClass.isOptionalColumn(i) && !(columns.get(i) instanceof ConstantColumn))
+                compared.add(columns.get(i));
+    }
+
+
     @Override
     protected boolean isRestricted(Variable variable, SqlExpressionIntercode value)
     {
@@ -2082,7 +2119,7 @@ public final class SqlTableAccess extends SqlIntercode
     @Override
     public SqlCode translate(Request request, Scope scope)
     {
-        return translateAccess(request, null);
+        return translateAccess(request, null, Set.of());
     }
 
 
@@ -2095,7 +2132,8 @@ public final class SqlTableAccess extends SqlIntercode
     {
         SqlCode condition = getRowCondition(request.getConfiguration(), outer);
 
-        return condition == null ? translate(request, scope) : translateLateral(request, condition);
+        return condition == null ? translate(request, scope) :
+                translateLateral(request, condition, getRowComparedColumns(request.getConfiguration(), outer));
     }
 
 
@@ -2237,6 +2275,35 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
+     * The columns of the access that the condition looking it up for a row of an outer table (see
+     * {@link #getLookupCondition}) compares strictly, rejecting a row whose column is null: the columns of the
+     * variables whose values are converted to the class of the columns (see {@link #isConvertedFor}), except the
+     * optional ones; the other variables are compared as a join compares them, which a null may satisfy.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param outer bindings of the outer rows
+     * @return the columns of the access that the lookup condition compares strictly
+     */
+    Set<Column> getLookupComparedColumns(ClassRelations relations, VariableBindings outer)
+    {
+        Set<Column> compared = new HashSet<>();
+
+        for(VariableBinding value : outer.getValues())
+        {
+            VariableBinding inner = internal.get(value.getVariable());
+
+            if(inner != null && isConvertedFor(relations, value))
+            {
+                Entry<ResourceClass, List<Column>> mapping = inner.getMappings().entrySet().iterator().next();
+                addComparedColumns(compared, mapping.getKey(), mapping.getValue());
+            }
+        }
+
+        return compared;
+    }
+
+
+    /**
      * The variables by whose values in a row of the outer table the access is restricted to the rows compatible with
      * the row: those whose values are compared with the columns of the access as the columns are (see
      * {@link #isLookedUpBy}), by plain equalities, which an index of the table can serve. A row whose column of another
@@ -2278,6 +2345,25 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
+     * The columns of the access that the condition restricting it to the rows compatible with a row of the outer table
+     * (see {@link #getRowCondition}) compares strictly (see {@link #getLookupComparedColumns}).
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param outer the rows the access is evaluated for one by one
+     * @return the columns of the access that the row condition compares strictly
+     */
+    Set<Column> getRowComparedColumns(ClassRelations relations, JoinOptimizer.Outer outer)
+    {
+        VariableBindings values = new VariableBindings();
+
+        for(Variable variable : getRowVariables(relations, outer))
+            values.add(outer.bindings().get(variable));
+
+        return getLookupComparedColumns(relations, values);
+    }
+
+
+    /**
      * SQL code of the access evaluated for a row of the outer tables it is joined with laterally: the correlated
      * condition, which refers to the columns of the outer tables, restricts the rows along with the conditions of the
      * access, and the subquery is fenced by {@code OFFSET 0}, so that the planner does not flatten it into the outer
@@ -2285,11 +2371,13 @@ public final class SqlTableAccess extends SqlIntercode
      *
      * @param request the current request
      * @param correlatedCondition SQL condition over the columns of the table and of the outer tables
+     * @param compared columns of the access that the correlated condition compares strictly, rejecting a row whose
+     *            column is null (see {@link #getLookupComparedColumns}), so that their null tests are left out
      * @return SQL code of the access evaluated for a row of the outer tables
      */
-    public SqlCode translateLateral(Request request, SqlCode correlatedCondition)
+    public SqlCode translateLateral(Request request, SqlCode correlatedCondition, Set<Column> compared)
     {
-        return translateAccess(request, correlatedCondition);
+        return translateAccess(request, correlatedCondition, compared);
     }
 
 
@@ -2300,12 +2388,16 @@ public final class SqlTableAccess extends SqlIntercode
      *
      * @param request the current request
      * @param correlatedCondition SQL condition over the columns of the table and of the outer tables, or null
+     * @param correlatedColumns columns of the access that the correlated condition compares strictly
      * @return SQL code of the access
      */
-    private SqlCode translateAccess(Request request, SqlCode correlatedCondition)
+    private SqlCode translateAccess(Request request, SqlCode correlatedCondition, Set<Column> correlatedColumns)
     {
         // the values of the current solution restrict the rows along with the conditions
         SqlCode valueCondition = translateValues(request.getConfiguration());
+
+        Set<Column> compared = new HashSet<>(correlatedColumns);
+        compared.addAll(getValueComparedColumns(request.getConfiguration()));
         SqlCode extraCondition = valueCondition == null ? correlatedCondition :
                 correlatedCondition == null ? valueCondition : SqlCode.of(valueCondition, " AND ", correlatedCondition);
 
@@ -2370,7 +2462,7 @@ public final class SqlTableAccess extends SqlIntercode
             builder.append(table);
         }
 
-        appendConditions(builder, conditions, extraCondition);
+        appendConditions(builder, conditions, extraCondition, compared);
 
         if(groupColumns != null)
         {
@@ -2424,96 +2516,75 @@ public final class SqlTableAccess extends SqlIntercode
      * Appends the WHERE clause of the conditions and of the extra condition, nothing when the conditions always hold
      * and there is no extra one. An equivalence class of columns is written as the comparisons of its least member with
      * the others (see {@link Condition#getSpanningEqualities}), which imply the rest, and the null test of a column
-     * that the strict comparisons of the same disjunct compare is left out, as those reject a null; the database would
-     * count the fraction of nulls twice otherwise.
+     * that the strict comparisons of the same disjunct or of the extra condition compare is left out, as those reject a
+     * null; the database would count the fraction of nulls twice otherwise.
      *
      * @param builder the SQL code being built
      * @param conditions the conditions
      * @param extra SQL code of an extra condition in conjunction with the conditions, or null
+     * @param extraCompared columns that the extra condition compares strictly, rejecting a row whose column is null
      */
-    private static void appendConditions(SqlBuilder builder, Conditions conditions, SqlCode extra)
+    private static void appendConditions(SqlBuilder builder, Conditions conditions, SqlCode extra,
+            Set<Column> extraCompared)
     {
         if(conditions.isTrue() && extra == null)
             return;
 
         builder.append(" WHERE ");
 
-        if(conditions.isTrue())
+        List<SqlCode> disjuncts = new ArrayList<>();
+
+        for(Condition condition : conditions.isTrue() ? List.<Condition> of() : conditions.getConditions())
         {
-            builder.append(extra);
+            List<SqlCode> parts = new ArrayList<>();
+
+            // the columns a strict comparison of the disjunct or of the extra condition rejects the nulls of
+            Set<Column> compared = new HashSet<>(extraCompared);
+
+            for(ColumnComparison pair : condition.getSpanningEqualities())
+            {
+                parts.add(pair.getType().equal(pair.getLeft(), pair.getRight()));
+                compared.add(pair.getLeft());
+                compared.add(pair.getRight());
+            }
+
+            for(ColumnComparison pair : condition.getSpanningNotDistinct())
+                parts.add(pair.getType().notDistinct(pair.getLeft(), pair.getRight()));
+
+            for(ColumnComparison pair : condition.getAreNotEqual())
+            {
+                parts.add(pair.getType().notEqual(pair.getLeft(), pair.getRight()));
+                compared.add(pair.getLeft());
+                compared.add(pair.getRight());
+            }
+
+            for(Column column : condition.getIsNotNull())
+                if(!compared.contains(column))
+                    parts.add(SqlCode.of(column, " IS NOT NULL"));
+
+            for(Column column : condition.getIsNull())
+                parts.add(SqlCode.of(column, " IS NULL"));
+
+            // a disjunct whose null tests the extra condition implies holds wherever the extra condition does
+            if(parts.isEmpty())
+            {
+                disjuncts.clear();
+                break;
+            }
+
+            disjuncts.add(parts.stream().collect(SqlCode.joining(" AND ", "(", ")")));
+        }
+
+        if(disjuncts.isEmpty())
+        {
+            builder.append(extra != null ? extra : SqlCode.TRUE);
             return;
         }
 
         if(extra != null)
             builder.append("(");
 
-        boolean hasWhere = false;
-
-        for(Condition condition : conditions.getConditions())
-        {
-            appendOr(builder, hasWhere);
-            hasWhere = true;
-
-            builder.append("(");
-            boolean hasCondition = false;
-
-            // the columns a strict comparison of the disjunct rejects the nulls of
-            Set<Column> compared = new HashSet<>();
-
-            for(ColumnComparison pair : condition.getSpanningEqualities())
-            {
-                appendAnd(builder, hasCondition);
-                hasCondition = true;
-
-                builder.append(pair.getType().equal(pair.getLeft(), pair.getRight()));
-                compared.add(pair.getLeft());
-                compared.add(pair.getRight());
-            }
-
-            for(ColumnComparison pair : condition.getSpanningNotDistinct())
-            {
-                appendAnd(builder, hasCondition);
-                hasCondition = true;
-
-                builder.append(pair.getType().notDistinct(pair.getLeft(), pair.getRight()));
-            }
-
-            for(ColumnComparison pair : condition.getAreNotEqual())
-            {
-                appendAnd(builder, hasCondition);
-                hasCondition = true;
-
-                builder.append(pair.getType().notEqual(pair.getLeft(), pair.getRight()));
-                compared.add(pair.getLeft());
-                compared.add(pair.getRight());
-            }
-
-            //TODO: a column compared strictly with a value of the current solution or of a lateral row (see
-            // translateValues and translateLateral) keeps its null test as well
-
-            for(Column column : condition.getIsNotNull())
-            {
-                if(compared.contains(column))
-                    continue;
-
-                appendAnd(builder, hasCondition);
-                hasCondition = true;
-
-                builder.append(column);
-                builder.append(" IS NOT NULL");
-            }
-
-            for(Column column : condition.getIsNull())
-            {
-                appendAnd(builder, hasCondition);
-                hasCondition = true;
-
-                builder.append(column);
-                builder.append(" IS NULL");
-            }
-
-            builder.append(")");
-        }
+        builder.append(disjuncts.stream().collect(SqlCode.joining(" OR ")));
 
         if(extra != null)
         {
@@ -2659,7 +2730,8 @@ public final class SqlTableAccess extends SqlIntercode
         builder.append(" FROM ");
         builder.append(left.table);
 
-        appendConditions(builder, new Conditions(l.resolve(r)), left.translateValues(relations));
+        appendConditions(builder, new Conditions(l.resolve(r)), left.translateValues(relations),
+                left.getValueComparedColumns(relations));
 
         return builder.toCode();
     }
