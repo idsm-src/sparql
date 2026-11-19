@@ -46,17 +46,18 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * condition. The nodes standing for the parameters and the results in the text of the call bind nothing, and the parser
  * refuses their other occurrences. The function takes the values of the parameters in the columns of their declared
  * classes (see {@link ParameterDefinition}), so a literal of the datatype of a canonical declared class supplies its
- * value in every valid lexical form and a numeric declared class takes the value of every numeric XPath substitutes or
- * promotes to its datatype (see {@link SqlExpressionIntercode#getValue}), and a parameter supplying no value of its
- * class gives no solution. A call of a deterministic procedure (see {@link ProcedureDefinition#setDeterministic}) over
- * the empty solution, which takes nothing from any context, is evaluated by a common table expression (see
- * {@link Request#getCommonTableExpression}), so that the statement evaluates it once even when it occurs several times,
- * e.g. in every branch of a union a join above it was distributed over, or in the pattern of an EXISTS evaluated for
- * every current solution; PostgreSQL folds a common table expression referenced once into the query unless the function
- * is volatile. A call whose parameter takes a value of a current solution, that of an EXISTS pattern or of the left
- * side of a lateral join (see {@link Scope#refersToCurrentSolution}), stays in its place, where the value is known. A
- * result is bound to the classes the parent accepts a value of only, and a specialiser of the procedure may adapt the
- * call to them (see {@link ProcedureDefinition#setSpecializer}).
+ * value in every valid lexical form, a numeric declared class takes the value of every numeric XPath substitutes or
+ * promotes to its datatype and the class of the string literals takes the string of a string literal of any kind (see
+ * {@link SqlExpressionIntercode#getValue}), and a parameter supplying no value of its class gives no solution. A call
+ * of a deterministic procedure (see {@link ProcedureDefinition#setDeterministic}) over the empty solution, which takes
+ * nothing from any context, is evaluated by a common table expression (see {@link Request#getCommonTableExpression}),
+ * so that the statement evaluates it once even when it occurs several times, e.g. in every branch of a union a join
+ * above it was distributed over, or in the pattern of an EXISTS evaluated for every current solution; PostgreSQL folds
+ * a common table expression referenced once into the query unless the function is volatile. A call whose parameter
+ * takes a value of a current solution, that of an EXISTS pattern or of the left side of a lateral join (see
+ * {@link Scope#refersToCurrentSolution}), stays in its place, where the value is known. A result is bound to the
+ * classes the parent accepts a value of only, and a specialiser of the procedure may adapt the call to them (see
+ * {@link ProcedureDefinition#setSpecializer}).
  */
 public final class SqlProcedureCall extends SqlIntercode
 {

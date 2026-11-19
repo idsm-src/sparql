@@ -1,12 +1,14 @@
 package cz.iocb.sparql.engine.imcode.expression;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasStringLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.numericBaseClasses;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.promotableTo;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.stringLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
@@ -855,7 +857,8 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      * the class (see {@link #getValue}), as SPARQL takes the arguments of its own functions: for a canonical literal
      * class, the literals of its datatype in every valid lexical form (its base class) and, for a numeric class, the
      * literals of every datatype XPath substitutes or promotes to its datatype (see
-     * {@link cz.iocb.sparql.engine.mapping.classes.BuiltinClasses#promotableTo}); otherwise the class itself.
+     * {@link cz.iocb.sparql.engine.mapping.classes.BuiltinClasses#promotableTo}); otherwise the class itself, which for
+     * {@link cz.iocb.sparql.engine.mapping.classes.BuiltinClasses#stringLiteral} means the string literals of any kind.
      *
      * @param resClass the class the value is taken in
      * @return class of the terms an extension function or a procedure takes a value of the given class from
@@ -876,8 +879,11 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      * Columns of the class holding the value of the expression as an extension function or a procedure takes it: the
      * columns of the expression converted to the class, except that a literal of the datatype of a canonical literal
      * class supplies its value in every valid lexical form, i.e. the leading columns of its base class, which are laid
-     * out as the columns of the class (see {@link CanonicalLiteralClass#getBaseClass}), and that a numeric class takes
-     * the value of every literal XPath substitutes or promotes to its datatype (see {@link #getNumericValue}).
+     * out as the columns of the class (see {@link CanonicalLiteralClass#getBaseClass}), that a numeric class takes the
+     * value of every literal XPath substitutes or promotes to its datatype (see {@link #getNumericValue}), and that the
+     * class of the string literals ({@link cz.iocb.sparql.engine.mapping.classes.BuiltinClasses#stringLiteral}), the
+     * argument kind "string literal" of SPARQL, takes the string of a string literal of any kind (plain or
+     * language-tagged, with or without a base direction) in a single {@code varchar} column, NULL for any other term.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param resClass the class the value is taken in
@@ -886,6 +892,10 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      */
     public List<Column> getValue(ClassRelations relations, ResourceClass resClass)
     {
+        if(resClass.equals(stringLiteral))
+            return List.of(getResourceClasses().stream().anyMatch(r -> hasStringLiteral(r)) ? getStringLiteral() :
+                    new NullColumn(SqlType.VARCHAR));
+
         if(resClass instanceof CanonicalLiteralClass literalClass && isNumeric(literalClass))
             return List.of(getNumericValue(relations, literalClass));
 

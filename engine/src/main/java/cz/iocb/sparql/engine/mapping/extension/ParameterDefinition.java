@@ -12,9 +12,11 @@ import cz.iocb.sparql.engine.model.triple.Node;
  * a canonical literal class supplies its value in every valid lexical form, a numeric class takes the value of every
  * numeric XPath substitutes or promotes to its datatype, e.g. an xsd:integer or an xsd:decimal for an xsd:double, but
  * not an xsd:decimal for an xsd:integer (see
- * {@link cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode#getAcceptedClass}), and a term supplying no
- * value of the class gives the call no solution. A function working on the terms themselves declares a base class,
- * which keeps the lexical form, or the box.
+ * {@link cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode#getAcceptedClass}), the class of the string
+ * literals ({@link cz.iocb.sparql.engine.mapping.classes.BuiltinClasses#stringLiteral}), the argument kind "string
+ * literal" of SPARQL, takes the string of a plain or language-tagged literal as a single {@code varchar}, and a term
+ * supplying no value of the class gives the call no solution. A function working on the terms themselves declares a
+ * base class, which keeps the lexical form, or the box.
  */
 public class ParameterDefinition
 {

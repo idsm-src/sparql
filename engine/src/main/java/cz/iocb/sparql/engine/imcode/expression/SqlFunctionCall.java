@@ -1,6 +1,5 @@
 package cz.iocb.sparql.engine.imcode.expression;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.stringLiteral;
 import static java.util.Collections.singletonMap;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,9 +22,11 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 /**
  * Call of an extension function defined by the configuration. The function takes the values of the arguments in the
  * columns of their declared classes (see {@link FunctionDefinition}), so a literal of the datatype of a canonical
- * declared class supplies its value in every valid lexical form, and a numeric declared class takes the value of every
- * numeric XPath substitutes or promotes to its datatype (see {@link SqlExpressionIntercode#getValue}); an argument
- * supplying no value of its declared class makes the call an error.
+ * declared class supplies its value in every valid lexical form, a numeric declared class takes the value of every
+ * numeric XPath substitutes or promotes to its datatype, and the class of the string literals takes the string of a
+ * string literal of any kind (see {@link SqlExpressionIntercode#getValue}); an argument supplying no value of its
+ * declared class makes the call an error, the value being NULL for the SQL function, which is STRICT (see
+ * {@link FunctionDefinition}).
  */
 public final class SqlFunctionCall extends SqlExpressionIntercode
 {
@@ -174,10 +175,8 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
 
             ResourceClass argClass = definition.getArgumentClasses().get(i);
 
-            if(argClass.equals(stringLiteral)) //FIXME: use different approach
-                builder.append(arguments.get(i).getStringLiteral());
-            else
-                builder.append(arguments.get(i).getValue(relations, argClass).get(0)); //NOTE: only first column is used
+            // an argument class has a single column (see FunctionDefinition)
+            builder.append(arguments.get(i).getValue(relations, argClass).get(0));
         }
 
         builder.append(")");
