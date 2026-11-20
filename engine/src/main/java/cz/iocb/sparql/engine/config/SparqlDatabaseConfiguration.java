@@ -1018,50 +1018,117 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
-     * Registers a join quad mapping of this service (see {@link JoinTableQuadMapping}): graph, subject and predicate
-     * come from the first table, the object from the last one. With {@code autoAddToDefaultGraph}, a named-graph
-     * mapping is also added to the default graph. The graph is a constant IRI or a column of the first table of a class
-     * that can hold IRIs, such as the box. The columns referenced by the mappings, the join columns and the conditions
-     * are checked against the database schema: they have to exist in their tables with the types they are declared
-     * with.
+     * Registers a join quad mapping of this service (see {@link JoinTableQuadMapping}): the tables are joined as a tree
+     * by the joins, each of which names its two tables or joins the two adjacent tables at its position, and the graph,
+     * the subject, the predicate and the object are taken from the tables at the given indexes. With
+     * {@code autoAddToDefaultGraph}, a named-graph mapping is also added to the default graph. The graph and the
+     * predicate are constant IRIs or columns of a class that can hold IRIs, such as the box. The columns referenced by
+     * the mappings, the join columns and the conditions are checked against the database schema: they have to exist in
+     * their tables with the types they are declared with.
      *
      * @param tables the tables
-     * @param joinColumnsPairs join columns between adjacent tables
+     * @param joinColumnsPairs the joins of the tables
+     * @param graphTable index of the table the graph is taken from
      * @param graph the graph mapping, or null for the default graph
+     * @param subjectTable index of the table the subject is taken from
      * @param subject the subject mapping
+     * @param predicateTable index of the table the predicate is taken from
      * @param predicate the predicate mapping
+     * @param objectTable index of the table the object is taken from
      * @param object the object mapping
-     * @param conditions the conditions
+     * @param conditions conditions on each table
      * @param distinct distinct flag of each table
-     * @throws IllegalArgumentException if the graph mapping cannot hold an IRI, or if a referenced column is unknown to
-     *             the schema or declared with another type
+     * @throws IllegalArgumentException if the joins do not connect the tables as a tree, if a term is taken from a
+     *             table the mapping does not have, if the conditions or the distinct flags are not given for each
+     *             table, if the graph or the predicate mapping cannot hold an IRI, or if a referenced column is unknown
+     *             to the schema or declared with another type
      * @throws IllegalStateException if the configuration has no database schema
      */
-    public void addQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
-            TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions,
-            List<Boolean> distinct)
+    public void addQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, int graphTable,
+            TermMapping graph, int subjectTable, TermMapping subject, int predicateTable, TermMapping predicate,
+            int objectTable, TermMapping object, List<Conditions> conditions, List<Boolean> distinct)
     {
         checkSchema("a mapping of a table");
         checkVirtualTables(tables);
         checkIriMapping(graph);
-        checkMapping(tables.get(0), graph);
-        checkMapping(tables.get(0), subject);
-        checkMapping(tables.get(tables.size() - 1), object);
+        checkIriMapping(predicate);
 
-        for(int i = 0; i < joinColumnsPairs.size(); i++)
-            checkJoinColumns(tables.get(i), tables.get(i + 1), joinColumnsPairs.get(i));
+        List<JoinColumns> joins = checkJoins(tables, joinColumnsPairs);
+
+        for(int table : List.of(graphTable, subjectTable, predicateTable, objectTable))
+            if(table < 0 || table >= tables.size())
+                throw new IllegalArgumentException("a join mapping takes a term from a table it does not have");
+
+        if(conditions.size() != tables.size() || distinct.size() != tables.size())
+            throw new IllegalArgumentException(
+                    "a join mapping needs the conditions and the distinct flag of each of its tables");
+
+        checkMapping(tables.get(graphTable), graph);
+        checkMapping(tables.get(subjectTable), subject);
+        checkMapping(tables.get(predicateTable), predicate);
+        checkMapping(tables.get(objectTable), object);
+
+        for(JoinColumns join : joins)
+            checkJoinColumns(tables.get(join.getLeftTable()), tables.get(join.getRightTable()), join);
 
         for(int i = 0; i < conditions.size(); i++)
             checkConditions(tables.get(i), conditions.get(i));
 
         checkColumnCollations(tables, graph, subject, predicate, object);
 
-        mappings.get(serviceIri).add(new JoinTableQuadMapping(tables, joinColumnsPairs, graph, subject, predicate,
-                object, conditions, distinct));
+        mappings.get(serviceIri).add(new JoinTableQuadMapping(tables, joins, graphTable, graph, subjectTable, subject,
+                predicateTable, predicate, objectTable, object, conditions, distinct));
 
         if(graph != null && autoAddToDefaultGraph)
-            mappings.get(serviceIri).add(new JoinTableQuadMapping(tables, joinColumnsPairs, null, subject, predicate,
-                    object, conditions, distinct));
+            mappings.get(serviceIri).add(new JoinTableQuadMapping(tables, joins, graphTable, null, subjectTable,
+                    subject, predicateTable, predicate, objectTable, object, conditions, distinct));
+    }
+
+
+    /**
+     * Registers an unconditional join quad mapping taking its terms from the tables at the given indexes, without
+     * distinct flags.
+     *
+     * @param tables the tables
+     * @param joinColumnsPairs the joins of the tables
+     * @param graphTable index of the table the graph is taken from
+     * @param graph the graph mapping, or null for the default graph
+     * @param subjectTable index of the table the subject is taken from
+     * @param subject the subject mapping
+     * @param predicateTable index of the table the predicate is taken from
+     * @param predicate the predicate mapping
+     * @param objectTable index of the table the object is taken from
+     * @param object the object mapping
+     */
+    public void addQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, int graphTable,
+            TermMapping graph, int subjectTable, TermMapping subject, int predicateTable, TermMapping predicate,
+            int objectTable, TermMapping object)
+    {
+        addQuadMapping(tables, joinColumnsPairs, graphTable, graph, subjectTable, subject, predicateTable, predicate,
+                objectTable, object, Collections.nCopies(tables.size(), new Conditions(true)),
+                Collections.nCopies(tables.size(), false));
+    }
+
+
+    /**
+     * Registers a join quad mapping taking the graph, the subject and the predicate from the first table and the object
+     * from the last one.
+     *
+     * @param tables the tables
+     * @param joinColumnsPairs the joins of the tables
+     * @param graph the graph mapping, or null for the default graph
+     * @param subject the subject mapping
+     * @param predicate the predicate mapping
+     * @param object the object mapping
+     * @param conditions conditions on each table
+     * @param distinct distinct flag of each table
+     */
+    public void addQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
+            TermMapping subject, TermMapping predicate, TermMapping object, List<Conditions> conditions,
+            List<Boolean> distinct)
+    {
+        addQuadMapping(tables, joinColumnsPairs, 0, graph, 0, subject, 0, predicate, tables.size() - 1, object,
+                conditions, distinct);
     }
 
 
@@ -1069,15 +1136,15 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * Registers a join quad mapping without distinct flags.
      *
      * @param tables the tables
-     * @param joinColumnsPairs join columns between adjacent tables
+     * @param joinColumnsPairs the joins of the tables
      * @param graph the graph mapping, or null for the default graph
      * @param subject the subject mapping
      * @param predicate the predicate mapping
      * @param object the object mapping
-     * @param conditions the conditions
+     * @param conditions conditions on each table
      */
     public void addQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
-            TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions)
+            TermMapping subject, TermMapping predicate, TermMapping object, List<Conditions> conditions)
     {
         addQuadMapping(tables, joinColumnsPairs, graph, subject, predicate, object, conditions,
                 Collections.nCopies(tables.size(), false));
@@ -1088,14 +1155,14 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * Registers an unconditional join quad mapping.
      *
      * @param tables the tables
-     * @param joinColumnsPairs join columns between adjacent tables
+     * @param joinColumnsPairs the joins of the tables
      * @param graph the graph mapping, or null for the default graph
      * @param subject the subject mapping
      * @param predicate the predicate mapping
      * @param object the object mapping
      */
     public void addQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
-            TermMapping subject, ConstantIriMapping predicate, TermMapping object)
+            TermMapping subject, TermMapping predicate, TermMapping object)
     {
         addQuadMapping(tables, joinColumnsPairs, graph, subject, predicate, object,
                 Collections.nCopies(tables.size(), new Conditions(true)));
@@ -1684,6 +1751,52 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
         for(Column column : conditions.getNonConstantColumns())
             checkColumn(table, column);
+    }
+
+
+    /**
+     * Checks that the joins of a join mapping connect its tables as a tree: there is one fewer of them than tables,
+     * each joins two different tables of the mapping, and every table is reached from the first one.
+     *
+     * @param tables the tables
+     * @param joinColumnsPairs the joins of the tables
+     * @return the joins, each naming its two tables (see {@link JoinColumns#at})
+     * @throws IllegalArgumentException if the joins do not connect the tables as a tree
+     */
+    private static List<JoinColumns> checkJoins(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs)
+    {
+        if(joinColumnsPairs.size() != tables.size() - 1)
+            throw new IllegalArgumentException("a join mapping needs one join fewer than tables");
+
+        List<JoinColumns> joins = new ArrayList<>(joinColumnsPairs.size());
+
+        for(int i = 0; i < joinColumnsPairs.size(); i++)
+        {
+            JoinColumns join = joinColumnsPairs.get(i).at(i);
+
+            if(join.getLeftTable() < 0 || join.getLeftTable() >= tables.size() || join.getRightTable() < 0
+                    || join.getRightTable() >= tables.size() || join.getLeftTable() == join.getRightTable())
+                throw new IllegalArgumentException("a join of a join mapping has to join two of its tables");
+
+            joins.add(join);
+        }
+
+        Set<Integer> reached = new HashSet<>();
+        reached.add(0);
+
+        for(boolean extended = true; extended;)
+        {
+            extended = false;
+
+            for(JoinColumns join : joins)
+                if(reached.contains(join.getLeftTable()) != reached.contains(join.getRightTable()))
+                    extended = reached.add(join.getLeftTable()) | reached.add(join.getRightTable());
+        }
+
+        if(reached.size() != tables.size())
+            throw new IllegalArgumentException("the joins of a join mapping have to connect all its tables");
+
+        return joins;
     }
 
 

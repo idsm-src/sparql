@@ -665,10 +665,13 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         else if(qmapping instanceof JoinTableQuadMapping mapping)
         {
             List<SourceTable> tables = mapping.getTables();
-            List<JoinColumns> joinColumnsPairs = mapping.getJoinColumnsPairs();
+            List<JoinColumns> joins = mapping.getJoinColumnsPairs();
 
-            ResourceClass resourceClass = null;
-            RdfTerm term = subject;
+            // every join has a node, which the accesses to its two tables bind to their join columns
+            List<JoinNode> nodes = new ArrayList<>(joins.size());
+
+            for(JoinColumns join : joins)
+                nodes.add(getJoinNode(mapping, join, graph, subject, predicate, object));
 
             SqlIntercode result = SqlEmptySolution.get();
 
@@ -689,22 +692,18 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                     maps.add(new MappedTerm(object, mapping.getObject()));
 
 
-                if(i > 0)
+                for(int j = 0; j < joins.size(); j++)
                 {
-                    TermMapping nodeMapping = new InternalNodeMapping(resourceClass,
-                            joinColumnsPairs.get(i - 1).getRightColumns());
-                    maps.add(new MappedTerm(term, nodeMapping));
-                }
+                    JoinColumns join = joins.get(j);
+                    JoinNode node = nodes.get(j);
 
-                if(i < tables.size() - 1)
-                {
-                    JoinNode node = getJoinNode(mapping, i, graph, subject, predicate, object);
+                    if(join.getRightTable() == i)
+                        maps.add(new MappedTerm(node.variable(),
+                                new InternalNodeMapping(node.resourceClass(), join.getRightColumns())));
 
-                    resourceClass = node.resourceClass();
-                    TermMapping nodeMapping = new InternalNodeMapping(resourceClass,
-                            joinColumnsPairs.get(i).getLeftColumns());
-                    term = node.variable();
-                    maps.add(new MappedTerm(term, nodeMapping));
+                    if(join.getLeftTable() == i)
+                        maps.add(new MappedTerm(node.variable(),
+                                new InternalNodeMapping(node.resourceClass(), join.getLeftColumns())));
                 }
 
 
@@ -727,26 +726,25 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     /**
-     * Node joining the tables {@code index} and {@code index + 1} of a join mapping, which is bound to the join columns
-     * of both. When one of the two tables holds a term of the pattern that is a variable in columns containing a key of
-     * the table, the row of the table is given by the term, and the node stands for the values of its join columns in
-     * that row (see {@link TranslateVisitor#getJoinNode}): every triple pattern of the current join scope that reads
-     * the table by the term of that variable gets the same node, so the tables joined to the rows of the term are
-     * joined to each other directly. Otherwise the node is a fresh variable of a class of its own.
+     * Node of a join of a join mapping, which is bound to the join columns of both tables of the join. When one of the
+     * two tables holds a term of the pattern that is a variable in columns containing a key of the table, the row of
+     * the table is given by the term, and the node stands for the values of its join columns in that row (see
+     * {@link TranslateVisitor#getJoinNode}): every triple pattern of the current join scope that reads the table by the
+     * term of that variable gets the same node, so the tables joined to the rows of the term are joined to each other
+     * directly. Otherwise the node is a fresh variable of a class of its own.
      *
      * @param mapping the join mapping
-     * @param index index of the left one of the two tables
+     * @param join the join
      * @param graph the graph term
      * @param subject the subject term
      * @param predicate the predicate term
      * @param object the object term
      * @return the node joining the two tables
      */
-    private JoinNode getJoinNode(JoinTableQuadMapping mapping, int index, RdfTerm graph, RdfTerm subject,
+    private JoinNode getJoinNode(JoinTableQuadMapping mapping, JoinColumns join, RdfTerm graph, RdfTerm subject,
             RdfTerm predicate, RdfTerm object)
     {
         DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
-        JoinColumns joinColumns = mapping.getJoinColumnsPairs().get(index);
 
         List<MappedTerm> terms = List.of(new MappedTerm(subject, mapping.getSubject()),
                 new MappedTerm(object, mapping.getObject()), new MappedTerm(predicate, mapping.getPredicate()),
@@ -754,10 +752,11 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         List<Integer> tables = List.of(mapping.getSubjectTableIdx(), mapping.getObjectTableIdx(),
                 mapping.getPredicateTableIdx(), mapping.getGraphTableIdx());
 
-        for(int side = index; side <= index + 1; side++)
+        for(boolean left : List.of(true, false))
         {
+            int side = left ? join.getLeftTable() : join.getRightTable();
             SourceTable table = mapping.getTables().get(side);
-            List<Column> joined = side == index ? joinColumns.getLeftColumns() : joinColumns.getRightColumns();
+            List<Column> joined = left ? join.getLeftColumns() : join.getRightColumns();
 
             for(int i = 0; i < terms.size(); i++)
             {
@@ -775,7 +774,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
         return new JoinNode(parent.createVariable(variablePrefix),
-                new InternalResourceClass(joinColumns.getLeftColumns().stream().map(Column::getType).toList()));
+                new InternalResourceClass(join.getLeftColumns().stream().map(Column::getType).toList()));
     }
 
 

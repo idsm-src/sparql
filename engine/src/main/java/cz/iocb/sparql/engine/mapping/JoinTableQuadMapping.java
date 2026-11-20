@@ -10,23 +10,36 @@ import cz.iocb.sparql.engine.database.SourceTable;
 
 
 /**
- * Quad mapping over a chain of tables, adjacent ones joined on {@link JoinColumns}. Each term position names by index
- * the table it is taken from (the convenience constructors take graph, subject and predicate from the first table and
- * the object from the last one), and every table has its own conditions and distinct flag (see
- * {@link SingleTableQuadMapping}).
+ * Quad mapping over several tables joined as a tree: every join ({@link JoinColumns}) joins two of the tables, and the
+ * joins connect all the tables without a cycle, so there is one fewer of them than tables. A join that does not name
+ * its tables joins two adjacent ones, the join at the position {@code i} of the list the tables {@code i} and
+ * {@code i + 1}, so that joins given so make a chain. Each term position names by index the table it is taken from (the
+ * convenience constructors take graph, subject and predicate from the first table and the object from the last one),
+ * and every table has its own conditions and distinct flag (see {@link SingleTableQuadMapping}).
  */
 public class JoinTableQuadMapping extends QuadMapping
 {
     /**
-     * Columns joining two adjacent tables of the chain (left table columns to right table columns, matched by position
-     * and of the same SQL types).
+     * Columns joining two tables of the mapping (left table columns to right table columns, matched by position and of
+     * the same SQL types). The tables are named by their indexes among the tables of the mapping, or left to the
+     * position of the join in the list of the joins, which then joins two adjacent tables (see {@link #at}).
      */
     public static class JoinColumns
     {
         /**
+         * Index of the left table among the tables of the mapping, or -1 when the position of the join gives it.
+         */
+        private final int leftTable;
+
+        /**
          * Columns of the left table.
          */
         private final List<Column> leftColumns;
+
+        /**
+         * Index of the right table among the tables of the mapping, or -1 when the position of the join gives it.
+         */
+        private final int rightTable;
 
         /**
          * Columns of the right table, matched by position.
@@ -34,30 +47,97 @@ public class JoinTableQuadMapping extends QuadMapping
         private final List<Column> rightColumns;
 
         /**
-         * Creates the join on several column pairs.
+         * Creates the join of two adjacent tables on several column pairs.
          *
          * @param leftColumns columns of the left table
          * @param rightColumns columns of the right table
          */
         public JoinColumns(List<Column> leftColumns, List<Column> rightColumns)
         {
-            this.leftColumns = leftColumns;
-            this.rightColumns = rightColumns;
-
-            assert leftColumns.size() == rightColumns.size();
+            this(-1, leftColumns, -1, rightColumns);
         }
 
 
         /**
-         * Creates the join on a single column pair.
+         * Creates the join of two adjacent tables on a single column pair.
          *
          * @param leftColumn column of the left table
          * @param rightColumn column of the right table
          */
         public JoinColumns(Column leftColumn, Column rightColumn)
         {
-            this.leftColumns = List.of(leftColumn);
-            this.rightColumns = List.of(rightColumn);
+            this(-1, List.of(leftColumn), -1, List.of(rightColumn));
+        }
+
+
+        /**
+         * Creates the join of two given tables of the mapping on several column pairs.
+         *
+         * @param leftTable index of the left table among the tables of the mapping
+         * @param leftColumns columns of the left table
+         * @param rightTable index of the right table among the tables of the mapping
+         * @param rightColumns columns of the right table
+         */
+        public JoinColumns(int leftTable, List<Column> leftColumns, int rightTable, List<Column> rightColumns)
+        {
+            this.leftTable = leftTable;
+            this.leftColumns = leftColumns;
+            this.rightTable = rightTable;
+            this.rightColumns = rightColumns;
+
+            assert leftColumns.size() == rightColumns.size();
+            assert (leftTable < 0) == (rightTable < 0);
+        }
+
+
+        /**
+         * Creates the join of two given tables of the mapping on a single column pair.
+         *
+         * @param leftTable index of the left table among the tables of the mapping
+         * @param leftColumn column of the left table
+         * @param rightTable index of the right table among the tables of the mapping
+         * @param rightColumn column of the right table
+         */
+        public JoinColumns(int leftTable, Column leftColumn, int rightTable, Column rightColumn)
+        {
+            this(leftTable, List.of(leftColumn), rightTable, List.of(rightColumn));
+        }
+
+
+        /**
+         * The join naming its tables: the join itself when it names them, and the join of the tables {@code position}
+         * and {@code position + 1} on its columns otherwise.
+         *
+         * @param position position of the join in the list of the joins of a mapping
+         * @return the join naming its tables
+         */
+        public JoinColumns at(int position)
+        {
+            return leftTable >= 0 ? this : new JoinColumns(position, leftColumns, position + 1, rightColumns);
+        }
+
+
+        /**
+         * Index of the left table among the tables of the mapping; -1 when the join does not name its tables (the joins
+         * a mapping gives name them always).
+         *
+         * @return index of the left table among the tables of the mapping, or -1
+         */
+        public int getLeftTable()
+        {
+            return leftTable;
+        }
+
+
+        /**
+         * Index of the right table among the tables of the mapping; -1 when the join does not name its tables (the
+         * joins a mapping gives name them always).
+         *
+         * @return index of the right table among the tables of the mapping, or -1
+         */
+        public int getRightTable()
+        {
+            return rightTable;
         }
 
 
@@ -86,7 +166,7 @@ public class JoinTableQuadMapping extends QuadMapping
         @Override
         public int hashCode()
         {
-            return leftColumns.hashCode() ^ rightColumns.hashCode();
+            return leftColumns.hashCode() ^ rightColumns.hashCode() ^ leftTable ^ 31 * rightTable;
         }
 
         @Override
@@ -100,6 +180,9 @@ public class JoinTableQuadMapping extends QuadMapping
 
             JoinColumns pair = (JoinColumns) object;
 
+            if(leftTable != pair.leftTable || rightTable != pair.rightTable)
+                return false;
+
             if(!leftColumns.equals(pair.leftColumns))
                 return false;
 
@@ -112,12 +195,12 @@ public class JoinTableQuadMapping extends QuadMapping
 
 
     /**
-     * Tables of the chain in join order.
+     * Tables of the mapping.
      */
     private final List<SourceTable> tables;
 
     /**
-     * Join columns between adjacent tables; one fewer than tables.
+     * Joins of the tables, each naming its two tables; one fewer than tables.
      */
     private final List<JoinColumns> joinColumnsPairs;
 
@@ -156,7 +239,7 @@ public class JoinTableQuadMapping extends QuadMapping
      * Creates the mapping with explicit table indexes for every position and no distinct flags.
      *
      * @param tables the tables
-     * @param joinColumnsPairs join columns between adjacent tables
+     * @param joinColumnsPairs the joins of the tables
      * @param graphTableIdx index of the table providing the graph
      * @param graph the graph mapping, or null for the default graph
      * @param subjectTableIdx index of the table providing the subject
@@ -180,7 +263,7 @@ public class JoinTableQuadMapping extends QuadMapping
      * Creates the mapping with explicit table indexes for every position.
      *
      * @param tables the tables
-     * @param joinColumnsPairs join columns between adjacent tables
+     * @param joinColumnsPairs the joins of the tables
      * @param graphTableIdx index of the table providing the graph
      * @param graph the graph mapping, or null for the default graph
      * @param subjectTableIdx index of the table providing the subject
@@ -198,8 +281,15 @@ public class JoinTableQuadMapping extends QuadMapping
     {
         super(graph, subject, predicate, object);
 
+        assert tables.size() == joinColumnsPairs.size() + 1;
+
+        List<JoinColumns> joins = new ArrayList<>(joinColumnsPairs.size());
+
+        for(int i = 0; i < joinColumnsPairs.size(); i++)
+            joins.add(joinColumnsPairs.get(i).at(i));
+
         this.tables = tables;
-        this.joinColumnsPairs = joinColumnsPairs;
+        this.joinColumnsPairs = Collections.unmodifiableList(joins);
         this.conditions = conditions;
         this.distinct = distinct;
         this.graphTableIdx = graphTableIdx;
@@ -207,7 +297,6 @@ public class JoinTableQuadMapping extends QuadMapping
         this.predicateTableIdx = predicateTableIdx;
         this.objectTableIdx = objectTableIdx;
 
-        assert tables.size() == joinColumnsPairs.size() + 1;
         assert tables.size() == conditions.size();
         assert tables.size() == distinct.size();
     }
@@ -217,7 +306,7 @@ public class JoinTableQuadMapping extends QuadMapping
      * Creates the mapping taking graph, subject and predicate from the first table and the object from the last one.
      *
      * @param tables the tables
-     * @param joinColumnsPairs join columns between adjacent tables
+     * @param joinColumnsPairs the joins of the tables
      * @param graph the graph mapping, or null for the default graph
      * @param subject the subject mapping
      * @param predicate the predicate mapping
@@ -225,7 +314,7 @@ public class JoinTableQuadMapping extends QuadMapping
      * @param conditions conditions on each table
      */
     public JoinTableQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
-            TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions)
+            TermMapping subject, TermMapping predicate, TermMapping object, List<Conditions> conditions)
     {
         this(tables, joinColumnsPairs, 0, graph, 0, subject, 0, predicate, tables.size() - 1, object, conditions);
     }
@@ -236,7 +325,7 @@ public class JoinTableQuadMapping extends QuadMapping
      * with distinct flags.
      *
      * @param tables the tables
-     * @param joinColumnsPairs join columns between adjacent tables
+     * @param joinColumnsPairs the joins of the tables
      * @param graph the graph mapping, or null for the default graph
      * @param subject the subject mapping
      * @param predicate the predicate mapping
@@ -245,7 +334,7 @@ public class JoinTableQuadMapping extends QuadMapping
      * @param distinct distinct flag of each table
      */
     public JoinTableQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
-            TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions,
+            TermMapping subject, TermMapping predicate, TermMapping object, List<Conditions> conditions,
             List<Boolean> distinct)
     {
         this(tables, joinColumnsPairs, 0, graph, 0, subject, 0, predicate, tables.size() - 1, object, conditions,
@@ -258,14 +347,14 @@ public class JoinTableQuadMapping extends QuadMapping
      * without conditions.
      *
      * @param tables the tables
-     * @param joinColumnsPairs join columns between adjacent tables
+     * @param joinColumnsPairs the joins of the tables
      * @param graph the graph mapping, or null for the default graph
      * @param subject the subject mapping
      * @param predicate the predicate mapping
      * @param object the object mapping
      */
     public JoinTableQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
-            TermMapping subject, ConstantIriMapping predicate, TermMapping object)
+            TermMapping subject, TermMapping predicate, TermMapping object)
     {
         this(tables, joinColumnsPairs, graph, subject, predicate, object,
                 Collections.nCopies(tables.size(), new Conditions(true)));
@@ -303,9 +392,9 @@ public class JoinTableQuadMapping extends QuadMapping
 
 
     /**
-     * Tables of the chain in join order.
+     * Tables of the mapping.
      *
-     * @return tables of the chain in join order
+     * @return tables of the mapping
      */
     public final List<SourceTable> getTables()
     {
@@ -314,9 +403,10 @@ public class JoinTableQuadMapping extends QuadMapping
 
 
     /**
-     * Join columns between adjacent tables.
+     * Joins of the tables, each naming its two tables (see {@link JoinColumns#getLeftTable} and
+     * {@link JoinColumns#getRightTable}).
      *
-     * @return join columns between adjacent tables
+     * @return joins of the tables, each naming its two tables
      */
     public final List<JoinColumns> getJoinColumnsPairs()
     {
