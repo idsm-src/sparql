@@ -408,6 +408,33 @@ public class JoinNodeTest
 
 
     @Test
+    @DisplayName("a walk seeded by a table of a join mapping whose node the other table still needs")
+    void seededWalk() throws Exception
+    {
+        // the table of the kinds is distinct over the start of the walk, so it seeds the walk, whereas the table of
+        // the items stays outside and is joined with the walk by the node joining the two tables
+        assertThat(check("SELECT ?i ?n WHERE { ?i ex:kind ?k . ?k ex:follows* ?n }"),
+                containsInAnyOrder(row(item(10), kind("red")), row(item(10), kind("green")),
+                        row(item(10), kind("blue")), row(item(11), kind("red")), row(item(11), kind("green")),
+                        row(item(11), kind("blue")), row(item(12), kind("green")), row(item(12), kind("blue")),
+                        row(item(13), kind("blue")), row(item(14), kind("grey"))));
+
+        assertThat(check("SELECT ?i ?n WHERE { ?i ex:kind ?k . ?n ex:follows* ?k }"), hasSize(8));
+
+        assertThat(check("SELECT ?i ?k ?n WHERE { ?i ex:other ?k . ?k ex:follows* ?n }"), hasSize(6));
+
+        assertThat(check("SELECT ?n WHERE { item:12 ex:kind ?k . ?k ex:follows* ?n }"),
+                containsInAnyOrder(row(kind("green")), row(kind("blue"))));
+
+        assertThat(check("SELECT ?i ?j WHERE { ?i ex:kind ?k . ?k ex:follows* ?n . ?j ex:other ?n }"), hasSize(9));
+
+        assertThat(check("SELECT ?i ?n WHERE { ?i ex:kind ?k . ?k ex:follows? ?n }"), hasSize(10));
+
+        assertThat(check("SELECT ?i ?n WHERE { ?i ex:kind ?k . ?k ex:follows+ ?n }"), hasSize(6));
+    }
+
+
+    @Test
     @DisplayName("a shared variable at an end of a property path")
     void paths() throws Exception
     {
