@@ -62,7 +62,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * {@link SqlIntercode#addAcceptedValues}). With the join optimizer on, an access whose variable a filter above accepts
  * only with one of several constant terms takes the terms into its conditions as a disjunction (see
  * {@link #restrictToAcceptedTerms}). An access to a dictionary table whose row constants select by a key reads the row
- * when it is optimised and takes it by the key the access is joined by (see {@link #resolveDictionaryRows}).
+ * when it is optimised and takes it by the key the access is joined by (see {@link #resolveDictionaryRows}), and an
+ * access to a probed table that constants restrict by an index is asked for a row then, giving no solution when it has
+ * none (see {@link #probeRows}).
  */
 public final class SqlTableAccess extends SqlIntercode
 {
@@ -1931,6 +1933,12 @@ public final class SqlTableAccess extends SqlIntercode
         if(optimizedConditions.isFalse())
             return SqlNoSolution.get();
 
+        // a probed table is asked whether it has a row the constants select
+        optimizedConditions = probeRows(request, optimizedConditions);
+
+        if(optimizedConditions.isFalse())
+            return SqlNoSolution.get();
+
         Set<Column> optimizedDistinct = distinctColumns;
 
         if(!distinctColumns.isEmpty() && isDistinctImpliedByKey(request.getConfiguration().getDatabaseSchema()))
@@ -2129,6 +2137,103 @@ public final class SqlTableAccess extends SqlIntercode
             resolved.addAreEqual(key.get(i), new ValueColumn(rows.get(0).get(i), key.get(i).getType()));
 
         return resolved;
+    }
+
+
+    /**
+     * The conditions on the rows of a probed table (see
+     * {@link cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration#addProbedTable}) without the disjuncts that no
+     * row of the table satisfies, as far as an index tells (see {@link #hasRows}); no disjunct left is no solution.
+     *
+     * @param request the current request
+     * @param conditions the conditions on the rows
+     * @return the conditions without the disjuncts no row satisfies (the given ones when nothing has changed)
+     */
+    private Conditions probeRows(Request request, Conditions conditions)
+    {
+        if(table == null || !request.getConfiguration().isProbedTable(table))
+            return conditions;
+
+        Conditions result = new Conditions(false);
+        boolean changed = false;
+
+        for(Condition condition : conditions.getConditions())
+        {
+            if(hasRows(request, condition))
+                result.add(condition);
+            else
+                changed = true;
+        }
+
+        return changed ? result : conditions;
+    }
+
+
+    /**
+     * False if the table is found to have no row that a disjunct of the conditions holds for: the table is asked for a
+     * row with the constants the disjunct requires in the leading columns of one of its indexes (see
+     * {@link DatabaseSchema#getLookupColumns}), which is a lookup in that index, and the disjunct holds for none when
+     * there is none. The other parts of the disjunct are left out of the question, as a row satisfying them might be
+     * found only after many that do not. A disjunct that requires no constant in a leading column of an index is not
+     * asked about. An answer got during the request before is taken from the request (see
+     * {@link Request#getProbedRows}).
+     *
+     * @param request the current request
+     * @param condition the disjunct
+     * @return false if the table is found to have no row the disjunct holds for, true otherwise
+     * @throws SQLRuntimeException when the table cannot be read
+     */
+    private boolean hasRows(Request request, Condition condition)
+    {
+        Map<Column, Column> constants = new HashMap<>();
+
+        for(ColumnComparison comparison : condition.getAreEqual())
+        {
+            if(comparison.getLeft() instanceof TableColumn column && isConstant(comparison.getRight()))
+                constants.putIfAbsent(column, comparison.getRight());
+            else if(comparison.getRight() instanceof TableColumn column && isConstant(comparison.getLeft()))
+                constants.putIfAbsent(column, comparison.getLeft());
+        }
+
+        List<Column> columns = schema.getLookupColumns(table, constants.keySet());
+
+        if(columns.isEmpty())
+            return true;
+
+        Condition probe = new Condition();
+
+        for(Column column : columns)
+            probe.addAreEqual(column, constants.get(column));
+
+        SqlBuilder builder = new SqlBuilder();
+        builder.append("SELECT 1 FROM ");
+        builder.append(table);
+        appendConditions(builder, new Conditions(probe), null, Set.of());
+        builder.append(" LIMIT 1");
+
+        SqlCode code = builder.toCode();
+
+        // the question has to be answered by the table alone
+        if(!code.getOuterTables().isEmpty() || !code.getDeclaredTables().isEmpty())
+            return true;
+
+        Boolean found = request.getProbedRows().get(code.getText());
+
+        if(found == null)
+        {
+            try
+            {
+                found = request.lookup(List.of(code.getText()), result -> result.next()).get(0);
+            }
+            catch(SQLException e)
+            {
+                throw new SQLRuntimeException(e);
+            }
+
+            request.getProbedRows().put(code.getText(), found);
+        }
+
+        return found;
     }
 
 

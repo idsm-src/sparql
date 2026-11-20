@@ -587,6 +587,34 @@ public class DatabaseSchema
 
 
     /**
+     * The columns, out of the given ones, that the rows of the table can be looked up by with a single index: the
+     * longest run of leading key columns of an index of the table that are all among the given columns. Empty when no
+     * index of the table begins with one of them.
+     *
+     * @param table the table
+     * @param columns columns bound to values
+     * @return the given columns the rows can be looked up by with a single index, in the order of the index
+     */
+    public List<Column> getLookupColumns(SourceTable table, Set<Column> columns)
+    {
+        List<Column> result = List.of();
+
+        for(List<Column> index : indexes.getOrDefault(table, List.of()))
+        {
+            int length = 0;
+
+            while(length < index.size() && columns.contains(index.get(length)))
+                length++;
+
+            if(length > result.size())
+                result = List.copyOf(index.subList(0, length));
+        }
+
+        return result;
+    }
+
+
+    /**
      * Declares a foreign key: {@code foreignColumns} of {@code foreignTable} reference {@code parentColumns} of
      * {@code parentTable} (matched by position).
      *

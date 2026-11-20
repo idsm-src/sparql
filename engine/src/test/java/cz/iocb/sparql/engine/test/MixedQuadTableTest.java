@@ -39,9 +39,10 @@ import cz.iocb.sparql.testing.Database;
  * numbered terms and the boxes of the other objects are mapped by disjoint classes derived from the box, so a triple
  * pattern reads only the table of quads that can hold its object, whether a constant, a join or a filter tells what the
  * object is, and a variable shared by two objects is compared by numbers among the resources and by boxes among the
- * other terms. The data: {@code ex:a} knows {@code ex:b} and a blank node, {@code ex:b} knows {@code ex:a}, the three
- * have names, {@code ex:a} and {@code ex:b} ages, {@code ex:a} says a triple term, and the graph {@code ex:g} holds an
- * acquaintance and a name of {@code ex:c}.
+ * other terms. With the tables of the quads declared to be probed tables, a pattern of a predicate that has no quad in
+ * one of them reads only the other one. The data: {@code ex:a} knows {@code ex:b} and a blank node, {@code ex:b} knows
+ * {@code ex:a}, the three have names, {@code ex:a} and {@code ex:b} ages, {@code ex:a} says a triple term and likes
+ * both {@code ex:b} and a literal, and the graph {@code ex:g} holds an acquaintance and a name of {@code ex:c}.
  */
 public class MixedQuadTableTest
 {
@@ -66,7 +67,8 @@ public class MixedQuadTableTest
     private static SparqlDatabaseConfiguration plain = null;
 
     /**
-     * Configuration declaring the table of the resources a dictionary table, with the join optimizer on.
+     * Configuration declaring the table of the resources a dictionary table and the tables of the quads probed tables,
+     * with the join optimizer on.
      */
     private static SparqlDatabaseConfiguration dictionary = null;
 
@@ -114,6 +116,8 @@ public class MixedQuadTableTest
         quads.add(new Quad(null, b, age, twentyFive));
         quads.add(new Quad(null, x, name, NodeFactory.createLiteralString("X")));
         quads.add(new Quad(null, a, iri("says"), NodeFactory.createTripleTerm(b, age, twentyFive)));
+        quads.add(new Quad(null, a, iri("likes"), b));
+        quads.add(new Quad(null, a, iri("likes"), NodeFactory.createLiteralString("tea")));
         quads.add(new Quad(iri("g"), c, knows, a));
         quads.add(new Quad(iri("g"), c, name, NodeFactory.createLiteralString("C")));
 
@@ -242,7 +246,7 @@ public class MixedQuadTableTest
         assertThat(translate(plain, variable), containsString(valueQuads));
         assertThat(check(variable), hasSize(1));
 
-        assertThat(check("SELECT ?s ?p ?o WHERE { ?s ?p ?o }"), hasSize(9));
+        assertThat(check("SELECT ?s ?p ?o WHERE { ?s ?p ?o }"), hasSize(11));
     }
 
 
@@ -268,7 +272,7 @@ public class MixedQuadTableTest
     {
         // the object of the first pattern is the subject of the second one, so it is a resource: the other quads are
         // read for the second pattern only, and the two patterns are joined by the numbers
-        String query = "SELECT ?s ?x WHERE { ?s ex:knows ?o . ?o ex:name ?x }";
+        String query = "SELECT ?s ?x WHERE { ?s ex:likes ?o . ?o ex:likes ?x }";
 
         for(SparqlDatabaseConfiguration config : List.of(plain, dictionary))
         {
@@ -279,7 +283,9 @@ public class MixedQuadTableTest
         }
 
         assertThat(translate(dictionary, query), containsString("\".\"s\" = \""));
-        assertThat(check(query), hasSize(3));
+        assertThat(check(query), empty());
+
+        assertThat(check("SELECT ?s ?x WHERE { ?s ex:knows ?o . ?o ex:name ?x }"), hasSize(3));
     }
 
 
@@ -288,7 +294,7 @@ public class MixedQuadTableTest
     {
         // an object shared by two patterns is a resource in both or another term in both: the numbers are compared in
         // one branch and the boxes in the other one
-        String query = "SELECT ?a ?b WHERE { ?a ex:age ?n . ?b ex:age ?n }";
+        String query = "SELECT ?a ?b WHERE { ?a ex:likes ?n . ?b ex:likes ?n }";
 
         for(SparqlDatabaseConfiguration config : List.of(plain, dictionary))
         {
@@ -314,9 +320,9 @@ public class MixedQuadTableTest
         checkTable("SELECT ?s ?o WHERE { ?s ?p ?o FILTER(isIRI(?o)) }", resourceQuads, valueQuads);
         checkTable("SELECT ?s ?o WHERE { ?s ?p ?o FILTER(isBlank(?o)) }", resourceQuads, valueQuads);
 
-        assertThat(check("SELECT ?s ?o WHERE { ?s ?p ?o FILTER(isLiteral(?o)) }"), hasSize(5));
+        assertThat(check("SELECT ?s ?o WHERE { ?s ?p ?o FILTER(isLiteral(?o)) }"), hasSize(6));
         assertThat(check("SELECT ?s ?o WHERE { ?s ?p ?o FILTER(isTriple(?o)) }"), hasSize(1));
-        assertThat(check("SELECT ?s ?o WHERE { ?s ?p ?o FILTER(isIRI(?o)) }"), hasSize(2));
+        assertThat(check("SELECT ?s ?o WHERE { ?s ?p ?o FILTER(isIRI(?o)) }"), hasSize(3));
         assertThat(check("SELECT ?s ?o WHERE { ?s ?p ?o FILTER(isBlank(?o)) }"), hasSize(1));
 
         // a comparison of its value, which no resource has
@@ -329,12 +335,53 @@ public class MixedQuadTableTest
         String resource = "SELECT ?s ?o WHERE { ?s ?p ?o FILTER(?o = ex:b) }";
 
         checkTable(resource, resourceQuads, valueQuads);
-        assertThat(check(resource), hasSize(1));
+        assertThat(check(resource), hasSize(2));
 
         String literal = "SELECT ?s ?o WHERE { ?s ?p ?o FILTER(?o = \"A\") }";
 
         checkTable(literal, valueQuads, resourceQuads);
         assertThat(check(literal), hasSize(1));
+    }
+
+
+    @Test
+    void probedTables() throws Exception
+    {
+        // no name is a resource, which the table of the numbered quads tells when it is asked for a quad of the
+        // predicate, so a pattern of a name reads the other table only
+        String name = "SELECT ?s ?n WHERE { ?s ex:name ?n }";
+
+        assertThat(translate(dictionary, name), not(containsString(resourceQuads)));
+        assertThat(check(name), hasSize(3));
+
+        // the tables are asked by the numbers of the constants, which the plain configuration does not read
+        assertThat(translate(plain, name), containsString(resourceQuads));
+
+        // so a join of such patterns has no branch for every combination of the tables
+        String join = "SELECT * WHERE { ?a ex:name ?n . ?a ex:age ?g . ?a ex:knows ?k . ?k ex:name ?m }";
+
+        assertThat(count(translate(dictionary, join), " UNION ALL "), is(0));
+        assertThat(count(translate(plain, join), " UNION ALL "), is(7));
+        assertThat(check(join), hasSize(3));
+
+        // a predicate with objects of both kinds keeps both tables
+        String likes = "SELECT ?s ?o WHERE { ?s ex:likes ?o }";
+
+        assertThat(translate(dictionary, likes), containsString(resourceQuads));
+        assertThat(translate(dictionary, likes), containsString(valueQuads));
+        assertThat(check(likes), hasSize(2));
+
+        // a constant object is asked about together with the predicate: nobody is known to know ex:c
+        String nobody = "SELECT ?s WHERE { ?s ex:knows ex:c }";
+
+        assertThat(translate(dictionary, nobody), not(containsString("sparql_test")));
+        assertThat(check(nobody), empty());
+
+        // what the index of a table does not begin with is not asked about, so its quads are read
+        String literal = "SELECT ?s WHERE { ?s ex:name \"Nobody\" }";
+
+        assertThat(translate(dictionary, literal), containsString(valueQuads));
+        assertThat(check(literal), empty());
     }
 
 

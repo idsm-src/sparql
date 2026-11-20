@@ -232,6 +232,11 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     protected final Set<SourceTable> dictionaryTables = new HashSet<>();
 
     /**
+     * Tables whose accesses the translation of a query asks for a row (see {@link #addProbedTable}).
+     */
+    protected final Set<SourceTable> probedTables = new HashSet<>();
+
+    /**
      * Whether the engine chooses the order and the methods of the joins it generates (see {@link #setJoinOptimizer}).
      */
     protected boolean joinOptimizer = false;
@@ -2135,6 +2140,38 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     public boolean isDictionaryTable(SourceTable table)
     {
         return dictionaryTables.contains(table);
+    }
+
+
+    /**
+     * Declares a probed table: a table whose accesses are asked for a row when a query is translated. An access that
+     * constants restrict in the leading columns of an index of the table is looked up by those constants, and one that
+     * has no such row gives no solution (see {@link cz.iocb.sparql.engine.imcode.SqlTableAccess}). It serves tables
+     * that several mappings split the data into by something a query seldom tells, like two tables of quads for the two
+     * kinds of objects: a pattern matches all such mappings, and a join of several such patterns has a branch for every
+     * combination of their tables, whereas a predicate mostly has rows in one of the tables, which the lookup tells.
+     * What the translation finds is kept for the request only.
+     *
+     * @param table the table
+     * @throws IllegalStateException if the configuration has no database schema
+     */
+    public void addProbedTable(DatabaseTable table)
+    {
+        checkSchema("a probed table");
+
+        probedTables.add(table);
+    }
+
+
+    /**
+     * True if the table is declared to be a probed table (see {@link #addProbedTable}).
+     *
+     * @param table the table
+     * @return true if the table is declared to be a probed table, false otherwise
+     */
+    public boolean isProbedTable(SourceTable table)
+    {
+        return probedTables.contains(table);
     }
 
 

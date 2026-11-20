@@ -53,7 +53,8 @@ public final class MixedQuadTable
 
         /**
          * The table of the resources is a dictionary table, whose rows the translation reads for the constants of a
-         * query, and the join optimizer of the engine chooses the joins.
+         * query, the tables of the quads are probed tables, which the translation asks whether they hold the constants
+         * of a pattern, and the join optimizer of the engine chooses the joins.
          */
         DICTIONARY
     }
@@ -95,7 +96,8 @@ public final class MixedQuadTable
 
     /**
      * Creates the three tables unless they exist: the resources are unique and numbered by the primary key, which the
-     * numbers of the quads reference.
+     * numbers of the quads reference, and the quads are indexed by the predicate with the subject and, where it is a
+     * number, with the object.
      *
      * @param statement statement of the test database
      * @throws SQLException on database errors
@@ -112,6 +114,10 @@ public final class MixedQuadTable
 
         statement.execute("create table if not exists " + valueQuadTable + " (g int8" + number + ", s int8 not null"
                 + number + ", p int8 not null" + number + ", o sparql.rdfbox not null)");
+
+        statement.execute("create index if not exists resource_quads_pso on " + resourceQuadTable + " (p, s, o)");
+        statement.execute("create index if not exists resource_quads_pos on " + resourceQuadTable + " (p, o, s)");
+        statement.execute("create index if not exists value_quads_ps on " + valueQuadTable + " (p, s)");
     }
 
 
@@ -163,6 +169,8 @@ public final class MixedQuadTable
         if(variant == Variant.DICTIONARY)
         {
             config.addDictionaryTable(resourceTable);
+            config.addProbedTable(resourceQuadTable);
+            config.addProbedTable(valueQuadTable);
             config.setJoinOptimizer(true);
         }
     }

@@ -296,6 +296,12 @@ public class Request implements AutoCloseable
     private final Map<String, List<List<String>>> dictionaryRows = new HashMap<>();
 
     /**
+     * Whether the probed tables asked for a row during the request have one, by the texts of the queries asking (see
+     * {@link #getProbedRows}).
+     */
+    private final Map<String, Boolean> probedRows = new HashMap<>();
+
+    /**
      * Start of the execution in {@link System#nanoTime} units.
      */
     private long begin;
@@ -1087,6 +1093,19 @@ public class Request implements AutoCloseable
     public Map<String, List<List<String>>> getDictionaryRows()
     {
         return dictionaryRows;
+    }
+
+
+    /**
+     * Whether the probed tables asked for a row during the request have one, by the texts of the queries asking: a
+     * table asked again is answered from here (see {@link cz.iocb.sparql.engine.imcode.SqlTableAccess}). Nothing found
+     * so outlives the request.
+     *
+     * @return whether the probed tables asked for a row during the request have one, by the texts of the queries
+     */
+    public Map<String, Boolean> getProbedRows()
+    {
+        return probedRows;
     }
 
 
