@@ -493,13 +493,18 @@ public class QueryVisitor extends BaseVisitor<Query>
 
 
     /**
-     * Reports the other occurrences of a variable standing for the parameters or the results of a procedure call: the
-     * call binds no such variable, so another occurrence would join it unbound. The patterns are searched at any depth,
-     * with the triple terms, the expressions, the inline data and the patterns of sub-selects; the projections and the
-     * solution modifiers are not, as the clients that replace the blank nodes of a pattern by variables (Virtuoso
-     * forwarding the pattern of a SERVICE call) project them, and a variable of another scope, like one that a
-     * sub-select does not project, is another variable. The blank nodes are checked when the calls are assembled (see
-     * {@link GraphPatternVisitor#assembleProcedureCalls}), as their labels cannot occur in another basic graph pattern.
+     * Reports the occurrences of a variable standing for the parameters or the results of a procedure call in the
+     * triple patterns of the query: as their subject, predicate or object, or a component of a triple term there, at
+     * any depth, with the patterns of expressions and of sub-selects. The call binds such a variable to a blank node of
+     * the call, as a pattern of triples would bind it (see {@link cz.iocb.sparql.engine.imcode.SqlProcedureCall}), but
+     * the triples of the call are no data, so a triple pattern matching the node, which a pattern would match against
+     * those triples (another parameter of the call, say), would match none of them. Elsewhere the variable is a
+     * variable a pattern binds: the expressions, the inline data, the projections and the solution modifiers, which the
+     * clients replacing the blank nodes of a pattern by variables (Virtuoso forwarding the pattern of a SERVICE call)
+     * project, and the parameters and results of other calls may refer to it. A variable of another scope, like one
+     * that a sub-select does not project, is another variable. The blank nodes are checked when the calls are assembled
+     * (see {@link GraphPatternVisitor#assembleProcedureCalls}), as their labels cannot occur in another basic graph
+     * pattern.
      *
      * @param select the select of the query
      */
@@ -538,21 +543,34 @@ public class QueryVisitor extends BaseVisitor<Query>
         new ElementVisitor<Void>()
         {
             @Override
-            public Void visit(Select select)
+            public Void visit(Triple triple)
             {
-                return aggregateResult(visitElement(select.getPattern()), visitElement(select.getValues()));
+                check(triple.getSubject());
+                check(triple.getPredicate());
+                check(triple.getObject());
+
+                return null;
             }
 
 
-            @Override
-            public Void visit(VariableNode variable)
+            /**
+             * Reports the node when it is a variable standing for parameters or results, and such variables among the
+             * components of a triple term.
+             *
+             * @param node a subject, a predicate or an object of a triple pattern or of a triple term
+             */
+            private void check(Object node)
             {
-                MessageType type = nodes.get(variable);
-
-                if(type != null)
+                if(node instanceof VariableNode variable && nodes.get(variable) instanceof MessageType type)
+                {
                     messages.add(new TranslateMessage(type, variable.getRange(), variable.getName()));
-
-                return null;
+                }
+                else if(node instanceof TripleTermNode term)
+                {
+                    check(term.getSubject());
+                    check(term.getPredicate());
+                    check(term.getObject());
+                }
             }
         }.visitElement(select);
     }

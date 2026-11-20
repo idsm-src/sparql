@@ -78,12 +78,14 @@ public enum MessageType
     reuseOfResultNode(ERROR, "Result node of the procedure '%s' is already used."),
 
     /**
-     * A variable serving as the parameter node of a procedure call occurs elsewhere as well.
+     * A variable serving as the parameter node of a procedure call occurs in a triple pattern as well, which the
+     * triples of the call are no data of.
      */
     invalidParameterVariableOccurence(ERROR, "Variable '%s' is already used as a procedure parameter node."),
 
     /**
-     * A variable serving as the result node of a procedure call occurs elsewhere as well.
+     * A variable serving as the result node of a procedure call occurs in a triple pattern as well, which the triples
+     * of the call are no data of.
      */
     invalidResultVariableOccurence(ERROR, "Variable '%s' is already used as a procedure result node."),
 

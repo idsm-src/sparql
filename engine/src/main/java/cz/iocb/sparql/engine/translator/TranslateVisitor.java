@@ -1794,7 +1794,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      * values of omitted parameters; a call that takes no parameter value from {@code context} is evaluated once and
      * joined with it, because the database would otherwise run the function again for every solution. Inside an EXISTS
      * pattern, a parameter the context does not bind takes its value in the current solution the pattern is evaluated
-     * for (see {@link #getOuterVariable}).
+     * for (see {@link #getOuterVariable}). The nodes standing for the parameters and the results are bound to blank
+     * nodes of the call (see {@link #bindNode}).
      *
      * @param procedureCallBase the procedure call
      * @param context solutions the call is evaluated for
@@ -1906,8 +1907,15 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
 
+        /* bind the nodes standing for the parameters and the results */
+
+        Variable parameterNode = bindNode(procedureCallBase.getParameterNode(), used, conditions);
+        Variable resultNode = procedureCallBase instanceof MultiProcedureCall call ?
+                bindNode(call.getResultNode(), used, conditions) : null;
+
+
         SqlIntercode intercode = SqlProcedureCall.create(request, procedureDefinition, parameterNodes, resultNodes,
-                context);
+                parameterNode, resultNode, context);
 
         for(Entry<VariableNode, Node> entry : conditions.entrySet())
         {
@@ -1935,6 +1943,37 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
         return intercode;
+    }
+
+
+    /**
+     * The variable a procedure call binds to the node standing for its parameters or its results (see
+     * {@link SqlProcedureCall}): the variable or the blank node written in its place, or a fresh variable merged with
+     * it afterwards when the context or the results bind it already, as a result is.
+     *
+     * @param node the node standing for the parameters or the results, or null
+     * @param used the variables the context and the results of the call bind so far, extended by the returned one
+     * @param conditions fresh variables to merge with the nodes written in their place, extended by the returned one
+     *            when it is fresh
+     * @return the variable the call binds to the node, or null for no node
+     */
+    private Variable bindNode(Node node, Set<Variable> used, LinkedHashMap<VariableNode, Node> conditions)
+    {
+        if(!(node instanceof VariableOrBlankNode variable))
+            return null;
+
+        VariableOrBlankNode bound = variable;
+
+        if(used.contains(getVariable(variable)))
+        {
+            VariableNode fresh = createVariableNode(variablePrefix);
+            conditions.put(fresh, node);
+            bound = fresh;
+        }
+
+        used.add(getVariable(bound));
+
+        return getVariable(bound);
     }
 
 

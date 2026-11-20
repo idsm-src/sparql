@@ -17,7 +17,7 @@ import cz.iocb.sparql.engine.request.Request;
  * Resource class of blank nodes with a string value; their result class is {@link BuiltinClasses#strBlankNode}.
  */
 public sealed abstract class StrBlankNodeClass extends BlankNodeClass
-        permits StrBlankNodeCompositeClass, StrBlankNodeInSegmentClass, StrBlankNodeScalarClass
+        permits StrBlankNodeCompositeClass, StrBlankNodeInSegmentClass, StrBlankNodeScalarClass, ProcedureNodeClass
 {
     /**
      * Creates the class with its name, column types and superclasses.

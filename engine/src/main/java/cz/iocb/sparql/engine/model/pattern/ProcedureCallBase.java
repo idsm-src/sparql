@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import cz.iocb.sparql.engine.model.IriNode;
+import cz.iocb.sparql.engine.model.VariableNode;
 import cz.iocb.sparql.engine.model.base.BaseElement;
 import cz.iocb.sparql.engine.model.triple.Node;
 import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
@@ -90,7 +91,7 @@ public abstract class ProcedureCallBase extends PatternElement implements BasicP
 
 
     /**
-     * Creates the call.
+     * Creates the call; a variable standing for the parameters becomes in scope.
      *
      * @param procedure IRI of the procedure
      * @param parameters the parameters
@@ -101,6 +102,9 @@ public abstract class ProcedureCallBase extends PatternElement implements BasicP
         this.procedure = procedure;
         this.parameters = Collections.unmodifiableList(new ArrayList<>(parameters));
         this.parameterNode = parameterNode;
+
+        if(parameterNode instanceof VariableNode variable)
+            variablesInScope.add(variable);
     }
 
 
@@ -128,8 +132,9 @@ public abstract class ProcedureCallBase extends PatternElement implements BasicP
 
     /**
      * Node standing for the parameters in the text of the call: the object of the triple naming the procedure, a blank
-     * node or a variable that is the subject of the triples of the parameters. It is syntax only, so the call binds no
-     * such variable, and no visitor visits the node as a child of the call.
+     * node or a variable that is the subject of the triples of the parameters. The call binds it to a blank node of the
+     * call, as a pattern of triples would bind it, but no visitor visits the node as a child of the call, as it is no
+     * value of the call.
      *
      * @return node standing for the parameters in the text of the call, or null if the call has none
      */

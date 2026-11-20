@@ -927,6 +927,34 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
 
     /**
+     * SQL types of the columns holding a value as an extension function or a procedure takes it (see
+     * {@link #getValue}): those of the class, except the single {@code varchar} of the class of the string literals.
+     *
+     * @param resClass the class the value is taken in
+     * @return SQL types of the columns holding a value as an extension function or a procedure takes it
+     */
+    public static List<SqlType> getValueTypes(ResourceClass resClass)
+    {
+        return resClass.equals(stringLiteral) ? List.of(SqlType.VARCHAR) : resClass.getSqlTypes();
+    }
+
+
+    /**
+     * True if a column holding a value as an extension function or a procedure takes it (see {@link #getValue}) may be
+     * NULL while the value is given, as an optional column of the class may (see
+     * {@link ResourceClass#isOptionalColumn}); the single column of the class of the string literals may not.
+     *
+     * @param resClass the class the value is taken in
+     * @param index position of the column
+     * @return true if the column may be NULL while the value is given, false otherwise
+     */
+    public static boolean isOptionalValueColumn(ResourceClass resClass, int index)
+    {
+        return !resClass.equals(stringLiteral) && resClass.isOptionalColumn(index);
+    }
+
+
+    /**
      * Column of the date-time class of one timezone offset holding the value of the expression adjusted to the offset,
      * as {@code fn:adjust-dateTime-to-timezone} of XPath adjusts it: a date-time of an offset keeps its instant, and
      * one without an offset gets the offset, keeping its local time; for the class of the date-times without an offset,

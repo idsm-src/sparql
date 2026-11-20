@@ -34,7 +34,7 @@ public class MultiProcedureCall extends ProcedureCallBase
 
 
     /**
-     * Creates the call; variables among the results and parameters become in scope.
+     * Creates the call; variables among the results and parameters and the variables standing for them become in scope.
      *
      * @param results the named results
      * @param procedure IRI of the procedure
@@ -48,6 +48,9 @@ public class MultiProcedureCall extends ProcedureCallBase
         super(procedure, parameters, parameterNode);
         this.results = Collections.unmodifiableList(new ArrayList<>(results));
         this.resultNode = resultNode;
+
+        if(resultNode instanceof VariableNode variable)
+            variablesInScope.add(variable);
 
         for(Parameter result : results)
             if(result.getValue() instanceof VariableNode variable)
@@ -72,8 +75,9 @@ public class MultiProcedureCall extends ProcedureCallBase
 
     /**
      * Node standing for the results in the text of the call: the subject of the triple naming the procedure, a blank
-     * node or a variable that is the subject of the triples of the results. It is syntax only, so the call binds no
-     * such variable, and no visitor visits the node as a child of the call.
+     * node or a variable that is the subject of the triples of the results. The call binds it to a blank node of the
+     * row of results, as a pattern of triples would bind it, but no visitor visits the node as a child of the call, as
+     * it is no value of the call.
      *
      * @return node standing for the results in the text of the call, or null if the call has none
      */

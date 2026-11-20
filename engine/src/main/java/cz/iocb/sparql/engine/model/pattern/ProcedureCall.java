@@ -26,7 +26,8 @@ public class ProcedureCall extends ProcedureCallBase
 
 
     /**
-     * Creates the call; a variable result and variables among the parameters become in scope.
+     * Creates the call; a variable result, variables among the parameters and the variable standing for them become in
+     * scope.
      *
      * @param result node receiving the result
      * @param procedure IRI of the procedure

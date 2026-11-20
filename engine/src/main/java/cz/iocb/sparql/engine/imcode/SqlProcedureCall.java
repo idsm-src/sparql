@@ -1,6 +1,9 @@
 package cz.iocb.sparql.engine.imcode;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.getAcceptedClass;
+import static cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.getValueTypes;
+import static cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.isOptionalValueColumn;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.intersect;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
@@ -13,6 +16,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.CommonTable;
 import cz.iocb.sparql.engine.database.ConstantColumn;
@@ -21,11 +26,14 @@ import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.TableColumn;
+import cz.iocb.sparql.engine.database.ValueColumn;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
+import cz.iocb.sparql.engine.mapping.classes.ProcedureNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.extension.ParameterDefinition;
 import cz.iocb.sparql.engine.mapping.extension.ProcedureDefinition;
@@ -43,18 +51,25 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * Call of a procedure (a set-returning SQL function) for every solution of the child: the parameters are expressions
  * over the child's variables, the results are bound to fresh variables, as the translator renames a result variable
  * that the child binds already and merges it with the result (see {@link SqlMerge}), so the node makes no join
- * condition. The nodes standing for the parameters and the results in the text of the call bind nothing, and the parser
- * refuses their other occurrences. The function takes the values of the parameters in the columns of their declared
- * classes (see {@link ParameterDefinition}), so a literal of the datatype of a canonical declared class supplies its
- * value in every valid lexical form, a numeric declared class takes the value of every numeric XPath substitutes or
- * promotes to its datatype and the class of the string literals takes the string of a string literal of any kind (see
- * {@link SqlExpressionIntercode#getValue}), and a parameter supplying no value of its class gives no solution. A call
- * of a deterministic procedure (see {@link ProcedureDefinition#setDeterministic}) over the empty solution, which takes
- * nothing from any context, is evaluated by a common table expression (see {@link Request#getCommonTableExpression}),
- * so that the statement evaluates it once even when it occurs several times, e.g. in every branch of a union a join
- * above it was distributed over, or in the pattern of an EXISTS evaluated for every current solution; PostgreSQL folds
- * a common table expression referenced once into the query unless the function is volatile. A call whose parameter
- * takes a value of a current solution, that of an EXISTS pattern or of the left side of a lateral join (see
+ * condition. The variables written in place of the nodes standing for the parameters and the results in the text of the
+ * call are bound as a pattern of triples would bind them, to blank nodes held by columns (see
+ * {@link ProcedureNodeClass}), each procedure having a class of the nodes of its parameters and one of the nodes of its
+ * rows of results (see {@link #getNodeClasses}): the node of the parameters is held by the values the call passes to
+ * the parameters, so it is the same for every call of the procedure passing the same values, and all results of a call
+ * share it; the node of the results of a call with several results is held by those values and the text of the row of
+ * results the function returns. The constant values hold the nodes as they are, the others are read from the call (see
+ * {@link #translateCall}), and a node the parent does not need is not bound. The function takes the values of the
+ * parameters in the columns of their declared classes (see {@link ParameterDefinition}), so a literal of the datatype
+ * of a canonical declared class supplies its value in every valid lexical form, a numeric declared class takes the
+ * value of every numeric XPath substitutes or promotes to its datatype and the class of the string literals takes the
+ * string of a string literal of any kind (see {@link SqlExpressionIntercode#getValue}), and a parameter supplying no
+ * value of its class gives no solution. A call of a deterministic procedure (see
+ * {@link ProcedureDefinition#setDeterministic}) over the empty solution, which takes nothing from any context, is
+ * evaluated by a common table expression (see {@link Request#getCommonTableExpression}), so that the statement
+ * evaluates it once even when it occurs several times, e.g. in every branch of a union a join above it was distributed
+ * over, or in the pattern of an EXISTS evaluated for every current solution; PostgreSQL folds a common table expression
+ * referenced once into the query unless the function is volatile. A call whose parameter takes a value of a current
+ * solution, that of an EXISTS pattern or of the left side of a lateral join (see
  * {@link Scope#refersToCurrentSolution}), stays in its place, where the value is known. A result is bound to the
  * classes the parent accepts a value of only, and a specialiser of the procedure may adapt the call to them (see
  * {@link ProcedureDefinition#setSpecializer}).
@@ -65,6 +80,39 @@ public final class SqlProcedureCall extends SqlIntercode
      * Alias of the function result in the generated SQL.
      */
     private static final Variable resultVar = new Variable("@res");
+
+    /**
+     * Prefix of the aliases of the values the call passes to the parameters in the generated SQL, which a node standing
+     * for the parameters or the results reads (see {@link #getNodeColumns}).
+     */
+    private static final String parameterAlias = "@par";
+
+    /**
+     * Classes of the nodes standing for the parameters and the results of the calls of each procedure (see
+     * {@link #getNodeClasses}), made on the first call of the procedure; the procedures are held weakly, and the
+     * classes do not refer to them.
+     */
+    private static final Map<ProcedureDefinition, NodeClasses> nodeClasses = Collections
+            .synchronizedMap(new WeakHashMap<>());
+
+    /**
+     * The segment of the next class of nodes of procedure calls: the segments follow the reserved segment of the blank
+     * nodes of BNODE() upwards (see {@link cz.iocb.sparql.engine.mapping.classes.BuiltinClasses#bnodeStrBlankNode}),
+     * whereas the blank nodes of the SERVICE calls of a request take the segments below zero downwards.
+     */
+    private static final AtomicInteger nextSegment = new AtomicInteger(Integer.MIN_VALUE + 1);
+
+
+    /**
+     * Classes of the nodes standing for the parameters and the results of the calls of a procedure.
+     *
+     * @param parameters class of the nodes standing for the parameters, held by the values passed to them
+     * @param results class of the nodes standing for the rows of results, held by the values passed to the parameters
+     *            and the text of the row
+     */
+    private record NodeClasses(ProcedureNodeClass parameters, ProcedureNodeClass results)
+    {
+    }
 
     /**
      * Solutions the procedure is called for.
@@ -85,6 +133,17 @@ public final class SqlProcedureCall extends SqlIntercode
      * Variable receiving each result.
      */
     private final LinkedHashMap<ResultDefinition, Variable> results;
+
+    /**
+     * Variable receiving the node standing for the parameters, or null when the parent does not need it.
+     */
+    private final Variable parameterNode;
+
+    /**
+     * Variable receiving the node standing for the results, or null when the call has none or the parent does not need
+     * it.
+     */
+    private final Variable resultNode;
 
     /**
      * For each output column, the column of the call or the child it is taken from.
@@ -110,6 +169,8 @@ public final class SqlProcedureCall extends SqlIntercode
      * @param procedure the procedure definition
      * @param parameters expression of each parameter
      * @param results variable receiving each result
+     * @param parameterNode variable receiving the node standing for the parameters, or null
+     * @param resultNode variable receiving the node standing for the results, or null
      * @param child the child node
      * @param columnMap the column map
      * @param resultClasses classes the call binds each result in
@@ -117,8 +178,9 @@ public final class SqlProcedureCall extends SqlIntercode
      */
     protected SqlProcedureCall(VariableBindings bindings, ProcedureDefinition procedure,
             LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameters,
-            LinkedHashMap<ResultDefinition, Variable> results, SqlIntercode child, Map<Column, Column> columnMap,
-            Map<ResultDefinition, Set<ResourceClass>> resultClasses, ProcedureSpecialization specialization)
+            LinkedHashMap<ResultDefinition, Variable> results, Variable parameterNode, Variable resultNode,
+            SqlIntercode child, Map<Column, Column> columnMap, Map<ResultDefinition, Set<ResourceClass>> resultClasses,
+            ProcedureSpecialization specialization)
     {
         super(bindings, child.isDeterministic() && procedure.isDeterministic());
 
@@ -126,6 +188,8 @@ public final class SqlProcedureCall extends SqlIntercode
         this.procedure = procedure;
         this.parameters = parameters;
         this.results = results;
+        this.parameterNode = parameterNode;
+        this.resultNode = resultNode;
         this.columnMap = columnMap;
         this.resultClasses = resultClasses;
         this.specialization = specialization;
@@ -139,14 +203,17 @@ public final class SqlProcedureCall extends SqlIntercode
      * @param procedure the procedure definition
      * @param parameters expression of each parameter
      * @param results variable receiving each result
+     * @param parameterNode variable receiving the node standing for the parameters, or null
+     * @param resultNode variable receiving the node standing for the results, or null
      * @param child the child node
      * @return procedure call over the child's solutions
      */
     public static SqlIntercode create(Request request, ProcedureDefinition procedure,
             LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameters,
-            LinkedHashMap<ResultDefinition, Variable> results, SqlIntercode child)
+            LinkedHashMap<ResultDefinition, Variable> results, Variable parameterNode, Variable resultNode,
+            SqlIntercode child)
     {
-        return create(request, procedure, parameters, results, child, null, null);
+        return create(request, procedure, parameters, results, parameterNode, resultNode, child, null, null);
     }
 
 
@@ -157,20 +224,27 @@ public final class SqlProcedureCall extends SqlIntercode
      * @param procedure the procedure definition
      * @param parameters expression of each parameter
      * @param results variable receiving each result
+     * @param parameterNode variable receiving the node standing for the parameters, or null
+     * @param resultNode variable receiving the node standing for the results, or null
      * @param child the child node
      * @param restrictions what the parent needs of the variables
      * @param boundClasses classes the call binds each result in so far, narrowed further to those the parent accepts a
      *            value of; null for all the classes of the definitions
      * @return procedure call over the child, joined with it on the variables used as parameters and results, or no
-     *         solutions when a variable is used as parameters of disjoint classes or the parent accepts a result in no
-     *         class
+     *         solutions when a variable is used as parameters of disjoint classes or the parent accepts a result or a
+     *         node in no class
      */
     protected static SqlIntercode create(Request request, ProcedureDefinition procedure,
             LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameters,
-            LinkedHashMap<ResultDefinition, Variable> results, SqlIntercode child, Restrictions restrictions,
-            Map<ResultDefinition, Set<ResourceClass>> boundClasses)
+            LinkedHashMap<ResultDefinition, Variable> results, Variable parameterNode, Variable resultNode,
+            SqlIntercode child, Restrictions restrictions, Map<ResultDefinition, Set<ResourceClass>> boundClasses)
     {
         ClassRelations relations = request.getConfiguration();
+        NodeClasses nodeClasses = getNodeClasses(procedure);
+
+        if(!isAccepted(relations, restrictions, parameterNode, nodeClasses.parameters())
+                || !isAccepted(relations, restrictions, resultNode, nodeClasses.results()))
+            return SqlNoSolution.get();
 
         Map<Variable, Set<ResourceClass>> resClasses = new HashMap<>();
 
@@ -241,13 +315,139 @@ public final class SqlProcedureCall extends SqlIntercode
             callBindings.add(new VariableBinding(entry.getValue(), mappings, false));
         }
 
+        addNodeBindings(relations, callBindings, procedure, parameters, parameterNode, resultNode);
+
 
         Map<Column, Column> columnMap = new HashMap<>();
         VariableBindings bindings = getJoinVariableBindings(request, callBindings, child.getVariableBindings(), null,
                 null, null, columnMap).restrict(relations, restrictions);
 
-        return new SqlProcedureCall(bindings, procedure, parameters, results, child, columnMap, resultClasses,
-                specialization);
+        return new SqlProcedureCall(bindings, procedure, parameters, results, parameterNode, resultNode, child,
+                columnMap, resultClasses, specialization);
+    }
+
+
+    /**
+     * True if the parent accepts a value of the class of a node the call binds to the variable: the call binds the
+     * variable always, so a value the parent accepts in no class leaves no solution.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param restrictions what the parent needs of the variables, or null
+     * @param variable the variable receiving the node, or null
+     * @param resClass the class of the node
+     * @return true if the parent accepts a value of the class of the node, or no variable receives it, false otherwise
+     */
+    private static boolean isAccepted(ClassRelations relations, Restrictions restrictions, Variable variable,
+            ResourceClass resClass)
+    {
+        Set<ResourceClass> accepted = variable == null || restrictions == null ? null :
+                restrictions.getAcceptedClasses(variable);
+
+        return accepted == null || accepted.stream().anyMatch(a -> !ResourceClass.areDisjunct(relations, a, resClass));
+    }
+
+
+    /**
+     * Classes of the nodes standing for the parameters and the results of the calls of the procedure, made on its first
+     * call, when it is defined: the node of the parameters is held by the columns of the values passed to the
+     * parameters, in the order of their definitions, as the call passes them (see
+     * {@link SqlExpressionIntercode#getValueTypes}), or by the empty string for a procedure without parameters, and the
+     * node of the results by those columns and the text of the row of results. Each class takes a segment of its own.
+     *
+     * @param procedure the procedure definition
+     * @return classes of the nodes standing for the parameters and the results of the calls of the procedure
+     */
+    private static NodeClasses getNodeClasses(ProcedureDefinition procedure)
+    {
+        return nodeClasses.computeIfAbsent(procedure, _ -> {
+            List<SqlType> types = new ArrayList<>();
+            List<Boolean> optional = new ArrayList<>();
+
+            for(ParameterDefinition parameter : procedure.getParameters())
+            {
+                List<SqlType> valueTypes = getValueTypes(parameter.getParameterClass());
+
+                for(int i = 0; i < valueTypes.size(); i++)
+                {
+                    types.add(valueTypes.get(i));
+                    optional.add(isOptionalValueColumn(parameter.getParameterClass(), i));
+                }
+            }
+
+            if(types.isEmpty())
+            {
+                types.add(VARCHAR);
+                optional.add(false);
+            }
+
+            ProcedureNodeClass parameters = new ProcedureNodeClass(nextSegment.getAndIncrement(), types, optional);
+
+            types.add(VARCHAR);
+            optional.add(false);
+
+            return new NodeClasses(parameters, new ProcedureNodeClass(nextSegment.getAndIncrement(), types, optional));
+        });
+    }
+
+
+    /**
+     * Columns holding the node standing for the parameters of a call: the columns of the values passed to the
+     * parameters, a constant as it is and any other column read by its alias from the call (see
+     * {@link #translateCall}), or the empty string for a procedure without parameters.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param parameters expression of each parameter
+     * @return columns holding the node standing for the parameters of the call
+     */
+    private static List<Column> getNodeColumns(ClassRelations relations,
+            LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameters)
+    {
+        List<Column> columns = new ArrayList<>();
+
+        for(Entry<ParameterDefinition, SqlExpressionIntercode> entry : parameters.entrySet())
+            for(Column column : entry.getValue().getValue(relations, entry.getKey().getParameterClass()))
+                columns.add(column instanceof ConstantColumn ? column : new ExpressionColumn(
+                        SqlCode.of("\"" + parameterAlias + columns.size() + "\""), column.getType()));
+
+        if(columns.isEmpty())
+            columns.add(new ValueColumn("", VARCHAR));
+
+        return columns;
+    }
+
+
+    /**
+     * Adds the bindings of the variables receiving the nodes standing for the parameters and the results (see
+     * {@link #getNodeColumns}); the text of the row of results holding the node of the results is read from the result
+     * of the function.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param bindings the bindings of the call
+     * @param procedure the procedure definition
+     * @param parameters expression of each parameter
+     * @param parameterNode variable receiving the node standing for the parameters, or null
+     * @param resultNode variable receiving the node standing for the results, or null
+     */
+    private static void addNodeBindings(ClassRelations relations, VariableBindings bindings,
+            ProcedureDefinition procedure, LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameters,
+            Variable parameterNode, Variable resultNode)
+    {
+        if(parameterNode == null && resultNode == null)
+            return;
+
+        NodeClasses classes = getNodeClasses(procedure);
+        List<Column> columns = getNodeColumns(relations, parameters);
+
+        if(parameterNode != null)
+            bindings.add(new VariableBinding(parameterNode, classes.parameters(), columns, false));
+
+        if(resultNode != null)
+        {
+            List<Column> row = new ArrayList<>(columns);
+            row.add(new ExpressionColumn(SqlCode.of("quote_nullable(\"", resultVar, "\")"), VARCHAR));
+
+            bindings.add(new VariableBinding(resultNode, classes.results(), row, false));
+        }
     }
 
 
@@ -264,6 +464,11 @@ public final class SqlProcedureCall extends SqlIntercode
         for(Entry<ResultDefinition, Variable> result : results.entrySet())
             if(restrictions.containsVar(result.getValue()))
                 optResults.put(result.getKey(), result.getValue());
+
+        // a node the parent does not need is not computed
+        Variable optParameterNode = parameterNode != null && restrictions.containsVar(parameterNode) ? parameterNode :
+                null;
+        Variable optResultNode = resultNode != null && restrictions.containsVar(resultNode) ? resultNode : null;
 
 
         Restrictions childRestrictions = new Restrictions(restrictions);
@@ -286,7 +491,8 @@ public final class SqlProcedureCall extends SqlIntercode
             {
                 LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> childParams = optimize(request, scope,
                         optParameters, child);
-                childs.add(create(request, procedure, childParams, optResults, child, restrictions, resultClasses));
+                childs.add(create(request, procedure, childParams, optResults, optParameterNode, optResultNode, child,
+                        restrictions, resultClasses));
             }
 
             return SqlUnion.union(request, childs).optimize(request, scope, restrictions, reduced, evalServices);
@@ -343,6 +549,8 @@ public final class SqlProcedureCall extends SqlIntercode
             callBindings.add(new VariableBinding(entry.getValue(), mappings, false));
         }
 
+        addNodeBindings(relations, callBindings, procedure, optParameters, optParameterNode, optResultNode);
+
         for(SqlIntercode r : getJoinList(optChild))
         {
             List<VariableBindingPair> pairs = VariableBindingPair.getPairs(relations, callBindings,
@@ -358,11 +566,13 @@ public final class SqlProcedureCall extends SqlIntercode
                 e -> getResultClasses(relations, e.getKey(), e.getValue(), restrictions, resultClasses.get(e.getKey()))
                         .equals(resultClasses.get(e.getKey())));
 
-        if(sameClasses && optResults.equals(results) && optParameters.equals(parameters) && optChild == child
+        if(sameClasses && optResults.equals(results) && Objects.equals(optParameterNode, parameterNode)
+                && Objects.equals(optResultNode, resultNode) && optParameters.equals(parameters) && optChild == child
                 && restrictions.isOptimized(relations, bindings))
             return this;
 
-        return create(request, procedure, optParameters, optResults, optChild, restrictions, resultClasses);
+        return create(request, procedure, optParameters, optResults, optParameterNode, optResultNode, optChild,
+                restrictions, resultClasses);
     }
 
 
@@ -441,6 +651,9 @@ public final class SqlProcedureCall extends SqlIntercode
 
         List<SqlCode> declared = new ArrayList<>();
 
+        // the values a node standing for the parameters or the results reads by their aliases (see getNodeColumns)
+        List<SqlCode> read = new ArrayList<>();
+
         // a value that the class of its parameter does not hold, missing in the value column, gives no solution, whether
         // the function is strict or not
         List<SqlCode> tested = new ArrayList<>();
@@ -455,7 +668,13 @@ public final class SqlProcedureCall extends SqlIntercode
             List<Column> columns = node.getValue(relations, resClass);
 
             for(Column column : columns)
+            {
+                if(!(column instanceof ConstantColumn))
+                    read.add(SqlCode.of(columnMap.getOrDefault(column, column),
+                            " AS \"" + parameterAlias + declared.size() + "\""));
+
                 declared.add(columnMap.getOrDefault(column, column).getCode());
+            }
 
             Column value = columnMap.getOrDefault(columns.get(0), columns.get(0));
 
@@ -476,6 +695,12 @@ public final class SqlProcedureCall extends SqlIntercode
         builder.append(" AS \"");
         builder.append(resultVar);
         builder.append('"');
+
+        // a node standing for the parameters or the results is held by the values passed to the parameters as declared,
+        // whatever the specialisation of the call is
+        if(parameterNode != null || resultNode != null)
+            for(SqlCode value : read)
+                builder.append(", ").append(value);
 
         for(Column column : child.getVariableBindings()
                 .restrict(relations, new Restrictions(this.getVariableBindings().getVariables()))
@@ -630,6 +855,18 @@ public final class SqlProcedureCall extends SqlIntercode
             e.getValue().generateExplanation(builder, null);
         }
 
+        if(parameterNode != null)
+        {
+            indentInfo(builder, indent, true);
+            builder.append("#parameters to ").append(parameterNode);
+        }
+
+        if(resultNode != null)
+        {
+            indentInfo(builder, indent, true);
+            builder.append("#results to ").append(resultNode);
+        }
+
         indentChild(builder, indent, true);
         child.generateExplanation(builder, getIndent(indent, true));
     }
@@ -656,6 +893,12 @@ public final class SqlProcedureCall extends SqlIntercode
         if(!Objects.equals(results, imcode.results))
             return false;
 
+        if(!Objects.equals(parameterNode, imcode.parameterNode))
+            return false;
+
+        if(!Objects.equals(resultNode, imcode.resultNode))
+            return false;
+
         if(!Objects.equals(child, imcode.child))
             return false;
 
@@ -669,6 +912,6 @@ public final class SqlProcedureCall extends SqlIntercode
     @Override
     protected int getHashCode()
     {
-        return Objects.hash(procedure, parameters, results, child, resultClasses);
+        return Objects.hash(procedure, parameters, results, parameterNode, resultNode, child, resultClasses);
     }
 }
