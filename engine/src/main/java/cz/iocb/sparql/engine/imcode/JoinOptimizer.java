@@ -14,6 +14,7 @@ import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.TableStatistics;
@@ -59,9 +60,11 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * calibrated on the NeXtProt queries over a single table of triples. A filter above the join counts as well (see
  * {@link SqlIntercode.Restrictions#getFilterConditions}), because the database evaluates a condition as soon as the
  * variables deciding it are bound: a condition that one variable decides alone reduces the child the join takes the
- * variable from, and a condition requiring two variables taken from two children to be equal reduces every join that
- * holds both children, as a variable shared by them would; where it holds only for the same term, the children are
- * joined on it like on such a variable, by hashing or by an index lookup (see {@link Equality}).
+ * variable from (the rows it drops are read all the same when the child is scanned, unless an index serves the
+ * condition, so they are the cost of the scan, which a lookup of the child spares; see {@link #isServedByIndex}), and a
+ * condition requiring two variables taken from two children to be equal reduces every join that holds both children, as
+ * a variable shared by them would; where it holds only for the same term, the children are joined on it like on such a
+ * variable, by hashing or by an index lookup (see {@link Equality}).
  *
  * The sides of an OPTIONAL keep their order, so only the method of their join is chosen (see {@link #planLeftJoin}):
  * the right side is evaluated once and the sides are hashed, or the right side is evaluated for every solution of the
@@ -385,14 +388,17 @@ final class JoinOptimizer
      * What the filters above a join leave of the solutions of its children (see {@link #plan}).
      *
      * @param kept the fraction of its solutions each child gives the joins
+     * @param read the fraction of its solutions the database reads of each child it scans: what is kept by the
+     *            conditions of the child that an index of its table serves (see {@link #isServedByIndex}), the others
+     *            being evaluated on the rows read
      * @param values per child, the fraction of its values that each variable keeps in the solutions the child gives the
      *            joins, by the conditions the variable decides alone; no entry for a variable keeping all its values
      * @param equated the pairs of variables that the conditions require to be equal and that the join takes from two
      *            children
      * @param equalities those of the pairs that the children are joined on (see {@link Equality})
      */
-    private record Filtering(double[] kept, List<Map<Variable, Double>> values, List<List<Variable>> equated,
-            List<Equality> equalities)
+    private record Filtering(double[] kept, double[] read, List<Map<Variable, Double>> values,
+            List<List<Variable>> equated, List<Equality> equalities)
     {
         /**
          * The filtering by no condition.
@@ -405,7 +411,7 @@ final class JoinOptimizer
             double[] kept = new double[n];
             Arrays.fill(kept, 1);
 
-            return new Filtering(kept, Collections.nCopies(n, Map.of()), List.of(), List.of());
+            return new Filtering(kept, kept, Collections.nCopies(n, Map.of()), List.of(), List.of());
         }
     }
 
@@ -444,15 +450,17 @@ final class JoinOptimizer
      * (see {@link #getFilters}). The database evaluates such a condition as soon as the variables deciding it are
      * bound. A condition that one variable decides alone is evaluated before the joins: the child the join takes the
      * variable from gives the joins only the fraction of its solutions the conditions are estimated to keep (see
-     * {@link #selectivity(Request, SqlIntercode, List)}). A condition requiring two variables to be equal (see
-     * {@link #getEquated}) that the join takes from two children is evaluated where the second of them is joined, so
-     * every join holding both has only the fraction of its solutions the condition is estimated to keep (see
-     * {@link #equalitySelectivity}); when a child binds both variables, how many of its solutions hold the same value
-     * twice is not known, so the condition does not count. Such a condition that holds only for the same term joins the
-     * two children as well (see {@link #getEquality}). The tree is chosen for the children and the joins so reduced;
-     * the estimated rows of the plan are those of the join itself, as the filters are no part of it. When the join is
-     * evaluated for the rows of an outer table one by one, the tree is chosen for the children as they are evaluated
-     * for one of the rows (see {@link #estimateForRow}).
+     * {@link #selectivity(Request, SqlIntercode, List)}). The database still reads the solutions such a condition
+     * drops, unless an index of the table of the child serves the condition (see {@link #isServedByIndex}), so a child
+     * that is scanned costs the rows it reads, whereas one looked up for the rows of the others is read only where they
+     * need it. A condition requiring two variables to be equal (see {@link #getEquated}) that the join takes from two
+     * children is evaluated where the second of them is joined, so every join holding both has only the fraction of its
+     * solutions the condition is estimated to keep (see {@link #equalitySelectivity}); when a child binds both
+     * variables, how many of its solutions hold the same value twice is not known, so the condition does not count.
+     * Such a condition that holds only for the same term joins the two children as well (see {@link #getEquality}). The
+     * tree is chosen for the children and the joins so reduced; the estimated rows of the plan are those of the join
+     * itself, as the filters are no part of it. When the join is evaluated for the rows of an outer table one by one,
+     * the tree is chosen for the children as they are evaluated for one of the rows (see {@link #estimateForRow}).
      *
      * @param request the current request
      * @param childs the children
@@ -509,6 +517,9 @@ final class JoinOptimizer
         double[] kept = new double[n];
         Arrays.fill(kept, 1);
 
+        double[] read = new double[n];
+        Arrays.fill(read, 1);
+
         List<Map<Variable, Double>> values = new ArrayList<>();
 
         for(int i = 0; i < n; i++)
@@ -521,6 +532,15 @@ final class JoinOptimizer
 
             kept[index] = selectivity(request, child, entry.getValue());
 
+            // a scan of the child reads also the rows dropped by the conditions that no index serves
+            List<SqlExpressionIntercode> served = entry.getValue().stream()
+                    .filter(c -> isServedByIndex(request, child, c, filters.get(c).iterator().next())).toList();
+
+            if(served.size() == entry.getValue().size())
+                read[index] = kept[index];
+            else if(!served.isEmpty())
+                read[index] = selectivity(request, child, served);
+
             // a condition that a variable decides alone keeps a fraction of the values of the variable
             Map<Variable, List<SqlExpressionIntercode>> alone = new HashMap<>();
 
@@ -532,7 +552,7 @@ final class JoinOptimizer
                         kept[index] : selectivity(request, child, single.getValue()));
         }
 
-        Plan plan = plan(request, childs, new Filtering(kept, values, equated, equalities), outer);
+        Plan plan = plan(request, childs, new Filtering(kept, read, values, equated, equalities), outer);
 
         return new Plan(plan.root(), plan(request, childs, Filtering.none(n), outer).rows(), plan.cost(),
                 plan.restricted(), plan.equalities());
@@ -664,6 +684,10 @@ final class JoinOptimizer
 
         double[] rows = new double[n];
 
+        // the rows a scan of a child reads beyond those the child gives the joins: the rows the filters above drop,
+        // unless an index serves the filters
+        double[] dropped = new double[n];
+
         // what a child costs as a leaf of the tree: nothing beyond its rows when the join is evaluated once, its whole
         // evaluation when the join is evaluated for a row, as the child is then evaluated for every row anew
         double[] costs = new double[n];
@@ -675,6 +699,7 @@ final class JoinOptimizer
             double solutions = evaluation == null ? estimateRows(request, childs.get(i)) : evaluation.rows();
 
             rows[i] = Math.max(solutions * filtering.kept()[i], 1);
+            dropped[i] = Math.max(solutions * filtering.read()[i] - rows[i], 0);
             costs[i] = evaluation == null ? 0 : evaluation.cost();
             restricted |= evaluation != null && evaluation.restricted();
         }
@@ -785,8 +810,9 @@ final class JoinOptimizer
 
         Sizes sizes = new Sizes(n, rows, shared, filters);
 
-        Node root = n <= EXHAUSTIVE_LIMIT ? planExhaustively(n, rows, adjacent, hashableAdjacent, lookupable, sizes) :
-                planGreedily(n, rows, hashableAdjacent, lookupable, sizes);
+        Node root = n <= EXHAUSTIVE_LIMIT ?
+                planExhaustively(n, rows, dropped, adjacent, hashableAdjacent, lookupable, sizes) :
+                planGreedily(n, dropped, hashableAdjacent, lookupable, sizes);
 
         return new Plan(root, sizes.get((1 << n) - 1), cost(root, costs, hashableAdjacent, sizes).cost(), restricted,
                 filtering.equalities());
@@ -826,6 +852,41 @@ final class JoinOptimizer
 
         return columns.size() == 1 && columns.iterator().next() instanceof TableColumn column
                 && schema.canLookUp(access.getTable(), column, bound);
+    }
+
+
+    /**
+     * True if an index of the table of the child is taken to serve the condition, which the variable decides alone, so
+     * that a scan of the child reads only the rows the condition keeps: the child is an access to a table that has
+     * taken the terms of the condition into its own conditions (see {@link #isCounted}), or the condition only compares
+     * the variable with constants (see {@link #getComparison}) and the access holds the variable in a column that an
+     * index can be looked up by (see {@link #canLookUp}) and whose type an index compares as the condition does (see
+     * {@link SqlType#isComparedByIndex}). Any other condition, like a call of a function, is evaluated for every row
+     * the child has without it.
+     *
+     * @param request the current request
+     * @param child the child
+     * @param condition the condition
+     * @param variable the variable deciding the condition
+     * @return true if an index of the table of the child is taken to serve the condition, false otherwise
+     */
+    private static boolean isServedByIndex(Request request, SqlIntercode child, SqlExpressionIntercode condition,
+            Variable variable)
+    {
+        if(!(child instanceof SqlTableAccess access) || access.getTable() == null)
+            return false;
+
+        if(isCounted(request, child, condition))
+            return true;
+
+        SqlExpressionIntercode comparison = getComparison(request.getConfiguration(), condition,
+                child.getVariableBindings());
+
+        if(comparison == null || comparison instanceof SqlLiteral || comparison instanceof SqlNull)
+            return false;
+
+        return canLookUp(request, child, variable) && access.getInternalVariableBinding(variable)
+                .getNonConstantColumns().stream().allMatch(c -> c.getType().isComparedByIndex());
     }
 
 
@@ -1019,7 +1080,9 @@ final class JoinOptimizer
 
 
     /**
-     * Cost of joining two subsets of the children by the cheapest method and the node doing it.
+     * Cost of joining two subsets of the children by the cheapest method and the node doing it. The trees of the two
+     * sides cost on top of that, a single child what its scan does; a child that is looked up is not scanned, so the
+     * cost of its lookups is given less the rows that only a scan of it reads.
      *
      * @param left the left subset
      * @param right the right subset
@@ -1028,10 +1091,11 @@ final class JoinOptimizer
      * @param hashableAdjacent the children adjacent to each child through a hashable variable
      * @param lookupable the children whose rows can be the outer rows of an index lookup into each child
      * @param sizes the sizes of the joins
+     * @param dropped the rows a scan of each child reads beyond the rows the child gives the joins
      * @return the cost and the node
      */
     private static Map.Entry<Double, Node> join(int left, int right, Node leftTree, Node rightTree,
-            int[] hashableAdjacent, int[] lookupable, Sizes sizes)
+            int[] hashableAdjacent, int[] lookupable, Sizes sizes, double[] dropped)
     {
         double cost = hashCost(left, right, hashableAdjacent, sizes);
         Node node = new HashJoin(leftTree, rightTree);
@@ -1042,7 +1106,7 @@ final class JoinOptimizer
 
             if((lookupable[child] & left) != 0)
             {
-                double lookup = lookupCost(left, right, sizes);
+                double lookup = lookupCost(left, right, sizes) - dropped[child];
 
                 if(lookup < cost)
                 {
@@ -1144,18 +1208,21 @@ final class JoinOptimizer
 
     /**
      * The cheapest join tree over every subset of the children by dynamic programming: a subset is joined from two
-     * disjoint subsets connected by a shared variable, or from any two when none are connected.
+     * disjoint subsets connected by a shared variable, or from any two when none are connected. A tree costs its joins
+     * (see {@link #join}) and its children: a child costs the rows it gives the joins, which are the same in every
+     * tree, and, when it is scanned, the rows it reads beyond them.
      *
      * @param n number of children
      * @param rows estimated rows of each child
+     * @param dropped the rows a scan of each child reads beyond the rows the child gives the joins
      * @param adjacent the children adjacent to each child through a shared variable
      * @param hashableAdjacent the children adjacent to each child through a hashable variable
      * @param lookupable the children whose rows can be the outer rows of an index lookup into each child
      * @param sizes the sizes of the joins
      * @return the join tree
      */
-    private static Node planExhaustively(int n, double[] rows, int[] adjacent, int[] hashableAdjacent, int[] lookupable,
-            Sizes sizes)
+    private static Node planExhaustively(int n, double[] rows, double[] dropped, int[] adjacent, int[] hashableAdjacent,
+            int[] lookupable, Sizes sizes)
     {
         int full = (1 << n) - 1;
 
@@ -1172,7 +1239,7 @@ final class JoinOptimizer
 
         for(int i = 0; i < n; i++)
         {
-            costs[1 << i] = rows[i];
+            costs[1 << i] = rows[i] + dropped[i];
             trees[1 << i] = new Leaf(i);
         }
 
@@ -1202,7 +1269,7 @@ final class JoinOptimizer
                         continue;
 
                     Map.Entry<Double, Node> candidate = join(left, right, trees[left], trees[right], hashableAdjacent,
-                            lookupable, sizes);
+                            lookupable, sizes, dropped);
 
                     double cost = candidate.getKey() + costs[left] + costs[right];
 
@@ -1228,16 +1295,19 @@ final class JoinOptimizer
 
     /**
      * A left-deep join tree built greedily, the cheapest join of the next child taken at every step, from the start
-     * giving the cheapest tree.
+     * giving the cheapest tree. A step costs the join and, when the child is scanned, the rows the scan reads beyond
+     * those the child gives the joins. The rows the children give do not count here: every tree has them (see
+     * {@link #planExhaustively}), whereas counted in a step they would keep a child of many rows from being joined
+     * early, also where it is looked up for a few rows and so read for those only.
      *
      * @param n number of children
-     * @param rows estimated rows of each child
+     * @param dropped the rows a scan of each child reads beyond the rows the child gives the joins
      * @param hashableAdjacent the children adjacent to each child through a hashable variable
      * @param lookupable the children whose rows can be the outer rows of an index lookup into each child
      * @param sizes the sizes of the joins
      * @return the join tree
      */
-    private static Node planGreedily(int n, double[] rows, int[] hashableAdjacent, int[] lookupable, Sizes sizes)
+    private static Node planGreedily(int n, double[] dropped, int[] hashableAdjacent, int[] lookupable, Sizes sizes)
     {
         int full = (1 << n) - 1;
 
@@ -1248,7 +1318,7 @@ final class JoinOptimizer
         {
             Node tree = new Leaf(start);
             int mask = 1 << start;
-            double cost = rows[start];
+            double cost = dropped[start];
 
             while(mask != full)
             {
@@ -1262,11 +1332,11 @@ final class JoinOptimizer
                         continue;
 
                     Map.Entry<Double, Node> candidate = join(mask, 1 << i, tree, new Leaf(i), hashableAdjacent,
-                            lookupable, sizes);
+                            lookupable, sizes, dropped);
 
-                    if(candidate.getKey() + rows[i] < stepCost)
+                    if(candidate.getKey() + dropped[i] < stepCost)
                     {
-                        stepCost = candidate.getKey() + rows[i];
+                        stepCost = candidate.getKey() + dropped[i];
                         stepTree = candidate.getValue();
                         stepChild = i;
                     }

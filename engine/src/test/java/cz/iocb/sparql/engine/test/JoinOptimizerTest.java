@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.test;
 
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedIri;
@@ -492,6 +493,60 @@ public class JoinOptimizerTest
 
         assertThat(translate(optimized, query), not(containsString("LATERAL")));
         assertThat(check(query), hasSize(1000));
+    }
+
+
+    @Test
+    public void rowsReadByAFilter() throws Exception
+    {
+        String nodes = "\"join_optimizer_test\".\"nodes\" WHERE ";
+
+        // the filter leaves few of the thousand labels, but the database has to read them all to evaluate it, so the
+        // labels of the five tagged nodes are looked up instead
+        String query = "SELECT ?x ?l WHERE { ?x ex:tag ?t . ?x ex:label ?l FILTER(regex(?l, '^node [1-3]$')) }";
+
+        String sql = translate(optimized, query);
+        assertThat(sql, containsString(" CROSS JOIN LATERAL (SELECT "));
+        assertThat(sql, containsString(nodes));
+        assertThat(check(query), hasSize(3));
+
+        // so are they for a comparison of a column that has no index
+        query = "SELECT ?x ?l WHERE { ?x ex:tag ?t . ?x ex:label ?l FILTER(?l < 'node 1000') }";
+
+        assertThat(translate(optimized, query), containsString(nodes));
+        assertThat(check(query), hasSize(1));
+
+        // an index of the scores serves a narrow range, so the few scores it leaves are read by it and hashed
+        query = "SELECT ?x ?s WHERE { ?x ex:tag ?t . ?x ex:score ?s FILTER(?s < 4) }";
+
+        assertThat(translate(optimized, query), not(containsString("LATERAL")));
+        assertThat(check(query), hasSize(3));
+
+        // an index of a box orders the terms, whereas a filter compares the values
+        assertThat(INT4.isComparedByIndex(), is(true));
+        assertThat(RDFBOX.isComparedByIndex(), is(false));
+    }
+
+
+    @Test
+    public void manyChildren() throws Exception
+    {
+        String links = "\"join_optimizer_test\".\"links\"";
+
+        // a join of more children than are planned exhaustively
+        String query = """
+                SELECT ?x ?z ?w ?v WHERE { ?x ex:tag ?t . ?x ex:link ?z . ?z ex:score ?s . ?x ex:label ?lx . \
+                ?x ex:score ?sx . ?x ex:ref ?rx . ?z ex:label ?lz . ?z ex:ref ?rz . ?z ex:link ?w . ?w ex:label ?lw . \
+                ?w ex:score ?sw . ?w ex:ref ?rw . ?w ex:link ?v . ?v ex:label ?lv . ?v ex:score ?sv . ?v ex:ref ?rv \
+                FILTER(?s < 40) }""";
+
+        // the links of the five tagged nodes are looked up, however many links the table holds: the rows of a child
+        // that is looked up do not make its join cost more, so the links are not read whole to be hashed with the tags
+        String sql = translate(optimized, query);
+        assertThat(sql, containsString(links + " WHERE "));
+        assertThat(sql, not(containsString(links + ") AS ")));
+
+        assertThat(check(query), hasSize(3833));
     }
 
 

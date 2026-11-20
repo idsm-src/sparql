@@ -5,6 +5,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -12,6 +13,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -236,6 +238,19 @@ public class BoxTableOptimizerTest
         assertThat(translate(same), containsString(lookup));
         assertThat(check(same), hasSize(50));
     }
+
+    @Test
+    public void functionOfABox() throws Exception
+    {
+        // the function is evaluated for every kind the table holds, however few of them it is taken to keep, so the
+        // kinds of the fifty nodes the rare ones link to are looked up as well
+        String query = """
+                SELECT ?x ?y WHERE { ?x ex:kind "rare" . ?x ex:link ?y . ?y ex:kind ?k FILTER(CONTAINS(?k, "mm")) }""";
+
+        assertThat(translate(query).split(Pattern.quote(lookup), -1).length - 1, is(2));
+        assertThat(check(query), hasSize(50));
+    }
+
 
     @Test
     public void termsAcceptedByAFilter() throws Exception

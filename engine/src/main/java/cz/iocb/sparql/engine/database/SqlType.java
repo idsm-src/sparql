@@ -241,6 +241,20 @@ public class SqlType
 
 
     /**
+     * True if an index of a column of the type can serve a comparison of the values of the column with a constant. The
+     * types of the pgsparql extension cannot: their values are compared by the value operators ({@code =}, {@code <}),
+     * whereas their operator classes are built on the identity operators, so an index of such a column serves only the
+     * lookups of a term.
+     *
+     * @return true if an index of a column of the type can serve a comparison of its values, false otherwise
+     */
+    public final boolean isComparedByIndex()
+    {
+        return !hasIdentityOperators();
+    }
+
+
+    /**
      * True if the type is one of the floating-point types {@code float4} and {@code float8}, whose {@code =} takes the
      * zeros of the two signs for equal, although {@code 0.0E0} and {@code -0.0E0} are different RDF terms. (It takes
      * every two NaNs for equal too, which is what the identity needs, as all of them are the term {@code NaN}.)
