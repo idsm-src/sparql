@@ -4,10 +4,12 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -357,6 +359,26 @@ public class MixedQuadTableTest
         // the tables are asked by the numbers of the constants, which the plain configuration does not read
         assertThat(translate(plain, name), containsString(resourceQuads));
 
+        // each table is asked once, with the scans of the whole table turned off for the question only, so that the
+        // database looks the row up instead of scanning the table for it
+        try(Request request = new Engine(dictionary).getRequest())
+        {
+            PreparedQuery prepared = request.prepareQuery(prefix + name, null);
+
+            new TranslateVisitor(request).translate(prepared.getSyntaxTree(), null, null, List.of()).optimize(request,
+                    false);
+
+            assertThat(request.getProbedRows().keySet(), hasSize(2));
+            assertThat(request.getProbedRows().keySet(), everyItem(containsString("\"p\" = ")));
+            assertThat(request.getProbedRows().values(), containsInAnyOrder(true, false));
+
+            try(ResultSet setting = request.getStatement().executeQuery("SHOW enable_seqscan"))
+            {
+                assertThat(setting.next(), is(true));
+                assertThat(setting.getString(1), is("on"));
+            }
+        }
+
         // so a join of such patterns has no branch for every combination of the tables
         String join = "SELECT * WHERE { ?a ex:name ?n . ?a ex:age ?g . ?a ex:knows ?k . ?k ex:name ?m }";
 
@@ -377,7 +399,8 @@ public class MixedQuadTableTest
         assertThat(translate(dictionary, nobody), not(containsString("sparql_test")));
         assertThat(check(nobody), empty());
 
-        // what the index of a table does not begin with is not asked about, so its quads are read
+        // an index that holds only some of the rows does not count, as the database may be unable to use it, so the
+        // other quads are asked about by the predicate alone and read for the literal
         String literal = "SELECT ?s WHERE { ?s ex:name \"Nobody\" }";
 
         assertThat(translate(dictionary, literal), containsString(valueQuads));

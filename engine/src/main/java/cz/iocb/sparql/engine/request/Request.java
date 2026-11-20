@@ -996,6 +996,24 @@ public class Request implements AutoCloseable
      */
     public <T> List<T> lookup(List<String> queries, ResultReader<T> reader) throws SQLException
     {
+        return lookup(List.of(), queries, reader);
+    }
+
+
+    /**
+     * Runs queries as {@link #lookup(List, ResultReader)} does, under settings of the database that hold for them only:
+     * the settings are made after the savepoint for the current transaction, and the transaction is rolled back to the
+     * savepoint after the queries, which takes the settings back, so the queries may only read.
+     *
+     * @param <T> type of what is read from the result of a query
+     * @param settings the settings the queries run under, each as {@code name = value}
+     * @param queries SQL of the queries, each a single statement that only reads
+     * @param reader reader of the result of each query
+     * @return what the reader has read from the results of the queries, in their order
+     * @throws SQLException when a query fails
+     */
+    public <T> List<T> lookup(List<String> settings, List<String> queries, ResultReader<T> reader) throws SQLException
+    {
         List<T> values = new ArrayList<>(queries.size());
 
         if(queries.isEmpty())
@@ -1003,9 +1021,21 @@ public class Request implements AutoCloseable
 
         Statement statement = getStatement();
 
+        StringBuilder builder = new StringBuilder("SAVEPOINT lookup; ");
+
+        for(String setting : settings)
+            builder.append("SET LOCAL ").append(setting).append("; ");
+
+        builder.append(String.join("; ", queries));
+
+        if(!settings.isEmpty())
+            builder.append("; ROLLBACK TO SAVEPOINT lookup");
+
+        builder.append("; RELEASE SAVEPOINT lookup");
+
         try
         {
-            statement.execute("SAVEPOINT lookup; " + String.join("; ", queries) + "; RELEASE SAVEPOINT lookup");
+            statement.execute(builder.toString());
         }
         catch(SQLException e)
         {
@@ -1021,7 +1051,10 @@ public class Request implements AutoCloseable
             throw e;
         }
 
-        // the results follow that of the savepoint, in the order of the queries
+        // the results follow those of the savepoint and of the settings, in the order of the queries
+        for(int i = 0; i < settings.size(); i++)
+            statement.getMoreResults();
+
         for(int i = 0; i < queries.size(); i++)
         {
             if(!statement.getMoreResults())

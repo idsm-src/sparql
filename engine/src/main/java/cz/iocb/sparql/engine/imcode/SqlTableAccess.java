@@ -105,6 +105,12 @@ public final class SqlTableAccess extends SqlIntercode
     private static final int disjunctLimit = 30;
 
     /**
+     * Settings of the planner of the database under which a probed table is asked for a row (see {@link #hasRows}): no
+     * scan of the whole table, so that the row is looked up by the index of the columns asked about.
+     */
+    private static final List<String> probeSettings = List.of("enable_seqscan = off", "enable_bitmapscan = off");
+
+    /**
      * Database schema the table belongs to; null for constants only.
      */
     private final DatabaseSchema schema;
@@ -2174,8 +2180,11 @@ public final class SqlTableAccess extends SqlIntercode
      * row with the constants the disjunct requires in the leading columns of one of its indexes (see
      * {@link DatabaseSchema#getLookupColumns}), which is a lookup in that index, and the disjunct holds for none when
      * there is none. The other parts of the disjunct are left out of the question, as a row satisfying them might be
-     * found only after many that do not. A disjunct that requires no constant in a leading column of an index is not
-     * asked about. An answer got during the request before is taken from the request (see
+     * found only after many that do not. The question is asked with the scans of the whole table turned off for it (see
+     * {@link #probeSettings}): the database would otherwise scan the table for a row it estimates to be common,
+     * expecting to meet one soon, which reads the whole table when the rows lie in the order of the column asked about
+     * and there is none, or the first one lies far. A disjunct that requires no constant in a leading column of an
+     * index is not asked about. An answer got during the request before is taken from the request (see
      * {@link Request#getProbedRows}).
      *
      * @param request the current request
@@ -2223,7 +2232,7 @@ public final class SqlTableAccess extends SqlIntercode
         {
             try
             {
-                found = request.lookup(List.of(code.getText()), result -> result.next()).get(0);
+                found = request.lookup(probeSettings, List.of(code.getText()), result -> result.next()).get(0);
             }
             catch(SQLException e)
             {

@@ -19,10 +19,11 @@ import cz.iocb.sparql.engine.database.VirtualTableDefinition.UnjoinableColumns;
 
 /**
  * Catalog facts about the source tables used by the optimiser and the translator: the columns with their SQL types,
- * nullable columns, unique keys, foreign keys, the key columns of the indexes, column pairs known never to join, the
- * collations of the character columns that do not use the default one, and character columns with a collation that does
- * not order by code points. The facts about database tables are read from the PostgreSQL catalog (or filled in by
- * hand); the facts about virtual tables are merged in from their definitions by {@link #addVirtualTable}.
+ * nullable columns, unique keys, foreign keys, the key columns of the indexes (and which indexes hold all the rows of
+ * their tables), column pairs known never to join, the collations of the character columns that do not use the default
+ * one, and character columns with a collation that does not order by code points. The facts about database tables are
+ * read from the PostgreSQL catalog (or filled in by hand); the facts about virtual tables are merged in from their
+ * definitions by {@link #addVirtualTable}.
  */
 public class DatabaseSchema
 {
@@ -83,11 +84,11 @@ public class DatabaseSchema
 
     /**
      * Catalog query listing the key columns of every valid btree or hash index of a user relation that is not over an
-     * expression, ordered by the index and the position; a partial index is listed too, its predicate being left
-     * unread, and the included non-key columns are left out.
+     * expression, ordered by the index and the position; a partial index is listed too, its predicate being left unread
+     * but for the fact that it has one, and the included non-key columns are left out.
      */
     private static final String indexQuery = """
-            SELECT i.indexrelid, n.nspname, c.relname, a.attname
+            SELECT i.indexrelid, n.nspname, c.relname, a.attname, i.indpred IS NOT NULL
             FROM pg_index i
             JOIN pg_class c ON c.oid = i.indrelid
             JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -163,6 +164,12 @@ public class DatabaseSchema
      * Indexes per table, each as its list of key columns in the order of the index.
      */
     protected final Map<SourceTable, List<List<Column>>> indexes = new HashMap<>();
+
+    /**
+     * The indexes that hold all the rows of their tables, per table (see {@link #addIndex}); the others are partial
+     * (see {@link #addPartialIndex}).
+     */
+    protected final Map<SourceTable, List<List<Column>>> wholeIndexes = new HashMap<>();
 
     /**
      * Foreign keys per (parent table, foreign table) pair, each as its set of column pairs.
@@ -247,6 +254,7 @@ public class DatabaseSchema
                 {
                     long index = 0;
                     SourceTable table = null;
+                    boolean partial = false;
                     List<Column> columns = new ArrayList<>();
 
                     while(keys.next())
@@ -254,10 +262,11 @@ public class DatabaseSchema
                         if(keys.getLong(1) != index)
                         {
                             if(table != null)
-                                addIndex(table, columns);
+                                addIndex(table, columns, partial);
 
                             index = keys.getLong(1);
                             table = new DatabaseTable(keys.getString(2), keys.getString(3));
+                            partial = keys.getBoolean(5);
                             columns = new ArrayList<>();
                         }
 
@@ -265,7 +274,7 @@ public class DatabaseSchema
                     }
 
                     if(table != null)
-                        addIndex(table, columns);
+                        addIndex(table, columns, partial);
                 }
 
 
@@ -409,6 +418,9 @@ public class DatabaseSchema
         for(Entry<SourceTable, List<List<Column>>> e : other.indexes.entrySet())
             indexes.put(e.getKey(), new ArrayList<>(e.getValue()));
 
+        for(Entry<SourceTable, List<List<Column>>> e : other.wholeIndexes.entrySet())
+            wholeIndexes.put(e.getKey(), new ArrayList<>(e.getValue()));
+
         for(Entry<TablePair, List<Set<ColumnPair>>> e : other.foreignKeys.entrySet())
             foreignKeys.put(e.getKey(), new ArrayList<>(e.getValue()));
 
@@ -542,14 +554,43 @@ public class DatabaseSchema
 
 
     /**
-     * Declares an index of the table over the columns, in the order of the index.
+     * Declares an index of the table over the columns, in the order of the index, that holds all the rows of the table.
      *
      * @param table the table
      * @param columns the key columns of the index
      */
     public void addIndex(SourceTable table, List<Column> columns)
     {
+        addIndex(table, columns, false);
+    }
+
+
+    /**
+     * Declares a partial index of the table over the columns, in the order of the index: an index that holds only some
+     * of the rows of the table, which the database uses only for the queries its predicate lets it.
+     *
+     * @param table the table
+     * @param columns the key columns of the index
+     */
+    public void addPartialIndex(SourceTable table, List<Column> columns)
+    {
+        addIndex(table, columns, true);
+    }
+
+
+    /**
+     * Declares an index of the table over the columns, in the order of the index.
+     *
+     * @param table the table
+     * @param columns the key columns of the index
+     * @param partial whether the index holds only some of the rows of the table
+     */
+    private void addIndex(SourceTable table, List<Column> columns, boolean partial)
+    {
         indexes.computeIfAbsent(table, _ -> new ArrayList<>()).add(new ArrayList<>(columns));
+
+        if(!partial)
+            wholeIndexes.computeIfAbsent(table, _ -> new ArrayList<>()).add(new ArrayList<>(columns));
     }
 
 
@@ -587,9 +628,10 @@ public class DatabaseSchema
 
 
     /**
-     * The columns, out of the given ones, that the rows of the table can be looked up by with a single index: the
-     * longest run of leading key columns of an index of the table that are all among the given columns. Empty when no
-     * index of the table begins with one of them.
+     * The columns, out of the given ones, that the rows of the table can be looked up by with a single index whatever
+     * the rows are: the longest run of leading key columns of an index of the table that are all among the given
+     * columns, a partial index not counting, as the database may use it for some values only. Empty when no such index
+     * of the table begins with one of them.
      *
      * @param table the table
      * @param columns columns bound to values
@@ -599,7 +641,7 @@ public class DatabaseSchema
     {
         List<Column> result = List.of();
 
-        for(List<Column> index : indexes.getOrDefault(table, List.of()))
+        for(List<Column> index : wholeIndexes.getOrDefault(table, List.of()))
         {
             int length = 0;
 
