@@ -10,6 +10,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.is;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -25,6 +26,7 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
+import cz.iocb.sparql.engine.imcode.SqlSelect;
 import cz.iocb.sparql.engine.mapping.classes.IntegerUserIriClass;
 import cz.iocb.sparql.engine.mapping.classes.StringUserIriClass;
 import cz.iocb.sparql.engine.mapping.extension.ParameterDefinition;
@@ -36,8 +38,10 @@ import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.Engine;
 import cz.iocb.sparql.engine.request.LimitExceedException;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.request.Request.PreparedQuery;
 import cz.iocb.sparql.engine.request.Result;
 import cz.iocb.sparql.engine.translator.ServiceException;
+import cz.iocb.sparql.engine.translator.TranslateVisitor;
 import cz.iocb.sparql.testing.Database;
 
 
@@ -48,9 +52,10 @@ import cz.iocb.sparql.testing.Database;
  * all mappings of that service, which the dataset clauses of the query do not restrict, its named graphs are the graphs
  * of these mappings and its procedures are those of that service. After the pattern, the mappings of the query are in
  * effect again. The pattern is evaluated by itself and joined, as the endpoint of the service would evaluate it: its
- * expressions and OPTIONAL do not see the variables bound outside it, nor inside an EXISTS pattern the current
- * solution, and only the procedure calls that are its direct members take the values of their parameters from the
- * solutions outside, as from the VALUES clause sent to an endpoint.
+ * expressions, OPTIONAL and EXISTS patterns do not see the variables bound outside it, nor inside an EXISTS pattern the
+ * current solution, and only the procedure calls that are its direct members take the values of their parameters from
+ * the solutions outside, as from the VALUES clause sent to an endpoint. Inside an EXISTS pattern, the pattern is still
+ * optimised along with the members of the EXISTS pattern around it.
  */
 public class LocalServiceTest
 {
@@ -71,11 +76,11 @@ public class LocalServiceTest
 
     /**
      * Creates the {@code local_service_test} schema and the two services. The queried service has the values
-     * {@code ex:v} of the nodes 1, 2 and 3 in its default graph and the values {@code ex:n} in the graphs {@code ex:gm}
-     * (nodes 1 and 2) and {@code ex:shared} (node 1). The imported service has the values {@code ex:w} of the nodes 1
-     * and 7 and the tags of three things in its default graph, the values {@code ex:m} in the graphs {@code ex:go}
-     * (node 7) and {@code ex:shared} (node 9), and the procedure {@code ex:search}, which returns the things with the
-     * tag given as {@code ex:query}.
+     * {@code ex:v} of the nodes 1, 2 and 3 in its default graph (a value per node, the node being the primary key of
+     * the table) and the values {@code ex:n} in the graphs {@code ex:gm} (nodes 1 and 2) and {@code ex:shared} (node
+     * 1). The imported service has the values {@code ex:w} of the nodes 1 and 7 and the tags of three things in its
+     * default graph, the values {@code ex:m} in the graphs {@code ex:go} (node 7) and {@code ex:shared} (node 9), and
+     * the procedure {@code ex:search}, which returns the things with the tag given as {@code ex:query}.
      */
     @BeforeAll
     static void init() throws SQLException
@@ -85,7 +90,7 @@ public class LocalServiceTest
         try(Connection connection = connectionPool.getConnection(); Statement statement = connection.createStatement())
         {
             statement.execute("create schema local_service_test");
-            statement.execute("create table local_service_test.main_v (s int not null, v int not null)");
+            statement.execute("create table local_service_test.main_v (s int primary key, v int not null)");
             statement.execute("insert into local_service_test.main_v values (1, 1), (2, 2), (3, 3)");
             statement.execute("create table local_service_test.main_gm (s int not null, n int not null)");
             statement.execute("insert into local_service_test.main_gm values (1, 11), (2, 12)");
@@ -182,6 +187,28 @@ public class LocalServiceTest
                 rows.add(Arrays.asList(result.getRow()));
 
             return rows;
+        }
+    }
+
+
+    /**
+     * Translates the query run against the queried service into SQL.
+     *
+     * @param query the query, without the prefix declarations
+     * @return the generated SQL
+     * @throws SQLException on database errors
+     * @throws TranslateExceptions if the query has errors
+     * @throws ServiceException if a federated SERVICE call fails
+     */
+    private static String translate(String query) throws SQLException, TranslateExceptions, ServiceException
+    {
+        try(Request request = engine.getRequest())
+        {
+            PreparedQuery prepared = request.prepareQuery(prefix + query, null);
+
+            SqlSelect imcode = new TranslateVisitor(request).translate(prepared.getSyntaxTree(), null, null, List.of());
+
+            return imcode.optimize(request, false).optimize(request, true).translate(request);
         }
     }
 
@@ -379,6 +406,26 @@ public class LocalServiceTest
                 + "OPTIONAL { ?s ex:w ?v } } } }";
 
         assertThat(execute(optional), empty());
+
+        // nor does an EXISTS pattern in the pattern, for which the value of the current solution is no value
+        String exists = "SELECT ?s WHERE { ?s ex:v ?v FILTER EXISTS { SERVICE service:other { ?s ex:w ?w "
+                + "FILTER EXISTS { ?s ex:w ?v } } } }";
+
+        assertThat(execute(exists), containsInAnyOrder(row(node(1))));
+    }
+
+
+    @Test
+    @DisplayName("the pattern of a SERVICE in an EXISTS pattern is optimised along with the members around it")
+    void mergedPatternInExists() throws Exception
+    {
+        // the member beside the SERVICE pattern and the one inside it read a value of the node by the primary key, so
+        // they are read by one access
+        String query = "SELECT ?s WHERE { ?s ex:v ?v FILTER EXISTS { ?s ex:v ?x SERVICE service:main { ?s ex:v ?y } "
+                + "FILTER(?x = ?y) } }";
+
+        assertThat(execute(query), containsInAnyOrder(row(node(1)), row(node(2)), row(node(3))));
+        assertThat(translate(query).split("\"main_v\"", -1).length - 1, is(2));
     }
 
 

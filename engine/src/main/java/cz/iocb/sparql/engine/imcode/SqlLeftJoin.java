@@ -84,6 +84,16 @@ public final class SqlLeftJoin extends SqlIntercode
     private final List<SqlExpressionIntercode> conditions;
 
     /**
+     * True when every solution of the right side extends the current solution of the pattern of an expression the join
+     * lies in (see {@link Scope#getCurrentSolution}), as the translator makes the right side of an OPTIONAL in such a
+     * pattern agree with that solution; false for a join of a pattern evaluated independently of it (see
+     * {@link Scope#isolate}), whose right side may bind a variable of the current solution to another value, and for a
+     * join outside such patterns. It is fixed when the join is translated, because the join may be optimised in the
+     * scope of the enclosing pattern.
+     */
+    private final boolean extending;
+
+    /**
      * Alias of the left side (see {@link Scope#getLeftInputTable}), fixed when the join is created, because the column
      * map and the conditions address the columns of the side through it.
      */
@@ -116,6 +126,8 @@ public final class SqlLeftJoin extends SqlIntercode
      * @param left the left side
      * @param right the right side
      * @param conditions the conditions
+     * @param extending whether every solution of the right side extends the current solution of the pattern the join
+     *            lies in
      * @param leftTable alias of the left side
      * @param rightTable alias of the right side
      * @param columnMap the column map
@@ -123,7 +135,7 @@ public final class SqlLeftJoin extends SqlIntercode
      *            solutions by
      */
     protected SqlLeftJoin(VariableBindings bindings, SqlIntercode left, SqlIntercode right,
-            List<SqlExpressionIntercode> conditions, InputTable leftTable, InputTable rightTable,
+            List<SqlExpressionIntercode> conditions, boolean extending, InputTable leftTable, InputTable rightTable,
             Map<Column, Column> columnMap, Map<Variable, Set<SqlExpressionIntercode>> filterConditions)
     {
         super(bindings, left.isDeterministic() && right.isDeterministic()
@@ -132,6 +144,7 @@ public final class SqlLeftJoin extends SqlIntercode
         this.left = left;
         this.right = right;
         this.conditions = conditions;
+        this.extending = extending;
         this.leftTable = leftTable;
         this.rightTable = rightTable;
         this.columnMap = columnMap;
@@ -140,7 +153,10 @@ public final class SqlLeftJoin extends SqlIntercode
 
 
     /**
-     * Left join with the given filter conditions of the optional pattern.
+     * Left join of an OPTIONAL with the given filter conditions of the optional pattern, as the translator builds it:
+     * when the scope has a current solution, the translator has made the right side agree with it, so every solution of
+     * the right side extends it, whereas the pattern of a scope without one is evaluated independently of any current
+     * solution (see {@link Scope#isolate}).
      *
      * @param request the current request
      * @param scope the scope of the join
@@ -152,7 +168,7 @@ public final class SqlLeftJoin extends SqlIntercode
     public static SqlIntercode leftJoin(Request request, Scope scope, SqlIntercode left, SqlIntercode right,
             List<SqlExpressionIntercode> conditions)
     {
-        return leftJoin(request, scope, left, right, conditions, null);
+        return leftJoin(request, scope, left, right, conditions, scope.getCurrentSolution() != null, null);
     }
 
 
@@ -165,12 +181,14 @@ public final class SqlLeftJoin extends SqlIntercode
      * @param left the left side
      * @param right the right side
      * @param conditions the conditions
+     * @param extending whether every solution of the right side extends the current solution of the pattern the join
+     *            lies in
      * @param restrictions what the parent needs of the variables
      * @return left join exposing only what the parent needs; constant columns of the right side are turned into real
      *         columns so they can be tested for NULL
      */
     protected static SqlIntercode leftJoin(Request request, Scope scope, SqlIntercode left, SqlIntercode right,
-            List<SqlExpressionIntercode> conditions, Restrictions restrictions)
+            List<SqlExpressionIntercode> conditions, boolean extending, Restrictions restrictions)
     {
         boolean hasConstantColumn = false;
 
@@ -191,7 +209,7 @@ public final class SqlLeftJoin extends SqlIntercode
         VariableBindings bindings = getJoinVariableBindings(request, left.getVariableBindings(),
                 setCanBeNull(right.getVariableBindings()), leftTable, rightTable, restrictions, map);
 
-        return new SqlLeftJoin(bindings, left, right, conditions, leftTable, rightTable, map,
+        return new SqlLeftJoin(bindings, left, right, conditions, extending, leftTable, rightTable, map,
                 getFilterConditions(left, restrictions));
     }
 
@@ -327,10 +345,11 @@ public final class SqlLeftJoin extends SqlIntercode
     /**
      * True if the right side changes no value the parent reads: it is deterministic and calls no SERVICE (nor do the
      * conditions), and every variable it binds that the parent needs is bound always by the left side or by the current
-     * solution of the pattern the join lies in, which every solution of the right side extends (see
-     * {@link Scope#getCurrentSolution}). Every solution of the left side is then a solution of the join, extended at
-     * most by values the parent does not read, so where duplicate solutions do not matter, the join is its left side:
-     * an OPTIONAL whose own variables nothing uses, like one at the start of an EXISTS pattern, is left out.
+     * solution of the pattern the join lies in, when every solution of the right side extends that solution (see
+     * {@link #extending} and {@link Scope#getCurrentSolution}). Every solution of the left side is then a solution of
+     * the join, extended at most by values the parent does not read, so where duplicate solutions do not matter, the
+     * join is its left side: an OPTIONAL whose own variables nothing uses, like one at the start of an EXISTS pattern,
+     * is left out.
      *
      * @param scope the scope of the join
      * @param restrictions what the parent needs of the variables
@@ -342,7 +361,7 @@ public final class SqlLeftJoin extends SqlIntercode
                 || conditions.stream().anyMatch(c -> c.hasServiceSubpattern()))
             return false;
 
-        VariableBindings current = scope.getCurrentSolution();
+        VariableBindings current = extending ? scope.getCurrentSolution() : null;
 
         for(Variable variable : right.getVariableBindings().getVariables())
         {
@@ -381,7 +400,7 @@ public final class SqlLeftJoin extends SqlIntercode
             right = strip.getChild();
 
         // the conditions the right side decides by itself filter it before the sides are optimised
-        SqlIntercode filteredRight = filterRight(request, scope, left, right, conditions, restrictions);
+        SqlIntercode filteredRight = filterRight(request, scope, left, right, conditions, extending, restrictions);
 
         if(filteredRight != null)
             return filteredRight.optimize(request, scope, restrictions, reduced, evalServices);
@@ -543,7 +562,7 @@ public final class SqlLeftJoin extends SqlIntercode
             }
 
             if(sunk != optRight)
-                return leftJoin(request, scope, optLeft, sunk, kept, restrictions).optimize(request, scope,
+                return leftJoin(request, scope, optLeft, sunk, kept, extending, restrictions).optimize(request, scope,
                         restrictions, optReduced, evalServices);
         }
 
@@ -560,7 +579,7 @@ public final class SqlLeftJoin extends SqlIntercode
                 List<SqlExpressionIntercode> cnds = optimize(request, scope, optConditions, child.getVariableBindings(),
                         optRight.getVariableBindings(), evalServices);
 
-                unionList.add(leftJoin(request, scope, child, optRight, cnds, restrictions));
+                unionList.add(leftJoin(request, scope, child, optRight, cnds, extending, restrictions));
             }
 
             return SqlUnion.union(request, unionList).optimize(request, scope, restrictions, optReduced, evalServices);
@@ -583,13 +602,13 @@ public final class SqlLeftJoin extends SqlIntercode
             SqlIntercode shared = SqlShared.share(optLeft);
             SqlIntercode seed = SqlShared.seed(request, scope, shared, seedVar, evalServices);
 
-            return leftJoin(request, scope, shared, SqlJoin.join(request, seed, optRight), optConditions, restrictions)
-                    .optimize(request, scope, restrictions, optReduced, evalServices);
+            return leftJoin(request, scope, shared, SqlJoin.join(request, seed, optRight), optConditions, extending,
+                    restrictions).optimize(request, scope, restrictions, optReduced, evalServices);
         }
 
         // the conditions the right side decides by itself only now filter it (a walk seeded in the meantime, a union
         // reduced to a branch), which the sides are optimised for again
-        SqlIntercode filtered = filterRight(request, scope, optLeft, optRight, optConditions, restrictions);
+        SqlIntercode filtered = filterRight(request, scope, optLeft, optRight, optConditions, extending, restrictions);
 
         if(filtered != null)
             return filtered.optimize(request, scope, restrictions, optReduced, evalServices);
@@ -610,7 +629,7 @@ public final class SqlLeftJoin extends SqlIntercode
                 && filterConditions.equals(getFilterConditions(optLeft, restrictions)))
             return this;
 
-        return leftJoin(request, scope, optLeft, optRight, optConditions, restrictions);
+        return leftJoin(request, scope, optLeft, optRight, optConditions, extending, restrictions);
     }
 
 
@@ -633,11 +652,13 @@ public final class SqlLeftJoin extends SqlIntercode
      * @param left the left side
      * @param right the right side
      * @param conditions the conditions
+     * @param extending whether every solution of the right side extends the current solution of the pattern the join
+     *            lies in
      * @param restrictions what the parent needs of the variables
      * @return the left join whose right side is filtered by the conditions it decides by itself, or null
      */
     private static SqlIntercode filterRight(Request request, Scope scope, SqlIntercode left, SqlIntercode right,
-            List<SqlExpressionIntercode> conditions, Restrictions restrictions)
+            List<SqlExpressionIntercode> conditions, boolean extending, Restrictions restrictions)
     {
         if(conditions.isEmpty() || isUnionAlone(right) || SqlRecursive.holdsSeedableWalk(right))
             return null;
@@ -665,7 +686,7 @@ public final class SqlLeftJoin extends SqlIntercode
                 kept.add(condition);
         }
 
-        return filtered == right ? null : leftJoin(request, scope, left, filtered, kept, restrictions);
+        return filtered == right ? null : leftJoin(request, scope, left, filtered, kept, extending, restrictions);
     }
 
 
@@ -711,7 +732,7 @@ public final class SqlLeftJoin extends SqlIntercode
             return null;
 
         return leftJoin(request, scope, sunk, right instanceof SqlStripConstantColumns strip ? strip.getChild() : right,
-                conditions);
+                conditions, extending, null);
     }
 
 
@@ -1238,6 +1259,9 @@ public final class SqlLeftJoin extends SqlIntercode
             return false;
 
         if(!Objects.equals(conditions, imcode.conditions))
+            return false;
+
+        if(extending != imcode.extending)
             return false;
 
         if(!filterConditions.equals(imcode.filterConditions))

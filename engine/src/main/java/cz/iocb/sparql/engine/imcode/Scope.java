@@ -105,10 +105,13 @@ public final class Scope
 
 
     /**
-     * The scope of the nodes of a pattern evaluated independently of the current solutions of the patterns of
-     * expressions this scope lies in, like the pattern of a SERVICE call of a service of the configuration, which a
-     * remote call would not see either (see {@link SqlIsolated}): the nodes lie at the depth of this scope, but no
-     * current solution is in effect for them.
+     * The scope in which the translator translates a pattern evaluated independently of the current solutions of the
+     * patterns of expressions this scope lies in, like the pattern of a SERVICE call of a service of the configuration,
+     * which a remote call would not see either: the nodes lie at the depth of this scope, but no current solution is in
+     * effect for them. The nodes are optimised and rendered in the scope of the enclosing pattern, as its part, so the
+     * nodes that would read the current solution there keep that they do not: the existence tests of the pattern are
+     * not chained to it (see {@link SqlExists#getCurrentSolution}), and the right sides of its left joins do not extend
+     * it (see {@link SqlLeftJoin}).
      *
      * @return the scope of the nodes of an independent pattern
      */

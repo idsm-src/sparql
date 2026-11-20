@@ -47,7 +47,6 @@ import cz.iocb.sparql.engine.imcode.SqlEmptySolution;
 import cz.iocb.sparql.engine.imcode.SqlFilter;
 import cz.iocb.sparql.engine.imcode.SqlIntercode;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
-import cz.iocb.sparql.engine.imcode.SqlIsolated;
 import cz.iocb.sparql.engine.imcode.SqlJoin;
 import cz.iocb.sparql.engine.imcode.SqlLateralJoin;
 import cz.iocb.sparql.engine.imcode.SqlLeftJoin;
@@ -1023,9 +1022,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         if(getGraph() instanceof Variable graph)
             mentioned.add(graph);
 
-        // the clauses above the WHERE clause of a sub-select see its solutions only, which extend no current solution
+        // the clauses above the WHERE clause of a sub-select see its solutions only, which extend no current solution,
+        // and so do the nodes of a pattern evaluated independently of the current solution (see Scope.isolate), even
+        // when they are optimised in the scope of the enclosing pattern
         boolean enclosingAboveWhereClause = aboveWhereClause;
-        boolean chained = !enclosingAboveWhereClause;
+        boolean chained = !enclosingAboveWhereClause && scope.getCurrentSolution() != null;
         VariableBindings enclosing = chained ? scope.getCurrentSolution() : null;
 
         Set<Variable> variables = mentioned;
@@ -1965,10 +1966,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      * not restrict, and joined with the context. Like the VALUES clause sent to an endpoint, the context gives the
      * values of their parameters to the procedure calls that are direct members of the pattern (see
      * {@link #translateProcedureCall}), except inside an EXISTS pattern, where a remote call gets no context either;
-     * there the pattern does not see the current solution of the EXISTS pattern, neither when it is translated nor when
-     * it is optimised (see {@link SqlIsolated}). Any other service becomes a {@link SqlServiceStub} evaluated later
-     * against the remote endpoint, which knows the lateral joins of the evaluations per graph it lies in (see
-     * {@link #enclosures}).
+     * there the pattern does not see the current solution of the EXISTS pattern: it is translated without it (see
+     * {@link Scope#isolate}), and the nodes that would read it when optimised keep that they do not (the existence
+     * tests of the pattern are not chained to the current solution, see {@link SqlExists#getCurrentSolution}, and the
+     * right sides of its left joins do not extend it, see {@link SqlLeftJoin#leftJoin}), so that the pattern is
+     * optimised as a part of the enclosing pattern, its nodes merged with the nodes around. Any other service becomes a
+     * {@link SqlServiceStub} evaluated later against the remote endpoint, which knows the lateral joins of the
+     * evaluations per graph it lies in (see {@link #enclosures}).
      *
      * @param service the SERVICE pattern
      * @param context solutions the call is evaluated for
@@ -1996,10 +2000,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             List<Pattern> patterns = pattern instanceof GroupGraph group ? group.getPatterns() : List.of(pattern);
 
             Scope enclosingScope = scope;
-            boolean isolated = scope.getCurrentSolution() != null;
             scope = enclosingScope.isolate();
 
-            if(!isolated)
+            if(enclosingScope.getCurrentSolution() == null)
                 for(Pattern member : patterns)
                     if(member instanceof ProcedureCallBase call)
                         serviceContexts.put(call, context);
@@ -2020,9 +2023,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 graphEnumerations = enclosingGraphEnumerations;
                 namedGraphs = enclosingNamedGraphs;
             }
-
-            if(isolated)
-                result = SqlIsolated.create(result);
 
             return SqlJoin.join(request, context, result);
         }
