@@ -7,13 +7,16 @@ import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
 import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.SqlType;
+import cz.iocb.sparql.engine.database.ValueColumn;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.request.Request;
 
@@ -38,6 +41,12 @@ public class EnumUserIriClass extends SimpleUserIriClass
      * Stored value of each member IRI.
      */
     private final Map<Iri, String> values;
+
+    /**
+     * Member IRI of each stored value: of the members storing one value, the first in the order of the conversion to
+     * IRIs (see {@link #generateFunction}), as that conversion gives it for the value.
+     */
+    private final Map<String, Iri> members;
 
     /**
      * Longest common prefix of the member IRIs.
@@ -68,6 +77,13 @@ public class EnumUserIriClass extends SimpleUserIriClass
 
         this.prefix = first.substring(0, length);
         this.values = values;
+
+        Map<String, Iri> members = new HashMap<>();
+
+        for(Entry<Iri, String> entry : values.entrySet())
+            members.putIfAbsent(entry.getValue(), entry.getKey());
+
+        this.members = members;
 
         this.regexp = values.keySet().stream().map(i -> Pattern.quote(i.getValue())).collect(joining("|"));
         this.pattern = Pattern.compile(regexp);
@@ -124,6 +140,10 @@ public class EnumUserIriClass extends SimpleUserIriClass
     @Override
     public String getPrefix(List<Column> columns)
     {
+        // a constant is the stored value of the member it stands for; a value the class does not store stands for none
+        if(columns.get(0) instanceof ValueColumn column && members.get(column.getValue()) instanceof Iri member)
+            return member.getValue();
+
         return prefix;
     }
 
