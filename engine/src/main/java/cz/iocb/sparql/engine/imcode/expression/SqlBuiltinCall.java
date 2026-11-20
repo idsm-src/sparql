@@ -2622,28 +2622,43 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 if(!restriction.contains(relations, xsdBoolean))
                     return new SqlBuiltinCall(function, distinct, arguments, singletonMap(xsdBoolean, null), true);
 
-                // one call over the classes of the text that can hold a string literal: the box of a single class
-                // stored so, the string literal of any other classes, which every class reads by its own key
+                // the text of a class stored in a box is tested in the box, which sparql.regex_rdfbox reads the string
+                // of itself, and the text of the other classes by sparql.regex_string over the string of the class,
+                // each class read by its own key, so that no text is converted to be tested; a solution has the text
+                // in one class at most, so one of the calls decides, unless the pattern or the flags are computed,
+                // which the second call would evaluate again, and one call over the strings of all the classes tests
+                // the text then
                 Set<ResourceClass> classes = argument.getResourceClasses().stream().filter(r -> hasStringLiteral(r))
                         .collect(toSet());
-                ResourceClass single = classes.size() == 1 ? classes.iterator().next() : null;
+                Set<ResourceClass> boxed = classes.stream().filter(r -> r.getEffectiveClass().equals(box))
+                        .collect(toSet());
+                Set<ResourceClass> strings = classes.stream().filter(r -> !boxed.contains(r)).collect(toSet());
 
-                SqlBuilder builder = new SqlBuilder();
+                Column patternColumn = pattern.get(relations, xsdString).get(0);
+                Column flagsColumn = flags == null ? null : flags.get(relations, xsdString).get(0);
+                boolean computed = pattern.hasExpressionColumn(relations, xsdString)
+                        || flags != null && flags.hasExpressionColumn(relations, xsdString);
 
-                if(single != null && single.getEffectiveClass().equals(box))
-                    builder.append("sparql.regex_rdfbox(").append(argument.get(relations, single).get(0));
+                Set<Column> calls = new HashSet<>();
+
+                if(!boxed.isEmpty() && !strings.isEmpty() && computed)
+                {
+                    calls.add(regex("sparql.regex_string", argument.getStringLiteral(relations, classes), patternColumn,
+                            flagsColumn));
+                }
                 else
-                    builder.append("sparql.regex_string(").append(argument.getStringLiteral(relations, classes));
+                {
+                    if(!boxed.isEmpty())
+                        calls.add(regex("sparql.regex_rdfbox",
+                                coalesce(boxed.stream().map(r -> argument.get(relations, r).get(0)).collect(toSet())),
+                                patternColumn, flagsColumn));
 
-                builder.append(", ").append(pattern.get(relations, xsdString).get(0));
+                    if(!strings.isEmpty())
+                        calls.add(regex("sparql.regex_string", argument.getStringLiteral(relations, strings),
+                                patternColumn, flagsColumn));
+                }
 
-                if(flags != null)
-                    builder.append(", ").append(flags.get(relations, xsdString).get(0));
-
-                builder.append(")");
-
-                Map<ResourceClass, List<Column>> mappings = singletonMap(xsdBoolean,
-                        List.of(new ExpressionColumn(builder.toCode(), BOOL)));
+                Map<ResourceClass, List<Column>> mappings = singletonMap(xsdBoolean, List.of(coalesce(calls)));
 
                 // an invalid pattern, invalid flags and a matching that fails are errors, so the result may be unbound
                 // whatever the arguments are
@@ -3077,6 +3092,30 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 throw new IllegalArgumentException("unsupported function: " + function);
         }
 
+    }
+
+
+    /**
+     * Call of a function of REGEX testing the text against the pattern and the flags.
+     *
+     * @param function name of the SQL function
+     * @param text column of the text, in the type the function takes
+     * @param pattern column of the pattern
+     * @param flags column of the flags, or null without flags
+     * @return call of a function of REGEX testing the text against the pattern and the flags
+     */
+    private static Column regex(String function, Column text, Column pattern, Column flags)
+    {
+        SqlBuilder builder = new SqlBuilder();
+
+        builder.append(function).append("(").append(text).append(", ").append(pattern);
+
+        if(flags != null)
+            builder.append(", ").append(flags);
+
+        builder.append(")");
+
+        return new ExpressionColumn(builder.toCode(), BOOL);
     }
 
 
