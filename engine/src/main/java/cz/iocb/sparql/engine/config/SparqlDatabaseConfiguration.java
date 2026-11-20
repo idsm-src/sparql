@@ -227,6 +227,11 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     protected final Map<SourceTable, TableStatistics> tableStatistics = new ConcurrentHashMap<>();
 
     /**
+     * Tables whose rows the translation of a query may read (see {@link #addDictionaryTable}).
+     */
+    protected final Set<SourceTable> dictionaryTables = new HashSet<>();
+
+    /**
      * Whether the engine chooses the order and the methods of the joins it generates (see {@link #setJoinOptimizer}).
      */
     protected boolean joinOptimizer = false;
@@ -1985,6 +1990,38 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     {
         return tableStatistics.computeIfAbsent(table, t -> t instanceof DatabaseTable databaseTable ?
                 new CatalogStatistics(databaseTable) : new DefaultStatistics());
+    }
+
+
+    /**
+     * Declares a dictionary table: a table whose rows give the values of one of its keys for those of another one, like
+     * a table of the terms of a dataset with their numbers, and are neither changed nor removed while the configuration
+     * serves requests. The translation of a query then reads the row that constants select by a key of the table and
+     * takes the row by the key the access to the table is joined by instead (see
+     * {@link cz.iocb.sparql.engine.imcode.SqlTableAccess}), so that a table referencing that key is restricted by
+     * constants and the dictionary table is not read by the query at all. What the translation reads is kept for the
+     * request only.
+     *
+     * @param table the table
+     * @throws IllegalStateException if the configuration has no database schema
+     */
+    public void addDictionaryTable(DatabaseTable table)
+    {
+        checkSchema("a dictionary table");
+
+        dictionaryTables.add(table);
+    }
+
+
+    /**
+     * True if the table is declared to be a dictionary table (see {@link #addDictionaryTable}).
+     *
+     * @param table the table
+     * @return true if the table is declared to be a dictionary table, false otherwise
+     */
+    public boolean isDictionaryTable(SourceTable table)
+    {
+        return dictionaryTables.contains(table);
     }
 
 

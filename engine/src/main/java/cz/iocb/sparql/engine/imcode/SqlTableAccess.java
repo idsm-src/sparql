@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.imcode;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -23,12 +24,14 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
+import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
+import cz.iocb.sparql.engine.database.ValueColumn;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
@@ -58,7 +61,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * whose variable a filter above requires to be a constant term, which makes the filter needless (see
  * {@link SqlIntercode#addAcceptedValues}). With the join optimizer on, an access whose variable a filter above accepts
  * only with one of several constant terms takes the terms into its conditions as a disjunction (see
- * {@link #restrictToAcceptedTerms}).
+ * {@link #restrictToAcceptedTerms}). An access to a dictionary table whose row constants select by a key reads the row
+ * when it is optimised and takes it by the key the access is joined by (see {@link #resolveDictionaryRows}).
  */
 public final class SqlTableAccess extends SqlIntercode
 {
@@ -1921,6 +1925,12 @@ public final class SqlTableAccess extends SqlIntercode
 
         VariableBindings optimizedBindings = internal.restrict(relations, restrictions);
 
+        // a row of a dictionary table that constants select is read now and taken by the key the access is joined by
+        optimizedConditions = resolveDictionaryRows(request, optimizedConditions, optimizedBindings, optimizedValues);
+
+        if(optimizedConditions.isFalse())
+            return SqlNoSolution.get();
+
         Set<Column> optimizedDistinct = distinctColumns;
 
         if(!distinctColumns.isEmpty() && isDistinctImpliedByKey(request.getConfiguration().getDatabaseSchema()))
@@ -1976,6 +1986,162 @@ public final class SqlTableAccess extends SqlIntercode
         }
 
         return result;
+    }
+
+
+    /**
+     * The conditions on the rows of a dictionary table (see
+     * {@link cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration#addDictionaryTable}) in terms of the key the
+     * access is joined by: the key of the table whose columns are exactly the columns the bindings read. A disjunct
+     * that restricts the columns of another key to constants selects one row at most, which is read now (see
+     * {@link #resolveDictionaryRow}), and the disjunct becomes the equalities of the columns of the key the access is
+     * joined by with their values in that row, or is left out when there is no such row (no disjunct left is no
+     * solution). The access then refers to no other column than those of that key, so it is merged into an access
+     * referencing the key by a foreign key (see {@link #joinByForeignKey}), which takes the constants in its own
+     * columns: the dictionary table is not read by the query, and the rows of the referencing table are estimated and
+     * looked up by the constants. The conditions stay as they are when the bindings read another column as well, as the
+     * query has to read the table for it anyway, and when the rows are restricted to values (see {@link #values}).
+     *
+     * @param request the current request
+     * @param conditions the conditions on the rows
+     * @param bindings the bindings the parent needs, in terms of the table's own columns
+     * @param values the values the rows are restricted to
+     * @return the conditions in terms of the key the access is joined by (the given ones when nothing has changed)
+     */
+    private Conditions resolveDictionaryRows(Request request, Conditions conditions, VariableBindings bindings,
+            List<ValueCondition> values)
+    {
+        if(table == null || !values.isEmpty() || !request.getConfiguration().isDictionaryTable(table))
+            return conditions;
+
+        Set<Column> bound = bindings.getNonConstantColumns();
+        List<Column> key = schema.getCompatibleKey(table, bound);
+
+        if(key == null || !key.containsAll(bound))
+            return conditions;
+
+        Conditions result = new Conditions(false);
+        boolean changed = false;
+
+        for(Condition condition : conditions.getConditions())
+        {
+            Condition resolved = resolveDictionaryRow(request, condition, key);
+
+            changed |= resolved != condition;
+
+            if(resolved != null)
+                result.add(resolved);
+        }
+
+        return changed ? result : conditions;
+    }
+
+
+    /**
+     * A disjunct of the conditions on the rows of a dictionary table in terms of the given key (see
+     * {@link #resolveDictionaryRows}): when the disjunct refers to other columns than those of the key and restricts
+     * the columns of some key of the table to constants, the rows it holds for are read from the table, which is one
+     * row at most, and the disjunct becomes the equalities of the columns of the given key with their values in that
+     * row. As the whole disjunct is evaluated, the row satisfies its other parts too. A row read during the request
+     * before is taken from the request (see {@link Request#getDictionaryRows}).
+     *
+     * @param request the current request
+     * @param condition the disjunct
+     * @param key the key the access is joined by
+     * @return the disjunct in terms of the key, the given one when it stays as it is, or null when no row satisfies it
+     * @throws SQLRuntimeException when the table cannot be read
+     */
+    private Condition resolveDictionaryRow(Request request, Condition condition, List<Column> key)
+    {
+        if(key.containsAll(condition.getNonConstantColumns()))
+            return condition;
+
+        Set<Column> constants = new HashSet<>();
+
+        for(Set<ColumnComparison> comparisons : List.of(condition.getAreEqual(), condition.getAreNotDistinct()))
+        {
+            for(ColumnComparison comparison : comparisons)
+            {
+                if(comparison.getLeft() instanceof TableColumn column && isConstant(comparison.getRight()))
+                    constants.add(column);
+                else if(comparison.getRight() instanceof TableColumn column && isConstant(comparison.getLeft()))
+                    constants.add(column);
+            }
+        }
+
+        if(schema.getCompatibleKey(table, constants) == null)
+            return condition;
+
+        SqlBuilder builder = new SqlBuilder();
+        builder.append("SELECT ");
+        builder.append(key.stream().map(c -> SqlCode.of("(", c, ")::text")).collect(SqlCode.joining(", ")));
+        builder.append(" FROM ");
+        builder.append(table);
+        appendConditions(builder, new Conditions(condition), null, Set.of());
+        builder.append(" LIMIT 2");
+
+        SqlCode code = builder.toCode();
+
+        // the disjunct has to be decided by the row alone
+        if(!code.getOuterTables().isEmpty() || !code.getDeclaredTables().isEmpty())
+            return condition;
+
+        List<List<String>> rows = request.getDictionaryRows().get(code.getText());
+
+        if(rows == null)
+        {
+            try
+            {
+                rows = request.lookup(List.of(code.getText()), result -> {
+                    List<List<String>> read = new ArrayList<>();
+
+                    while(result.next())
+                    {
+                        List<String> row = new ArrayList<>(key.size());
+
+                        for(int i = 1; i <= key.size(); i++)
+                            row.add(result.getString(i));
+
+                        read.add(row);
+                    }
+
+                    return read;
+                }).get(0);
+            }
+            catch(SQLException e)
+            {
+                throw new SQLRuntimeException(e);
+            }
+
+            request.getDictionaryRows().put(code.getText(), rows);
+        }
+
+        if(rows.isEmpty())
+            return null;
+
+        // more rows than one, or a row without a value of the key, cannot be taken by the key
+        if(rows.size() > 1 || rows.get(0).contains(null))
+            return condition;
+
+        Condition resolved = new Condition();
+
+        for(int i = 0; i < key.size(); i++)
+            resolved.addAreEqual(key.get(i), new ValueColumn(rows.get(0).get(i), key.get(i).getType()));
+
+        return resolved;
+    }
+
+
+    /**
+     * True if the column stands for a constant in a condition on the rows: a constant value, or an expression, which is
+     * how a constant term is written in the class of some columns (like an IRI put into a box).
+     *
+     * @param column the column
+     * @return true if the column stands for a constant in a condition on the rows, false otherwise
+     */
+    private static boolean isConstant(Column column)
+    {
+        return column instanceof ValueColumn || column instanceof ExpressionColumn;
     }
 
 

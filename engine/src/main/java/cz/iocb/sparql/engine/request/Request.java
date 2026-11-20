@@ -290,6 +290,12 @@ public class Request implements AutoCloseable
     private final Map<String, Long> rowEstimates = new HashMap<>();
 
     /**
+     * Rows of the dictionary tables read during the request, by the texts of the queries reading them (see
+     * {@link #getDictionaryRows}).
+     */
+    private final Map<String, List<List<String>>> dictionaryRows = new HashMap<>();
+
+    /**
      * Start of the execution in {@link System#nanoTime} units.
      */
     private long begin;
@@ -1068,6 +1074,19 @@ public class Request implements AutoCloseable
     public Map<String, Long> getRowEstimates()
     {
         return rowEstimates;
+    }
+
+
+    /**
+     * Rows of the dictionary tables read during the request, by the texts of the queries reading them, each row as the
+     * text forms of its values: a row asked for again is taken from here (see
+     * {@link cz.iocb.sparql.engine.imcode.SqlTableAccess}). Nothing read so outlives the request.
+     *
+     * @return rows of the dictionary tables read during the request, by the texts of the queries reading them
+     */
+    public Map<String, List<List<String>>> getDictionaryRows()
+    {
+        return dictionaryRows;
     }
 
 
