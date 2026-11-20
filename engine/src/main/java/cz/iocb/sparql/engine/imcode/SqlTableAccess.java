@@ -34,6 +34,7 @@ import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restrictio
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBinding;
@@ -55,7 +56,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * access whose variable the nodes above merge with its value in the current solution takes the value into its own
  * conditions, compared in the class of its columns like a constant (see {@link ValueCondition}); so does an access
  * whose variable a filter above requires to be a constant term, which makes the filter needless (see
- * {@link SqlIntercode#addAcceptedValues}).
+ * {@link SqlIntercode#addAcceptedValues}). With the join optimizer on, an access whose variable a filter above accepts
+ * only with one of several constant terms takes the terms into its conditions as a disjunction (see
+ * {@link #restrictToAcceptedTerms}).
  */
 public final class SqlTableAccess extends SqlIntercode
 {
@@ -1910,6 +1913,12 @@ public final class SqlTableAccess extends SqlIntercode
         if(optimizedValues == null)
             return SqlNoSolution.get();
 
+        // so do the terms the parent accepts of the variables, as conditions on the rows
+        Conditions optimizedConditions = restrictToAcceptedTerms(request, restrictions);
+
+        if(optimizedConditions.isFalse())
+            return SqlNoSolution.get();
+
         VariableBindings optimizedBindings = internal.restrict(relations, restrictions);
 
         Set<Column> optimizedDistinct = distinctColumns;
@@ -1918,11 +1927,115 @@ public final class SqlTableAccess extends SqlIntercode
             optimizedDistinct = Set.of();
 
         if(this.reduced == reduced && optimizedBindings.equals(internal) && optimizedDistinct == distinctColumns
-                && optimizedValues == values)
+                && optimizedValues == values && optimizedConditions == conditions)
             return this;
 
-        return new SqlTableAccess(schema, table, conditions, optimizedBindings, reduced, optimizedDistinct,
+        return new SqlTableAccess(schema, table, optimizedConditions, optimizedBindings, reduced, optimizedDistinct,
                 optimizedValues);
+    }
+
+
+    /**
+     * The conditions on the rows together with the terms the parent accepts of the variables the access binds always in
+     * a single class (see {@link Restrictions#getAcceptedTerms}), when the join optimizer is on: a row holding another
+     * term in the columns of such a variable gives a solution that never reaches the result. The terms are converted to
+     * the class of the columns and make a disjunction of equalities with them, as the rows of inline data merged into
+     * the access do (see {@link SqlValues#asConditions}), so that the database looks the rows up by an index and the
+     * join optimizer estimates them by the statistics of the table for every term; the filter accepting the terms
+     * compares values, which the database can neither look up nor estimate where the columns hold the terms in boxes,
+     * and which it does not push into an access that is looked up for the rows of another one. The filter stays above
+     * the access. A term the class cannot hold is left out, and no row is left when it can hold none. The conditions
+     * stay as they are when they restrict the rows so already, and when the disjunction would give them too many
+     * disjuncts (see {@link #disjunctLimit}). Without the optimizer the database plans the joins by its own estimates,
+     * which would count the filter and the conditions as two restrictions, so the terms are left to the filter.
+     *
+     * @param request the current request
+     * @param restrictions what the parent needs of the variables
+     * @return the conditions on the rows together with the accepted terms (the conditions of this access when nothing
+     *         has changed)
+     */
+    private Conditions restrictToAcceptedTerms(Request request, Restrictions restrictions)
+    {
+        if(table == null || !request.getConfiguration().isJoinOptimizerEnabled())
+            return conditions;
+
+        Conditions result = conditions;
+
+        for(VariableBinding binding : internal.getValues())
+        {
+            Set<RdfTerm> terms = restrictions.getAcceptedTerms(binding.getVariable());
+            Conditions accepted = terms == null ? null : getTermConditions(request, binding, terms);
+
+            if(accepted == null || result.implies(accepted))
+                continue;
+
+            if((long) result.getConditions().size() * accepted.getConditions().size() > disjunctLimit)
+                continue;
+
+            result = Conditions.and(result, accepted);
+        }
+
+        return result;
+    }
+
+
+    /**
+     * The condition that the columns of a variable hold one of the given terms: a disjunction of the equalities of the
+     * columns with the terms converted to their class, a term the class cannot hold being left out (the condition is
+     * false when it can hold none). Null when the access does not bind the variable always, in a single class that has
+     * columns.
+     *
+     * @param request the current request
+     * @param binding binding of the variable in terms of the table's own columns, or null
+     * @param terms the terms
+     * @return the condition that the columns of the variable hold one of the terms, or null
+     */
+    private Conditions getTermConditions(Request request, VariableBinding binding, Set<RdfTerm> terms)
+    {
+        if(binding == null || binding.canBeNull() || binding.getMappings().size() != 1)
+            return null;
+
+        Entry<ResourceClass, List<Column>> mapping = binding.getMappings().entrySet().iterator().next();
+
+        if(mapping.getValue() == null)
+            return null;
+
+        Conditions accepted = new Conditions(false);
+
+        for(RdfTerm term : terms)
+        {
+            if(!request.match(mapping.getKey(), term))
+                continue;
+
+            List<Column> columns = request.getColumns(mapping.getKey(), term);
+
+            Condition condition = new Condition();
+            condition.addAreEqual(mapping.getValue(), columns,
+                    needsNullSafeEquality(schema, table, mapping.getKey(), mapping.getValue(), columns));
+
+            accepted.add(condition);
+        }
+
+        return accepted;
+    }
+
+
+    /**
+     * True if the conditions restrict the rows to those holding one of the given terms in the columns of the variable,
+     * as they do once the access has taken the terms a filter accepts of the variable in (see
+     * {@link #restrictToAcceptedTerms}); the join optimizer then counts the filter by the rows of the access alone.
+     *
+     * @param request the current request
+     * @param variable the variable
+     * @param terms the terms
+     * @return true if the conditions restrict the rows to those holding one of the terms in the columns of the
+     *         variable, false otherwise
+     */
+    boolean isRestrictedTo(Request request, Variable variable, Set<RdfTerm> terms)
+    {
+        Conditions accepted = getTermConditions(request, internal.get(variable), terms);
+
+        return accepted != null && conditions.implies(accepted);
     }
 
 

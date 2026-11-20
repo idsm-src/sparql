@@ -33,6 +33,7 @@ import cz.iocb.sparql.engine.imcode.expression.SqlUnaryLogical;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.Estimator;
@@ -1864,7 +1865,8 @@ final class JoinOptimizer
      * the values of a column are distributed, so it tells a range holding a few rows from one holding nearly all of
      * them, and it is asked about the conditions together, so that it sees both bounds of a range. The other
      * conditions, and all of them when the planner cannot be asked, are estimated by what they say (see
-     * {@link #selectivity(SqlExpressionIntercode)}).
+     * {@link #selectivity(SqlExpressionIntercode)}). A condition the rows estimated for the node count with already
+     * keeps them all (see {@link #isCounted}).
      *
      * @param request the current request
      * @param node the node
@@ -1881,6 +1883,10 @@ final class JoinOptimizer
 
         for(SqlExpressionIntercode condition : conditions)
         {
+            // the rows of an access that has taken the terms of the condition in count with the condition already
+            if(isCounted(request, node, condition))
+                continue;
+
             SqlExpressionIntercode comparison = !table ? null :
                     getComparison(request.getConfiguration(), condition, node.getVariableBindings());
 
@@ -1901,6 +1907,58 @@ final class JoinOptimizer
         double estimated = new Estimator(request).estimateSelectivity(request, Scope.TOP, node, comparisons);
 
         return others * (Double.isNaN(estimated) ? compared : estimated);
+    }
+
+
+    /**
+     * True if the rows estimated for the node count with the condition already: the condition accepts only some terms
+     * of a variable (see {@link SqlIntercode#getAcceptedTerms}) and a table access the node takes the variable from has
+     * taken those terms into its conditions (see {@link #isRestrictedTo}), so that its rows are estimated by the
+     * statistics of its table for the terms.
+     *
+     * @param request the current request
+     * @param node the node
+     * @param condition the condition
+     * @return true if the rows estimated for the node count with the condition already, false otherwise
+     */
+    private static boolean isCounted(Request request, SqlIntercode node, SqlExpressionIntercode condition)
+    {
+        SqlIntercode.AcceptedTerms accepted = SqlIntercode.getAcceptedTerms(request, condition,
+                node.getVariableBindings());
+
+        return accepted != null && isRestrictedTo(request, node, accepted.variable(), accepted.terms());
+    }
+
+
+    /**
+     * True if every solution of the node binds the variable to one of the terms because a table access has taken the
+     * terms into its conditions (see {@link SqlTableAccess#isRestrictedTo}): the access itself, a join with such a
+     * child, a union of such children, the left side of a left join or a difference, and a node passing the solutions
+     * of such a child on.
+     *
+     * @param request the current request
+     * @param node the node
+     * @param variable the variable
+     * @param terms the terms
+     * @return true if every solution of the node binds the variable to one of the terms by the conditions of a table
+     *         access, false otherwise
+     */
+    private static boolean isRestrictedTo(Request request, SqlIntercode node, Variable variable, Set<RdfTerm> terms)
+    {
+        return switch(node)
+        {
+            case SqlTableAccess access -> access.isRestrictedTo(request, variable, terms);
+            case SqlJoin join -> join.getChilds().stream().anyMatch(c -> isRestrictedTo(request, c, variable, terms));
+            case SqlUnion union -> union.getChilds().stream()
+                    .allMatch(c -> isRestrictedTo(request, c, variable, terms));
+            case SqlLeftJoin leftJoin -> isRestrictedTo(request, leftJoin.getLeft(), variable, terms);
+            case SqlMinus minus -> isRestrictedTo(request, minus.getLeft(), variable, terms);
+            case SqlFilter filter -> isRestrictedTo(request, filter.getChild(), variable, terms);
+            case SqlDistinct distinct -> isRestrictedTo(request, distinct.getChild(), variable, terms);
+            case SqlStripConstantColumns strip -> isRestrictedTo(request, strip.getChild(), variable, terms);
+            case SqlShared shared -> isRestrictedTo(request, shared.getChild(), variable, terms);
+            default -> false;
+        };
     }
 
 

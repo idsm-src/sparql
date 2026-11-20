@@ -35,8 +35,10 @@ import cz.iocb.sparql.testing.Database;
  * The join optimizer over a single table holding all the triples in boxes, with the statistics of the table kept per
  * predicate (see {@link GroupedStatistics}), where a constant is an expression putting the term into a box: a term that
  * a filter requires of a variable restricts the rows of the access binding the variable like a constant of the triple
- * pattern does, so the access of a few rows is the outer side of an index lookup. The solutions are those of the joins
- * left to the planner.
+ * pattern does, so the access of a few rows is the outer side of an index lookup; the terms a filter accepts of a
+ * variable become a disjunction in the conditions of the access, which the database looks up by an index and the
+ * optimizer estimates by the statistics, whereas the filter itself compares the values of boxes. The solutions are
+ * those of the joins left to the planner.
  */
 public class BoxTableOptimizerTest
 {
@@ -63,9 +65,9 @@ public class BoxTableOptimizerTest
 
     /**
      * Creates the {@code box_table_test} schema: the table of the triples of 2000 nodes, each with a kind
-     * ({@code "rare"} for ten of them, {@code "common"} for the others) and five links to other nodes, indexed by the
-     * predicate with the subject and with the object and analysed, and its statistics per predicate; and the two
-     * configurations mapping the table by boxes.
+     * ({@code "rare"} for ten of them, {@code "odd"} for other ten, {@code "common"} for the others) and five links to
+     * other nodes, indexed by the predicate with the subject and with the object and analysed, and its statistics per
+     * predicate; and the two configurations mapping the table by boxes.
      */
     @BeforeAll
     static void init() throws SQLException
@@ -85,7 +87,8 @@ public class BoxTableOptimizerTest
                     insert into box_table_test.triples
                     select sparql.rdfbox_create_from_iri('http://example.org/n/' || i),
                         sparql.rdfbox_create_from_iri('http://example.org/kind'),
-                        sparql.rdfbox_create_from_string(case when i % 200 = 0 then 'rare' else 'common' end)
+                        sparql.rdfbox_create_from_string(
+                            case when i % 200 = 0 then 'rare' when i % 200 = 100 then 'odd' else 'common' end)
                     from generate_series(1, 2000) as i""");
             statement.execute("""
                     insert into box_table_test.triples
@@ -161,7 +164,16 @@ public class BoxTableOptimizerTest
      */
     private static String translate(String query) throws Exception
     {
-        Engine engine = new Engine(optimized);
+        return translate(optimized, query);
+    }
+
+
+    /**
+     * Returns the SQL code the query is translated to over the configuration.
+     */
+    private static String translate(SparqlDatabaseConfiguration config, String query) throws Exception
+    {
+        Engine engine = new Engine(config);
 
         try(Request request = engine.getRequest())
         {
@@ -210,7 +222,7 @@ public class BoxTableOptimizerTest
         String common = "SELECT ?x ?y WHERE { ?x ex:kind ?k . ?x ex:link ?y FILTER(?k = \"common\") }";
 
         assertThat(translate(common), not(containsString(lookup)));
-        assertThat(check(common), hasSize(9950));
+        assertThat(check(common), hasSize(9900));
 
         // an IRI, which a box holds by another expression than a string
         String node = "SELECT ?x ?k WHERE { ?x ex:kind ?k . ?x ex:link ?y FILTER(?y = <http://example.org/n/21>) }";
@@ -223,5 +235,51 @@ public class BoxTableOptimizerTest
 
         assertThat(translate(same), containsString(lookup));
         assertThat(check(same), hasSize(50));
+    }
+
+    @Test
+    public void termsAcceptedByAFilter() throws Exception
+    {
+        String rare = "\"o\" operator(sparql.@=) sparql.rdfbox_create_from_string('rare'::varchar)";
+        String odd = "\"o\" operator(sparql.@=) sparql.rdfbox_create_from_string('odd'::varchar)";
+
+        // the twenty nodes of the two kinds are read by the index and are the outer side of a lookup of their links
+        String in = "SELECT ?x ?y WHERE { ?x ex:kind ?k . ?x ex:link ?y FILTER(?k IN (\"rare\", \"odd\")) }";
+
+        assertThat(translate(in), containsString(rare));
+        assertThat(translate(in), containsString(odd));
+        assertThat(translate(in), containsString(lookup));
+        assertThat(check(in), hasSize(100));
+
+        // a disjunction of equalities accepts the terms as well
+        String or = "SELECT ?x ?y WHERE { ?x ex:kind ?k . ?x ex:link ?y FILTER(?k = \"rare\" || ?k = \"odd\") }";
+
+        assertThat(translate(or), containsString(rare));
+        assertThat(translate(or), containsString(lookup));
+        assertThat(check(or), hasSize(100));
+
+        // nearly all the nodes are of the accepted kinds, which the statistics tell, so the sides are hashed
+        String common = "SELECT ?x ?y WHERE { ?x ex:kind ?k . ?x ex:link ?y FILTER(?k IN (\"common\", \"rare\")) }";
+
+        assertThat(translate(common), containsString(rare));
+        assertThat(translate(common), not(containsString(lookup)));
+        assertThat(check(common), hasSize(9950));
+
+        // IRIs, whose links are looked up from the accepted objects
+        String nodes = "SELECT ?x ?k WHERE { ?x ex:kind ?k . ?x ex:link ?y "
+                + "FILTER(?y IN (<http://example.org/n/21>, <http://example.org/n/22>)) }";
+
+        assertThat(translate(nodes), containsString(lookup));
+        assertThat(check(nodes), hasSize(10));
+
+        // the filter is evaluated above a grouping, and the access below takes the terms in all the same
+        String grouped = "SELECT ?k (COUNT(?x) AS ?c) WHERE { ?x ex:kind ?k } GROUP BY ?k "
+                + "HAVING(?k IN (\"rare\", \"odd\"))";
+
+        assertThat(translate(grouped), containsString(rare));
+        assertThat(check(grouped), hasSize(2));
+
+        // without the optimizer the database plans by its own estimates, so the terms are left to the filter
+        assertThat(translate(plain, in), not(containsString(rare)));
     }
 }

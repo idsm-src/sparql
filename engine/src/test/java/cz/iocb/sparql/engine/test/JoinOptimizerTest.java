@@ -518,4 +518,33 @@ public class JoinOptimizerTest
 
         assertThat(check(query), hasSize(20));
     }
+
+
+    @Test
+    public void filterAcceptingTerms() throws Exception
+    {
+        // the access takes the terms the filter accepts of its variable in, converted to the class of its column
+        String query = "SELECT ?x ?y WHERE { ?x ex:link ?y "
+                + "FILTER(?x IN (<http://example.org/n/1>, <http://example.org/n/2>)) }";
+
+        String sql = translate(optimized, query);
+        assertThat(sql, containsString("\"links\" WHERE (("));
+        assertThat(sql, containsString("\"src\" = '1'::int4"));
+        assertThat(sql, containsString("\"src\" = '2'::int4"));
+
+        // without the optimizer the terms are left to the filter, which the database pushes down by itself
+        assertThat(translate(plain, query), not(containsString("\"links\" WHERE ")));
+
+        assertThat(check(query), hasSize(20));
+
+        // a term the class of the column cannot hold is left out, and no row is left when it holds none of them
+        assertThat(check("SELECT ?x ?y WHERE { ?x ex:link ?y "
+                + "FILTER(?x IN (<http://example.org/n/1>, <http://example.org/other>)) }"), hasSize(10));
+        assertThat(check("SELECT ?x ?y WHERE { ?x ex:link ?y "
+                + "FILTER(?x IN (<http://example.org/other>, <http://example.org/another>)) }"), hasSize(0));
+
+        // a variable that may be unbound restricts no access
+        assertThat(check("SELECT ?x ?y WHERE { ?x ex:tag ?t OPTIONAL { ?x ex:link ?y } "
+                + "FILTER(?y IN (<http://example.org/n/8>, <http://example.org/n/15>)) }"), hasSize(4));
+    }
 }
