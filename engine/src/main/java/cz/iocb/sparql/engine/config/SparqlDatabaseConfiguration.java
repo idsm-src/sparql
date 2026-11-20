@@ -666,8 +666,8 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
-     * Column-based mapping of a class without a mapping of its own, the box or a triple term class, over the given
-     * column specifications (see {@link #getColumns(ResourceClass, String...)}).
+     * Column-based mapping of a class without a mapping of its own, the box, a class derived from the box or a triple
+     * term class, over the given column specifications (see {@link #getColumns(ResourceClass, String...)}).
      *
      * @param resourceClass the resource class
      * @param columns the columns
@@ -680,8 +680,8 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
-     * Column-based mapping of a class without a mapping of its own, the box or a triple term class, over the given
-     * columns.
+     * Column-based mapping of a class without a mapping of its own, the box, a class derived from the box or a triple
+     * term class, over the given columns.
      *
      * @param resourceClass the resource class
      * @param columns the columns

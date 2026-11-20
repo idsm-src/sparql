@@ -128,9 +128,9 @@ import cz.iocb.sparql.testing.Database;
  * {@code src/test/resources/sparql12}: syntax tests check that a query is or is not accepted, evaluation tests load the
  * test data as constant quad mappings of a fresh configuration (or store them in one table, as boxes or in typed
  * columns, mapped by column, or as the numbers of their terms next to a table numbering the terms, see
- * {@link NumberedQuadTable}) and compare the results with the expected {@code .srx} or {@code .ttl} file. The NeXtProt
- * families only translate and run the queries of {@code nextprot/queryset.sparql} against the three NeXtProt
- * configurations. Requires the {@link Database} container.
+ * {@link NumberedQuadTable}, or of their IRIs and blank nodes only, see {@link MixedQuadTable}) and compare the results
+ * with the expected {@code .srx} or {@code .ttl} file. The NeXtProt families only translate and run the queries of
+ * {@code nextprot/queryset.sparql} against the three NeXtProt configurations. Requires the {@link Database} container.
  */
 @DisplayName("SPARQL Tests")
 public class SparqlTest
@@ -210,8 +210,9 @@ public class SparqlTest
 
 
     /**
-     * Creates the quad table, the tables of the numbered quads and the NeXtProt engines, reads every
-     * {@code manifest.ttl} into the model and prepares the subset literal classes.
+     * Creates the quad table, the tables of the numbered quads, those of the quads whose resources only are numbered,
+     * and the NeXtProt engines, reads every {@code manifest.ttl} into the model and prepares the subset literal
+     * classes.
      */
     @BeforeAll
     static void init() throws FileNotFoundException, IOException, SQLException
@@ -225,6 +226,7 @@ public class SparqlTest
                     + "s sparql.rdfbox not null, p sparql.rdfbox not null, o sparql.rdfbox not null)");
 
             NumberedQuadTable.create(statement);
+            MixedQuadTable.create(statement);
         }
 
         schema = new DatabaseSchema(connectionPool);
@@ -468,6 +470,35 @@ public class SparqlTest
         try(Request request = engine.getRequest())
         {
             NumberedQuadTable.store(request, quads);
+
+            List<List<RdfTerm>> result = getResult(request.execute(query), expected.variables());
+
+            MatcherAssert.assertThat(result, Matchers.containsInAnyOrder(expected.rows().toArray()));
+        }
+    }
+
+
+    /**
+     * Evaluation tests with the test data stored in {@link MixedQuadTable}: the quads hold the numbers of their IRIs
+     * and blank nodes, which another table numbers, and the other objects in place, in a table of their own, as a
+     * triple store that numbers the resources only keeps its data.
+     */
+    @DisplayName("Query Evaluation Tests (with a table of numbered resources)")
+    @ParameterizedTest(name = "{0}: {1}")
+    @MethodSource("getMixedTableTests")
+    void doQueryEvaluationTestsWithNumberedResources(MixedQuadTable.Variant variant, String name, String query,
+            List<Quad> quads, ExpectedResult expected)
+            throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
+    {
+        SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool, schema, false);
+
+        MixedQuadTable.map(config, variant);
+
+        Engine engine = new Engine(config);
+
+        try(Request request = engine.getRequest())
+        {
+            MixedQuadTable.store(request, quads);
 
             List<List<RdfTerm>> result = getResult(request.execute(query), expected.variables());
 
@@ -780,6 +811,28 @@ public class SparqlTest
         List<Arguments> result = new ArrayList<>();
 
         for(NumberedQuadTable.Variant variant : NumberedQuadTable.Variant.values())
+        {
+            for(Arguments test : tests)
+            {
+                Object[] args = test.get();
+                result.add(Arguments.of(variant, args[0], args[1], args[2], args[3]));
+            }
+        }
+
+        return result;
+    }
+
+
+    /**
+     * The evaluation tests (see {@link #getQueryEvaluationTests}) in every variant of {@link MixedQuadTable}.
+     */
+    static List<Arguments> getMixedTableTests()
+            throws URISyntaxException, IOException, ParserConfigurationException, SAXException
+    {
+        List<Arguments> tests = getQueryEvaluationTests();
+        List<Arguments> result = new ArrayList<>();
+
+        for(MixedQuadTable.Variant variant : MixedQuadTable.Variant.values())
         {
             for(Arguments test : tests)
             {

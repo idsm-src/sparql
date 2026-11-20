@@ -209,6 +209,25 @@ public class SqlDumpTest
                     dump(out, "eval-numbered-" + variant.name().toLowerCase(ROOT), (String) a[0], numberedEngine,
                             (String) a[1]);
                 }
+
+                // and so are the queries over the quads whose resources only are numbered
+                for(MixedQuadTable.Variant variant : MixedQuadTable.Variant.values())
+                {
+                    SparqlDatabaseConfiguration mixedConfig = new SparqlDatabaseConfiguration(null,
+                            SparqlTest.connectionPool, SparqlTest.schema, false);
+
+                    MixedQuadTable.map(mixedConfig, variant);
+
+                    Engine mixedEngine = new Engine(mixedConfig);
+
+                    try(Request request = mixedEngine.getRequest())
+                    {
+                        MixedQuadTable.store(request, quads);
+                    }
+
+                    dump(out, "eval-mixed-" + variant.name().toLowerCase(ROOT), (String) a[0], mixedEngine,
+                            (String) a[1]);
+                }
             }
 
             for(Arguments args : SparqlTest.getNextProtTests())
