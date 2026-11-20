@@ -2001,7 +2001,10 @@ public final class SqlTableAccess extends SqlIntercode
     /**
      * The conditions on the rows together with the equalities of the columns with the constants the rows are restricted
      * to (see {@link #values}), which are conditions on the rows as well; a value of a current solution, known only
-     * when the statement runs, adds nothing. The join optimizer estimates the rows of the access by them.
+     * when the statement runs, adds nothing. A constant term is a constant also where its conversion to the class of
+     * the columns is an expression and no constant column, like an IRI or a literal put into a box, as the constants of
+     * the triple patterns are in the conditions on the rows. The join optimizer estimates the rows of the access by
+     * them.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @return the conditions on the rows together with the equalities of the columns with the constants the rows are
@@ -2020,7 +2023,7 @@ public final class SqlTableAccess extends SqlIntercode
 
             List<Column> derived = value.getBinding().deriveMapping(relations, condition.resourceClass());
 
-            if(derived.stream().allMatch(c -> c instanceof ConstantColumn))
+            if(value.getBinding().isConstant() || derived.stream().allMatch(c -> c instanceof ConstantColumn))
                 constants.addAreEqual(condition.columns(), derived, condition.resourceClass()::isOptionalColumn);
         }
 
