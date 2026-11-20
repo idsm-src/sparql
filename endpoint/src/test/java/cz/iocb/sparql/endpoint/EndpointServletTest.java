@@ -215,7 +215,7 @@ public class EndpointServletTest
      * @param type the type
      * @return default value of the type
      */
-    private static Object defaultValue(Class<?> type)
+    static Object defaultValue(Class<?> type)
     {
         if(type == boolean.class)
             return false;

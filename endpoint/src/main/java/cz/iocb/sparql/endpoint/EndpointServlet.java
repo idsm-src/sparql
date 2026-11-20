@@ -235,6 +235,118 @@ public class EndpointServlet extends HttpServlet
 
 
     /**
+     * The client has closed the connection before the response has been written.
+     */
+    static final class ClientAbortedException extends IOException
+    {
+        /**
+         * Serialization version.
+         */
+        private static final long serialVersionUID = 1L;
+
+
+        /**
+         * Creates the exception.
+         *
+         * @param cause the error that the cancelled request has ended by, or null
+         */
+        ClientAbortedException(Throwable cause)
+        {
+            super("the client has closed the connection", cause);
+        }
+    }
+
+
+    /**
+     * Check, while a result is written, that the client still takes the response, which needs no internal API of the
+     * container: the writer of the response does not report the failures of writing to a client that has closed the
+     * connection, it keeps them for {@link PrintWriter#checkError}, which flushes the writer, so every
+     * {@link #CHECK_ROWS} rows, or once {@link #CHECK_INTERVAL} nanoseconds have passed since the last check, the
+     * writer is flushed and its error checked, unless the response is not committed yet: nothing has been sent then, so
+     * nothing can have failed, and the flush would commit the response, whose status could tell an error no more. So
+     * the writing of the result ends soon after the client has closed the connection also where the watch of the
+     * connection does nothing (see {@link ClientWatch}), like for a stream of HTTP/2, which the client resets when it
+     * gives the request up, and behind a proxy that closes its connection once it has failed to write the response to
+     * its client.
+     */
+    static final class ClientCheck
+    {
+        /**
+         * Largest number of rows between two checks.
+         */
+        static final int CHECK_ROWS = 1000;
+
+        /**
+         * Longest time between two checks in nanoseconds.
+         */
+        static final long CHECK_INTERVAL = 1_000_000_000L;
+
+        /**
+         * The response.
+         */
+        private final HttpServletResponse response;
+
+        /**
+         * The writer of the response.
+         */
+        private final PrintWriter out;
+
+        /**
+         * Rows since the last check.
+         */
+        private int rows = 0;
+
+        /**
+         * Time of the last check in {@link System#nanoTime} units.
+         */
+        private long checked = System.nanoTime();
+
+
+        /**
+         * Creates the check of the response.
+         *
+         * @param response the response
+         * @param out the writer of the response
+         */
+        ClientCheck(HttpServletResponse response, PrintWriter out)
+        {
+            this.response = response;
+            this.out = out;
+        }
+
+
+        /**
+         * Moves the result to its next row, having checked first, when it is time, that the client still takes the
+         * response.
+         *
+         * @param result the result
+         * @return true if the result has moved to its next row, false at its end
+         * @throws ClientAbortedException if the client has closed the connection
+         * @throws SQLException on database errors
+         */
+        boolean next(Result result) throws ClientAbortedException, SQLException
+        {
+            if(++rows >= CHECK_ROWS || System.nanoTime() - checked >= CHECK_INTERVAL)
+            {
+                rows = 0;
+                checked = System.nanoTime();
+
+                if(response.isCommitted() && out.checkError())
+                    throw new ClientAbortedException(null);
+            }
+
+            return result.next();
+        }
+    }
+
+
+    /**
+     * Status logged for a request whose client has closed the connection before the response has been written, as nginx
+     * logs it.
+     */
+    private static final int CLIENT_CLOSED_REQUEST = 499;
+
+    /**
      * Logger of request processing.
      */
     private static final Logger logger = LoggerFactory.getLogger(EndpointServlet.class);
@@ -594,7 +706,9 @@ public class EndpointServlet extends HttpServlet
 
     /**
      * Prepares and runs the query with the protocol dataset parameters and writes the result in the negotiated format;
-     * errors are reported by HTTP status codes.
+     * errors are reported by HTTP status codes. The request of a client that closes the connection is cancelled (see
+     * {@link ClientWatch}), or its result is written no further (see {@link ClientCheck}), and the request is logged
+     * with the status {@link #CLIENT_CLOSED_REQUEST}.
      *
      * @param req the HTTP request
      * @param res the HTTP response
@@ -609,6 +723,9 @@ public class EndpointServlet extends HttpServlet
     private void process(HttpServletRequest req, HttpServletResponse res, String query, String[] defaultGraphs,
             String[] namedGraphs, String[] versions, long timeout, int sqlSizeLimit) throws IOException
     {
+        // whether the client has closed the connection before the response has been written
+        boolean aborted = false;
+
         try
         {
             MDC.put("request", getRequestString(req));
@@ -664,100 +781,122 @@ public class EndpointServlet extends HttpServlet
             }
 
 
-            try(Request request = engine.getRequest(serviceReorder))
+            try(Request request = engine.getRequest(serviceReorder);
+                    ClientWatch watch = ClientWatch.start(req, request))
             {
-                PreparedQuery preparedQuery = request.prepareQuery(query, dataSets, version);
-                OutputType format = detectOutputType(req, preparedQuery.getResultType());
-                List<Variable> order = format == RDF_JSON ? List.of(SUBJECT.getVariable(), PREDICATE.getVariable()) :
-                        List.of();
-
-                // RDF 1.2 is announced in the result when the request announced SPARQL 1.2 or accepted RDF 1.2
-                boolean announce = isVersion12(preparedQuery.getVersion()) || acceptsVersion12(req, format);
-
-                try(Result result = request.execute(preparedQuery, order, 0, limit, fetchSize, timeout, sqlSizeLimit))
+                try
                 {
-                    res.setContentType(announce && format.hasVersionParameter() ? format.getMime() + ";version=1.2" :
-                            format.getMime());
+                    PreparedQuery preparedQuery = request.prepareQuery(query, dataSets, version);
+                    OutputType format = detectOutputType(req, preparedQuery.getResultType());
+                    List<Variable> order = format == RDF_JSON ?
+                            List.of(SUBJECT.getVariable(), PREDICATE.getVariable()) : List.of();
 
-                    switch(result.getResultType())
+                    // RDF 1.2 is announced in the result when the request announced SPARQL 1.2 or accepted RDF 1.2
+                    boolean announce = isVersion12(preparedQuery.getVersion()) || acceptsVersion12(req, format);
+
+                    try(Result result = request.execute(preparedQuery, order, 0, limit, fetchSize, timeout,
+                            sqlSizeLimit))
                     {
-                        case ASK:
-                            switch(format)
-                            {
-                                case SPARQL_JSON:
-                                    writeAskJson(res.getWriter(), result, includeWarnings, announce);
-                                    break;
-                                case SPARQL_XML:
-                                    writeAskXml(res.getWriter(), result, includeWarnings);
-                                    break;
-                                case TSV:
-                                    // non-standard extension
-                                    writeAskTsv(res.getWriter(), result);
-                                    break;
-                                case CSV:
-                                    // non-standard extension
-                                    writeAskCsv(res.getWriter(), result);
-                                    break;
-                                default:
-                                    res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
-                                    break;
-                            }
-                            break;
+                        res.setContentType(announce && format.hasVersionParameter() ?
+                                format.getMime() + ";version=1.2" : format.getMime());
 
-                        case SELECT:
-                            switch(format)
-                            {
-                                case SPARQL_JSON:
-                                    writeSelectJson(res.getWriter(), result, includeWarnings, announce);
-                                    break;
-                                case SPARQL_XML:
-                                    writeSelectXml(res.getWriter(), result, includeWarnings);
-                                    break;
-                                case TSV:
-                                    writeSelectTsv(res.getWriter(), result);
-                                    break;
-                                case CSV:
-                                    writeSelectCsv(res.getWriter(), result);
-                                    break;
-                                default:
-                                    res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
-                                    break;
-                            }
-                            break;
+                        PrintWriter out = res.getWriter();
+                        ClientCheck client = new ClientCheck(res, out);
 
-                        case DESCRIBE:
-                        case CONSTRUCT:
-                            switch(format)
-                            {
-                                case RDF_XML:
-                                    writeGraphXml(res.getWriter(), result);
-                                    break;
-                                case RDF_JSON:
-                                    writeGraphJson(res.getWriter(), result);
-                                    break;
-                                case TURTLE:
-                                case TRIG:
-                                    writeGraphTurtle(res.getWriter(), result, engine.getConfig().getPrefixes(),
-                                            announce);
-                                    break;
-                                case NTRIPLES:
-                                case NQUADS:
-                                    writeGraphTriples(res.getWriter(), result, announce);
-                                    break;
-                                case TSV:
-                                    writeGraphTsv(res.getWriter(), result);
-                                    break;
-                                case CSV:
-                                    writeGraphCsv(res.getWriter(), result);
-                                    break;
-                                default:
-                                    res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
-                                    break;
-                            }
-                            break;
+                        switch(result.getResultType())
+                        {
+                            case ASK:
+                                switch(format)
+                                {
+                                    case SPARQL_JSON:
+                                        writeAskJson(out, result, includeWarnings, announce);
+                                        break;
+                                    case SPARQL_XML:
+                                        writeAskXml(out, result, includeWarnings);
+                                        break;
+                                    case TSV:
+                                        // non-standard extension
+                                        writeAskTsv(out, result);
+                                        break;
+                                    case CSV:
+                                        // non-standard extension
+                                        writeAskCsv(out, result);
+                                        break;
+                                    default:
+                                        res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+                                        break;
+                                }
+                                break;
+
+                            case SELECT:
+                                switch(format)
+                                {
+                                    case SPARQL_JSON:
+                                        writeSelectJson(out, result, client, includeWarnings, announce);
+                                        break;
+                                    case SPARQL_XML:
+                                        writeSelectXml(out, result, client, includeWarnings);
+                                        break;
+                                    case TSV:
+                                        writeSelectTsv(out, result, client);
+                                        break;
+                                    case CSV:
+                                        writeSelectCsv(out, result, client);
+                                        break;
+                                    default:
+                                        res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+                                        break;
+                                }
+                                break;
+
+                            case DESCRIBE:
+                            case CONSTRUCT:
+                                switch(format)
+                                {
+                                    case RDF_XML:
+                                        writeGraphXml(out, result, client);
+                                        break;
+                                    case RDF_JSON:
+                                        writeGraphJson(out, result, client);
+                                        break;
+                                    case TURTLE:
+                                    case TRIG:
+                                        writeGraphTurtle(out, result, client, engine.getConfig().getPrefixes(),
+                                                announce);
+                                        break;
+                                    case NTRIPLES:
+                                    case NQUADS:
+                                        writeGraphTriples(out, result, client, announce);
+                                        break;
+                                    case TSV:
+                                        writeGraphTsv(out, result, client);
+                                        break;
+                                    case CSV:
+                                        writeGraphCsv(out, result, client);
+                                        break;
+                                    default:
+                                        res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+                                        break;
+                                }
+                                break;
+                        }
                     }
                 }
+                catch(Exception e)
+                {
+                    // the watch cancels the request of a client that has closed the connection, which ends the request
+                    // by an error
+                    if(watch.isClosed())
+                        throw new ClientAbortedException(e);
+
+                    throw e;
+                }
             }
+        }
+        catch(ClientAbortedException e)
+        {
+            // nothing can be written to a client that has closed the connection
+            aborted = true;
         }
         catch(TranslateExceptions e)
         {
@@ -862,9 +1001,9 @@ public class EndpointServlet extends HttpServlet
         }
         finally
         {
-            int status = res.getStatus();
+            int status = aborted ? CLIENT_CLOSED_REQUEST : res.getStatus();
 
-            switch(res.getStatus())
+            switch(status)
             {
                 case HttpServletResponse.SC_OK -> logger.info(Integer.toString(status));
                 case HttpServletResponse.SC_INTERNAL_SERVER_ERROR -> logger.error(Integer.toString(status));
@@ -1222,11 +1361,12 @@ public class EndpointServlet extends HttpServlet
      *
      * @param out the output writer
      * @param result the result to write
+     * @param client the check that the client still takes the response
      * @param includeWarnings whether to include the statement warnings
      * @throws IOException on output errors
      * @throws SQLException on database errors
      */
-    private static void writeSelectXml(PrintWriter out, Result result, boolean includeWarnings)
+    private static void writeSelectXml(PrintWriter out, Result result, ClientCheck client, boolean includeWarnings)
             throws IOException, SQLException
     {
         out.println("<?xml version=\"1.0\"?>");
@@ -1245,7 +1385,7 @@ public class EndpointServlet extends HttpServlet
 
         out.println("\t<results>");
 
-        while(result.next())
+        while(client.next(result))
         {
             out.println("\t\t<result>");
 
@@ -1292,12 +1432,13 @@ public class EndpointServlet extends HttpServlet
      *
      * @param out the output writer
      * @param result the result to write
+     * @param client the check that the client still takes the response
      * @param includeWarnings whether to include the statement warnings
      * @param announceVersion whether to announce RDF 1.2 by the {@code version} member of the head
      * @throws IOException on output errors
      * @throws SQLException on database errors
      */
-    private static void writeSelectJson(PrintWriter out, Result result, boolean includeWarnings,
+    private static void writeSelectJson(PrintWriter out, Result result, ClientCheck client, boolean includeWarnings,
             boolean announceVersion) throws IOException, SQLException
     {
         out.print("{\n\t\"head\": { \"vars\": [ ");
@@ -1321,7 +1462,7 @@ public class EndpointServlet extends HttpServlet
 
         boolean hasResult = false;
 
-        while(result.next())
+        while(client.next(result))
         {
             if(hasResult)
                 out.println(",");
@@ -1387,10 +1528,12 @@ public class EndpointServlet extends HttpServlet
      *
      * @param out the output writer
      * @param result the result to write
+     * @param client the check that the client still takes the response
      * @throws IOException on output errors
      * @throws SQLException on database errors
      */
-    private static void writeSelectTsv(PrintWriter out, Result result) throws IOException, SQLException
+    private static void writeSelectTsv(PrintWriter out, Result result, ClientCheck client)
+            throws IOException, SQLException
     {
         boolean hasHead = false;
 
@@ -1408,7 +1551,7 @@ public class EndpointServlet extends HttpServlet
         out.print('\n');
 
 
-        while(result.next())
+        while(client.next(result))
         {
             boolean hasResult = false;
 
@@ -1432,10 +1575,12 @@ public class EndpointServlet extends HttpServlet
      *
      * @param out the output writer
      * @param result the result to write
+     * @param client the check that the client still takes the response
      * @throws IOException on output errors
      * @throws SQLException on database errors
      */
-    private static void writeSelectCsv(PrintWriter out, Result result) throws IOException, SQLException
+    private static void writeSelectCsv(PrintWriter out, Result result, ClientCheck client)
+            throws IOException, SQLException
     {
         boolean hasHead = false;
 
@@ -1452,7 +1597,7 @@ public class EndpointServlet extends HttpServlet
         out.print("\r\n");
 
 
-        while(result.next())
+        while(client.next(result))
         {
             boolean hasResult = false;
 
@@ -1561,10 +1706,12 @@ public class EndpointServlet extends HttpServlet
      *
      * @param out the output writer
      * @param result the result to write
+     * @param client the check that the client still takes the response
      * @throws IOException on output errors
      * @throws SQLException on database errors
      */
-    private static void writeGraphXml(PrintWriter out, Result result) throws IOException, SQLException
+    private static void writeGraphXml(PrintWriter out, Result result, ClientCheck client)
+            throws IOException, SQLException
     {
         RdfTerm subject = null;
 
@@ -1572,7 +1719,7 @@ public class EndpointServlet extends HttpServlet
         out.println("<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
 
 
-        while(result.next())
+        while(client.next(result))
         {
             if(!result.get(0).equals(subject))
             {
@@ -1723,17 +1870,19 @@ public class EndpointServlet extends HttpServlet
      *
      * @param out the output writer
      * @param result the result to write
+     * @param client the check that the client still takes the response
      * @throws IOException on output errors
      * @throws SQLException on database errors
      */
-    private static void writeGraphJson(PrintWriter out, Result result) throws IOException, SQLException
+    private static void writeGraphJson(PrintWriter out, Result result, ClientCheck client)
+            throws IOException, SQLException
     {
         RdfTerm subject = null;
         Iri predicate = null;
 
         out.println("{");
 
-        while(result.next())
+        while(client.next(result))
         {
             if(!result.get(0).equals(subject))
             {
@@ -1788,13 +1937,14 @@ public class EndpointServlet extends HttpServlet
      *
      * @param out the output writer
      * @param result the result to write
+     * @param client the check that the client still takes the response
      * @param systemPrefixes prefixes for abbreviating IRIs
      * @param announceVersion whether to announce RDF 1.2 by the VERSION directive
      * @throws IOException on output errors
      * @throws SQLException on database errors
      */
-    private static void writeGraphTurtle(PrintWriter out, Result result, Map<String, String> systemPrefixes,
-            boolean announceVersion) throws IOException, SQLException
+    private static void writeGraphTurtle(PrintWriter out, Result result, ClientCheck client,
+            Map<String, String> systemPrefixes, boolean announceVersion) throws IOException, SQLException
     {
         if(announceVersion)
             out.println("VERSION \"1.2\"");
@@ -1804,7 +1954,7 @@ public class EndpointServlet extends HttpServlet
         RdfTerm subject = null;
         RdfTerm predicate = null;
 
-        while(result.next())
+        while(client.next(result))
         {
             if(!result.get(0).equals(subject))
             {
@@ -1846,17 +1996,18 @@ public class EndpointServlet extends HttpServlet
      *
      * @param out the output writer
      * @param result the result to write
+     * @param client the check that the client still takes the response
      * @param announceVersion whether to announce RDF 1.2 by the VERSION directive
      * @throws IOException on output errors
      * @throws SQLException on database errors
      */
-    private static void writeGraphTriples(PrintWriter out, Result result, boolean announceVersion)
+    private static void writeGraphTriples(PrintWriter out, Result result, ClientCheck client, boolean announceVersion)
             throws IOException, SQLException
     {
         if(announceVersion)
             out.println("VERSION \"1.2\"");
 
-        while(result.next())
+        while(client.next(result))
         {
             writeTripleNode(out, result.get(0));
             out.print(' ');
@@ -1874,14 +2025,16 @@ public class EndpointServlet extends HttpServlet
      *
      * @param out the output writer
      * @param result the result to write
+     * @param client the check that the client still takes the response
      * @throws IOException on output errors
      * @throws SQLException on database errors
      */
-    private static void writeGraphTsv(PrintWriter out, Result result) throws IOException, SQLException
+    private static void writeGraphTsv(PrintWriter out, Result result, ClientCheck client)
+            throws IOException, SQLException
     {
         out.print("?subject\t?predicate\t?object\n");
 
-        while(result.next())
+        while(client.next(result))
         {
             writeTripleNode(out, result.get(0));
             out.print('\t');
@@ -1898,14 +2051,16 @@ public class EndpointServlet extends HttpServlet
      *
      * @param out the output writer
      * @param result the result to write
+     * @param client the check that the client still takes the response
      * @throws IOException on output errors
      * @throws SQLException on database errors
      */
-    private static void writeGraphCsv(PrintWriter out, Result result) throws IOException, SQLException
+    private static void writeGraphCsv(PrintWriter out, Result result, ClientCheck client)
+            throws IOException, SQLException
     {
         out.print("subject,predicate,object\r\n");
 
-        while(result.next())
+        while(client.next(result))
         {
             writeCsvNode(out, result.get(0));
             out.print(',');

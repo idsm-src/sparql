@@ -46,6 +46,13 @@
       <version>2.0.20</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <!-- the watch of the connections of the clients reads them through the internal classes of Tomcat -->
+      <groupId>org.apache.tomcat.embed</groupId>
+      <artifactId>tomcat-embed-core</artifactId>
+      <version>11.0.29</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
