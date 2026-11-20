@@ -4,8 +4,6 @@ import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intBlankNode;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intScalarBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.strBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.strScalarBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -91,11 +89,11 @@ public final class StrBlankNodeInSegmentClass extends StrBlankNodeClass
             return List.of(expression(VARCHAR, "sparql.rdfbox_get_sblanknode_value_of_segment(%s, '%d'::int4)",
                     columns.get(0), segment));
 
-        if(sourceClass.equals(intScalarBlankNode))
+        if(sourceClass.equals(strScalarBlankNode))
             return List.of(expression(VARCHAR, "sparql.sblanknode_get_value_of_segment(%s, '%d'::int4)", columns.get(0),
                     segment));
 
-        if(sourceClass.equals(intBlankNode))
+        if(sourceClass.equals(strBlankNode))
             return List.of(expression(VARCHAR, "CASE WHEN %s = '%d'::int4 THEN %s END", columns.get(1), segment,
                     columns.get(0)));
 
