@@ -9,6 +9,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import static java.util.stream.Collectors.toSet;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
@@ -21,6 +22,10 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -202,6 +207,91 @@ public class JoinOptimizerTest
 
             return imcode.optimize(request, false).optimize(request, true).translate(request);
         }
+    }
+
+
+    /**
+     * Returns the explanation of the query translated with the join optimizer on, which gives the tree of a join.
+     */
+    private static String explain(String query) throws Exception
+    {
+        Engine engine = new Engine(optimized);
+
+        try(Request request = engine.getRequest())
+        {
+            PreparedQuery prepared = request.prepareQuery(prefix + query, null);
+            SqlSelect imcode = new TranslateVisitor(request).translate(prepared.getSyntaxTree(), null, null, List.of());
+            SqlSelect translated = imcode.optimize(request, false).optimize(request, true);
+
+            translated.translate(request);
+
+            return translated.getExplanation();
+        }
+    }
+
+
+    /**
+     * Returns the tree of the first join of an explanation: a child by its index, a lookup as {@code (outer -> child)}
+     * and a hash join as {@code (left + right)}.
+     */
+    private static String getTree(String explanation)
+    {
+        Matcher matcher = Pattern.compile("join (\\(.*\\))$", Pattern.MULTILINE).matcher(explanation);
+
+        assertThat(matcher.find(), is(true));
+
+        return matcher.group(1);
+    }
+
+
+    /**
+     * Returns the tables of the test schema that an explanation accesses, in the order of the accesses.
+     */
+    private static List<String> getTables(String explanation)
+    {
+        return Pattern.compile("access join_optimizer_test\\.(\\w+)").matcher(explanation).results()
+                .map(r -> r.group(1)).toList();
+    }
+
+
+    /**
+     * Returns the tree of a join without some of its children, the others numbered by their order among themselves.
+     */
+    private static String without(String tree, Set<Integer> removed)
+    {
+        return without(tree, new int[] { 0 }, removed);
+    }
+
+
+    /**
+     * Reads the subtree at the position, which moves behind it, and returns it without the removed children, or null
+     * when it holds no other ones.
+     */
+    private static String without(String tree, int[] position, Set<Integer> removed)
+    {
+        if(tree.charAt(position[0]) != '(')
+        {
+            int begin = position[0];
+
+            while(position[0] < tree.length() && Character.isDigit(tree.charAt(position[0])))
+                position[0]++;
+
+            int child = Integer.parseInt(tree.substring(begin, position[0]));
+
+            return removed.contains(child) ? null :
+                    String.valueOf(child - removed.stream().filter(r -> r < child).count());
+        }
+
+        position[0]++;
+        String left = without(tree, position, removed);
+
+        String operator = tree.substring(position[0], tree.indexOf(' ', position[0] + 1) + 1);
+        position[0] += operator.length();
+
+        String right = without(tree, position, removed);
+        position[0]++;
+
+        return left == null ? right : right == null ? left : "(" + left + operator + right + ")";
     }
 
 
@@ -531,22 +621,50 @@ public class JoinOptimizerTest
     @Test
     public void manyChildren() throws Exception
     {
-        String links = "\"join_optimizer_test\".\"links\"";
-
-        // a join of more children than are planned exhaustively
+        // a join of more children than are planned exhaustively, none of which the others determine
         String query = """
-                SELECT ?x ?z ?w ?v WHERE { ?x ex:tag ?t . ?x ex:link ?z . ?z ex:score ?s . ?x ex:label ?lx . \
-                ?x ex:score ?sx . ?x ex:ref ?rx . ?z ex:label ?lz . ?z ex:ref ?rz . ?z ex:link ?w . ?w ex:label ?lw . \
-                ?w ex:score ?sw . ?w ex:ref ?rw . ?w ex:link ?v . ?v ex:label ?lv . ?v ex:score ?sv . ?v ex:ref ?rv \
-                FILTER(?s < 40) }""";
+                SELECT ?x ?z ?w ?v ?u ?q ?p WHERE { ?x ex:tag ?t . ?x ex:link ?z . ?z ex:ref ?rz . ?z ex:link ?w . \
+                ?w ex:tag ?tw . ?w ex:ref ?rw . ?w ex:link ?v . ?v ex:ref ?rv . ?v ex:link ?u . ?u ex:tag ?tu . \
+                ?u ex:ref ?ru . ?u ex:link ?q . ?q ex:ref ?rq . ?q ex:link ?p . ?p ex:tag ?tp . ?p ex:ref ?rp }""";
 
-        // the links of the five tagged nodes are looked up, however many links the table holds: the rows of a child
-        // that is looked up do not make its join cost more, so the links are not read whole to be hashed with the tags
+        // the next child is one sharing a variable with those joined so far, so the few tags, cheap as their joins
+        // with each other are, are not joined into all their combinations first, and the links are looked up
         String sql = translate(optimized, query);
-        assertThat(sql, containsString(links + " WHERE "));
-        assertThat(sql, not(containsString(links + ") AS ")));
+        assertThat(sql, not(containsString(" CROSS JOIN (")));
+        assertThat(sql, containsString("\"join_optimizer_test\".\"links\" WHERE "));
 
-        assertThat(check(query), hasSize(3833));
+        assertThat(check(query), hasSize(40));
+    }
+
+
+    @Test
+    public void determinedChildren() throws Exception
+    {
+        String pattern = """
+                ?x ex:tag ?t . ?x ex:link ?z . ?z ex:ref ?rz . ?z ex:link ?w . ?w ex:tag ?tw . ?w ex:ref ?rw . \
+                ?w ex:link ?v . ?v ex:ref ?rv . ?v ex:link ?u . ?u ex:tag ?tu""";
+
+        // the labels and the scores of the nodes: a node has one of each, and every node has them
+        String determined = """
+                ?x ex:label ?lx . ?z ex:label ?lz . ?w ex:label ?lw . ?v ex:label ?lv . ?u ex:label ?lu . \
+                ?x ex:score ?sx . ?z ex:score ?sz . ?w ex:score ?sw . ?v ex:score ?sv . ?u ex:score ?su""";
+
+        String few = explain("SELECT * WHERE { " + pattern + " }");
+        String many = explain("SELECT * WHERE { " + pattern + " . " + determined + " }");
+
+        List<String> tables = getTables(many);
+        assertThat(tables, hasSize(20));
+
+        // with them the join has more children than are planned exhaustively, so they are left out of the search and
+        // joined to the tree chosen for the others, which is the tree of the join without them
+        Set<Integer> removed = IntStream.range(0, tables.size())
+                .filter(i -> tables.get(i).equals("nodes") || tables.get(i).equals("scores")).boxed().collect(toSet());
+
+        assertThat(removed, hasSize(10));
+        assertThat(getTables(few), hasSize(10));
+        assertThat(without(getTree(many), removed), is(getTree(few)));
+
+        assertThat(check("SELECT * WHERE { " + pattern + " . " + determined + " }"), hasSize(20));
     }
 
 

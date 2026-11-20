@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.IntStream;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
@@ -56,15 +57,17 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * disjunction); a child that is a table access looked up by an index of a variable the other side binds may be joined
  * by an index nested loop instead, costing a lookup per outer row. The tree that minimises the sum of the costs and of
  * the sizes of the intermediate results is found by dynamic programming over the connected subsets of the children, up
- * to {@link #EXHAUSTIVE_LIMIT} of them, and greedily above that. The costs are in units of one row scanned or hashed,
- * calibrated on the NeXtProt queries over a single table of triples. A filter above the join counts as well (see
- * {@link SqlIntercode.Restrictions#getFilterConditions}), because the database evaluates a condition as soon as the
- * variables deciding it are bound: a condition that one variable decides alone reduces the child the join takes the
- * variable from (the rows it drops are read all the same when the child is scanned, unless an index serves the
- * condition, so they are the cost of the scan, which a lookup of the child spares; see {@link #isServedByIndex}), and a
- * condition requiring two variables taken from two children to be equal reduces every join that holds both children, as
- * a variable shared by them would; where it holds only for the same term, the children are joined on it like on such a
- * variable, by hashing or by an index lookup (see {@link Equality}).
+ * to {@link #EXHAUSTIVE_LIMIT} of them. Of more children, those that the others determine, like a dictionary giving the
+ * terms of the numbers the others hold, are left out of the search and joined to the tree chosen for the others (see
+ * {@link #getDetermined}), which is built greedily when the others are still too many. The costs are in units of one
+ * row scanned or hashed, calibrated on the NeXtProt queries over a single table of triples. A filter above the join
+ * counts as well (see {@link SqlIntercode.Restrictions#getFilterConditions}), because the database evaluates a
+ * condition as soon as the variables deciding it are bound: a condition that one variable decides alone reduces the
+ * child the join takes the variable from (the rows it drops are read all the same when the child is scanned, unless an
+ * index serves the condition, so they are the cost of the scan, which a lookup of the child spares; see
+ * {@link #isServedByIndex}), and a condition requiring two variables taken from two children to be equal reduces every
+ * join that holds both children, as a variable shared by them would; where it holds only for the same term, the
+ * children are joined on it like on such a variable, by hashing or by an index lookup (see {@link Equality}).
  *
  * The sides of an OPTIONAL keep their order, so only the method of their join is chosen (see {@link #planLeftJoin}):
  * the right side is evaluated once and the sides are hashed, or the right side is evaluated for every solution of the
@@ -810,12 +813,279 @@ final class JoinOptimizer
 
         Sizes sizes = new Sizes(n, rows, shared, filters);
 
-        Node root = n <= EXHAUSTIVE_LIMIT ?
-                planExhaustively(n, rows, dropped, adjacent, hashableAdjacent, lookupable, sizes) :
-                planGreedily(n, dropped, hashableAdjacent, lookupable, sizes);
+        // the trees of a join of too many children cannot all be tried, so the children that the others determine are
+        // left out of the search and joined to the tree chosen for the others
+        int determined = n <= EXHAUSTIVE_LIMIT ? 0 :
+                getDetermined(request, childs, filtering, shared, filters, lookupable);
+
+        Node root;
+
+        if(determined != 0)
+        {
+            int[] members = IntStream.range(0, n).filter(i -> (determined >> i & 1) == 0).toArray();
+
+            root = plan(members, rows, dropped, adjacent, hashableAdjacent, lookupable, shared, filters);
+
+            for(int i = 0; i < n; i++)
+                if((determined >> i & 1) != 0)
+                    root = attach(root, i, adjacent[i], hashableAdjacent, lookupable, sizes, dropped);
+        }
+        else if(n <= EXHAUSTIVE_LIMIT)
+        {
+            root = planExhaustively(n, rows, dropped, adjacent, hashableAdjacent, lookupable, sizes);
+        }
+        else
+        {
+            root = planGreedily(n, dropped, adjacent, hashableAdjacent, lookupable, sizes);
+        }
 
         return new Plan(root, sizes.get((1 << n) - 1), cost(root, costs, hashableAdjacent, sizes).cost(), restricted,
                 filtering.equalities());
+    }
+
+
+    /**
+     * The children of a join that the other children determine, so that joining such a child neither adds solutions nor
+     * drops any, whenever it is done: the child shares a single variable with the others, has one row for a value of
+     * the variable (see {@link SqlIntercode#isDistinct}) and no fewer values of it than any of them, as a dictionary
+     * holding the terms of the numbers the others refer to does, can be looked up for the rows of any of them, and no
+     * condition of the filters above the join is decided by it. Of the children sharing a variable that determine each
+     * other, one is left to the others.
+     *
+     * @param request the current request
+     * @param childs the children
+     * @param filtering what the filters above the join leave of the solutions of the children
+     * @param shared the shared variables
+     * @param filters the conditions of the filters above the join that require variables of two children to be equal
+     * @param lookupable the children whose rows can be the outer rows of an index lookup into each child
+     * @return the children that the other children determine, as a bit per child
+     */
+    private static int getDetermined(Request request, List<SqlIntercode> childs, Filtering filtering,
+            List<Shared> shared, List<Filter> filters, int[] lookupable)
+    {
+        int determined = 0;
+
+        for(int i = 0; i < childs.size(); i++)
+        {
+            int child = 1 << i;
+
+            List<Shared> variables = shared.stream().filter(s -> (s.mask() & child) != 0).toList();
+
+            if(variables.size() != 1 || filtering.kept()[i] != 1
+                    || filters.stream().anyMatch(f -> (f.mask() & child) != 0))
+                continue;
+
+            Shared variable = variables.get(0);
+            int others = variable.mask() & ~child;
+
+            if(!variable.hashable() || (others & ~lookupable[i]) != 0 || (others & ~determined) == 0)
+                continue;
+
+            if(!childs.get(i).isDistinct(request, List.of(variable.variable())))
+                continue;
+
+            double values = variable.distinct()[i];
+
+            if(IntStream.range(0, childs.size())
+                    .anyMatch(j -> (others >> j & 1) != 0 && variable.distinct()[j] > values))
+                continue;
+
+            determined |= child;
+        }
+
+        return determined;
+    }
+
+
+    /**
+     * The join tree of some of the children of a join, which are numbered anew for the search: all the trees are tried
+     * when the children are few enough (see {@link #planExhaustively}), and the tree is built greedily otherwise (see
+     * {@link #planGreedily}).
+     *
+     * @param members the children the tree is made of, by their indexes in increasing order
+     * @param rows estimated rows of each child of the join
+     * @param dropped the rows a scan of each child of the join reads beyond the rows the child gives the joins
+     * @param adjacent the children adjacent to each child through a shared variable
+     * @param hashableAdjacent the children adjacent to each child through a hashable variable
+     * @param lookupable the children whose rows can be the outer rows of an index lookup into each child
+     * @param shared the shared variables
+     * @param filters the conditions of the filters above the join that require variables of two children to be equal
+     * @return the join tree of the members
+     */
+    private static Node plan(int[] members, double[] rows, double[] dropped, int[] adjacent, int[] hashableAdjacent,
+            int[] lookupable, List<Shared> shared, List<Filter> filters)
+    {
+        int n = members.length;
+
+        double[] memberRows = new double[n];
+        double[] memberDropped = new double[n];
+        int[] memberAdjacent = new int[n];
+        int[] memberHashableAdjacent = new int[n];
+        int[] memberLookupable = new int[n];
+
+        for(int i = 0; i < n; i++)
+        {
+            memberRows[i] = rows[members[i]];
+            memberDropped[i] = dropped[members[i]];
+            memberAdjacent[i] = renumber(adjacent[members[i]], members);
+            memberHashableAdjacent[i] = renumber(hashableAdjacent[members[i]], members);
+            memberLookupable[i] = renumber(lookupable[members[i]], members);
+        }
+
+        List<Shared> memberShared = shared.stream().map(s -> new Shared(s.variable(), renumber(s.mask(), members),
+                Arrays.stream(members).mapToDouble(m -> s.distinct()[m]).toArray(), s.hashable())).toList();
+
+        List<Filter> memberFilters = filters.stream().map(f -> new Filter(renumber(f.mask(), members), f.selectivity()))
+                .filter(f -> Integer.bitCount(f.mask()) == 2).toList();
+
+        Sizes sizes = new Sizes(n, memberRows, memberShared, memberFilters);
+
+        Node root = n <= EXHAUSTIVE_LIMIT ?
+                planExhaustively(n, memberRows, memberDropped, memberAdjacent, memberHashableAdjacent, memberLookupable,
+                        sizes) :
+                planGreedily(n, memberDropped, memberAdjacent, memberHashableAdjacent, memberLookupable, sizes);
+
+        return renumber(root, members);
+    }
+
+
+    /**
+     * The members of a subset of the children of a join as a subset of the members numbered anew.
+     *
+     * @param mask the subset, as a bit per child of the join
+     * @param members the members, by their indexes in the join
+     * @return the members of the subset, as a bit per member
+     */
+    private static int renumber(int mask, int[] members)
+    {
+        int renumbered = 0;
+
+        for(int i = 0; i < members.length; i++)
+            if((mask >> members[i] & 1) != 0)
+                renumbered |= 1 << i;
+
+        return renumbered;
+    }
+
+
+    /**
+     * A join tree of members numbered anew as the tree of the children of the join.
+     *
+     * @param node the tree of the members
+     * @param members the members, by their indexes in the join
+     * @return the tree of the children of the join
+     */
+    private static Node renumber(Node node, int[] members)
+    {
+        return switch(node)
+        {
+            case Leaf leaf -> new Leaf(members[leaf.child()]);
+            case Lookup lookup -> new Lookup(renumber(lookup.outer(), members), members[lookup.child()]);
+            case HashJoin join -> new HashJoin(renumber(join.left(), members), renumber(join.right(), members));
+        };
+    }
+
+
+    /**
+     * A subtree of a join tree with the children it joins.
+     *
+     * @param node the subtree
+     * @param mask the children of the subtree, as a bit per child
+     */
+    private record Subtree(Node node, int mask)
+    {
+    }
+
+
+    /**
+     * The join tree with one more child joined to it where its join costs the least: to any subtree holding a child it
+     * shares a variable with, by the method that is cheaper there (see {@link #join}). The child is one the others
+     * determine (see {@link #getDetermined}), so the rows of the joins above are the same wherever it is joined, and
+     * its join costs by the rows of the subtree alone. Of the subtrees costing the same the largest one is taken, which
+     * keeps the columns of the child out of the joins inside it.
+     *
+     * @param tree the tree
+     * @param child index of the child
+     * @param adjacent the children adjacent to the child through a shared variable
+     * @param hashableAdjacent the children adjacent to each child through a hashable variable
+     * @param lookupable the children whose rows can be the outer rows of an index lookup into each child
+     * @param sizes the sizes of the joins
+     * @param dropped the rows a scan of each child reads beyond the rows the child gives the joins
+     * @return the tree with the child joined
+     */
+    private static Node attach(Node tree, int child, int adjacent, int[] hashableAdjacent, int[] lookupable,
+            Sizes sizes, double[] dropped)
+    {
+        List<Subtree> subtrees = new ArrayList<>();
+        collect(tree, subtrees);
+
+        double bestCost = Double.POSITIVE_INFINITY;
+        Node bestSubtree = null;
+        Node bestJoin = null;
+
+        // a subtree follows the subtrees inside it
+        for(Subtree subtree : subtrees)
+        {
+            if((subtree.mask() & adjacent) == 0)
+                continue;
+
+            Map.Entry<Double, Node> candidate = join(subtree.mask(), 1 << child, subtree.node(), new Leaf(child),
+                    hashableAdjacent, lookupable, sizes, dropped);
+
+            if(candidate.getKey() <= bestCost)
+            {
+                bestCost = candidate.getKey();
+                bestSubtree = subtree.node();
+                bestJoin = candidate.getValue();
+            }
+        }
+
+        return replace(tree, bestSubtree, bestJoin);
+    }
+
+
+    /**
+     * Collects the subtrees of a join tree, each after the subtrees inside it.
+     *
+     * @param node the tree
+     * @param subtrees the list the subtrees are added to
+     * @return the children of the tree, as a bit per child
+     */
+    private static int collect(Node node, List<Subtree> subtrees)
+    {
+        int mask = switch(node)
+        {
+            case Leaf leaf -> 1 << leaf.child();
+            case Lookup lookup -> collect(lookup.outer(), subtrees) | 1 << lookup.child();
+            case HashJoin join -> collect(join.left(), subtrees) | collect(join.right(), subtrees);
+        };
+
+        subtrees.add(new Subtree(node, mask));
+
+        return mask;
+    }
+
+
+    /**
+     * The join tree with one of its subtrees replaced.
+     *
+     * @param node the tree
+     * @param subtree the subtree to replace, one of the nodes of the tree
+     * @param replacement the tree taking its place
+     * @return the tree with the subtree replaced
+     */
+    private static Node replace(Node node, Node subtree, Node replacement)
+    {
+        if(node == subtree)
+            return replacement;
+
+        return switch(node)
+        {
+            case Leaf leaf -> leaf;
+            case Lookup lookup -> new Lookup(replace(lookup.outer(), subtree, replacement), lookup.child());
+            case HashJoin join -> new HashJoin(replace(join.left(), subtree, replacement),
+                    replace(join.right(), subtree, replacement));
+        };
     }
 
 
@@ -1295,19 +1565,24 @@ final class JoinOptimizer
 
     /**
      * A left-deep join tree built greedily, the cheapest join of the next child taken at every step, from the start
-     * giving the cheapest tree. A step costs the join and, when the child is scanned, the rows the scan reads beyond
+     * giving the cheapest tree. The next child is one sharing a variable with the children joined so far, when there is
+     * one, as a subset is joined from connected subsets when all the trees are tried (see {@link #planExhaustively}):
+     * the join of two small children that share none may cost little, but every row of the others is then joined to
+     * every pair of their rows. A step costs the join and, when the child is scanned, the rows the scan reads beyond
      * those the child gives the joins. The rows the children give do not count here: every tree has them (see
      * {@link #planExhaustively}), whereas counted in a step they would keep a child of many rows from being joined
      * early, also where it is looked up for a few rows and so read for those only.
      *
      * @param n number of children
      * @param dropped the rows a scan of each child reads beyond the rows the child gives the joins
+     * @param adjacent the children adjacent to each child through a shared variable
      * @param hashableAdjacent the children adjacent to each child through a hashable variable
      * @param lookupable the children whose rows can be the outer rows of an index lookup into each child
      * @param sizes the sizes of the joins
      * @return the join tree
      */
-    private static Node planGreedily(int n, double[] dropped, int[] hashableAdjacent, int[] lookupable, Sizes sizes)
+    private static Node planGreedily(int n, double[] dropped, int[] adjacent, int[] hashableAdjacent, int[] lookupable,
+            Sizes sizes)
     {
         int full = (1 << n) - 1;
 
@@ -1318,17 +1593,20 @@ final class JoinOptimizer
         {
             Node tree = new Leaf(start);
             int mask = 1 << start;
+            int neighbours = adjacent[start];
             double cost = dropped[start];
 
             while(mask != full)
             {
+                int candidates = (neighbours & ~mask) != 0 ? neighbours & ~mask : full & ~mask;
+
                 double stepCost = Double.POSITIVE_INFINITY;
                 Node stepTree = null;
                 int stepChild = -1;
 
                 for(int i = 0; i < n; i++)
                 {
-                    if((mask >> i & 1) != 0)
+                    if((candidates >> i & 1) == 0)
                         continue;
 
                     Map.Entry<Double, Node> candidate = join(mask, 1 << i, tree, new Leaf(i), hashableAdjacent,
@@ -1345,6 +1623,7 @@ final class JoinOptimizer
                 cost += stepCost;
                 tree = stepTree;
                 mask |= 1 << stepChild;
+                neighbours |= adjacent[stepChild];
             }
 
             if(cost < bestCost)
