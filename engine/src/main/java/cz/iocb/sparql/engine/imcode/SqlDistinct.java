@@ -221,6 +221,42 @@ public final class SqlDistinct extends SqlIntercode
 
 
     /**
+     * SQL code of the solutions of a node deduplicated over all the variables the node binds, made of the code the node
+     * is translated to; that code itself when the solutions are distinct already (see {@link SqlIntercode#isDistinct})
+     * or have no column to tell them apart. A side of an existence test that the database evaluates once is written so
+     * (the right side of a MINUS, the pattern of an EXISTS test of a filter, see {@link SqlMinus} and
+     * {@link SqlFilter}): the database joins the two sides by hashing either of them, and when it hashes the tested
+     * solutions and probes them with the solutions of the side, every probe walks all the tested solutions it is
+     * compatible with, whether an earlier probe has matched them or not, so the test costs the product of the
+     * duplicates of both sides. Over distinct solutions of the side, a tested solution is visited once for every
+     * distinct solution it is compatible with, and the deduplication costs no more than hashing the side would.
+     *
+     * @param request the current request
+     * @param node the node
+     * @param code SQL code the node is translated to
+     * @return SQL code of the distinct solutions of the node
+     */
+    static SqlCode deduplicate(Request request, SqlIntercode node, SqlCode code)
+    {
+        Set<Column> columns = node.getVariableBindings().getNonConstantColumns();
+
+        if(columns.isEmpty() || node.isDistinct(request, node.getVariableBindings().getVariables()))
+            return code;
+
+        SqlBuilder builder = new SqlBuilder();
+
+        builder.append("SELECT ");
+        builder.append(columns.stream().collect(SqlCode.joining(", ")));
+        builder.append(" FROM (");
+        builder.append(code);
+        builder.append(" ) AS tab GROUP BY ");
+        builder.append(SqlType.getGroupingKeys(columns));
+
+        return builder.toCode();
+    }
+
+
+    /**
      * The rows the child is evaluated for when the deduplication is evaluated for the given rows: a variable the
      * solutions are deduplicated over restricts the child as it restricts the deduplicated solutions, because the
      * solutions of one value of it are deduplicated among themselves.

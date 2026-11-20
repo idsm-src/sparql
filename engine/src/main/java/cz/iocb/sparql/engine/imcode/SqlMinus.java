@@ -375,11 +375,12 @@ public final class SqlMinus extends SqlIntercode
     /**
      * SQL code of the difference: the solutions of the left side for which no solution of the right side removing them
      * exists. With the join optimizer on, the right side is written the way the optimizer chooses (see
-     * {@link #getPlan}): as it is, for the database to evaluate it once and to hash the sides (an anti-join), or
-     * evaluated for every solution of the left side, restricted to the solutions compatible with it (see
-     * {@link SqlIntercode#translateForRow}), so that the database looks them up. The left side is then named by the
-     * alias of the left side of a left join of the scope, through which the right side refers to its solutions: unlike
-     * the alias used otherwise, no node of the right side gives it to a subquery the solution is handed to.
+     * {@link #getPlan}): with its solutions deduplicated (see {@link #translateRight}), for the database to evaluate it
+     * once and to hash the sides (an anti-join), or evaluated for every solution of the left side, restricted to the
+     * solutions compatible with it (see {@link SqlIntercode#translateForRow}), so that the database looks them up. The
+     * left side is then named by the alias of the left side of a left join of the scope, through which the right side
+     * refers to its solutions: unlike the alias used otherwise, no node of the right side gives it to a subquery the
+     * solution is handed to.
      */
     @Override
     public SqlCode translate(Request request, Scope scope)
@@ -437,7 +438,7 @@ public final class SqlMinus extends SqlIntercode
 
         builder.append(" WHERE NOT EXISTS (SELECT 1 FROM (");
         builder.append(
-                solutions != null ? right.translateForRow(request, scope, solutions) : right.translate(request, scope));
+                solutions != null ? right.translateForRow(request, scope, solutions) : translateRight(request, scope));
         builder.append(") AS ");
         builder.append(rightTable);
 
@@ -453,6 +454,29 @@ public final class SqlMinus extends SqlIntercode
         builder.append(")");
 
         return builder.toCode();
+    }
+
+
+    /**
+     * SQL code of the right side evaluated once. With the join optimizer on, the database joins the sides by hashing
+     * one of them, so the solutions of the right side are deduplicated (see {@link SqlDistinct#deduplicate}): a
+     * solution removes the same solutions of the left side however many times it occurs. A right side whose code refers
+     * to an outer table (inside a pattern evaluated for a current solution) is evaluated for every row of that table
+     * anyway and is left as it is, and so is every right side without the optimizer, where the database may look the
+     * solutions up for the solutions of the left side.
+     *
+     * @param request the current request
+     * @param scope the scope of the difference
+     * @return SQL code of the right side
+     */
+    private SqlCode translateRight(Request request, Scope scope)
+    {
+        SqlCode code = right.translate(request, scope);
+
+        if(!request.getConfiguration().isJoinOptimizerEnabled() || !code.getOuterTables().isEmpty())
+            return code;
+
+        return SqlDistinct.deduplicate(request, right, code);
     }
 
 

@@ -269,6 +269,40 @@ public class JoinOptimizerTest
 
 
     @Test
+    public void deduplicatedTests() throws Exception
+    {
+        // a right side evaluated once is deduplicated, as the database may hash the left side and probe it
+        String minus = "SELECT ?x WHERE { ?x ex:label ?l MINUS { ?x ex:link ?y } }";
+
+        assertThat(translate(optimized, minus), containsString(" GROUP BY \"src\""));
+        assertThat(translate(plain, minus), not(containsString(" GROUP BY ")));
+        assertThat(check(minus), hasSize(800));
+
+        // so is the pattern of an existence test
+        for(String test : List.of("FILTER NOT EXISTS", "FILTER EXISTS"))
+        {
+            String query = "SELECT ?x WHERE { ?x ex:label ?l " + test + " { ?x ex:link ?y } }";
+
+            assertThat(translate(optimized, query), containsString(" GROUP BY \"src\""));
+            assertThat(translate(plain, query), not(containsString(" GROUP BY ")));
+            assertThat(check(query), hasSize(test.contains("NOT") ? 800 : 200));
+        }
+
+        // solutions that a key of the table makes distinct are left as they are
+        String distinct = "SELECT ?x ?y WHERE { ?x ex:link ?y MINUS { ?x ex:score ?s FILTER(?s > 100) } }";
+
+        assertThat(translate(optimized, distinct), not(containsString(" GROUP BY ")));
+        assertThat(check(distinct), hasSize(1000));
+
+        // and so is a right side looked up for every solution of the left side
+        String lookedUp = "SELECT ?x WHERE { ?x ex:tag ?t MINUS { ?x ex:link ?y } }";
+
+        assertThat(translate(optimized, lookedUp), not(containsString(" GROUP BY ")));
+        assertThat(check(lookedUp), hasSize(0));
+    }
+
+
+    @Test
     public void propertyPath() throws Exception
     {
         String query = "SELECT DISTINCT ?y WHERE { <http://example.org/n/1> ex:link+ ?y }";

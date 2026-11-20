@@ -295,10 +295,10 @@ public final class SqlFilter extends SqlIntercode
      * SQL code of the conjunction of the conditions as the filter itself evaluates them (see
      * {@link #translateConditions(Request)}). With the join optimizer on, the pattern of a condition that is an
      * existence test (see {@link SqlExists}) is written the way the optimizer chooses (see
-     * {@link JoinOptimizer#planTest}): as the test was rendered, for the database to evaluate the pattern once and to
-     * join it with the solutions of the child by hashing, or evaluated for every solution of the child that the other
-     * conditions keep, restricted to the solutions compatible with it (see {@link SqlIntercode#translateForRow}), so
-     * that the database looks them up.
+     * {@link JoinOptimizer#planTest}): with its solutions deduplicated (see {@link SqlDistinct#deduplicate}), for the
+     * database to evaluate the pattern once and to join it with the solutions of the child by hashing, or evaluated for
+     * every solution of the child that the other conditions keep, restricted to the solutions compatible with it (see
+     * {@link SqlIntercode#translateForRow}), so that the database looks them up.
      *
      * @param request the current request
      * @param scope the scope of the filter
@@ -326,8 +326,10 @@ public final class SqlFilter extends SqlIntercode
 
 
     /**
-     * SQL code of an existence test among the conditions: the code the test was rendered with, or the test of the
-     * pattern evaluated for every solution of the child anew when the optimizer chooses so (see
+     * SQL code of an existence test among the conditions: the test of the distinct solutions of the pattern, which the
+     * database evaluates once (the code the test was rendered with when the solutions are distinct already, or when the
+     * pattern refers to an outer table and is evaluated for every row of it anyway), or the test of the pattern
+     * evaluated for every solution of the child anew when the optimizer chooses so (see
      * {@link #translateConditions(Request, Scope, JoinOptimizer.Outer)}). The pattern is restricted only by the values
      * that the solutions of the child give, which the test addresses through the alias of the input of the filter. A
      * value of a current solution the filter itself lies in would make the pattern of that solution refer to it, and
@@ -359,7 +361,16 @@ public final class SqlFilter extends SqlIntercode
         JoinOptimizer.Outer rows = JoinOptimizer.planTest(request, solutions, own, null, source).outer();
 
         if(rows == null)
-            return rendered;
+        {
+            SqlCode code = source.translate(request, scope.enterPattern(solution));
+
+            if(!code.getOuterTables().isEmpty())
+                return rendered;
+
+            SqlCode distinct = SqlDistinct.deduplicate(request, source, code);
+
+            return distinct == code ? rendered : test.translate(request, scope, distinct);
+        }
 
         return test.translate(request, scope, source.translateForRow(request, scope.enterPattern(solution), rows));
     }
