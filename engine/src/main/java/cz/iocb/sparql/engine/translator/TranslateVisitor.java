@@ -23,6 +23,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
@@ -135,6 +136,7 @@ import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.request.Request.NodeTerm;
 
 
 
@@ -217,6 +219,20 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      * {@link #translateApart}), because the nodes they are made of expose the ends of the path only.
      */
     private int joinScope = 0;
+
+    /**
+     * Scopes of the patterns translated before whose nodes the patterns being translated share as well (see
+     * {@link #getJoinNode}): those of the left side of a MINUS, for the patterns of its right side. The sides are not
+     * joined, but a solution of the right side removes one of the left side that agrees with it in the variables they
+     * share, and they agree in a variable exactly when they agree in the node standing for its term, so the sides are
+     * compared by the nodes (see {@link SqlMinus}).
+     */
+    private List<Integer> sharedScopes = List.of();
+
+    /**
+     * Scopes handed to the group graph pattern translated next for its {@link #sharedScopes}.
+     */
+    private List<Integer> handedScopes = List.of();
 
     /**
      * Counter of SERVICE calls, giving each its blank node segment.
@@ -1682,6 +1698,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         LinkedList<Filter> filters = new LinkedList<>();
 
+        // the scopes of the group so far
+        List<Integer> scopes = new ArrayList<>(List.of(joinScope));
+
         for(Pattern pattern : patterns)
         {
             if(pattern instanceof Optional optional)
@@ -1719,18 +1738,31 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                         restrictToCurrentGraph(translatedPattern), optionalFilters);
 
                 startJoinScope();
+                scopes.add(joinScope);
             }
             else if(pattern instanceof Minus minus)
             {
-                translatedGroupPattern = translateMinus(minus, translatedGroupPattern);
+                // the patterns of the right side share the nodes of the left side, which is the group so far
+                handedScopes = Stream.concat(sharedScopes.stream(), scopes.stream()).toList();
+
+                try
+                {
+                    translatedGroupPattern = translateMinus(minus, translatedGroupPattern);
+                }
+                finally
+                {
+                    handedScopes = List.of();
+                }
 
                 startJoinScope();
+                scopes.add(joinScope);
             }
             else if(pattern instanceof Bind bind)
             {
                 translatedGroupPattern = translateBind(bind, translatedGroupPattern);
 
                 startJoinScope();
+                scopes.add(joinScope);
             }
             else if(pattern instanceof Filter filter)
             {
@@ -1741,12 +1773,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 translatedGroupPattern = translateProcedureCall(procedureCall, translatedGroupPattern);
 
                 startJoinScope();
+                scopes.add(joinScope);
             }
             else if(pattern instanceof Service service)
             {
                 translatedGroupPattern = translateService(service, translatedGroupPattern);
 
                 startJoinScope();
+                scopes.add(joinScope);
             }
             else
             {
@@ -2363,11 +2397,26 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     JoinNode getJoinNode(Variable variable, SourceTable table, ResourceClass resourceClass, List<Column> columns,
             List<Column> joinColumns)
     {
+        InternalResourceClass nodeClass = joinClasses.computeIfAbsent(List.of(table, joinColumns),
+                _ -> new InternalResourceClass(joinColumns.stream().map(Column::getType).toList()));
+
+        // the node of a scope the patterns share the nodes of
+        for(int scope : sharedScopes)
+        {
+            Variable shared = joinVariables
+                    .get(new JoinKey(scope, variable, table, resourceClass, columns, joinColumns));
+
+            if(shared != null)
+                return new JoinNode(shared, nodeClass);
+        }
+
         JoinKey key = new JoinKey(joinScope, variable, table, resourceClass, columns, joinColumns);
         Variable node = joinVariables.computeIfAbsent(key, _ -> createVariable(joinVariablePrefix));
 
-        InternalResourceClass nodeClass = joinClasses.computeIfAbsent(List.of(table, joinColumns),
-                _ -> new InternalResourceClass(joinColumns.stream().map(Column::getType).toList()));
+        // the term gives the row, and so does the node when the join columns are a key of the table too: solutions then
+        // agree in the node exactly when they agree in the term
+        request.getNodeTerms().put(node, new NodeTerm(variable,
+                request.getConfiguration().getDatabaseSchema().isKey(table, new HashSet<>(joinColumns))));
 
         return new JoinNode(node, nodeClass);
     }
@@ -2393,6 +2442,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     SqlIntercode translateApart(Supplier<SqlIntercode> translation)
     {
         int enclosing = joinScope;
+        List<Integer> enclosingShared = sharedScopes;
+
+        // the scopes handed to a group graph pattern are those of the patterns it is translated for, not of its parts
+        sharedScopes = handedScopes;
+        handedScopes = List.of();
 
         startJoinScope();
 
@@ -2403,6 +2457,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         finally
         {
             joinScope = enclosing;
+            sharedScopes = enclosingShared;
         }
     }
 

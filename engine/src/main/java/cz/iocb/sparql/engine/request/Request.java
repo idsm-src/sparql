@@ -203,6 +203,21 @@ public class Request implements AutoCloseable
 
 
     /**
+     * What a node joining the tables of a join mapping by a key of a term stands for: the values of the join columns in
+     * the row of a table that holds the term of a variable. A solution binding the node binds the variable to that term
+     * wherever it binds it at all.
+     *
+     * @param variable the variable whose term gives the row
+     * @param determining whether the node gives the term as well, the join columns being a key of the table too: two
+     *            solutions binding the node then agree in it exactly when they agree in the variable, so the node can
+     *            be compared in place of the term
+     */
+    public record NodeTerm(Variable variable, boolean determining)
+    {
+    }
+
+
+    /**
      * Reader of the result of a lookup query (see {@link #lookup}).
      *
      * @param <T> type of what is read
@@ -300,6 +315,12 @@ public class Request implements AutoCloseable
      * {@link #getProbedRows}).
      */
     private final Map<String, Boolean> probedRows = new HashMap<>();
+
+    /**
+     * What the nodes joining the tables of join mappings by the keys of terms stand for, by the node (see
+     * {@link #getNodeTerms}).
+     */
+    private final Map<Variable, NodeTerm> nodeTerms = new HashMap<>();
 
     /**
      * Start of the execution in {@link System#nanoTime} units.
@@ -1139,6 +1160,18 @@ public class Request implements AutoCloseable
     public Map<String, Boolean> getProbedRows()
     {
         return probedRows;
+    }
+
+
+    /**
+     * What the nodes joining the tables of join mappings by the keys of terms stand for, by the node, for the query
+     * being translated (see {@link cz.iocb.sparql.engine.translator.TranslateVisitor}).
+     *
+     * @return what the nodes stand for, by the node
+     */
+    public Map<Variable, NodeTerm> getNodeTerms()
+    {
+        return nodeTerms;
     }
 
 

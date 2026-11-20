@@ -22,6 +22,7 @@ import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.request.Request.NodeTerm;
 import cz.iocb.sparql.engine.translator.VariableBinding;
 import cz.iocb.sparql.engine.translator.VariableBindingPair;
 import cz.iocb.sparql.engine.translator.VariableBindings;
@@ -35,7 +36,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * {@link #solutionBound}). A walk on the right side whose start the left side binds always is seeded with the distinct
  * values of the start read from the left side, shared so that the statement evaluates it once (see {@link SqlShared}).
  * With the join optimizer on, the engine chooses whether the right side is evaluated once or for every solution of the
- * left side (see {@link #translate}).
+ * left side (see {@link #translate}). Where the sides share a node of a join mapping that gives the term of a variable
+ * both ways, they are compared by the node, and the variable is left out of the comparison (see
+ * {@link #leaveOutDetermined}).
  */
 public final class SqlMinus extends SqlIntercode
 {
@@ -219,6 +222,8 @@ public final class SqlMinus extends SqlIntercode
         Restrictions rightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
                 optLeft.getVariableBindings(), new Restrictions(), true);
 
+        leaveOutDetermined(request, optLeft, optRight, restrictions, leftRestrictions, rightRestrictions);
+
         boolean offered = false;
 
         // the sides could swap their presentations of a shared variable in every round
@@ -266,7 +271,7 @@ public final class SqlMinus extends SqlIntercode
             Restrictions newRightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
                     Set.of(optLeft.getVariableBindings()), new Restrictions(), true, settlement.getClasses());
 
-
+            leaveOutDetermined(request, optLeft, optRight, restrictions, newLeftRestrictions, newRightRestrictions);
 
             if(newLeftReduced == leftReduced && newLeftRestrictions.equals(leftRestrictions)
                     && newRightRestrictions.equals(rightRestrictions))
@@ -294,7 +299,7 @@ public final class SqlMinus extends SqlIntercode
         for(VariableBindingPair pair : VariableBindingPair.getPairs(relations, optLeft.getVariableBindings(),
                 optRight.getVariableBindings()))
         {
-            if(!pair.getVariable().equals(graph))
+            if(!isGraph(request, pair.getVariable()))
                 shareVariables = true;
 
             if(!pair.isJoinable())
@@ -335,6 +340,65 @@ public final class SqlMinus extends SqlIntercode
             return this;
 
         return minus(request, optLeft, optRight, graph, optSolutionBound, restrictions);
+    }
+
+
+    /**
+     * Leaves out of what the sides are asked for the variables that need not be compared, because the sides are
+     * compared by the nodes standing for their terms: a node that both sides bind always and that gives the term of a
+     * variable both ways (see {@link NodeTerm#determining}) agrees in two solutions exactly when the variable does, and
+     * the variable is bound wherever the node is. The right side is then not asked for the variable at all, and the
+     * left side only when the parent needs it, so neither side reads the terms for the comparison, like a table of the
+     * terms of numbered quads. Inside an EXISTS pattern the sides are left as they are, as they are compared with the
+     * current solution by the variables.
+     *
+     * @param request the current request
+     * @param left the left side
+     * @param right the right side
+     * @param restrictions what the parent needs of the variables
+     * @param leftRestrictions what the left side is asked for
+     * @param rightRestrictions what the right side is asked for
+     */
+    private void leaveOutDetermined(Request request, SqlIntercode left, SqlIntercode right, Restrictions restrictions,
+            Restrictions leftRestrictions, Restrictions rightRestrictions)
+    {
+        if(solutionBound != null)
+            return;
+
+        for(VariableBinding node : left.getVariableBindings().getValues())
+        {
+            NodeTerm term = request.getNodeTerms().get(node.getVariable());
+            VariableBinding other = right.getVariable(node.getVariable());
+
+            if(term == null || !term.determining() || other == null || node.canBeNull() || other.canBeNull())
+                continue;
+
+            rightRestrictions.remove(term.variable());
+
+            if(!restrictions.containsVar(term.variable()))
+                leftRestrictions.remove(term.variable());
+        }
+    }
+
+
+    /**
+     * True if the variable is the variable of the enclosing GRAPH clause (see {@link #graph}) or a node standing for
+     * its term (see {@link Request#getNodeTerms}), which the sides share where they share the graph: like the graph
+     * variable, such a node has to agree, but it is no variable of the solutions and does not count as the shared
+     * variable a removal requires.
+     *
+     * @param request the current request
+     * @param variable the variable
+     * @return true if the variable is the graph variable or a node standing for its term, false otherwise
+     */
+    private boolean isGraph(Request request, Variable variable)
+    {
+        if(graph == null)
+            return false;
+
+        NodeTerm term = request.getNodeTerms().get(variable);
+
+        return variable.equals(graph) || term != null && term.variable().equals(graph);
     }
 
 
@@ -412,8 +476,6 @@ public final class SqlMinus extends SqlIntercode
      */
     private SqlCode translate(Request request, Scope scope, JoinOptimizer.Outer outer)
     {
-        ClassRelations relations = request.getConfiguration();
-
         SqlBuilder builder = new SqlBuilder();
 
         builder.append("SELECT ");
@@ -442,7 +504,7 @@ public final class SqlMinus extends SqlIntercode
         builder.append(") AS ");
         builder.append(rightTable);
 
-        SqlCode condition = generateCondition(relations, left.getVariableBindings(), right.getVariableBindings(), table,
+        SqlCode condition = generateCondition(request, left.getVariableBindings(), right.getVariableBindings(), table,
                 rightTable);
 
         if(condition != null)
@@ -485,7 +547,7 @@ public final class SqlMinus extends SqlIntercode
      * compatible and at least one of them (the graph variable excluded) is bound on both sides, a variable the current
      * solution of the enclosing EXISTS pattern binds counting as bound on both sides (see {@link #solutionBound}).
      *
-     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param request the current request
      * @param left bindings of the left side
      * @param right bindings of the right side
      * @param leftTable the left table
@@ -493,13 +555,15 @@ public final class SqlMinus extends SqlIntercode
      * @return SQL condition that a right solution removes a left one: the shared variables (the graph variable
      *         included) are compatible and at least one of them (the graph variable excluded) is bound on both sides
      */
-    private SqlCode generateCondition(ClassRelations relations, VariableBindings left, VariableBindings right,
-            Table leftTable, Table rightTable)
+    private SqlCode generateCondition(Request request, VariableBindings left, VariableBindings right, Table leftTable,
+            Table rightTable)
     {
+        ClassRelations relations = request.getConfiguration();
+
         SqlCode joinCondition = generateJoinCondition(relations, left, right, leftTable, rightTable);
 
         List<VariableBindingPair> pairs = VariableBindingPair.getPairs(relations, left, right).stream()
-                .filter(p -> !p.getVariable().equals(graph)).toList();
+                .filter(p -> !isGraph(request, p.getVariable())).toList();
 
         for(VariableBindingPair pair : pairs)
             if(!pair.getLeftVariableBinding().canBeNull() && !pair.getRightVariableBinding().canBeNull())

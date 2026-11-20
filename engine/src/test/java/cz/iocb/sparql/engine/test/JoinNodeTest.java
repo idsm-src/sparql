@@ -360,6 +360,51 @@ public class JoinNodeTest
 
 
     @Test
+    @DisplayName("the sides of a MINUS are compared by the nodes of the variables they share")
+    void minusByNodes() throws Exception
+    {
+        String kindTable = "\"join_node_test\".\"kind\"";
+
+        // the kind following another and the kind another follows are given by their numbers on both sides, so the
+        // sides are compared by the numbers, and the table of the kinds, which gives the names, is read for the result
+        // only
+        String query = "SELECT ?a WHERE { ?a ex:follows ?k MINUS { ?k ex:follows ?k } }";
+
+        assertThat(translate(shared, query).split(Pattern.quote(kindTable), -1).length - 1, is(1));
+        assertThat(translate(optimized, query).split(Pattern.quote(kindTable), -1).length - 1, is(1));
+        assertThat(translate(plain, query).split(Pattern.quote(kindTable), -1).length - 1, is(4));
+        assertThat(check(query), containsInAnyOrder(row(kind("red"))));
+
+        // a kind the query asks for is read for the solutions that are left
+        String needed = "SELECT ?a ?k WHERE { ?a ex:follows ?k MINUS { ?k ex:follows ?k } }";
+
+        assertThat(translate(shared, needed).split(Pattern.quote(kindTable), -1).length - 1, is(2));
+        assertThat(check(needed), containsInAnyOrder(row(kind("red"), kind("green"))));
+
+        // two differences of one group, and a difference inside another one
+        String two = "SELECT ?a WHERE { ?a ex:follows ?k . ?k ex:follows ?n MINUS { ?k ex:follows ?k } "
+                + "MINUS { ?n ex:follows ?m . ?m ex:follows ?m } }";
+
+        assertThat(translate(shared, two).split(Pattern.quote(kindTable), -1).length - 1, is(1));
+        check(two);
+
+        String nested = "SELECT ?a WHERE { ?a ex:follows ?k MINUS { ?k ex:follows ?n MINUS { ?n ex:follows ?n } } }";
+
+        assertThat(translate(shared, nested).split(Pattern.quote(kindTable), -1).length - 1, is(1));
+        check(nested);
+
+        // a node named after another table of its mapping is not shared, and the sides are compared by the terms
+        check("SELECT ?i WHERE { ?i ex:kind ?k MINUS { ?k ex:follows ?n } }");
+
+        // a variable the left side may leave unbound is compared as before
+        check("SELECT ?i WHERE { ?i ex:kind ?k OPTIONAL { ?i ex:other ?o } MINUS { ?o ex:follows ?n } }");
+
+        // and so is one the right side binds in a group of its own
+        check("SELECT ?i WHERE { ?i ex:kind ?k MINUS { { ?k ex:follows ?n } ?k ex:label ?l } }");
+    }
+
+
+    @Test
     @DisplayName("a shared variable bound by the branches of a union")
     void union() throws Exception
     {

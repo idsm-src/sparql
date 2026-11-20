@@ -698,6 +698,22 @@ public abstract class SqlIntercode extends SqlBaseClass
             return map.containsKey(var);
         }
 
+
+        /**
+         * Requires nothing of the variable any more.
+         *
+         * @param var the variable
+         */
+        public void remove(Variable var)
+        {
+            map.remove(var);
+            joinClasses.remove(var);
+            acceptedClasses.remove(var);
+            acceptedValues.remove(var);
+            acceptedTerms.remove(var);
+            filterConditions.remove(var);
+        }
+
         @Override
         public boolean equals(Object other)
         {
