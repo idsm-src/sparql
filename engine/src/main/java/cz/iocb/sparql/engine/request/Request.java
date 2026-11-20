@@ -300,9 +300,9 @@ public class Request implements AutoCloseable
     private long timeout;
 
     /**
-     * Whether the request was cancelled.
+     * Whether the request was cancelled; set by another thread than the one evaluating the request.
      */
-    private boolean canceled;
+    private volatile boolean canceled;
 
 
     /**
@@ -530,8 +530,9 @@ public class Request implements AutoCloseable
                 // optimize
                 imcode = imcode.optimize(this, false);
 
-                // the optimisation runs in Java, which no statement timeout bounds
+                // the optimisation runs in Java, which neither a statement timeout nor a cancelled statement ends
                 checkTimeout();
+                checkCanceled();
 
                 // evaluate service calls
                 imcode = imcode.optimize(this, true);
@@ -590,7 +591,9 @@ public class Request implements AutoCloseable
         }
         catch(SQLException e)
         {
-            if(e.getErrorCode() == 0 && "57014".equals(e.getSQLState()))
+            if(canceled)
+                logger.warn("query canceled: " + e.getMessage());
+            else if(e.getErrorCode() == 0 && "57014".equals(e.getSQLState()))
                 logger.warn("query timeout: " + e.getMessage());
             else
                 logger.error("query evaluation error: " + e.getMessage());
@@ -755,7 +758,11 @@ public class Request implements AutoCloseable
 
 
     /**
-     * Cancels the running database statement; the request cannot be used afterwards.
+     * Cancels the request: the running database statement is cancelled, and a SERVICE call waiting for the answer of an
+     * endpoint gives the answer up within a fraction of a second (see
+     * {@link cz.iocb.sparql.engine.imcode.SqlServiceStub}), closing the connection; the request cannot be used
+     * afterwards. It may be called by another thread than the one evaluating the request, also once the request has
+     * been closed.
      *
      * @throws SQLException on database errors
      */
@@ -901,9 +908,21 @@ public class Request implements AutoCloseable
      *
      * @return true if the request has been cancelled, false otherwise
      */
-    public synchronized boolean isCanceled()
+    public boolean isCanceled()
     {
         return canceled;
+    }
+
+
+    /**
+     * Checks that the request has not been cancelled.
+     *
+     * @throws SQLException if the request has been cancelled (see {@link #cancel})
+     */
+    public void checkCanceled() throws SQLException
+    {
+        if(canceled)
+            throw new SQLException("query was canceled");
     }
 
 
@@ -922,8 +941,7 @@ public class Request implements AutoCloseable
     {
         try
         {
-            if(canceled)
-                throw new SQLException("query was canceled");
+            checkCanceled();
 
             if(statement == null)
                 statement = getConnection().createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);

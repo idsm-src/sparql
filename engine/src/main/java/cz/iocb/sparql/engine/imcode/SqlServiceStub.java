@@ -11,9 +11,9 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedIr
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.estimateAsUnion;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
-import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.math.BigInteger;
 import java.net.HttpURLConnection;
@@ -25,6 +25,7 @@ import java.sql.SQLException;
 import java.sql.SQLTimeoutException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,6 +35,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
@@ -620,62 +624,325 @@ public final class SqlServiceStub extends SqlIntercode
 
 
     /**
-     * Answer of an endpoint that ends once the time limit of the request elapses. The read timeout of the connection
-     * bounds a single read by the time remaining when the connection was opened, which an endpoint sending its answer
-     * slowly never reaches, so the limit is checked before every read as well.
+     * Answer of an endpoint, received by a virtual thread of its own, so that the thread evaluating the request never
+     * blocks on the communication: it waits for the parts of the answer, checking every {@link #CHECK_INTERVAL} at the
+     * latest that the time limit of the request has not elapsed and that the request has not been cancelled (see
+     * {@link Request#cancel}), and once it gives the answer up, it interrupts the receiving thread, which ends a
+     * blocking operation of a virtual thread on a socket by closing the socket. So an endpoint that does not answer, or
+     * sends its answer slowly, holds the request neither beyond its time limit nor once the request is cancelled,
+     * whether the call is connecting, sending the query, waiting for the response or reading it (a single read of a
+     * connection is bounded only by its read timeout, the time remaining when the connection was opened, which an
+     * endpoint sending its answer slowly never reaches). The receiving thread hands the answer over in parts through a
+     * bounded queue, so it reads ahead only a few parts.
      */
-    private static final class TimedInputStream extends FilterInputStream
+    private static final class Answer extends InputStream
     {
         /**
-         * The request whose time limit ends the answer.
+         * Longest time in milliseconds the request waits for a part of the answer before it checks its time limit and
+         * its cancellation again.
+         */
+        private static final long CHECK_INTERVAL = 100;
+
+        /**
+         * Largest part of the answer handed over at once, in bytes.
+         */
+        private static final int PART_SIZE = 65536;
+
+        /**
+         * Element of the queue telling that the endpoint has accepted the request.
+         */
+        private static final Object ACCEPTED = new Object();
+
+        /**
+         * Element of the queue telling that the answer has ended.
+         */
+        private static final Object END = new Object();
+
+        /**
+         * The request the answer is received for.
          */
         private final Request request;
 
+        /**
+         * What the receiving thread has received and the request has not taken yet: {@link #ACCEPTED}, the parts of the
+         * answer as byte arrays and {@link #END}, or the {@link Throwable} that has ended the communication.
+         */
+        private final BlockingQueue<Object> received = new ArrayBlockingQueue<>(16);
 
         /**
-         * Creates the answer read within the time limit of the request.
-         *
-         * @param input the answer of the endpoint
-         * @param request the request whose time limit ends the answer
+         * The thread receiving the answer.
          */
-        TimedInputStream(InputStream input, Request request)
+        private final Thread receiver;
+
+        /**
+         * Part of the answer being read.
+         */
+        private byte[] part = new byte[0];
+
+        /**
+         * Position of the next byte to read in the part being read.
+         */
+        private int position = 0;
+
+        /**
+         * Whether the answer has ended.
+         */
+        private boolean ended = false;
+
+        /**
+         * The failure that has ended the answer, thrown again by every further read; null if there has been none.
+         */
+        private IOException failure = null;
+
+
+        /**
+         * Sends the query to the endpoint by a POST request, following the redirections, and starts receiving the
+         * answer.
+         *
+         * @param request the request the query is sent for
+         * @param endpoint the IRI of the endpoint
+         * @param query the query
+         * @param redirectLimit the largest number of redirections to follow
+         */
+        Answer(Request request, String endpoint, String query, int redirectLimit)
         {
-            super(input);
             this.request = request;
+            this.receiver = Thread.ofVirtual().start(() -> receive(endpoint, query, redirectLimit));
+        }
+
+
+        /**
+         * Sends the query and receives the answer, run by the receiving thread: what it receives, or the failure ending
+         * the communication, goes to the queue; once it is interrupted, it ends.
+         *
+         * @param endpoint the IRI of the endpoint
+         * @param query the query
+         * @param redirectLimit the largest number of redirections to follow
+         */
+        private void receive(String endpoint, String query, int redirectLimit)
+        {
+            try
+            {
+                HttpURLConnection connection = null;
+                String url = endpoint;
+
+                for(int i = 0; i <= redirectLimit && url != null; i++)
+                {
+                    int timeout = request.getConnectionTimeout();
+
+                    connection = (HttpURLConnection) (new URI(url)).toURL().openConnection();
+                    connection.setConnectTimeout(timeout);
+                    connection.setReadTimeout(timeout);
+                    connection.setRequestMethod("POST");
+                    connection.setRequestProperty("content-type", "application/x-www-form-urlencoded; charset=UTF-8");
+                    connection.setRequestProperty("user-agent", userAgent);
+                    connection.setRequestProperty("accept", "application/sparql-results+xml");
+                    connection.setDoOutput(true);
+
+                    try(OutputStream out = connection.getOutputStream())
+                    {
+                        out.write(("query=" + URLEncoder.encode(query, "UTF-8")).getBytes());
+                    }
+
+                    url = connection.getHeaderField("Location");
+                }
+
+                if(connection.getResponseCode() != HttpURLConnection.HTTP_OK)
+                    throw new IOException(connection.getResponseMessage());
+
+                received.put(ACCEPTED);
+
+                try(InputStream input = connection.getInputStream())
+                {
+                    byte[] buffer = new byte[PART_SIZE];
+
+                    for(int length; (length = input.read(buffer)) >= 0;)
+                        if(length > 0)
+                            received.put(Arrays.copyOf(buffer, length));
+                }
+
+                received.put(END);
+            }
+            catch(InterruptedException e)
+            {
+                // the request has given the answer up
+            }
+            catch(Throwable e)
+            {
+                try
+                {
+                    received.put(e);
+                }
+                catch(InterruptedException x)
+                {
+                    // the request has given the answer up
+                }
+            }
+        }
+
+
+        /**
+         * Waits until the endpoint accepts the request (answers with the status 200).
+         *
+         * @throws IOException if the communication fails, the endpoint answers with another status, the time limit of
+         *             the request elapses ({@link SocketTimeoutException}) or the request is cancelled
+         *             ({@link InterruptedIOException})
+         * @throws URISyntaxException if the IRI of the endpoint or of a redirection is no URI
+         * @throws SQLException with the SQL state 57014 of a cancelled statement if the time limit elapses before a
+         *             redirection is followed
+         */
+        void awaitAcceptance() throws IOException, URISyntaxException, SQLException
+        {
+            Object element = take();
+
+            if(element instanceof URISyntaxException e)
+                throw e;
+
+            if(element instanceof SQLException e)
+                throw e;
+
+            if(element instanceof IOException e)
+                throw e;
+
+            rethrow(element);
         }
 
 
         @Override
         public int read() throws IOException
         {
-            checkTimeout();
-            return super.read();
+            return fill() ? part[position++] & 0xff : -1;
         }
 
 
         @Override
         public int read(byte[] buffer, int offset, int length) throws IOException
         {
-            checkTimeout();
-            return super.read(buffer, offset, length);
+            Objects.checkFromIndexSize(offset, length, buffer.length);
+
+            if(length == 0)
+                return 0;
+
+            if(!fill())
+                return -1;
+
+            int count = Math.min(length, part.length - position);
+            System.arraycopy(part, position, buffer, offset, count);
+            position += count;
+
+            return count;
         }
 
 
         /**
-         * Ends the answer if the time limit of the request has elapsed.
-         *
-         * @throws SocketTimeoutException if the time limit of the request has elapsed
+         * Gives the answer up: the receiving thread is interrupted, which closes the connection if the answer has not
+         * ended yet.
          */
-        private void checkTimeout() throws SocketTimeoutException
+        @Override
+        public void close()
+        {
+            receiver.interrupt();
+        }
+
+
+        /**
+         * Makes the part being read hold a byte to read, taking the next part of the answer when it has none left.
+         *
+         * @return true if the part holds a byte to read, false at the end of the answer
+         * @throws IOException if the communication fails, the time limit of the request elapses
+         *             ({@link SocketTimeoutException}) or the request is cancelled ({@link InterruptedIOException})
+         */
+        private boolean fill() throws IOException
+        {
+            while(position == part.length)
+            {
+                if(failure != null)
+                    throw failure;
+
+                if(ended)
+                    return false;
+
+                Object element = take();
+
+                if(element == END)
+                {
+                    ended = true;
+                }
+                else if(element instanceof IOException e)
+                {
+                    failure = e;
+                }
+                else if(element instanceof byte[] bytes)
+                {
+                    part = bytes;
+                    position = 0;
+                }
+                else
+                {
+                    rethrow(element);
+                }
+            }
+
+            return true;
+        }
+
+
+        /**
+         * Takes what the receiving thread has received next, waiting for it as long as the time limit of the request
+         * has not elapsed and the request has not been cancelled.
+         *
+         * @return what the receiving thread has received next
+         * @throws IOException if the time limit of the request elapses ({@link SocketTimeoutException}), the request is
+         *             cancelled or the thread evaluating it is interrupted ({@link InterruptedIOException})
+         */
+        private Object take() throws IOException
         {
             try
             {
-                request.checkTimeout();
+                while(true)
+                {
+                    try
+                    {
+                        request.checkTimeout();
+                    }
+                    catch(SQLTimeoutException e)
+                    {
+                        throw new SocketTimeoutException(e.getMessage());
+                    }
+
+                    if(request.isCanceled())
+                        throw new InterruptedIOException("query was canceled");
+
+                    Object element = received.poll(CHECK_INTERVAL, TimeUnit.MILLISECONDS);
+
+                    if(element != null)
+                        return element;
+                }
             }
-            catch(SQLTimeoutException e)
+            catch(InterruptedException e)
             {
-                throw new SocketTimeoutException(e.getMessage());
+                Thread.currentThread().interrupt();
+                throw new InterruptedIOException("interrupted while waiting for the answer");
             }
+        }
+
+
+        /**
+         * Throws an unchecked failure received from the receiving thread again; anything else it may have received at
+         * the place of the caller is an error.
+         *
+         * @param element what the receiving thread has received
+         */
+        private static void rethrow(Object element)
+        {
+            if(element instanceof RuntimeException e)
+                throw e;
+
+            if(element instanceof Error e)
+                throw e;
+
+            if(element != ACCEPTED)
+                throw new IllegalStateException("unexpected element of the answer: " + element);
         }
     }
 
@@ -1240,41 +1507,20 @@ public final class SqlServiceStub extends SqlIntercode
 
                     /* open connection */
 
-                    HttpURLConnection connection = null;
+                    Answer answer = new Answer(request, endpoint, query, endpointSettings.redirectLimit());
 
                     try
                     {
-                        String url = endpoint;
-
-                        for(int i = 0; i <= endpointSettings.redirectLimit() && url != null; i++)
-                        {
-                            int timeout = request.getConnectionTimeout();
-
-                            connection = (HttpURLConnection) (new URI(url)).toURL().openConnection();
-                            connection.setConnectTimeout(timeout);
-                            connection.setReadTimeout(timeout);
-                            connection.setRequestMethod("POST");
-                            connection.setRequestProperty("content-type",
-                                    "application/x-www-form-urlencoded; charset=UTF-8");
-                            connection.setRequestProperty("user-agent", userAgent);
-                            connection.setRequestProperty("accept", "application/sparql-results+xml");
-                            connection.setDoOutput(true);
-
-                            try(OutputStream out = connection.getOutputStream())
-                            {
-                                out.write(("query=" + URLEncoder.encode(query, "UTF-8")).getBytes());
-                            }
-
-                            url = connection.getHeaderField("Location");
-                        }
-
-                        if(connection.getResponseCode() != HttpURLConnection.HTTP_OK)
-                            throw new IOException(connection.getResponseMessage());
+                        answer.awaitAcceptance();
                     }
                     catch(IOException | URISyntaxException e)
                     {
-                        // a connection timing out ends the request, as it times out with the time limit of the request
+                        answer.close();
+
+                        // a connection timing out ends the request, as it times out with the time limit of the request,
+                        // and a cancelled request ends whether the call is SILENT or not
                         request.checkTimeout();
+                        request.checkCanceled();
 
                         e.printStackTrace();
 
@@ -1314,23 +1560,21 @@ public final class SqlServiceStub extends SqlIntercode
 
                     /* receive result */
 
-                    try
+                    try(answer)
                     {
                         ResultsHandler handler = new ResultsHandler(request, serviceVariables, entry.getValue(),
                                 results, call++ + "r", blankNodeClass.getSegment(),
                                 endpointSettings.canonicalizeLiterals(), settings.resultLimit());
 
-                        try(InputStream input = new TimedInputStream(connection.getInputStream(), request))
-                        {
-                            SAXParserFactory factory = SAXParserFactory.newInstance();
-                            factory.setNamespaceAware(true);
-                            SAXParser saxParser = factory.newSAXParser();
-                            saxParser.parse(input, handler);
-                        }
+                        SAXParserFactory factory = SAXParserFactory.newInstance();
+                        factory.setNamespaceAware(true);
+                        SAXParser saxParser = factory.newSAXParser();
+                        saxParser.parse(answer, handler);
                     }
                     catch(ParserConfigurationException | SAXException | IOException e)
                     {
                         request.checkTimeout();
+                        request.checkCanceled();
 
                         if(e instanceof SAXException && results.size() >= settings.resultLimit())
                         {
