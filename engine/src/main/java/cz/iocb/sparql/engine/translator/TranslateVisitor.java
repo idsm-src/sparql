@@ -80,6 +80,7 @@ import cz.iocb.sparql.engine.mapping.QuadMapping;
 import cz.iocb.sparql.engine.mapping.SingleTableQuadMapping;
 import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
+import cz.iocb.sparql.engine.mapping.classes.InternalResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
@@ -146,14 +147,76 @@ import cz.iocb.sparql.engine.request.Request;
 public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 {
     /**
+     * Node joining two tables of a join mapping: the variable bound to the join columns of both tables, and the class
+     * of its values.
+     *
+     * @param variable the variable
+     * @param resourceClass class of the values of the variable
+     */
+    static record JoinNode(Variable variable, InternalResourceClass resourceClass)
+    {
+    }
+
+
+    /**
+     * What the node joining a table of a join mapping by a key of a term stands for (see {@link #getJoinNode}): the
+     * values of the join columns in the row of the table that holds the term of the variable in the given columns, for
+     * the patterns of one scope.
+     *
+     * @param scope the scope of the patterns sharing the node (see {@link #joinScope})
+     * @param variable the variable standing for the term
+     * @param table the table
+     * @param resourceClass class the columns hold the term in
+     * @param columns the columns of the table holding the term
+     * @param joinColumns the columns the table is joined by
+     */
+    private static record JoinKey(int scope, Variable variable, SourceTable table, ResourceClass resourceClass,
+            List<Column> columns, List<Column> joinColumns)
+    {
+    }
+
+
+    /**
      * Name prefix of the fresh variables.
      */
     private static final String variablePrefix = "@additionalvar";
 
     /**
+     * Name prefix of the variables joining the tables of join mappings by the keys of terms.
+     */
+    private static final String joinVariablePrefix = "@joinvar";
+
+    /**
      * Counter of fresh variables.
      */
     private int variableId = 0;
+
+    /**
+     * Variables joining the tables of join mappings by the keys of terms, by what they stand for (see
+     * {@link #getJoinNode}).
+     */
+    private final Map<JoinKey, Variable> joinVariables = new HashMap<>();
+
+    /**
+     * Classes of the values of the join columns of tables, by the table and the columns (see {@link #getJoinNode}).
+     */
+    private final Map<List<Object>, InternalResourceClass> joinClasses = new HashMap<>();
+
+    /**
+     * Counter of the scopes of the nodes joining the tables of join mappings.
+     */
+    private int joinScopeId = 0;
+
+    /**
+     * Scope the triple patterns are translated in, with respect to the nodes joining the tables of join mappings by the
+     * keys of terms: the patterns of one scope share the nodes (see {@link #getJoinNode}). A scope is a run of triple
+     * patterns of a group graph pattern that are joined to each other directly, so a node meets only joins and the
+     * unions of the mappings of a pattern on its way between the tables it joins: a new scope starts with every group
+     * graph pattern, and after every member of it that takes in the solutions of the members before it (an OPTIONAL, a
+     * MINUS, a BIND, a procedure call or a SERVICE). The parts of a repeated path have scopes of their own too (see
+     * {@link #translateApart}), because the nodes they are made of expose the ends of the path only.
+     */
+    private int joinScope = 0;
 
     /**
      * Counter of SERVICE calls, giving each its blank node segment.
@@ -1600,6 +1663,21 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      */
     private SqlIntercode translatePatternList(List<Pattern> patterns, SqlIntercode base)
     {
+        return translateApart(() -> translatePatterns(patterns, base));
+    }
+
+
+    /**
+     * Translates the patterns of a group graph pattern in the join scope started for them (see
+     * {@link #translatePatternList}); a member taking in the solutions of the members before it ends the run of the
+     * triple patterns sharing the nodes that join the tables of join mappings (see {@link #joinScope}).
+     *
+     * @param patterns the patterns
+     * @param base the code the patterns are joined to
+     * @return the resulting intermediate code
+     */
+    private SqlIntercode translatePatterns(List<Pattern> patterns, SqlIntercode base)
+    {
         SqlIntercode translatedGroupPattern = base;
 
         LinkedList<Filter> filters = new LinkedList<>();
@@ -1639,14 +1717,20 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 translatedGroupPattern = translateLeftJoin(translatedGroupPattern,
                         restrictToCurrentGraph(translatedPattern), optionalFilters);
+
+                startJoinScope();
             }
             else if(pattern instanceof Minus minus)
             {
                 translatedGroupPattern = translateMinus(minus, translatedGroupPattern);
+
+                startJoinScope();
             }
             else if(pattern instanceof Bind bind)
             {
                 translatedGroupPattern = translateBind(bind, translatedGroupPattern);
+
+                startJoinScope();
             }
             else if(pattern instanceof Filter filter)
             {
@@ -1655,10 +1739,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             else if(pattern instanceof ProcedureCallBase procedureCall)
             {
                 translatedGroupPattern = translateProcedureCall(procedureCall, translatedGroupPattern);
+
+                startJoinScope();
             }
             else if(pattern instanceof Service service)
             {
                 translatedGroupPattern = translateService(service, translatedGroupPattern);
+
+                startJoinScope();
             }
             else
             {
@@ -2255,6 +2343,67 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     protected Variable createVariable(String prefix)
     {
         return getVariable(new VariableNode(prefix + variableId++));
+    }
+
+
+    /**
+     * Node joining a table of a join mapping to another one by the values of the join columns in the row that holds the
+     * term of the variable in the given columns, which contain a key of the table. The row is given by the term, so the
+     * node is the same wherever a pattern of the current scope (see {@link #joinScope}) reads the table by the term of
+     * that variable: the tables that the patterns join to those rows are then joined to each other by the node, whether
+     * the rows themselves are read or not, as if the patterns shared a variable held by the join columns.
+     *
+     * @param variable the variable standing for the term
+     * @param table the table
+     * @param resourceClass class the columns hold the term in
+     * @param columns the columns of the table holding the term, which contain a key of the table
+     * @param joinColumns the columns the table is joined by
+     * @return the node joining the table by the row of the term
+     */
+    JoinNode getJoinNode(Variable variable, SourceTable table, ResourceClass resourceClass, List<Column> columns,
+            List<Column> joinColumns)
+    {
+        JoinKey key = new JoinKey(joinScope, variable, table, resourceClass, columns, joinColumns);
+        Variable node = joinVariables.computeIfAbsent(key, _ -> createVariable(joinVariablePrefix));
+
+        InternalResourceClass nodeClass = joinClasses.computeIfAbsent(List.of(table, joinColumns),
+                _ -> new InternalResourceClass(joinColumns.stream().map(Column::getType).toList()));
+
+        return new JoinNode(node, nodeClass);
+    }
+
+
+    /**
+     * Starts a new scope of the nodes joining the tables of join mappings (see {@link #joinScope}): the triple patterns
+     * translated from now on share no such node with those translated before.
+     */
+    private void startJoinScope()
+    {
+        joinScope = ++joinScopeId;
+    }
+
+
+    /**
+     * Translates a part of the query in a scope of its own with respect to the nodes joining the tables of join
+     * mappings (see {@link #joinScope}), so that its triple patterns share no such node with the patterns around it.
+     *
+     * @param translation the translation of the part
+     * @return what the translation returns
+     */
+    SqlIntercode translateApart(Supplier<SqlIntercode> translation)
+    {
+        int enclosing = joinScope;
+
+        startJoinScope();
+
+        try
+        {
+            return translation.get();
+        }
+        finally
+        {
+            joinScope = enclosing;
+        }
     }
 
 

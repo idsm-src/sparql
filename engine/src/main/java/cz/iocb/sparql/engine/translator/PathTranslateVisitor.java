@@ -27,6 +27,7 @@ import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.SourceTable;
+import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.imcode.SqlBind;
 import cz.iocb.sparql.engine.imcode.SqlDistinct;
 import cz.iocb.sparql.engine.imcode.SqlEmptySolution;
@@ -77,6 +78,7 @@ import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.translator.TranslateVisitor.JoinNode;
 
 
 
@@ -199,6 +201,23 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Translates a path element between the given subject and object as a part of a repeated path, in a scope of its
+     * own with respect to the nodes joining the tables of join mappings (see {@link TranslateVisitor#translateApart}):
+     * the node the part becomes a child of exposes the ends of the path only, so the tables the part reads cannot be
+     * joined to those of the patterns around the path by such a node.
+     *
+     * @param element the element
+     * @param subject the subject term
+     * @param object the object term
+     * @return the resulting intermediate code
+     */
+    private SqlIntercode visitApart(Element element, RdfTerm subject, RdfTerm object)
+    {
+        return parent.translateApart(() -> visitElement(element, subject, object));
+    }
+
+
     @Override
     public SqlIntercode visit(AlternativePath alternativePath)
     {
@@ -261,8 +280,9 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 .map(e -> (Variable) e).collect(toSet());
 
         if(repeatedPath.getKind() == Kind.ZeroOrOne)
-            return SqlDistinct.create(request, SqlUnion.union(request, List.of(translateZeroPath(subject, object),
-                    visitElement(repeatedPath.getChild(), subject, object))), distinct);
+            return SqlDistinct.create(request, SqlUnion.union(request,
+                    List.of(translateZeroPath(subject, object), visitApart(repeatedPath.getChild(), subject, object))),
+                    distinct);
 
 
         Variable joinVar = parent.createVariable(variablePrefix);
@@ -273,9 +293,9 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         if(!(object instanceof Variable) && subject instanceof Variable endVar)
         {
             SqlIntercode init = repeatedPath.getKind() == Kind.ZeroOrMore ? translateZeroPath(object, subject) :
-                    visitElement(repeatedPath.getChild(), subject, object);
+                    visitApart(repeatedPath.getChild(), subject, object);
 
-            SqlIntercode next = visitElement(repeatedPath.getChild(), subject, joinVar);
+            SqlIntercode next = visitApart(repeatedPath.getChild(), subject, joinVar);
 
             return SqlRecursive.create(request, init, next, null, joinVar, endVar, graphVar);
         }
@@ -296,12 +316,12 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         if(!objectStart.isEmpty())
         {
             SqlIntercode init = repeatedPath.getKind() == Kind.ZeroOrMore ? translateZeroPath(endVar, beginVar) :
-                    visitElement(repeatedPath.getChild(), beginVar, endVar);
+                    visitApart(repeatedPath.getChild(), beginVar, endVar);
 
-            SqlIntercode next = visitElement(repeatedPath.getChild(), beginVar, joinVar);
+            SqlIntercode next = visitApart(repeatedPath.getChild(), beginVar, joinVar);
 
             Variable reverseJoinVar = parent.createVariable(variablePrefix);
-            SqlIntercode reverseNext = visitElement(repeatedPath.getChild(), reverseJoinVar, endVar);
+            SqlIntercode reverseNext = visitApart(repeatedPath.getChild(), reverseJoinVar, endVar);
 
             return SqlRecursive.create(request, init, next, endVar, joinVar, beginVar, graphVar, reverseNext,
                     reverseJoinVar, objectStart);
@@ -309,9 +329,9 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
         SqlIntercode init = repeatedPath.getKind() == Kind.ZeroOrMore ? translateZeroPath(subject, endVar) :
-                visitElement(repeatedPath.getChild(), subject, endVar);
+                visitApart(repeatedPath.getChild(), subject, endVar);
 
-        SqlIntercode next = visitElement(repeatedPath.getChild(), joinVar, endVar);
+        SqlIntercode next = visitApart(repeatedPath.getChild(), joinVar, endVar);
 
         Map<Variable, SqlExpressionIntercode> start = beginVar != null ?
                 parent.getWalkStart(beginVar, endVar, graphVar) : Map.of();
@@ -323,7 +343,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             // a walk between two variables gets the step in both directions, and the recursion starts from the end the
             // parent restricts more (see SqlRecursive.optimize)
             Variable reverseJoinVar = parent.createVariable(variablePrefix);
-            SqlIntercode reverseNext = visitElement(repeatedPath.getChild(), beginVar, reverseJoinVar);
+            SqlIntercode reverseNext = visitApart(repeatedPath.getChild(), beginVar, reverseJoinVar);
 
             intercode = SqlRecursive.create(request, init, next, beginVar, joinVar, endVar, graphVar, reverseNext,
                     reverseJoinVar, start);
@@ -510,10 +530,10 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         if(subject instanceof Variable subjectVar && object instanceof Variable objectVar)
         {
-            SqlIntercode subjects = visitElement(parent.createVariableNode(variablePrefix), subject,
+            SqlIntercode subjects = visitApart(parent.createVariableNode(variablePrefix), subject,
                     parent.createVariable(variablePrefix));
 
-            SqlIntercode objects = visitElement(parent.createVariableNode(variablePrefix),
+            SqlIntercode objects = visitApart(parent.createVariableNode(variablePrefix),
                     parent.createVariable(variablePrefix), subject);
 
             Set<Variable> distinctVariables = new HashSet<>();
@@ -678,11 +698,12 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 if(i < tables.size() - 1)
                 {
-                    resourceClass = new InternalResourceClass(
-                            joinColumnsPairs.get(i).getLeftColumns().stream().map(Column::getType).toList());
+                    JoinNode node = getJoinNode(mapping, i, graph, subject, predicate, object);
+
+                    resourceClass = node.resourceClass();
                     TermMapping nodeMapping = new InternalNodeMapping(resourceClass,
                             joinColumnsPairs.get(i).getLeftColumns());
-                    term = parent.createVariable(variablePrefix);
+                    term = node.variable();
                     maps.add(new MappedTerm(term, nodeMapping));
                 }
 
@@ -702,6 +723,59 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
         return null;
+    }
+
+
+    /**
+     * Node joining the tables {@code index} and {@code index + 1} of a join mapping, which is bound to the join columns
+     * of both. When one of the two tables holds a term of the pattern that is a variable in columns containing a key of
+     * the table, the row of the table is given by the term, and the node stands for the values of its join columns in
+     * that row (see {@link TranslateVisitor#getJoinNode}): every triple pattern of the current join scope that reads
+     * the table by the term of that variable gets the same node, so the tables joined to the rows of the term are
+     * joined to each other directly. Otherwise the node is a fresh variable of a class of its own.
+     *
+     * @param mapping the join mapping
+     * @param index index of the left one of the two tables
+     * @param graph the graph term
+     * @param subject the subject term
+     * @param predicate the predicate term
+     * @param object the object term
+     * @return the node joining the two tables
+     */
+    private JoinNode getJoinNode(JoinTableQuadMapping mapping, int index, RdfTerm graph, RdfTerm subject,
+            RdfTerm predicate, RdfTerm object)
+    {
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+        JoinColumns joinColumns = mapping.getJoinColumnsPairs().get(index);
+
+        List<MappedTerm> terms = List.of(new MappedTerm(subject, mapping.getSubject()),
+                new MappedTerm(object, mapping.getObject()), new MappedTerm(predicate, mapping.getPredicate()),
+                new MappedTerm(graph, mapping.getGraph()));
+        List<Integer> tables = List.of(mapping.getSubjectTableIdx(), mapping.getObjectTableIdx(),
+                mapping.getPredicateTableIdx(), mapping.getGraphTableIdx());
+
+        for(int side = index; side <= index + 1; side++)
+        {
+            SourceTable table = mapping.getTables().get(side);
+            List<Column> joined = side == index ? joinColumns.getLeftColumns() : joinColumns.getRightColumns();
+
+            for(int i = 0; i < terms.size(); i++)
+            {
+                TermMapping termMapping = terms.get(i).mapping();
+
+                if(tables.get(i) != side || !(terms.get(i).term() instanceof Variable variable) || termMapping == null
+                        || termMapping instanceof ConstantMapping)
+                    continue;
+
+                List<Column> columns = termMapping.getColumns(request);
+
+                if(columns.stream().allMatch(c -> c instanceof TableColumn) && schema.isKey(table, Set.copyOf(columns)))
+                    return parent.getJoinNode(variable, table, termMapping.getResourceClass(request), columns, joined);
+            }
+        }
+
+        return new JoinNode(parent.createVariable(variablePrefix),
+                new InternalResourceClass(joinColumns.getLeftColumns().stream().map(Column::getType).toList()));
     }
 
 

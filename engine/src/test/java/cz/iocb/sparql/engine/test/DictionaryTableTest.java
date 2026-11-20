@@ -56,7 +56,7 @@ import cz.iocb.sparql.testing.Database;
  *
  * The table {@code kind} holds the kinds red (1), green (2) and blue (3), identified by their names, of which blue has
  * no label; the table {@code item} holds the items 10 and 11 of the kind red, 12 of the kind green and 13 of the kind
- * blue, and the table {@code follows} says that green and blue follow red and that blue follows green. The table
+ * blue, and the table {@code follows} says that red follows green and blue and that green follows blue. The table
  * {@code term} numbers five terms kept in boxes, and the table {@code fact} relates their numbers: s1 to s2 and to
  * {@code "x"}, s2 to {@code "x"} and to the integer 5.
  */
