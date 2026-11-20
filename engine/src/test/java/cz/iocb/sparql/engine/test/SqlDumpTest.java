@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.test;
 
+import static java.util.Locale.ROOT;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
@@ -187,6 +188,27 @@ public class SqlDumpTest
                             SparqlTest.getMapping(quad.object(), mapConfig, SparqlTest.literalClassMap));
 
                 dump(out, "eval-map", (String) a[0], new Engine(mapConfig), (String) a[1]);
+
+
+                // the queries over the numbered quads are translated with the data stored, as the translation reads
+                // the numbers of the constants from the table of the terms
+                for(NumberedQuadTable.Variant variant : NumberedQuadTable.Variant.values())
+                {
+                    SparqlDatabaseConfiguration numberedConfig = new SparqlDatabaseConfiguration(null,
+                            SparqlTest.connectionPool, SparqlTest.schema, false);
+
+                    NumberedQuadTable.map(numberedConfig, variant);
+
+                    Engine numberedEngine = new Engine(numberedConfig);
+
+                    try(Request request = numberedEngine.getRequest())
+                    {
+                        NumberedQuadTable.store(request, quads);
+                    }
+
+                    dump(out, "eval-numbered-" + variant.name().toLowerCase(ROOT), (String) a[0], numberedEngine,
+                            (String) a[1]);
+                }
             }
 
             for(Arguments args : SparqlTest.getNextProtTests())
