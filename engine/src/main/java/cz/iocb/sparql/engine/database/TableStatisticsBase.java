@@ -12,12 +12,14 @@ import cz.iocb.sparql.engine.request.Request.ResultReader;
 
 
 /**
- * Estimates from the statistics of groups of rows the way the database planner does: the rows of a disjunct of the
+ * Estimates from the statistics of groups of rows much the way the database planner does: the rows of a disjunct of the
  * conditions are the rows of the group the disjunct selects, multiplied by the selectivity of every column bound to a
  * value (the frequency of the value when it is among the most common ones, otherwise the frequency of an average of the
  * remaining values, which share the rows holding neither a most common value nor a null) and by the fraction of null or
- * not-null values of every column tested for them; the rows of a disjunction are the sum over its disjuncts. Subclasses
- * supply the groups and the frequencies.
+ * not-null values of every column tested for them; the rows of a disjunction are the sum over its disjuncts. Unlike the
+ * planner, which takes all those conditions for independent, the columns a disjunct requires not to be null are taken
+ * to be null together (see {@link #estimateRows(Request, Condition)}). Subclasses supply the groups and the
+ * frequencies.
  */
 public abstract class TableStatisticsBase implements TableStatistics
 {
@@ -155,7 +157,15 @@ public abstract class TableStatisticsBase implements TableStatistics
 
 
     /**
-     * Estimated number of rows satisfying the disjunct.
+     * Estimated number of rows satisfying the disjunct. The columns the disjunct requires not to be null, by a test or
+     * by a value, are taken to be null together: a table of rows of several kinds has the columns of a kind filled in
+     * the rows of that kind and null in the others, so the rows in which a column is not null are mostly among those in
+     * which a column of fewer nulls is not null either, far from being independent of them. The columns together thus
+     * leave the rows of the one with the most nulls, and a value is taken to be as frequent among those rows as it is
+     * among the rows in which its own column is not null. Taken for independent, each such column would take its nulls
+     * away from the rows the others have left, and the rows of a kind, all of which have its columns filled, would come
+     * out the fewer the more of its columns are asked for. A column required to be null is taken for independent of the
+     * others.
      *
      * @param request the current request
      * @param condition the disjunct
@@ -168,9 +178,22 @@ public abstract class TableStatisticsBase implements TableStatistics
 
         double rows = group != null ? group.rows() : DEFAULT_ROWS;
 
+        // the fraction of the rows in which all the columns required not to be null are not null
+        double present = 1;
+
         for(Entry<TableColumn, Column> entry : values.entrySet())
-            if(!isGroupColumn(entry.getKey()))
-                rows *= selectivity(request, group, entry.getKey(), entry.getValue());
+        {
+            if(isGroupColumn(entry.getKey()))
+                continue;
+
+            double filled = 1 - nullFraction(group, entry.getKey());
+
+            // the frequency of the value among the rows in which its column is not null
+            if(filled > 0)
+                rows *= Math.min(selectivity(request, group, entry.getKey(), entry.getValue()) / filled, 1);
+
+            present = Math.min(present, filled);
+        }
 
         for(Column column : condition.getIsNull())
             if(column instanceof TableColumn tableColumn)
@@ -178,9 +201,9 @@ public abstract class TableStatisticsBase implements TableStatistics
 
         for(Column column : condition.getIsNotNull())
             if(column instanceof TableColumn tableColumn && !values.containsKey(tableColumn))
-                rows *= 1 - nullFraction(group, tableColumn);
+                present = Math.min(present, 1 - nullFraction(group, tableColumn));
 
-        return rows;
+        return rows * Math.max(present, 0);
     }
 
 

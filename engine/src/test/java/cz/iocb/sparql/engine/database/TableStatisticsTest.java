@@ -13,9 +13,9 @@ import cz.iocb.sparql.engine.request.Request;
  * Arithmetic of the estimates over given statistics: the rows of a disjunct are the rows of its group multiplied by the
  * selectivities of its bound columns (the frequency of a most common value, the average of the remaining values
  * otherwise, which share the rows that are not null, the planner's default without statistics) and by the null
- * fractions; the disjuncts add up; the distinct values of a bound column are one, of a free column the skew-corrected
- * count capped by the rows; a group column is accounted for by its group; the effective number of distinct values
- * follows from the frequencies among the rows that are not null.
+ * fractions, the columns required not to be null being null together; the disjuncts add up; the distinct values of a
+ * bound column are one, of a free column the skew-corrected count capped by the rows; a group column is accounted for
+ * by its group; the effective number of distinct values follows from the frequencies among the rows that are not null.
  */
 public class TableStatisticsTest
 {
@@ -27,6 +27,8 @@ public class TableStatisticsTest
 
     private static final TableColumn n = new TableColumn("n", INT4);
 
+    private static final TableColumn m = new TableColumn("m", INT4);
+
     private static final Column one = new ValueColumn("1", INT4);
 
     private static final Column two = new ValueColumn("2", INT4);
@@ -36,8 +38,9 @@ public class TableStatisticsTest
 
     /**
      * Statistics of one group of 1000 rows: 100 distinct values of {@code s} with the value 1 held by a fifth of the
-     * rows and the other values equally frequent, 10 distinct values of {@code o}, a column {@code n} null in half of
-     * the rows and a column {@code u} nothing is known about; grouped by {@code p} when asked so.
+     * rows and the other values equally frequent, 10 distinct values of {@code o}, a column {@code n} of two values
+     * null in half of the rows, a column {@code m} of four values null in four fifths of the rows and a column
+     * {@code u} nothing is known about; grouped by {@code p} when asked so.
      */
     private static class TestStatistics extends TableStatisticsBase
     {
@@ -50,8 +53,8 @@ public class TableStatisticsTest
             this.grouped = grouped;
             this.group = new Group(grouped ? "'a'" : null, 1000,
                     Map.of("s", ColumnStatistics.of(1000, 100, 0, 1, 0.2, 0.04), "o",
-                            ColumnStatistics.of(1000, 10, 0, 0, 0, 0), "n",
-                            ColumnStatistics.of(1000, 2, 0.5, 0, 0, 0)));
+                            ColumnStatistics.of(1000, 10, 0, 0, 0, 0), "n", ColumnStatistics.of(1000, 2, 0.5, 0, 0, 0),
+                            "m", ColumnStatistics.of(1000, 4, 0.8, 0, 0, 0)));
         }
 
         @Override
@@ -160,6 +163,43 @@ public class TableStatisticsTest
 
         assertEquals(500, new TestStatistics(false).estimateRows(null, conditions(isNull)), 1e-9);
         assertEquals(500, new TestStatistics(false).estimateRows(null, conditions(isNotNull)), 1e-9);
+    }
+
+
+    @Test
+    public void rowsOfColumnsNullTogether()
+    {
+        // the columns required not to be null leave the rows of the one with the most nulls
+        Condition filled = new Condition();
+        filled.addIsNotNull(n);
+        filled.addIsNotNull(m);
+
+        assertEquals(1000 * 0.2, new TestStatistics(false).estimateRows(null, conditions(filled)), 1e-9);
+
+        // one of the two values of the other column is in a half of them, as it is in a half of the rows of its column
+        Condition outer = equal(n, one);
+        outer.addIsNotNull(m);
+
+        assertEquals(1000 * 0.2 / 2, new TestStatistics(false).estimateRows(null, conditions(outer)), 1e-9);
+
+        // the rows of a value of the column with the most nulls are among the rows the other column leaves
+        Condition inner = equal(m, one);
+        inner.addIsNotNull(n);
+
+        assertEquals(1000 * 0.2 / 4, new TestStatistics(false).estimateRows(null, conditions(inner)), 1e-9);
+
+        // the values of the two columns are independent of each other among those rows
+        Condition both = equal(n, one);
+        both.addAreEqual(m, two);
+
+        assertEquals(1000 * 0.2 / 2 / 4, new TestStatistics(false).estimateRows(null, conditions(both)), 1e-9);
+
+        // a column required to be null is independent of the others
+        Condition mixed = new Condition();
+        mixed.addIsNull(n);
+        mixed.addIsNotNull(m);
+
+        assertEquals(1000 * 0.5 * 0.2, new TestStatistics(false).estimateRows(null, conditions(mixed)), 1e-9);
     }
 
 

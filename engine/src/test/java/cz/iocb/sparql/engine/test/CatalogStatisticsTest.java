@@ -35,8 +35,9 @@ import cz.iocb.sparql.testing.Database;
 /**
  * Statistics read from the database: the catalog statistics of an analysed table give its rows, the frequency of a most
  * common value, the average frequency of the other values and the distinct values of its columns, also where a column
- * holds nulls or booleans; the grouped statistics read the side tables for a bound group column and fall back to the
- * catalog otherwise; the configuration serves the registered statistics and the catalog statistics of other tables.
+ * holds nulls or booleans, the columns required not to be null being null together; the grouped statistics read the
+ * side tables for a bound group column and fall back to the catalog otherwise; the configuration serves the registered
+ * statistics and the catalog statistics of other tables.
  */
 public class CatalogStatisticsTest
 {
@@ -218,6 +219,31 @@ public class CatalogStatisticsTest
             // for the skew is the geometric mean of the two
             assertThat(statistics.estimateDistinct(request, code, new Conditions(true)),
                     closeTo(Math.sqrt(201 * 4), 3));
+        }
+    }
+
+
+    @Test
+    public void catalogColumnsNullTogether() throws SQLException
+    {
+        TableStatistics statistics = new CatalogStatistics(entities);
+
+        try(Request request = new Engine(config).getRequest())
+        {
+            // the 200 rows that have a flag are among the 400 that have a code, so they are the rows that have both,
+            // whereas the two columns taken for independent would leave 80
+            Condition both = new Condition();
+            both.addIsNotNull(flag);
+            both.addIsNotNull(code);
+
+            assertThat(statistics.estimateRows(request, new Conditions(both)), closeTo(200, 5));
+
+            // and all the rows of a flag have a code
+            Condition value = new Condition();
+            value.addAreEqual(flag, new ValueColumn("true", BOOL));
+            value.addIsNotNull(code);
+
+            assertThat(statistics.estimateRows(request, new Conditions(value)), closeTo(150, 5));
         }
     }
 
