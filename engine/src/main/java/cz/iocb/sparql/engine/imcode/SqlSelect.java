@@ -452,12 +452,123 @@ public final class SqlSelect extends SqlIntercode
         }
 
 
+        if(!optDistinct && stripedSimpleOrderBy.isEmpty())
+        {
+            SqlIntercode sliced = sliceBeforeTerms(request, optChild, stripedOrderBy);
+
+            if(sliced != null)
+                optChild = sliced.optimize(request, scope, childRestrictions, false, evalServices);
+        }
+
+
         if(optChild == child && optDistinct == distinct && stripedOrderBy.equals(orderBy)
                 && stripedSimpleOrderBy.equals(simpleOrderBy))
             return this;
 
         return createTopLevel(request, projections, optChild, optDistinct, stripedOrderBy, offset, limit,
                 stripedSimpleOrderBy);
+    }
+
+
+    /**
+     * The solutions of a child sliced in the given order before the terms of the nodes of its groups are read: where
+     * the child joins solutions grouped or deduplicated by nodes with the readers of the terms of the nodes (see
+     * {@link SqlIntercode#readTerms}), possibly under the binds of the projected expressions, and the slice orders them
+     * by other variables than a term so read, like the groups by their counts, the solutions are ordered and sliced
+     * first, by a sub-select, and the terms are read only for those the slice leaves. A reader has exactly one row for
+     * every such solution, whose node comes from the rows of the table of the term, so the join neither drops nor
+     * multiplies the solutions and may follow the slice; the select orders and slices the few rows left once more. A
+     * reader whose term the order or a bind uses stays below the slice.
+     *
+     * @param request the current request
+     * @param child the child
+     * @param order ORDER BY variables with their directions
+     * @return the child sliced before the terms are read, or null when the select has no ordered slice or the child no
+     *         terms to read after it
+     */
+    private SqlIntercode sliceBeforeTerms(Request request, SqlIntercode child, LinkedHashMap<Variable, Direction> order)
+    {
+        if(limit == null || order.isEmpty())
+            return null;
+
+        List<SqlBind> binds = new ArrayList<>();
+        SqlIntercode node = child;
+
+        while(node instanceof SqlBind bind)
+        {
+            binds.add(bind);
+            node = bind.getChild();
+        }
+
+        if(!(node instanceof SqlJoin join))
+            return null;
+
+        List<SqlIntercode> grouped = join.getChilds().stream()
+                .filter(c -> c instanceof SqlAggregation || c instanceof SqlDistinct).toList();
+
+        if(grouped.size() != 1)
+            return null;
+
+        SqlIntercode solutions = grouped.get(0);
+
+        Set<Variable> keys = solutions instanceof SqlAggregation aggregation ? aggregation.getGroupVariables() :
+                ((SqlDistinct) solutions).getDistinctVariables();
+
+        // the variables that have to be bound below the slice
+        Set<Variable> used = new HashSet<>(order.keySet());
+        binds.forEach(b -> used.addAll(b.getExpression().getReferencedVariables()));
+
+        List<SqlIntercode> inner = new ArrayList<>(grouped);
+        List<SqlIntercode> readers = new ArrayList<>();
+        Set<Variable> read = new HashSet<>();
+        Set<Variable> nodes = new HashSet<>();
+
+        for(SqlIntercode other : join.getChilds())
+        {
+            if(other == solutions)
+                continue;
+
+            Variable key = keys.stream().filter(k -> other.getVariable(k) != null).findAny().orElse(null);
+            VariableBinding binding = key == null ? null : solutions.getVariable(key);
+
+            Variable variable = binding == null || binding.canBeNull() || !(other instanceof SqlTableAccess access) ?
+                    null : access.getReadVariable(request, key);
+
+            if(variable == null)
+                return null;
+
+            if(used.contains(variable) || solutions.getVariable(variable) != null)
+            {
+                inner.add(other);
+            }
+            else
+            {
+                readers.add(other);
+                read.add(variable);
+                nodes.add(key);
+            }
+        }
+
+        if(readers.isEmpty())
+            return null;
+
+        SqlIntercode sliced = inner.size() == 1 ? inner.get(0) : SqlJoin.join(request, inner);
+
+        for(SqlBind bind : binds.reversed())
+            sliced = SqlBind.bind(request, bind.getVariable(), bind.getExpression(), sliced);
+
+        Set<Variable> variables = new HashSet<>(child.getVariableBindings().getVariables());
+        variables.removeAll(read);
+        variables.addAll(order.keySet());
+        variables.addAll(nodes);
+
+        BigInteger rows = offset == null ? limit : limit.add(offset);
+
+        List<SqlIntercode> childs = new ArrayList<>();
+        childs.add(create(request, variables, sliced, false, new LinkedHashMap<>(order), null, rows));
+        childs.addAll(readers);
+
+        return SqlJoin.join(request, childs);
     }
 
 
@@ -535,6 +646,14 @@ public final class SqlSelect extends SqlIntercode
 
         if(limit != null && limit.compareTo(BigInteger.valueOf(0)) <= 0)
             return SqlNoSolution.get();
+
+        if(!optDistinct)
+        {
+            SqlIntercode slicedChild = sliceBeforeTerms(request, optChild, stripedOrderBy);
+
+            if(slicedChild != null)
+                optChild = slicedChild.optimize(request, scope, patternRestrictions, childReduced, evalServices);
+        }
 
         if(optChild.equals(SqlEmptySolution.get()) && offset == null && limit == null)
             return SqlEmptySolution.get();

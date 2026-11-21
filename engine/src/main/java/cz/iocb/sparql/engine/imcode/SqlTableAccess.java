@@ -40,6 +40,7 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.request.Request.NodeTerm;
 import cz.iocb.sparql.engine.translator.VariableBinding;
 import cz.iocb.sparql.engine.translator.VariableBindingPair;
 import cz.iocb.sparql.engine.translator.VariableBindingPair.ResourceClassPair;
@@ -732,6 +733,34 @@ public final class SqlTableAccess extends SqlIntercode
     {
         return table == null
                 || schema.getCompatibleKey(table, getKnownNotNull(schema, getCoveredColumns(distinctColumns))) != null;
+    }
+
+
+    /**
+     * The variable whose terms the access only reads for a node (see {@link NodeTerm#reader}): the access reads the
+     * table of the term as the reader of the node does, restricted by nothing more, and binds nothing but the node and
+     * the variable the node stands for.
+     *
+     * @param request the current request
+     * @param node the node
+     * @return the variable the node stands for when the access only reads its terms for the node, or null
+     */
+    Variable getReadVariable(Request request, Variable node)
+    {
+        NodeTerm term = request.getNodeTerms().get(node);
+
+        if(term == null || !term.determining() || !(term.reader() instanceof SqlTableAccess reader))
+            return null;
+
+        if(!Objects.equals(table, reader.table) || !conditions.equals(reader.conditions) || !values.isEmpty()
+                || isDeduplicating() || bindings.get(node) == null || bindings.get(node).canBeNull())
+            return null;
+
+        for(Variable variable : bindings.getVariables())
+            if(!variable.equals(node) && !variable.equals(term.variable()))
+                return null;
+
+        return term.variable();
     }
 
 

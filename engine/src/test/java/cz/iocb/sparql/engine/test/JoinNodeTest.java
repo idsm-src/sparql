@@ -724,4 +724,51 @@ public class JoinNodeTest
 
         assertThat(check("SELECT ?n (COUNT(*) AS ?c) WHERE { " + optional + " } GROUP BY ?n"), hasSize(3));
     }
+
+
+    @Test
+    @DisplayName("an ordered slice taken before the terms of the nodes of the groups are read")
+    void sliceBeforeTerms() throws Exception
+    {
+        String grouped = "SELECT ?k (COUNT(?a) AS ?c) WHERE { ?a ex:follows ?k } GROUP BY ?k";
+
+        // the groups are ordered by their counts and sliced, by a sub-select, before the names of the kinds are read
+        // for those the slice leaves
+        String top = grouped + " ORDER BY DESC(?c) LIMIT 1";
+
+        assertThat(count(translate(shared, top), " LIMIT 1"), is(2));
+        assertThat(count(translate(optimized, top), " LIMIT 1"), is(2));
+        assertThat(count(translate(plain, top), " LIMIT 1"), is(1));
+        assertThat(check(top), contains(row(kind("blue"), integer(3))));
+
+        // the sub-select takes the rows the offset skips as well
+        String second = grouped + " ORDER BY DESC(?c) OFFSET 1 LIMIT 1";
+
+        assertThat(translate(shared, second), containsString(" LIMIT 2"));
+        assertThat(check(second), contains(row(kind("green"), integer(1))));
+
+        // a term the slice orders by is read before it, and so is one an expression of the projection uses
+        String byTerm = grouped + " ORDER BY ?k LIMIT 1";
+        String used = "SELECT (STR(?k) AS ?n) (COUNT(?a) AS ?c) WHERE { ?a ex:follows ?k } GROUP BY ?k "
+                + "ORDER BY DESC(?c) LIMIT 1";
+
+        assertThat(count(translate(shared, byTerm), " LIMIT 1"), is(1));
+        assertThat(count(translate(shared, used), " LIMIT 1"), is(1));
+        assertThat(check(byTerm), contains(row(kind("blue"), integer(3))));
+        assertThat(check(used), hasSize(1));
+
+        // of the terms of deduplicated solutions, those the slice does not order by are read after it
+        String distinct = "SELECT DISTINCT ?a ?b WHERE { ?a ex:follows ?k . ?k ex:follows ?b } ORDER BY ?a LIMIT 2";
+
+        assertThat(count(translate(shared, distinct), " LIMIT 2"), is(2));
+        assertThat(check(distinct), contains(row(kind("blue"), kind("blue")), row(kind("green"), kind("blue"))));
+
+        // a slice of a sub-select
+        String nested = "SELECT ?k ?c ?l WHERE { { " + top + " } OPTIONAL { ?k ex:label ?l } }";
+
+        assertThat(check(nested), hasSize(1));
+
+        // a slice in no order needs no sub-select, as the terms are looked up for the rows it reads
+        assertThat(count(translate(shared, grouped + " LIMIT 1"), " LIMIT 1"), is(1));
+    }
 }
