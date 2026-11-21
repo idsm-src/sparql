@@ -490,6 +490,37 @@ public class JoinOptimizerTest
 
 
     @Test
+    public void firstRowsOfTestedSolutions() throws Exception
+    {
+        String negated = "SELECT ?x ?l WHERE { ?x ex:label ?l FILTER NOT EXISTS { ?x ex:link ?y } }";
+        String minus = "SELECT ?x ?l WHERE { ?x ex:label ?l MINUS { ?x ex:link ?y } }";
+        String tested = "SELECT ?x ?l WHERE { ?x ex:label ?l FILTER EXISTS { ?x ex:link ?y } }";
+
+        for(String query : List.of(negated, minus, tested))
+        {
+            // the pattern is tested for all the solutions at once, its solutions deduplicated to be hashed
+            assertThat(translate(optimized, query), containsString(" GROUP BY \"src\""));
+            assertThat(translate(optimized, query), not(containsString(" OFFSET 0")));
+
+            // a slice in no order reads a few solutions, for each of which the pattern is looked up
+            assertThat(translate(optimized, query + " LIMIT 10"), containsString(" = \"src\"))) OFFSET 0)"));
+            assertThat(translate(optimized, query + " LIMIT 10"), not(containsString(" GROUP BY ")));
+
+            // an ordered slice reads them all
+            assertThat(translate(optimized, query + " ORDER BY ?l LIMIT 10"), containsString(" GROUP BY \"src\""));
+
+            List<List<RdfTerm>> all = execute(plain, query);
+            List<List<RdfTerm>> rows = execute(optimized, query + " LIMIT 10");
+
+            assertThat(rows, hasSize(10));
+
+            for(List<RdfTerm> row : rows)
+                assertThat(all.contains(row), is(true));
+        }
+    }
+
+
+    @Test
     public void treeOfThree() throws Exception
     {
         String query = "SELECT ?x ?l ?y WHERE { ?x ex:tag ?t . ?x ex:label ?l . ?x ex:link ?y }";

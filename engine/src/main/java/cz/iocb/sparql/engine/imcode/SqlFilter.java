@@ -60,6 +60,12 @@ public final class SqlFilter extends SqlIntercode
      */
     private final List<SqlExpressionIntercode> conditions;
 
+    /**
+     * The number of the solutions of the filter that the parent reads at most (see {@link Restrictions#getNeededRows}),
+     * for which the optimizer chooses the way the patterns of the conditions are tested.
+     */
+    private final double neededRows;
+
 
     /**
      * Creates the node.
@@ -67,13 +73,16 @@ public final class SqlFilter extends SqlIntercode
      * @param bindings the variable bindings
      * @param child the child node
      * @param conditions the conditions
+     * @param neededRows the number of the solutions of the filter that the parent reads at most
      */
-    protected SqlFilter(VariableBindings bindings, SqlIntercode child, List<SqlExpressionIntercode> conditions)
+    protected SqlFilter(VariableBindings bindings, SqlIntercode child, List<SqlExpressionIntercode> conditions,
+            double neededRows)
     {
         super(bindings, child.isDeterministic() && conditions.stream().allMatch(c -> c.isDeterministic()));
 
         this.child = child;
         this.conditions = conditions;
+        this.neededRows = neededRows;
     }
 
 
@@ -105,7 +114,8 @@ public final class SqlFilter extends SqlIntercode
     {
         VariableBindings bindings = child.getVariableBindings().restrict(request.getConfiguration(), restrictions);
 
-        return new SqlFilter(bindings, child, conditions);
+        return new SqlFilter(bindings, child, conditions,
+                restrictions == null ? Double.POSITIVE_INFINITY : restrictions.getNeededRows());
     }
 
 
@@ -443,7 +453,8 @@ public final class SqlFilter extends SqlIntercode
         }
 
 
-        if(optCnds.equals(conditions) && optChild == child && restrictions.isOptimized(relations, bindings))
+        if(optCnds.equals(conditions) && optChild == child && restrictions.isOptimized(relations, bindings)
+                && neededRows == restrictions.getNeededRows())
             return this;
 
         return filter(request, optCnds, optChild, restrictions);
@@ -539,9 +550,13 @@ public final class SqlFilter extends SqlIntercode
 
         List<SqlExpressionIntercode> others = conditions.stream().filter(c -> !(c instanceof SqlExists)).toList();
 
-        double solutions = (outer == null ? JoinOptimizer.estimateRows(request, child) :
+        double kept = (outer == null ? JoinOptimizer.estimateRows(request, child) :
                 JoinOptimizer.estimateForRow(request, child, outer).rows())
                 * (others.isEmpty() ? 1 : JoinOptimizer.selectivity(request, child, getConjuncts(others)));
+
+        // a parent reading only the first solutions of the filter has the tests evaluated only for the solutions of
+        // the child that give them
+        double solutions = outer != null ? kept : Math.min(kept, getNeededRows(request, neededRows, conditions));
 
         return conditions.stream().map(c -> c instanceof SqlExists test ?
                 translateTest(request, scope, test, solutions) : c.get(relations, xsdBoolean).get(0).getCode())
@@ -694,6 +709,9 @@ public final class SqlFilter extends SqlIntercode
             return false;
 
         if(!Objects.equals(new Multiset<>(conditions), new Multiset<>(imcode.conditions)))
+            return false;
+
+        if(neededRows != imcode.neededRows)
             return false;
 
         if(!Objects.equals(child, imcode.child))
