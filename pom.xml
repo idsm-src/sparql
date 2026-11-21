@@ -22,6 +22,11 @@
     <pluginManagement>
       <plugins>
         <plugin>
+          <!-- pinned: the Maven of Debian binds version 2.17 by default, which does not run the tests of JUnit 5+ -->
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>3.5.4</version>
+        </plugin>
+        <plugin>
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>3.12.0</version>
           <configuration>
