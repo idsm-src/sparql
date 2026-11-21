@@ -551,7 +551,9 @@ public final class SqlExists extends SqlExpressionIntercode
      * the current one matters, so the pattern is optimised as a join with the current solution would optimise it; a
      * solution binding a variable to another term than the given value of the current solution cannot be compatible
      * either, so the table accesses of the pattern take the values into their conditions (see
-     * {@link Restrictions#getAcceptedValue}).
+     * {@link Restrictions#getAcceptedValue}). A pattern that shares no variable with the current solution, like the
+     * pattern of an ASK query, is read for its first solution only (see {@link Restrictions#getNeededRows}): the test
+     * then compares nothing, so the database cannot turn it into a join that would read the pattern whole.
      *
      * @param request the current request
      * @param scope the scope of the pattern
@@ -574,6 +576,11 @@ public final class SqlExists extends SqlExpressionIntercode
                     relations, optPattern.getVariableBindings(), solution, new Restrictions(), true);
 
             values.forEach(restrictions::setAcceptedValue);
+
+            // a test comparing nothing with the current solution is no join for the database, which evaluates the
+            // pattern by itself and stops at its first solution
+            if(solution == null || solution.getVariables().isEmpty())
+                restrictions.setNeededRows(1);
 
             SqlIntercode next = optPattern.optimize(request, scope, restrictions, true, evalServices);
 

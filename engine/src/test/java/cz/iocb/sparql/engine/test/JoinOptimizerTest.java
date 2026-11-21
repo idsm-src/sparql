@@ -467,6 +467,29 @@ public class JoinOptimizerTest
 
 
     @Test
+    public void firstRowOfATest() throws Exception
+    {
+        String pattern = "?x ex:link ?y . ?y ex:link ?z";
+
+        // the pattern of an ASK query is read for its first solution only
+        String ask = "ASK { " + pattern + " }";
+        assertThat(getTree(explain(ask)), containsString(" -> "));
+
+        // so is the pattern of a test sharing no variable with its group, which the database evaluates by itself
+        String apart = "SELECT ?n ?l WHERE { ?n ex:tag ?l FILTER EXISTS { " + pattern + " } }";
+        assertThat(getTree(explain(apart)), containsString(" -> "));
+
+        // a test sharing a variable is a join for the database, which reads the pattern whole
+        String shared = "SELECT ?x ?l WHERE { ?x ex:label ?l FILTER EXISTS { " + pattern + " } }";
+        assertThat(getTree(explain(shared)), containsString(" + "));
+
+        assertThat(check(ask), hasSize(1));
+        assertThat(check(apart), hasSize(5));
+        assertThat(check(shared), hasSize(200));
+    }
+
+
+    @Test
     public void treeOfThree() throws Exception
     {
         String query = "SELECT ?x ?l ?y WHERE { ?x ex:tag ?t . ?x ex:label ?l . ?x ex:link ?y }";
