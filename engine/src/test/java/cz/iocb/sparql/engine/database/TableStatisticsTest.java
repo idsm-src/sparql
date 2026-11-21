@@ -164,6 +164,20 @@ public class TableStatisticsTest
 
 
     @Test
+    public void nullFractionOfAColumn()
+    {
+        TableColumn u = new TableColumn("u", INT4);
+
+        assertEquals(0.5, new TestStatistics(false).estimateNullFraction(null, n));
+        assertEquals(0, new TestStatistics(false).estimateNullFraction(null, s));
+
+        // nothing is known about the column, and a constant is no column of the table
+        assertEquals(0, new TestStatistics(false).estimateNullFraction(null, u));
+        assertEquals(0, new TestStatistics(false).estimateNullFraction(null, one));
+    }
+
+
+    @Test
     public void rowsOfADisjunction()
     {
         assertEquals(200 + 1000 * 0.8 / 99,

@@ -2,6 +2,8 @@ package cz.iocb.sparql.engine.translator;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -106,38 +108,49 @@ public class Estimator
 
 
     /**
-     * Fraction of the solutions of the intermediate code that the conditions are estimated to keep: the rows the
-     * planner of the database estimates for the code filtered by the conditions, over the rows it estimates for the
-     * code itself, so that what the planner misses about the code itself cancels out. The planner estimates a
-     * comparison of a column with a constant from the statistics of the column, which the engine keeps no like of. The
-     * two estimates are asked for together. {@link Double#NaN} when the planner cannot be asked, because the code
-     * refers to a solution it is evaluated for, so that it is no statement by itself, or when an estimate fails.
+     * Fractions of the solutions of the intermediate code that lists of conditions are estimated to keep, each list by
+     * itself: the rows the planner of the database estimates for the code filtered by the conditions of the list, over
+     * the rows it estimates for the code itself, so that what the planner misses about the code itself cancels out. The
+     * planner estimates a comparison of a column with a constant from the statistics of the column, which the engine
+     * keeps no like of. All the estimates are asked for together. Every fraction is {@link Double#NaN} when the planner
+     * cannot be asked, because the code refers to a solution it is evaluated for, so that it is no statement by itself,
+     * or when an estimate fails.
      *
      * @param request the current request
      * @param scope the scope of the intermediate code
      * @param imcode the intermediate code
-     * @param conditions conditions over the variable bindings of the intermediate code
-     * @return fraction of the solutions of the intermediate code that the conditions are estimated to keep, or
-     *         {@link Double#NaN}
+     * @param conditions the lists of conditions over the variable bindings of the intermediate code, the conditions of
+     *            a list having to hold all
+     * @return per list, the fraction of the solutions of the intermediate code that its conditions are estimated to
+     *         keep, or {@link Double#NaN}
      */
-    public double estimateSelectivity(Request request, Scope scope, SqlIntercode imcode,
-            List<SqlExpressionIntercode> conditions)
+    public List<Double> estimateSelectivities(Request request, Scope scope, SqlIntercode imcode,
+            List<List<SqlExpressionIntercode>> conditions)
     {
-        SqlCode all = imcode.translate(request, scope);
-        SqlCode kept = SqlFilter.filter(request, conditions, imcode).translate(request, scope);
+        List<Double> unknown = Collections.nCopies(conditions.size(), Double.NaN);
 
-        if(!all.getOuterTables().isEmpty() || !kept.getOuterTables().isEmpty())
-            return Double.NaN;
+        List<SqlCode> codes = new ArrayList<>();
+        codes.add(imcode.translate(request, scope));
+
+        for(List<SqlExpressionIntercode> list : conditions)
+            codes.add(SqlFilter.filter(request, list, imcode).translate(request, scope));
+
+        if(codes.stream().anyMatch(c -> !c.getOuterTables().isEmpty()))
+            return unknown;
 
         try
         {
-            List<Long> rows = estimateRowCounts(List.of(translateStatement(all), translateStatement(kept)));
+            List<Long> rows = estimateRowCounts(codes.stream().map(this::translateStatement).toList());
+            long all = rows.get(0);
 
-            return rows.get(0) <= 0 ? Double.NaN : Math.min((double) rows.get(1) / rows.get(0), 1);
+            if(all <= 0)
+                return unknown;
+
+            return rows.stream().skip(1).map(kept -> Math.min((double) kept / all, 1)).toList();
         }
         catch(SQLException e)
         {
-            return Double.NaN;
+            return unknown;
         }
     }
 

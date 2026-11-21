@@ -146,6 +146,14 @@ public abstract class TableStatisticsBase implements TableStatistics
     }
 
 
+    @Override
+    public double estimateNullFraction(Request request, Column column)
+    {
+        return column instanceof TableColumn tableColumn ?
+                nullFraction(lookupGroup(request, new Condition()), tableColumn) : 0;
+    }
+
+
     /**
      * Estimated number of rows satisfying the disjunct.
      *

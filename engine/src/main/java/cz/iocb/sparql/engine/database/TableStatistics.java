@@ -34,4 +34,15 @@ public interface TableStatistics
      * @return estimated number of distinct values of the column among the rows satisfying the conditions
      */
     double estimateDistinct(Request request, Column column, Conditions conditions);
+
+
+    /**
+     * Estimated fraction of the rows of the table whose value of the column is null, as the database planner takes it
+     * for the table as a whole; 0 when nothing is known about the column.
+     *
+     * @param request the current request, whose database connection may be used for lookups
+     * @param column the column
+     * @return estimated fraction of the rows of the table whose value of the column is null
+     */
+    double estimateNullFraction(Request request, Column column);
 }

@@ -6,10 +6,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.ToDoubleFunction;
 import java.util.stream.IntStream;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
@@ -2533,10 +2535,9 @@ final class JoinOptimizer
     /**
      * Estimated fraction of the solutions of a node that the conditions keep, all of which have to hold. The conditions
      * that only compare a variable with constants (see {@link #getComparison}) are estimated by the planner of the
-     * database when the node is an access to a table (see {@link Estimator#estimateSelectivity}): the planner knows how
-     * the values of a column are distributed, so it tells a range holding a few rows from one holding nearly all of
-     * them, and it is asked about the conditions together, so that it sees both bounds of a range. The other
-     * conditions, and all of them when the planner cannot be asked, are estimated by what they say (see
+     * database when the node is an access to a table (see {@link #estimateComparisons}): the planner knows how the
+     * values of a column are distributed, so it tells a range holding a few rows from one holding nearly all of them.
+     * The other conditions, and all of them when the planner cannot be asked, are estimated by what they say (see
      * {@link #selectivity(SqlExpressionIntercode)}). A condition the rows estimated for the node count with already
      * keeps them all (see {@link #isCounted}).
      *
@@ -2576,9 +2577,215 @@ final class JoinOptimizer
         if(comparisons.isEmpty())
             return others;
 
-        double estimated = new Estimator(request).estimateSelectivity(request, Scope.TOP, node, comparisons);
+        double estimated = estimateComparisons(request, (SqlTableAccess) node, comparisons);
 
         return others * (Double.isNaN(estimated) ? compared : estimated);
+    }
+
+
+    /**
+     * Estimated fraction of the rows of a table access that conditions comparing its variables with constants keep (see
+     * {@link #getComparison}), all of which have to hold, as the planner of the database estimates the parts they are
+     * made of (see {@link #estimateConjunction}). The planner is asked about all the parts at once (see
+     * {@link Estimator#estimateSelectivities}): the estimate is computed twice, first only to find what the planner is
+     * to be asked about, then with its answers, which come in the order of the questions.
+     *
+     * @param request the current request
+     * @param access the table access
+     * @param comparisons the conditions, over the variable bindings of the access
+     * @return estimated fraction of the rows of the access that the conditions keep, or {@link Double#NaN} when the
+     *         planner cannot be asked
+     */
+    private static double estimateComparisons(Request request, SqlTableAccess access,
+            List<SqlExpressionIntercode> comparisons)
+    {
+        List<List<SqlExpressionIntercode>> questions = new ArrayList<>();
+
+        double decided = estimateConjunction(request, access, comparisons, question -> {
+            questions.add(question);
+            return 1;
+        });
+
+        // the classes of the variables may decide every part
+        if(questions.isEmpty())
+            return decided;
+
+        Iterator<Double> answers = new Estimator(request).estimateSelectivities(request, Scope.TOP, access, questions)
+                .iterator();
+
+        return estimateConjunction(request, access, comparisons, _ -> answers.next());
+    }
+
+
+    /**
+     * Estimated fraction of the rows of a table access that conditions comparing its variables with constants keep, all
+     * of which have to hold. The planner estimates such conditions from the statistics of the columns, but it takes the
+     * comparisons for independent of each other, and the fraction it gives for a comparison of a column is one of all
+     * the rows of the table, those in which the column is null kept by no comparison. An access binding the variable
+     * always has no such rows, so the planner counts the nulls of the column once more with every comparison of it,
+     * {@code ?x != a && ?x != b} or {@code ?x NOT IN (a, b)}, which is compared likewise, the more the more constants
+     * there are. So only the conditions of the variables whose columns hold no null are asked about together, as the
+     * planner then pairs the bounds of a range and uses whatever it knows of the columns together. Of the others, the
+     * bounds of a variable (the comparisons other than {@code =} and {@code !=}) are asked about together as well, the
+     * planner estimating them as one range, and what they keep is taken among the rows in which the column is not null
+     * (see {@link #getPresentFraction}); any other condition is estimated by its parts (see
+     * {@link #estimateCondition}).
+     *
+     * @param request the current request
+     * @param access the table access
+     * @param conditions the conditions, over the variable bindings of the access
+     * @param planner gives the fraction of the rows of the access that the planner estimates conditions asked about
+     *            together to keep, all of which have to hold
+     * @return estimated fraction of the rows of the access that the conditions keep
+     */
+    private static double estimateConjunction(Request request, SqlTableAccess access,
+            List<SqlExpressionIntercode> conditions, ToDoubleFunction<List<SqlExpressionIntercode>> planner)
+    {
+        List<SqlExpressionIntercode> conjuncts = new ArrayList<>();
+
+        for(SqlExpressionIntercode condition : conditions)
+            addConjuncts(condition, conjuncts);
+
+        List<SqlExpressionIntercode> together = new ArrayList<>();
+        Map<Variable, List<SqlExpressionIntercode>> bounds = new LinkedHashMap<>();
+        double kept = 1;
+
+        for(SqlExpressionIntercode conjunct : conjuncts)
+        {
+            Set<Variable> variables = conjunct.getReferencedVariables();
+
+            if(variables.stream().allMatch(v -> getPresentFraction(request, access, v) == 1))
+                together.add(conjunct);
+            else if(conjunct instanceof SqlBinaryComparison comparison
+                    && comparison.getOperator() != ComparisonOperator.EQUAL
+                    && comparison.getOperator() != ComparisonOperator.NOT_EQUAL)
+                bounds.computeIfAbsent(variables.iterator().next(), _ -> new ArrayList<>()).add(conjunct);
+            else
+                kept *= estimateCondition(request, access, conjunct, planner);
+        }
+
+        if(!together.isEmpty())
+            kept *= planner.applyAsDouble(together);
+
+        for(Map.Entry<Variable, List<SqlExpressionIntercode>> entry : bounds.entrySet())
+            kept *= Math.min(
+                    planner.applyAsDouble(entry.getValue()) / getPresentFraction(request, access, entry.getKey()), 1);
+
+        return kept;
+    }
+
+
+    /**
+     * Adds the conditions that have to hold all for the condition to hold: the operands of a conjunction, each taken so
+     * as well, and the condition itself otherwise; the effective boolean value of a condition holds when the condition
+     * does.
+     *
+     * @param condition the condition
+     * @param conjuncts the conditions that have to hold all
+     */
+    private static void addConjuncts(SqlExpressionIntercode condition, List<SqlExpressionIntercode> conjuncts)
+    {
+        if(condition instanceof SqlEffectiveBooleanValue value)
+        {
+            addConjuncts(value.getOperand(), conjuncts);
+        }
+        else if(condition instanceof SqlBinaryLogical logical && logical.getOperator() == LogicalOperator.AND)
+        {
+            addConjuncts(logical.getLeft(), conjuncts);
+            addConjuncts(logical.getRight(), conjuncts);
+        }
+        else
+        {
+            conjuncts.add(condition);
+        }
+    }
+
+
+    /**
+     * Estimated fraction of the rows of a table access that a condition comparing its variables with constants keeps,
+     * made of the estimates of its parts: a negation keeps what its operand does not, a disjunction what either of its
+     * operands does, the two taken for independent, a conjunction what its operands keep together (see
+     * {@link #estimateConjunction}), and a variable is none of some constants unless it is one of them. A comparison of
+     * a variable with a constant, or the test that it is one of some constants, is what the planner is asked about, and
+     * what it keeps is taken among the rows in which the column of the variable is not null (see
+     * {@link #getPresentFraction}); the access has all its rows among them, whereas the planner gives a fraction of all
+     * the rows of the table.
+     *
+     * @param request the current request
+     * @param access the table access
+     * @param condition the condition, over the variable bindings of the access
+     * @param planner gives the fraction of the rows of the access that the planner estimates conditions asked about
+     *            together to keep, all of which have to hold
+     * @return estimated fraction of the rows of the access that the condition keeps
+     */
+    private static double estimateCondition(Request request, SqlTableAccess access, SqlExpressionIntercode condition,
+            ToDoubleFunction<List<SqlExpressionIntercode>> planner)
+    {
+        if(condition instanceof SqlEffectiveBooleanValue value)
+            return estimateCondition(request, access, value.getOperand(), planner);
+
+        if(condition instanceof SqlUnaryLogical negation)
+            return 1 - estimateCondition(request, access, negation.getOperand(), planner);
+
+        if(condition instanceof SqlBinaryLogical logical && logical.getOperator() == LogicalOperator.AND)
+            return estimateConjunction(request, access, List.of(condition), planner);
+
+        if(condition instanceof SqlBinaryLogical logical)
+        {
+            double left = estimateCondition(request, access, logical.getLeft(), planner);
+            double right = estimateCondition(request, access, logical.getRight(), planner);
+
+            return left + right - left * right;
+        }
+
+        if(condition instanceof SqlInExpression in && in.isNegated())
+            return 1 - estimateCondition(request, access,
+                    SqlInExpression.create(request.getConfiguration(), false, in.getLeft(), in.getRights()), planner);
+
+        // a part the classes of the variable decide
+        if(condition instanceof SqlLiteral || condition instanceof SqlNull)
+            return condition.equals(SqlLiteral.trueValue) ? 1 : 0;
+
+        double present = 1;
+
+        for(Variable variable : condition.getReferencedVariables())
+            present = Math.min(present, getPresentFraction(request, access, variable));
+
+        return Math.min(planner.applyAsDouble(List.of(condition)) / present, 1);
+    }
+
+
+    /**
+     * The fraction of the rows of the table of an access in which the column holding a variable is not null, when the
+     * access has its rows among them only: it binds the variable always, to a single column of the table, which it
+     * therefore requires not to be null. The fraction is the one the planner takes for the column (see
+     * {@link TableStatistics#estimateNullFraction}), because it is the planner's estimate that is taken among those
+     * rows. 1 for any other variable: one the access may leave unbound, whose rows the planner does not count twice,
+     * and one held in several columns or in an expression, whose comparison the planner estimates otherwise; and 1 for
+     * a column taken to hold nulls only, of which nothing can be told.
+     *
+     * @param request the current request
+     * @param access the table access
+     * @param variable the variable
+     * @return the fraction of the rows of the table in which the column holding the variable is not null, or 1
+     */
+    private static double getPresentFraction(Request request, SqlTableAccess access, Variable variable)
+    {
+        VariableBinding binding = access.getVariable(variable);
+        VariableBinding internal = access.getInternalVariableBinding(variable);
+
+        if(binding == null || binding.canBeNull() || internal == null)
+            return 1;
+
+        Set<Column> columns = internal.getNonConstantColumns();
+
+        if(columns.size() != 1 || !(columns.iterator().next() instanceof TableColumn column))
+            return 1;
+
+        TableStatistics statistics = request.getConfiguration().getTableStatistics(access.getTable());
+        double present = 1 - statistics.estimateNullFraction(request, column);
+
+        return present > 0 ? present : 1;
     }
 
 

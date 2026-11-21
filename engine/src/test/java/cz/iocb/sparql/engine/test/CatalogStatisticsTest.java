@@ -204,6 +204,7 @@ public class CatalogStatisticsTest
 
         try(Request request = new Engine(config).getRequest())
         {
+            assertThat(statistics.estimateNullFraction(request, code), closeTo(0.6, 0.01));
             assertThat(statistics.estimateRows(request, equal(code, "0")), closeTo(200, 5));
 
             // a value outside the most common ones gets the average of the remaining ones among the rows that hold
@@ -248,6 +249,7 @@ public class CatalogStatisticsTest
 
             // without the group column the catalog answers
             assertThat(statistics.estimateRows(request, new Conditions(true)), closeTo(1000, 1));
+            assertThat(statistics.estimateNullFraction(request, s), closeTo(0, 0));
             assertThat(statistics.estimateDistinct(request, p, new Conditions(true)), closeTo(2, 0.5));
         }
     }
