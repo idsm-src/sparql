@@ -99,6 +99,37 @@ public final class SqlFilter extends SqlIntercode
     }
 
 
+    /**
+     * The number of the solutions of the child that the filter reads for the solutions its parent reads of its own (see
+     * {@link Restrictions#getNeededRows}): as many more as the conditions are estimated to drop (see
+     * {@link JoinOptimizer#selectivity(SqlExpressionIntercode)}). A condition handed down as a filter condition of the
+     * variables deciding it (see {@link #addFilterConditions}) does not count, because the child that orders its joins
+     * with it in mind counts its own solutions without those the condition drops.
+     *
+     * @param request the current request
+     * @param needed the number of the solutions of the filter that its parent reads at most
+     * @param conditions the conditions of the filter
+     * @return the number of the solutions of the child the filter reads at most
+     */
+    private double getNeededRows(Request request, double needed, List<SqlExpressionIntercode> conditions)
+    {
+        if(Double.isInfinite(needed))
+            return needed;
+
+        ClassRelations relations = request.getConfiguration();
+
+        Restrictions handed = new Restrictions();
+        addFilterConditions(request, handed, conditions, child.getVariableBindings());
+
+        for(SqlExpressionIntercode conjunct : getConjuncts(conditions))
+            if(getDecidingVariables(relations, conjunct).stream()
+                    .noneMatch(v -> handed.getFilterConditions(v).contains(conjunct)))
+                needed /= JoinOptimizer.selectivity(conjunct);
+
+        return needed;
+    }
+
+
     @Override
     public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
             boolean evalServices)
@@ -125,6 +156,7 @@ public final class SqlFilter extends SqlIntercode
 
         // the other conditions leave the child as it is, but its joins are ordered with them in mind
         addFilterConditions(request, childRestrictions, optCnds, child.getVariableBindings());
+        childRestrictions.setNeededRows(getNeededRows(request, restrictions.getNeededRows(), optCnds));
 
         while(true)
         {
@@ -153,6 +185,7 @@ public final class SqlFilter extends SqlIntercode
             newOptCnds.forEach(c -> newChildRestrictions.add(c.getRequirements(relations)));
             newChildRestrictions.add(accepted);
             addFilterConditions(request, newChildRestrictions, newOptCnds, child.getVariableBindings());
+            newChildRestrictions.setNeededRows(getNeededRows(request, restrictions.getNeededRows(), newOptCnds));
 
             if(newChildReduced == childReduced && newChildRestrictions.equals(childRestrictions))
                 break;

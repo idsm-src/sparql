@@ -433,6 +433,40 @@ public class JoinOptimizerTest
 
 
     @Test
+    public void firstRowsUnderFilter() throws Exception
+    {
+        String pattern = "?x ex:link ?y . ?y ex:link ?z";
+        String query = "SELECT ?x ?z WHERE { " + pattern + " }";
+
+        // a filter reads as many more solutions of its child as its conditions drop: few for an inequality
+        String unequal = "SELECT ?x ?z WHERE { " + pattern + " FILTER(?x != ?z) }";
+        assertThat(getTree(explain(unequal)), containsString(" + "));
+        assertThat(getTree(explain(unequal + " LIMIT 10")), containsString(" -> "));
+
+        // a condition taken to keep few solutions makes a slice read most of them
+        String contained = "SELECT ?x ?z WHERE { " + pattern + " FILTER(CONTAINS(STR(?x), STR(?z))) }";
+
+        assertThat(getTree(explain(query + " LIMIT 50")), containsString(" -> "));
+        assertThat(getTree(explain(contained + " LIMIT 50")), containsString(" + "));
+        assertThat(getTree(explain(contained + " LIMIT 5")), containsString(" -> "));
+
+        // a condition the join orders its children with in mind is counted by the join itself
+        String one = "SELECT ?x ?z WHERE { " + pattern + " FILTER(CONTAINS(STR(?z), '9')) }";
+
+        for(String filtered : List.of(unequal, contained, one))
+        {
+            List<List<RdfTerm>> all = execute(plain, filtered);
+            List<List<RdfTerm>> rows = execute(optimized, filtered + " LIMIT 10");
+
+            assertThat(rows, hasSize(10));
+
+            for(List<RdfTerm> row : rows)
+                assertThat(all.contains(row), is(true));
+        }
+    }
+
+
+    @Test
     public void treeOfThree() throws Exception
     {
         String query = "SELECT ?x ?l ?y WHERE { ?x ex:tag ?t . ?x ex:label ?l . ?x ex:link ?y }";
