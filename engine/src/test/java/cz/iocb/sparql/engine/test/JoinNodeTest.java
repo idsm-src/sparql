@@ -460,6 +460,58 @@ public class JoinNodeTest
 
 
     @Test
+    @DisplayName("the pattern of an EXISTS is compared by the nodes it shares with the solutions it is tested for")
+    void existsByNodes() throws Exception
+    {
+        String kindTable = "\"join_node_test\".\"kind\"";
+
+        // the kind another follows is given by its number in the solutions of the group and in those of the pattern, so
+        // the test compares the numbers, and the table of the kinds is read for the result only
+        for(String test : List.of("EXISTS", "NOT EXISTS"))
+        {
+            String query = "SELECT ?a WHERE { ?a ex:follows ?k FILTER " + test + " { ?k ex:follows ?n } }";
+
+            assertThat(count(translate(shared, query), kindTable), is(1));
+            assertThat(count(translate(optimized, query), kindTable), is(1));
+            assertThat(count(translate(plain, query), kindTable) > 1, is(true));
+            check(query);
+        }
+
+        // a kind the query asks for is read for the solutions that pass the test
+        String needed = "SELECT ?a ?k WHERE { ?a ex:follows ?k FILTER EXISTS { ?k ex:follows ?n } }";
+
+        assertThat(count(translate(shared, needed), kindTable), is(2));
+        assertThat(check(needed), hasSize(4));
+
+        // a pattern of several triple patterns, and two tests of one filter
+        String chain = "SELECT ?a WHERE { ?a ex:follows ?k FILTER EXISTS { ?k ex:follows ?n . ?n ex:follows ?m } }";
+
+        assertThat(count(translate(shared, chain), kindTable), is(1));
+        check(chain);
+
+        String two = "SELECT ?a WHERE { ?a ex:follows ?k FILTER(EXISTS { ?k ex:follows ?n } "
+                + "&& NOT EXISTS { ?k ex:follows ?k }) }";
+
+        assertThat(count(translate(shared, two), kindTable), is(1));
+        check(two);
+
+        // a pattern with another member than triple patterns is compared by the variables as before
+        check("SELECT ?a WHERE { ?a ex:follows ?k FILTER EXISTS { ?k ex:follows ?n OPTIONAL { ?n ex:follows ?m } } }");
+        check("SELECT ?a WHERE { ?a ex:follows ?k FILTER EXISTS { ?k ex:follows+ ?n } }");
+        check("SELECT ?a WHERE { ?a ex:follows ?k FILTER EXISTS { ?k ex:follows ?n FILTER(?n != ?a) } }");
+
+        // and so is a test outside the filters of a group
+        check("SELECT ?a ?e WHERE { ?a ex:follows ?k BIND(EXISTS { ?k ex:follows ?n } AS ?e) }");
+        check("SELECT ?a ?n WHERE { ?a ex:follows ?k OPTIONAL { ?k ex:follows ?n "
+                + "FILTER EXISTS { ?n ex:follows ?n } } }");
+
+        // a test of a group inside the pattern of another one
+        check("SELECT ?a WHERE { ?a ex:follows ?k FILTER EXISTS { ?k ex:follows ?n "
+                + "FILTER EXISTS { ?n ex:follows ?m } } }");
+    }
+
+
+    @Test
     @DisplayName("a shared variable bound by the branches of a union")
     void union() throws Exception
     {

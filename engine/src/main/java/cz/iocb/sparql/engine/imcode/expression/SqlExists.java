@@ -33,6 +33,7 @@ import cz.iocb.sparql.engine.mapping.classes.DerivedClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.request.Request.NodeTerm;
 import cz.iocb.sparql.engine.translator.VariableBinding;
 import cz.iocb.sparql.engine.translator.VariableBindingPair;
 import cz.iocb.sparql.engine.translator.VariableBindings;
@@ -59,7 +60,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * pass evaluates the call and rebuilds the expression. With the join optimizer on, a filter whose condition the test is
  * chooses, when it is translated, whether the database joins the pattern with the solutions of the filter or the
  * pattern is evaluated for each of them, and writes the test anew in the latter case (see
- * {@link #translate(Request, Scope, SqlCode)}).
+ * {@link #translate(Request, Scope, SqlCode)}). Where the pattern shares a node of a join mapping with the solutions it
+ * is tested for, and the node gives the term of a variable both ways, the test compares the node in place of the
+ * variable (see {@link #getComparedVariables}), so that nothing reads the terms on account of the test.
  */
 public final class SqlExists extends SqlExpressionIntercode
 {
@@ -111,9 +114,16 @@ public final class SqlExists extends SqlExpressionIntercode
     private final VariableBindings bindings;
 
     /**
-     * The variables of the current solution the pattern may refer to.
+     * The variables of the current solution the pattern may refer to, and the nodes that may stand in for some of them
+     * in the test (see {@link #getComparedVariables}).
      */
     private final Set<Variable> variables;
+
+    /**
+     * The variables a node stands in for in the test (see {@link #getReplacedVariables}): the surrounding solutions are
+     * not asked for them on account of the test.
+     */
+    private final Set<Variable> replaced;
 
     /**
      * True when the solutions of the node holding the expression extend the current solution of the pattern the node
@@ -152,6 +162,7 @@ public final class SqlExists extends SqlExpressionIntercode
      * @param mappings columns per resource class
      * @param bindings the variable bindings
      * @param variables the variables of the current solution the pattern may refer to
+     * @param replaced the variables a node stands in for in the test
      * @param chained whether the current solution extends the current solution of the pattern the node holding the
      *            expression lies in
      * @param solution bindings of the current solution the pattern was built for, or null
@@ -161,7 +172,7 @@ public final class SqlExists extends SqlExpressionIntercode
      */
     private SqlExists(boolean negated, SqlIntercode pattern, SqlIntercode evaluated, SqlIntercode origin,
             Map<ResourceClass, List<Column>> mappings, VariableBindings bindings, Set<Variable> variables,
-            boolean chained, VariableBindings solution, Set<Variable> bound, boolean optimized)
+            Set<Variable> replaced, boolean chained, VariableBindings solution, Set<Variable> bound, boolean optimized)
     {
         super(mappings, false, pattern.isDeterministic());
 
@@ -171,6 +182,7 @@ public final class SqlExists extends SqlExpressionIntercode
         this.origin = origin;
         this.bindings = bindings;
         this.variables = variables;
+        this.replaced = replaced;
         this.chained = chained;
         this.solution = solution;
         this.bound = bound;
@@ -197,7 +209,7 @@ public final class SqlExists extends SqlExpressionIntercode
             VariableBindings bindings)
     {
         return create(request, scope.enterPattern(null), negated, pattern, pattern, null, pattern, bindings, Set.of(),
-                false, null, Set.of(), Restriction.ALL, false);
+                Set.of(), false, null, Set.of(), Restriction.ALL, false);
     }
 
 
@@ -227,7 +239,8 @@ public final class SqlExists extends SqlExpressionIntercode
                 bound.add(variable);
 
         return create(request, scope.enterPattern(solution), negated, pattern, pattern, null, pattern, bindings,
-                variables, chained, solution, bound, Restriction.ALL, false);
+                variables, getReplacedVariables(request, pattern, bindings, variables), chained, solution, bound,
+                Restriction.ALL, false);
     }
 
 
@@ -245,6 +258,7 @@ public final class SqlExists extends SqlExpressionIntercode
      * @param origin the pattern as translated
      * @param bindings the variable bindings
      * @param variables the variables of the current solution the pattern may refer to
+     * @param replaced the variables a node stands in for in the test
      * @param chained whether the current solution extends the current solution of the pattern the node holding the
      *            expression lies in
      * @param solution bindings of the current solution the pattern was built for, or null
@@ -256,8 +270,8 @@ public final class SqlExists extends SqlExpressionIntercode
      */
     private static SqlExpressionIntercode create(Request request, Scope scope, boolean negated, SqlIntercode pattern,
             SqlIntercode evaluated, SqlCode sql, SqlIntercode origin, VariableBindings bindings,
-            Set<Variable> variables, boolean chained, VariableBindings solution, Set<Variable> bound,
-            Restriction restriction, boolean optimized)
+            Set<Variable> variables, Set<Variable> replaced, boolean chained, VariableBindings solution,
+            Set<Variable> bound, Restriction restriction, boolean optimized)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -275,13 +289,13 @@ public final class SqlExists extends SqlExpressionIntercode
 
         if(!restriction.contains(relations, xsdBoolean))
             return new SqlExists(negated, pattern, evaluated, origin, singletonMap(xsdBoolean, null), bindings,
-                    variables, chained, solution, bound, optimized);
+                    variables, replaced, chained, solution, bound, optimized);
 
         // the call is evaluated by the second optimisation pass, which rebuilds the expression and everything built
         // on it; until then a placeholder stands for the test
         if(pattern.hasServiceSubpattern())
             return new SqlExists(negated, pattern, evaluated, origin, singletonMap(xsdBoolean, List.of(unevaluated)),
-                    bindings, variables, chained, solution, bound, optimized);
+                    bindings, variables, replaced, chained, solution, bound, optimized);
 
 
         // the SQL of the test is rendered at once, as the column of the expression, which keeps what the code reads
@@ -289,7 +303,7 @@ public final class SqlExists extends SqlExpressionIntercode
         List<Column> result = List.of(new ExpressionColumn(test, BOOL, false));
 
         return new SqlExists(negated, pattern, evaluated, origin, singletonMap(xsdBoolean, result), bindings, variables,
-                chained, solution, bound, optimized);
+                replaced, chained, solution, bound, optimized);
     }
 
 
@@ -351,12 +365,79 @@ public final class SqlExists extends SqlExpressionIntercode
     }
 
 
+    /**
+     * The variables that a node stands in for in the test: a node among the given variables that both the pattern and
+     * the surrounding bindings bind always, and that gives the term of its variable both ways (see
+     * {@link NodeTerm#determining}), agrees in a solution of the pattern and in the current solution exactly when the
+     * variable does, so the test compares the node and not the variable, and nothing has to read the term for it.
+     *
+     * @param request the current request
+     * @param pattern the tested pattern, or null when it is not known yet
+     * @param bindings bindings of the solutions the expression is evaluated for
+     * @param variables the variables of the current solution the pattern may refer to, with the nodes that may stand in
+     *            for some of them
+     * @return the variables that a node stands in for in the test
+     */
+    private static Set<Variable> getReplacedVariables(Request request, SqlIntercode pattern, VariableBindings bindings,
+            Set<Variable> variables)
+    {
+        Set<Variable> replaced = new HashSet<>();
+
+        if(pattern == null)
+            return replaced;
+
+        for(Variable node : variables)
+        {
+            NodeTerm term = request.getNodeTerms().get(node);
+            VariableBinding outer = bindings.get(node);
+            VariableBinding inner = pattern.getVariable(node);
+
+            if(term != null && term.determining() && variables.contains(term.variable()) && outer != null
+                    && !outer.canBeNull() && inner != null && !inner.canBeNull())
+                replaced.add(term.variable());
+        }
+
+        return replaced;
+    }
+
+
+    /**
+     * The variables the current solution of the test holds, out of the given ones: the variables the pattern may refer
+     * to but for those a node stands in for (see {@link #getReplacedVariables}), and the nodes standing in for them; a
+     * node that stands in for no variable is no part of a solution.
+     *
+     * @param request the current request
+     * @param pattern the tested pattern, or null when it is not known yet
+     * @param bindings bindings of the solutions the expression is evaluated for
+     * @param variables the variables of the current solution the pattern may refer to, with the nodes that may stand in
+     *            for some of them
+     * @return the variables the current solution of the test holds
+     */
+    public static Set<Variable> getComparedVariables(Request request, SqlIntercode pattern, VariableBindings bindings,
+            Set<Variable> variables)
+    {
+        Set<Variable> replaced = getReplacedVariables(request, pattern, bindings, variables);
+        Set<Variable> compared = new HashSet<>();
+
+        for(Variable variable : variables)
+        {
+            NodeTerm term = request.getNodeTerms().get(variable);
+
+            if(term == null ? !replaced.contains(variable) : replaced.contains(term.variable()))
+                compared.add(variable);
+        }
+
+        return compared;
+    }
+
+
     @Override
     public Restrictions getRequirements(ClassRelations relations)
     {
         // the current solution is read from the surrounding bindings on every optimisation, so they have to keep every
-        // variable the pattern may refer to in all its classes, also one bound to constants only
-        return new Restrictions(variables);
+        // variable the pattern may refer to in all its classes, also one bound to constants only; a variable a node
+        // stands in for is not read
+        return new Restrictions(variables.stream().filter(v -> !replaced.contains(v)).toList());
     }
 
 
@@ -416,13 +497,15 @@ public final class SqlExists extends SqlExpressionIntercode
         // the optimisation only narrows the bindings of a node, so a variable they bound always is left out, or left
         // possibly unbound, only by the bindings of a node that has no solution any more; the test is then evaluated
         // for nothing and stays as it is, the nodes of its pattern being translated for the values of those variables
+        Set<Variable> replaced = getReplacedVariables(request, pattern, bindings, variables);
+
         for(Variable variable : bound)
-            if(bindings.get(variable) == null || bindings.get(variable).canBeNull())
+            if(!replaced.contains(variable) && (bindings.get(variable) == null || bindings.get(variable).canBeNull()))
                 return this;
 
         // the current solution as the surrounding bindings provide it now
-        VariableBindings solution = this.solution == null ? null :
-                getCurrentSolution(request, scope, bindings, variables, chained);
+        VariableBindings solution = this.solution == null ? null : getCurrentSolution(request, scope, bindings,
+                getComparedVariables(request, pattern, bindings, variables), chained);
 
         // a pattern optimised for another current solution serves this one only if this one is not wider
         SqlIntercode base = solution == null || isNarrower(this.solution, solution) ? pattern : origin;
@@ -433,7 +516,8 @@ public final class SqlExists extends SqlExpressionIntercode
         SqlIntercode optPattern = settle(request, inner, base, solution, Map.of(), evalServices);
 
         if(optimized && optPattern == pattern && bindings.equals(this.bindings)
-                && Objects.equals(solution, this.solution) && restriction.isOptimized(relations, variableBinding))
+                && Objects.equals(solution, this.solution) && replaced.equals(this.replaced)
+                && restriction.isOptimized(relations, variableBinding))
             return this;
 
         // the test evaluates the pattern with the values of the current solution in its table accesses, as far as the
@@ -457,8 +541,8 @@ public final class SqlExists extends SqlExpressionIntercode
             }
         }
 
-        return create(request, inner, negated, optPattern, evaluated, sql, origin, bindings, variables, chained,
-                solution, bound, restriction, true);
+        return create(request, inner, negated, optPattern, evaluated, sql, origin, bindings, variables, replaced,
+                chained, solution, bound, restriction, true);
     }
 
 
@@ -731,7 +815,7 @@ public final class SqlExists extends SqlExpressionIntercode
         if(negated != imcode.negated || chained != imcode.chained)
             return false;
 
-        if(!Objects.equals(variables, imcode.variables))
+        if(!Objects.equals(variables, imcode.variables) || !Objects.equals(replaced, imcode.replaced))
             return false;
 
         if(!Objects.equals(solution, imcode.solution))

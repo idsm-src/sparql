@@ -235,6 +235,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private List<Integer> handedScopes = List.of();
 
     /**
+     * Scopes of the group graph pattern whose FILTERs are being translated, together with the scopes it shares the
+     * nodes of; empty elsewhere. The pattern of an EXISTS in such a filter is tested for the solutions of the group, so
+     * it shares the nodes of the group when the test can compare them (see {@link #translateExists}).
+     */
+    private List<Integer> filterScopes = List.of();
+
+    /**
      * Counter of SERVICE calls, giving each its blank node segment.
      */
     private int serviceId = 0;
@@ -1068,7 +1075,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      * the pattern bind it; when the pattern contains a MINUS, it holds all variables, because the sides of the MINUS
      * share the variables of the current solution. The solutions of a node of a group lying in another EXISTS pattern
      * extend the current solution of that pattern, so the current solution of the nested pattern is joined with it. In
-     * an evaluation per graph, the pattern is restricted to the graph of the current solution.
+     * an evaluation per graph, the pattern is restricted to the graph of the current solution. A pattern made of plain
+     * triple patterns only, in a filter of a group graph pattern, shares the nodes joining the tables of join mappings
+     * with that group (see {@link #filterScopes}), and the nodes they share may stand in for their variables in the
+     * test (see {@link SqlExists#getComparedVariables}).
      *
      * @param exists the EXISTS expression
      * @param bindings bindings of the solutions the expression is evaluated for
@@ -1118,20 +1128,62 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 variables.addAll(enclosing.getVariables());
         }
 
-        VariableBindings solution = SqlExists.getCurrentSolution(request, scope, bindings, variables, chained);
+        VariableBindings solution = SqlExists.getCurrentSolution(request, scope, bindings,
+                SqlExists.getComparedVariables(request, null, bindings, variables), chained);
+
+        // a pattern of plain triple patterns, tested by a filter of a group for the solutions of the group, shares the
+        // nodes of the group: nothing in it reads the current solution, which only the test compares it with
+        List<Integer> enclosingFilter = filterScopes;
+        boolean shared = !chained && !enclosingFilter.isEmpty() && isBasic(pattern);
 
         // the nodes of the pattern lie one level deeper than the node holding the expression
         Scope enclosingScope = scope;
         scope = enclosingScope.enterPattern(solution);
         aboveWhereClause = false;
+        filterScopes = List.of();
 
         try
         {
-            SqlIntercode translated = restrictToCurrentGraph(visitElement(pattern));
+            handedScopes = shared ? enclosingFilter : List.of();
+
+            SqlIntercode translated = null;
+
+            try
+            {
+                translated = restrictToCurrentGraph(visitElement(pattern));
+            }
+            finally
+            {
+                handedScopes = List.of();
+            }
 
             // the test compares a variable the pattern binds always by plain equality, whereas one it may leave unbound
             // would be compared by a disjunction the database can neither hash nor look up by an index
             translated = restrictToCurrentSolution(translated, null, Set.of(), true);
+
+            // a node of the group that the pattern binds as well may stand in for its variable in the test: where
+            // both the pattern and the solutions it is tested for bind the node always, the test compares the node and
+            // nothing reads the term on account of it, which the test finds out whenever it is optimised
+            if(shared)
+            {
+                Set<Variable> extended = new HashSet<>(variables);
+
+                for(VariableBinding node : translated.getVariableBindings().getValues())
+                {
+                    NodeTerm term = request.getNodeTerms().get(node.getVariable());
+
+                    if(term != null && term.determining() && variables.contains(term.variable())
+                            && bindings.get(node.getVariable()) != null)
+                        extended.add(node.getVariable());
+                }
+
+                if(!extended.equals(variables))
+                {
+                    variables = extended;
+                    solution = SqlExists.getCurrentSolution(request, enclosingScope, bindings,
+                            SqlExists.getComparedVariables(request, translated, bindings, variables), chained);
+                }
+            }
 
             return SqlExists.create(request, enclosingScope, exists.isNegated(), translated, bindings, variables,
                     chained, solution);
@@ -1140,7 +1192,24 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         {
             aboveWhereClause = enclosingAboveWhereClause;
             scope = enclosingScope;
+            filterScopes = enclosingFilter;
         }
+    }
+
+
+    /**
+     * True if the pattern is a group of plain triple patterns only: no property path, no triple term and no other
+     * member, so that nothing in the pattern reads the current solution it is evaluated for.
+     *
+     * @param pattern the pattern
+     * @return true if the pattern is a group of plain triple patterns only, false otherwise
+     */
+    private static boolean isBasic(GraphPattern pattern)
+    {
+        return pattern instanceof GroupGraph group && group.getPatterns().stream()
+                .allMatch(p -> p instanceof Triple triple && triple.getPredicate() instanceof VarOrIri
+                        && !(triple.getSubject() instanceof TripleTermNode)
+                        && !(triple.getObject() instanceof TripleTermNode));
     }
 
 
@@ -1799,6 +1868,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
         }
 
+        // the patterns tested by the filters are tested for the solutions of the group
+        filterScopes = Stream.concat(sharedScopes.stream(), scopes.stream()).toList();
+
         return translateFilters(filters, translatedGroupPattern);
     }
 
@@ -2452,10 +2524,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         int enclosing = joinScope;
         List<Integer> enclosingShared = sharedScopes;
+        List<Integer> enclosingFilter = filterScopes;
 
         // the scopes handed to a group graph pattern are those of the patterns it is translated for, not of its parts
         sharedScopes = handedScopes;
         handedScopes = List.of();
+        filterScopes = List.of();
 
         startJoinScope();
 
@@ -2467,6 +2541,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         {
             joinScope = enclosing;
             sharedScopes = enclosingShared;
+            filterScopes = enclosingFilter;
         }
     }
 
