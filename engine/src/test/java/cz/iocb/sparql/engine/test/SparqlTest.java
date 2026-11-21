@@ -40,6 +40,7 @@ import java.sql.Statement;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -130,7 +131,9 @@ import cz.iocb.sparql.testing.Database;
  * columns, mapped by column, or as the numbers of their terms next to a table numbering the terms, see
  * {@link NumberedQuadTable}, or of their IRIs and blank nodes only, see {@link MixedQuadTable}) and compare the results
  * with the expected {@code .srx} or {@code .ttl} file. The NeXtProt families only translate and run the queries of
- * {@code nextprot/queryset.sparql} against the three NeXtProt configurations. Requires the {@link Database} container.
+ * {@code nextprot/queryset.sparql} against the three NeXtProt configurations, each with its joins left to the planner
+ * of the database and with the join optimizer of the engine (see {@link Joins}). Requires the {@link Database}
+ * container.
  */
 @DisplayName("SPARQL Tests")
 public class SparqlTest
@@ -194,19 +197,36 @@ public class SparqlTest
     static Model model = null;
 
     /**
-     * Engine over the NeXtProt string configuration.
+     * Engines over the NeXtProt string configuration, by who chooses their joins.
      */
-    static Engine stringEngine = null;
+    static final Map<Joins, Engine> stringEngines = new EnumMap<>(Joins.class);
 
     /**
-     * Engine over the NeXtProt integer configuration.
+     * Engines over the NeXtProt integer configuration, by who chooses their joins.
      */
-    static Engine integerEngine = null;
+    static final Map<Joins, Engine> integerEngines = new EnumMap<>(Joins.class);
 
     /**
-     * Engine over the NeXtProt combined configuration.
+     * Engines over the NeXtProt combined configuration, by who chooses their joins.
      */
-    static Engine combinedEngine = null;
+    static final Map<Joins, Engine> combinedEngines = new EnumMap<>(Joins.class);
+
+
+    /**
+     * Who chooses the order and the methods of the joins of the queries of the NeXtProt families.
+     */
+    enum Joins
+    {
+        /**
+         * The planner of the database.
+         */
+        PLANNER,
+
+        /**
+         * The join optimizer of the engine.
+         */
+        OPTIMIZER
+    }
 
 
     /**
@@ -231,16 +251,21 @@ public class SparqlTest
 
         schema = new DatabaseSchema(connectionPool);
 
-        SparqlDatabaseConfiguration stringConfig = new NeXtProtStringConfiguration(null, connectionPool, schema);
-        SparqlDatabaseConfiguration integerConfig = new NeXtProtIntegerConfiguration(null, connectionPool, schema);
-        SparqlDatabaseConfiguration combinedConfig = new NeXtProtCombinedConfiguration(null, connectionPool, schema);
+        // every NeXtProt configuration runs with the planner's joins and with the join optimizer of the engine
+        for(Joins joins : Joins.values())
+        {
+            SparqlDatabaseConfiguration stringConfig = new NeXtProtStringConfiguration(null, connectionPool, schema);
+            SparqlDatabaseConfiguration integerConfig = new NeXtProtIntegerConfiguration(null, connectionPool, schema);
+            SparqlDatabaseConfiguration combinedConfig = new NeXtProtCombinedConfiguration(null, connectionPool,
+                    schema);
 
-        // the string configuration runs with the join optimizer of the engine, the other two with the planner's joins
-        stringConfig.setJoinOptimizer(true);
+            for(SparqlDatabaseConfiguration config : List.of(stringConfig, integerConfig, combinedConfig))
+                config.setJoinOptimizer(joins == Joins.OPTIMIZER);
 
-        stringEngine = new Engine(stringConfig);
-        integerEngine = new Engine(integerConfig);
-        combinedEngine = new Engine(combinedConfig);
+            stringEngines.put(joins, new Engine(stringConfig));
+            integerEngines.put(joins, new Engine(integerConfig));
+            combinedEngines.put(joins, new Engine(combinedConfig));
+        }
 
         model = ModelFactory.createDefaultModel();
 
@@ -533,15 +558,15 @@ public class SparqlTest
 
 
     /**
-     * NeXtProt queries must translate and run against the string configuration.
+     * NeXtProt queries must translate and run against the string configuration, whoever chooses their joins.
      */
     @DisplayName("NeXtProt String Tests")
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("getNextProtTests")
-    void doNextProtStringTests(String name, String query)
+    @ParameterizedTest(name = "{0}: {1}")
+    @MethodSource("getNextProtJoinsTests")
+    void doNextProtStringTests(Joins joins, String name, String query)
             throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
     {
-        try(Request request = stringEngine.getRequest())
+        try(Request request = stringEngines.get(joins).getRequest())
         {
             request.execute(query);
         }
@@ -549,15 +574,15 @@ public class SparqlTest
 
 
     /**
-     * NeXtProt queries must translate and run against the integer configuration.
+     * NeXtProt queries must translate and run against the integer configuration, whoever chooses their joins.
      */
     @DisplayName("NeXtProt Integer Tests")
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("getNextProtTests")
-    void doNextProtIntegerTests(String name, String query)
+    @ParameterizedTest(name = "{0}: {1}")
+    @MethodSource("getNextProtJoinsTests")
+    void doNextProtIntegerTests(Joins joins, String name, String query)
             throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
     {
-        try(Request request = integerEngine.getRequest())
+        try(Request request = integerEngines.get(joins).getRequest())
         {
             request.execute(query);
         }
@@ -566,15 +591,15 @@ public class SparqlTest
 
 
     /**
-     * NeXtProt queries must translate and run against the combined configuration.
+     * NeXtProt queries must translate and run against the combined configuration, whoever chooses their joins.
      */
     @DisplayName("NeXtProt Combined Tests")
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("getNextProtTests")
-    void doNextProtCombinedTests(String name, String query)
+    @ParameterizedTest(name = "{0}: {1}")
+    @MethodSource("getNextProtJoinsTests")
+    void doNextProtCombinedTests(Joins joins, String name, String query)
             throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
     {
-        try(Request request = combinedEngine.getRequest())
+        try(Request request = combinedEngines.get(joins).getRequest())
         {
             request.execute(query);
         }
@@ -838,6 +863,27 @@ public class SparqlTest
             {
                 Object[] args = test.get();
                 result.add(Arguments.of(variant, args[0], args[1], args[2], args[3]));
+            }
+        }
+
+        return result;
+    }
+
+
+    /**
+     * The NeXtProt queries (see {@link #getNextProtTests}) with each of the two ways their joins are chosen.
+     */
+    static List<Arguments> getNextProtJoinsTests() throws URISyntaxException, IOException
+    {
+        List<Arguments> tests = getNextProtTests();
+        List<Arguments> result = new ArrayList<>();
+
+        for(Joins joins : Joins.values())
+        {
+            for(Arguments test : tests)
+            {
+                Object[] args = test.get();
+                result.add(Arguments.of(joins, args[0], args[1]));
             }
         }
 

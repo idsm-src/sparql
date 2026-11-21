@@ -230,12 +230,19 @@ public class SqlDumpTest
                 }
             }
 
-            for(Arguments args : SparqlTest.getNextProtTests())
+            // the NeXtProt queries with the planner's joins and with those of the join optimizer of the engine
+            for(Arguments args : SparqlTest.getNextProtJoinsTests())
             {
                 Object[] a = args.get();
-                dump(out, "nextprot-string", (String) a[0], SparqlTest.stringEngine, (String) a[1]);
-                dump(out, "nextprot-integer", (String) a[0], SparqlTest.integerEngine, (String) a[1]);
-                dump(out, "nextprot-combined", (String) a[0], SparqlTest.combinedEngine, (String) a[1]);
+                SparqlTest.Joins joins = (SparqlTest.Joins) a[0];
+                String suffix = "-" + joins.name().toLowerCase(ROOT);
+
+                dump(out, "nextprot-string" + suffix, (String) a[1], SparqlTest.stringEngines.get(joins),
+                        (String) a[2]);
+                dump(out, "nextprot-integer" + suffix, (String) a[1], SparqlTest.integerEngines.get(joins),
+                        (String) a[2]);
+                dump(out, "nextprot-combined" + suffix, (String) a[1], SparqlTest.combinedEngines.get(joins),
+                        (String) a[2]);
             }
         }
     }
