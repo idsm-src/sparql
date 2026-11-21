@@ -466,12 +466,19 @@ public final class SqlJoin extends SqlIntercode
             return SqlNoSolution.get();
 
 
-        if(fullChilds.equals(childs) && restrictions.isOptimized(relations, bindings)
+        boolean unchanged = fullChilds.equals(childs) && restrictions.isOptimized(relations, bindings)
                 && filterConditions.equals(getFilterConditions(fullChilds, restrictions))
-                && neededRows == restrictions.getNeededRows())
+                && neededRows == restrictions.getNeededRows();
+
+        if(unchanged && restrictions.getNames().stream()
+                .allMatch(v -> bindings.get(v) != null || fullChilds.stream().allMatch(c -> c.getVariable(v) == null)))
             return this;
 
-        return join(request, fullChilds, restrictions);
+        // a join that exposes less than the children bind of what the parent has come to need, like a node joining the
+        // tables of a join mapping that is asked for in place of the term it stands for, is made anew
+        SqlIntercode join = join(request, fullChilds, restrictions);
+
+        return unchanged && join.getVariableBindings().equals(bindings) ? this : join;
     }
 
 

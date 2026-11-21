@@ -2,8 +2,10 @@ package cz.iocb.sparql.engine.test;
 
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static java.util.Arrays.asList;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
@@ -31,6 +33,7 @@ import cz.iocb.sparql.engine.mapping.classes.IntegerUserIriClass;
 import cz.iocb.sparql.engine.mapping.classes.StringUserIriClass;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.Engine;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.request.Request.PreparedQuery;
@@ -289,6 +292,18 @@ public class JoinNodeTest
     private static Iri kind(String name)
     {
         return new Iri("http://example.org/kind/" + name);
+    }
+
+
+    /**
+     * The integer of the given value.
+     *
+     * @param value the value
+     * @return the literal of the integer
+     */
+    private static TypedLiteral integer(int value)
+    {
+        return new TypedLiteral(Integer.toString(value), xsdIntegerIri);
     }
 
 
@@ -599,5 +614,46 @@ public class JoinNodeTest
         assertThat(check("SELECT ?i ?n WHERE { ?i ex:kind ?k . ?n ex:follows+ ?k }"), hasSize(4));
 
         assertThat(check("SELECT ?a ?b WHERE { ?a ex:follows ?x . ?x (ex:follows|^ex:follows) ?b }"), hasSize(14));
+    }
+
+
+    @Test
+    @DisplayName("a deduplication by the nodes of the variables whose terms are not needed")
+    void distinctByNodes() throws Exception
+    {
+        String kindTable = "\"join_node_test\".\"kind\"";
+
+        // the kinds that others follow are counted by their numbers, which the table saying what follows what holds,
+        // so the table of the kinds, which gives their names, is not read
+        String counted = "SELECT (COUNT(DISTINCT ?k) AS ?c) WHERE { ?a ex:follows ?k }";
+
+        assertThat(count(translate(shared, counted), kindTable), is(0));
+        assertThat(count(translate(optimized, counted), kindTable), is(0));
+        assertThat(count(translate(plain, counted), kindTable), is(1));
+        assertThat(check(counted), contains(row(integer(2))));
+
+        // nor is it read for the number of the distinct solutions of a sub-select
+        String solutions = "SELECT (COUNT(*) AS ?c) WHERE { SELECT DISTINCT ?a ?b "
+                + "WHERE { ?a ex:follows ?k . ?k ex:follows ?b } }";
+
+        assertThat(count(translate(shared, solutions), kindTable), is(0));
+        assertThat(count(translate(optimized, solutions), kindTable), is(0));
+        assertThat(check(solutions), contains(row(integer(3))));
+
+        // the kinds the query returns are read
+        String returned = "SELECT DISTINCT ?k WHERE { ?a ex:follows ?k }";
+
+        assertThat(count(translate(shared, returned), kindTable), is(1));
+        assertThat(check(returned), containsInAnyOrder(row(kind("green")), row(kind("blue"))));
+
+        // a variable the solutions may leave unbound is deduplicated over as before
+        String optional = "SELECT (COUNT(DISTINCT ?n) AS ?c) WHERE { ?k ex:label ?l OPTIONAL { ?k ex:follows ?n } }";
+
+        assertThat(check(optional), contains(row(integer(2))));
+
+        // a deduplication under a grouping, and one of several variables of which the query needs some
+        assertThat(check("SELECT ?k (COUNT(DISTINCT ?n) AS ?c) WHERE { ?k ex:follows ?n } GROUP BY ?k"), hasSize(3));
+        assertThat(check("SELECT ?a WHERE { SELECT DISTINCT ?a ?b WHERE { ?a ex:follows ?k . ?k ex:follows ?b } }"),
+                hasSize(3));
     }
 }

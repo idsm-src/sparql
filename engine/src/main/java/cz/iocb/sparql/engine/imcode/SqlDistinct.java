@@ -119,6 +119,24 @@ public final class SqlDistinct extends SqlIntercode
                 childRestrictions.addFilterCondition(variable, condition);
         }
 
+        // a variable the parent does not need can be deduplicated over by a node standing in for its term, which the
+        // child is asked for as well, because the solutions may come to bind it always only once they are optimised
+        Map<Variable, List<Variable>> nodes = new LinkedHashMap<>();
+
+        for(Variable variable : distinctVariables)
+        {
+            if(restrictions.containsVar(variable))
+                continue;
+
+            List<Variable> candidates = getDeterminingNodes(request, variable);
+
+            if(!candidates.isEmpty())
+            {
+                nodes.put(variable, candidates);
+                childRestrictions.add(candidates);
+            }
+        }
+
         SqlIntercode optChild = child.optimize(request, scope, childRestrictions, true, evalServices);
 
 
@@ -127,6 +145,31 @@ public final class SqlDistinct extends SqlIntercode
 
         if(optChild.equals(SqlEmptySolution.get()))
             return SqlEmptySolution.get();
+
+        // the solutions binding a variable and a node standing in for its term always are the same whether
+        // deduplicated over the variable or over the node, and the child deduplicated over the node reads no term
+        Set<Variable> replaced = new HashSet<>(distinctVariables);
+
+        for(Map.Entry<Variable, List<Variable>> entry : nodes.entrySet())
+        {
+            VariableBinding binding = optChild.getVariable(entry.getKey());
+
+            if(binding == null || binding.canBeNull())
+                continue;
+
+            for(Variable node : entry.getValue())
+            {
+                if(optChild.getVariable(node) == null || optChild.getVariable(node).canBeNull())
+                    continue;
+
+                replaced.remove(entry.getKey());
+                replaced.add(node);
+                break;
+            }
+        }
+
+        if(!replaced.equals(distinctVariables))
+            return create(request, optChild, replaced).optimize(request, scope, restrictions, reduced, evalServices);
 
         // When the deduplication is left out below, the child's rows are already distinct over the variables, so the
         // child may treat them as reduced only if the parent needs all the variables in all their classes. If the

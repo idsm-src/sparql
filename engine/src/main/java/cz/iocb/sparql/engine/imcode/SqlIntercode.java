@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -2037,6 +2038,32 @@ public abstract class SqlIntercode extends SqlBaseClass
             if(!needed.containsVar(term.variable()))
                 leftRestrictions.remove(term.variable());
         }
+    }
+
+
+    /**
+     * The nodes of the request that can stand in for the term of a variable: a node gives the term both ways (see
+     * {@link NodeTerm#determining}), so two solutions binding it agree in it exactly when they agree in the variable.
+     * Where the solutions bind such a node and the variable always, they can be deduplicated or counted by the node,
+     * and the term need not be read for it, like from a table of the terms of numbered quads. A node that is asked for
+     * only as a node is exposed by the joins it joins the tables of, so it is looked for among all the nodes of the
+     * request, not among the bindings of a node optimised without it.
+     *
+     * @param request the current request
+     * @param variable the variable
+     * @return the nodes that give the term of the variable both ways, ordered by their names
+     */
+    protected static List<Variable> getDeterminingNodes(Request request, Variable variable)
+    {
+        List<Variable> nodes = new ArrayList<>();
+
+        for(Entry<Variable, NodeTerm> entry : request.getNodeTerms().entrySet())
+            if(entry.getValue().determining() && entry.getValue().variable().equals(variable))
+                nodes.add(entry.getKey());
+
+        nodes.sort(Comparator.comparing(Variable::getName));
+
+        return nodes;
     }
 
 
