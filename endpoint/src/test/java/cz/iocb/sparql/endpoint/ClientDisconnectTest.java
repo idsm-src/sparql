@@ -211,7 +211,7 @@ public class ClientDisconnectTest
 
         Context context = tomcat.addContext("", base.toString());
         Tomcat.addServlet(context, "sparql", new TestServlet(engine));
-        context.addServletMappingDecoded("/sparql", "sparql", false);
+        context.addServletMapping("/sparql", "sparql");
 
         tomcat.start();
 
