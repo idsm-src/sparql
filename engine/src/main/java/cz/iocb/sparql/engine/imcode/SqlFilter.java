@@ -1,10 +1,13 @@
 package cz.iocb.sparql.engine.imcode;
 
+import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.EQUAL;
+import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.NOT_EQUAL;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
@@ -13,15 +16,22 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.InputTable;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
+import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison;
+import cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical;
 import cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression;
+import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
 import cz.iocb.sparql.engine.imcode.expression.SqlExists;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
+import cz.iocb.sparql.engine.imcode.expression.SqlUnaryLogical;
+import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
+import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.request.Request.NodeTerm;
 import cz.iocb.sparql.engine.translator.Multiset;
 import cz.iocb.sparql.engine.translator.VariableBinding;
 import cz.iocb.sparql.engine.translator.VariableBindings;
@@ -100,6 +110,169 @@ public final class SqlFilter extends SqlIntercode
 
 
     /**
+     * A test of two variables for the same term.
+     *
+     * @param left a variable
+     * @param right the other variable
+     * @param negated whether the test holds when the terms are different
+     */
+    private record TermTest(Variable left, Variable right, boolean negated)
+    {
+    }
+
+
+    /**
+     * The test of two variables for the same term that a condition is: a test of the same term whatever the classes of
+     * the variables are, and an equality or an inequality where one of the variables is an IRI or a blank node always,
+     * which is equal to the same term only and is compared with any other term without an error.
+     *
+     * @param condition the condition
+     * @param bindings the variable bindings giving the classes of the variables
+     * @return the test of two variables for the same term, or null when the condition is none
+     */
+    private static TermTest getTermTest(SqlExpressionIntercode condition, VariableBindings bindings)
+    {
+        if(condition instanceof SqlBuiltinCall call && call.getFunction().equals("sameterm")
+                && call.getArguments().get(0) instanceof SqlVariable left
+                && call.getArguments().get(1) instanceof SqlVariable right)
+            return new TermTest(left.getVariable(), right.getVariable(), false);
+
+        if(!(condition instanceof SqlBinaryComparison comparison) || !(comparison.getLeft() instanceof SqlVariable left)
+                || !(comparison.getRight() instanceof SqlVariable right)
+                || comparison.getOperator() != EQUAL && comparison.getOperator() != NOT_EQUAL)
+            return null;
+
+        for(Variable variable : List.of(left.getVariable(), right.getVariable()))
+            if(bindings.get(variable) != null
+                    && bindings.get(variable).getClasses().stream().allMatch(BuiltinClasses::isReference))
+                return new TermTest(left.getVariable(), right.getVariable(), comparison.getOperator() == NOT_EQUAL);
+
+        return null;
+    }
+
+
+    /**
+     * The variables that a condition tests for the same term, two by two (see {@link #getTermTest}), also under the
+     * logical operators.
+     *
+     * @param condition the condition
+     * @param bindings the variable bindings giving the classes of the variables
+     * @return the variables that the condition tests for the same term
+     */
+    private static Set<Variable> getTestedVariables(SqlExpressionIntercode condition, VariableBindings bindings)
+    {
+        Set<Variable> variables = new LinkedHashSet<>();
+
+        if(condition instanceof SqlBinaryLogical logical)
+        {
+            variables.addAll(getTestedVariables(logical.getLeft(), bindings));
+            variables.addAll(getTestedVariables(logical.getRight(), bindings));
+        }
+        else if(condition instanceof SqlUnaryLogical negation)
+        {
+            variables.addAll(getTestedVariables(negation.getOperand(), bindings));
+        }
+        else if(getTermTest(condition, bindings) instanceof TermTest test)
+        {
+            variables.addAll(List.of(test.left(), test.right()));
+        }
+
+        return variables;
+    }
+
+
+    /**
+     * The condition with its tests of two variables for the same term (see {@link #getTermTest}) turned into tests of
+     * the nodes standing in for the terms (see {@link SqlIntercode#getDeterminingNodes}), where the solutions of the
+     * child bind both variables and such nodes always and the two nodes read their terms alike (see
+     * {@link #readAlike}): the terms are then the same exactly when the nodes are, so the child need not read the terms
+     * for the test.
+     *
+     * @param request the current request
+     * @param condition the condition
+     * @param child the child, asked for the nodes as well
+     * @return the condition comparing the nodes where it can
+     */
+    private static SqlExpressionIntercode compareNodes(Request request, SqlExpressionIntercode condition,
+            SqlIntercode child)
+    {
+        ClassRelations relations = request.getConfiguration();
+
+        if(condition instanceof SqlBinaryLogical logical)
+        {
+            SqlExpressionIntercode left = compareNodes(request, logical.getLeft(), child);
+            SqlExpressionIntercode right = compareNodes(request, logical.getRight(), child);
+
+            return left == logical.getLeft() && right == logical.getRight() ? condition :
+                    SqlBinaryLogical.create(relations, logical.getOperator(), left, right);
+        }
+
+        if(condition instanceof SqlUnaryLogical negation)
+        {
+            SqlExpressionIntercode operand = compareNodes(request, negation.getOperand(), child);
+
+            return operand == negation.getOperand() ? condition : SqlUnaryLogical.create(relations, operand);
+        }
+
+        TermTest test = getTermTest(condition, child.getVariableBindings());
+
+        if(test == null || test.left().equals(test.right()))
+            return condition;
+
+        for(Variable variable : List.of(test.left(), test.right()))
+            if(child.getVariable(variable) == null || child.getVariable(variable).canBeNull())
+                return condition;
+
+        for(Variable leftNode : getDeterminingNodes(request, test.left()))
+        {
+            for(Variable rightNode : getDeterminingNodes(request, test.right()))
+            {
+                VariableBinding leftBinding = child.getVariable(leftNode);
+                VariableBinding rightBinding = child.getVariable(rightNode);
+
+                if(leftBinding == null || leftBinding.canBeNull() || rightBinding == null || rightBinding.canBeNull()
+                        || !readAlike(request, leftNode, rightNode))
+                    continue;
+
+                List<SqlExpressionIntercode> nodes = List.of(SqlVariable.create(relations, leftBinding),
+                        SqlVariable.create(relations, rightBinding));
+
+                SqlExpressionIntercode same = SqlBuiltinCall.create(request, "sameterm", false, nodes);
+
+                return test.negated() ? SqlUnaryLogical.create(relations, same) : same;
+            }
+        }
+
+        return condition;
+    }
+
+
+    /**
+     * True if two nodes read their terms alike: from the same columns of one table, in the same class and by the same
+     * join columns, so that the two nodes are the same exactly when the terms they stand in for are.
+     *
+     * @param request the current request
+     * @param left a node
+     * @param right another node
+     * @return true if the two nodes read their terms alike, false otherwise
+     */
+    private static boolean readAlike(Request request, Variable left, Variable right)
+    {
+        NodeTerm leftTerm = request.getNodeTerms().get(left);
+        NodeTerm rightTerm = request.getNodeTerms().get(right);
+
+        if(!(leftTerm.reader() instanceof SqlTableAccess leftReader)
+                || !(rightTerm.reader() instanceof SqlTableAccess rightReader))
+            return false;
+
+        return leftReader.getTable().equals(rightReader.getTable())
+                && leftReader.getVariable(left).getMappings().equals(rightReader.getVariable(right).getMappings())
+                && leftReader.getVariable(leftTerm.variable()).getMappings()
+                        .equals(rightReader.getVariable(rightTerm.variable()).getMappings());
+    }
+
+
+    /**
      * The number of the solutions of the child that the filter reads for the solutions its parent reads of its own (see
      * {@link Restrictions#getNeededRows}): as many more as the conditions are estimated to drop (see
      * {@link JoinOptimizer#selectivity(SqlExpressionIntercode)}). A condition handed down as a filter condition of the
@@ -158,6 +331,12 @@ public final class SqlFilter extends SqlIntercode
         addFilterConditions(request, childRestrictions, optCnds, child.getVariableBindings());
         childRestrictions.setNeededRows(getNeededRows(request, restrictions.getNeededRows(), optCnds));
 
+        // two variables tested for the same term can be compared by the nodes standing in for their terms, which the
+        // child is asked for as well, because the solutions may come to bind them always only once they are optimised
+        for(SqlExpressionIntercode cnd : optCnds)
+            for(Variable variable : getTestedVariables(cnd, child.getVariableBindings()))
+                childRestrictions.add(getDeterminingNodes(request, variable));
+
         while(true)
         {
             SqlIntercode newOptChild = optChild.optimize(request, scope, childRestrictions, childReduced, evalServices);
@@ -187,6 +366,10 @@ public final class SqlFilter extends SqlIntercode
             addFilterConditions(request, newChildRestrictions, newOptCnds, child.getVariableBindings());
             newChildRestrictions.setNeededRows(getNeededRows(request, restrictions.getNeededRows(), newOptCnds));
 
+            for(SqlExpressionIntercode cnd : newOptCnds)
+                for(Variable variable : getTestedVariables(cnd, optChild.getVariableBindings()))
+                    newChildRestrictions.add(getDeterminingNodes(request, variable));
+
             if(newChildReduced == childReduced && newChildRestrictions.equals(childRestrictions))
                 break;
 
@@ -200,6 +383,14 @@ public final class SqlFilter extends SqlIntercode
 
         if(optCnds.isEmpty())
             return optChild.optimize(request, scope, restrictions, reduced, evalServices);
+
+        // the tests of the same term whose variables the solutions bind always along with nodes standing in for their
+        // terms compare the nodes, so that the child reads no term for them
+        SqlIntercode tested = optChild;
+        List<SqlExpressionIntercode> byNodes = optCnds.stream().map(c -> compareNodes(request, c, tested)).toList();
+
+        if(!byNodes.equals(optCnds))
+            return filter(request, byNodes, optChild).optimize(request, scope, restrictions, reduced, evalServices);
 
         if(optChild instanceof SqlFilter filter)
         {

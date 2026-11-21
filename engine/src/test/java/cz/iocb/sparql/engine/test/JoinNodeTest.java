@@ -771,4 +771,58 @@ public class JoinNodeTest
         // a slice in no order needs no sub-select, as the terms are looked up for the rows it reads
         assertThat(count(translate(shared, grouped + " LIMIT 1"), " LIMIT 1"), is(1));
     }
+
+
+    @Test
+    @DisplayName("two variables tested for the same term compared by their nodes")
+    void comparisonByNodes() throws Exception
+    {
+        String kindTable = "\"join_node_test\".\"kind\"";
+        String counted = "SELECT (COUNT(*) AS ?c) WHERE { ?a ex:follows ?b ";
+
+        // the kind that follows and the kind it follows are compared by their numbers, so the table of the kinds,
+        // which gives their names, is not read
+        for(String test : List.of("?a = ?b", "sameTerm(?a, ?b)", "!(?a != ?b)", "!(!sameTerm(?b, ?a))"))
+        {
+            String query = counted + "FILTER(" + test + ") }";
+
+            assertThat(count(translate(shared, query), kindTable), is(0));
+            assertThat(count(translate(optimized, query), kindTable), is(0));
+            assertThat(count(translate(plain, query), kindTable), is(2));
+            assertThat(check(query), contains(row(integer(1))));
+        }
+
+        for(String test : List.of("?a != ?b", "!sameTerm(?a, ?b)", "!(?b = ?a)"))
+        {
+            String query = counted + "FILTER(" + test + ") }";
+
+            assertThat(count(translate(shared, query), kindTable), is(0));
+            assertThat(count(translate(optimized, query), kindTable), is(0));
+            assertThat(check(query), contains(row(integer(3))));
+        }
+
+        // a test among other conditions, of which one reads a name
+        assertThat(check(counted + "FILTER(?a = ?b || ?a = kind:red) }"), contains(row(integer(3))));
+        assertThat(check(counted + "FILTER(?a != ?b && ?b != kind:green) }"), contains(row(integer(2))));
+
+        // the kinds two patterns give are joined by their numbers, and only the names returned are read
+        String joined = "SELECT ?a ?b WHERE { ?a ex:follows ?x . ?b ex:follows ?y FILTER(?x = ?y) }";
+
+        assertThat(count(translate(shared, joined), kindTable), is(2));
+        assertThat(count(translate(optimized, joined), kindTable), is(2));
+        assertThat(count(translate(plain, joined), kindTable), is(4));
+        assertThat(check(joined), hasSize(10));
+
+        String returned = "SELECT ?a ?b WHERE { ?a ex:follows ?b FILTER(?a != ?b) }";
+
+        assertThat(count(translate(shared, returned), kindTable), is(2));
+        assertThat(check(returned), containsInAnyOrder(row(kind("red"), kind("green")), row(kind("red"), kind("blue")),
+                row(kind("green"), kind("blue"))));
+
+        // a variable the solutions may leave unbound is compared by its term as before
+        String optional = "?k ex:label ?l OPTIONAL { ?k ex:follows ?n }";
+
+        assertThat(check("SELECT ?k ?n WHERE { " + optional + " FILTER(?k != ?n) }"), hasSize(3));
+        assertThat(check("SELECT ?k ?n WHERE { " + optional + " FILTER(!sameTerm(?k, ?n)) }"), hasSize(3));
+    }
 }
