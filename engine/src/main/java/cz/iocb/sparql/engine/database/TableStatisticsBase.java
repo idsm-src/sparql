@@ -15,8 +15,9 @@ import cz.iocb.sparql.engine.request.Request.ResultReader;
  * Estimates from the statistics of groups of rows the way the database planner does: the rows of a disjunct of the
  * conditions are the rows of the group the disjunct selects, multiplied by the selectivity of every column bound to a
  * value (the frequency of the value when it is among the most common ones, otherwise the frequency of an average of the
- * remaining values) and by the fraction of null or not-null values of every column tested for them; the rows of a
- * disjunction are the sum over its disjuncts. Subclasses supply the groups and the frequencies.
+ * remaining values, which share the rows holding neither a most common value nor a null) and by the fraction of null or
+ * not-null values of every column tested for them; the rows of a disjunction are the sum over its disjuncts. Subclasses
+ * supply the groups and the frequencies.
  */
 public abstract class TableStatisticsBase implements TableStatistics
 {
@@ -176,7 +177,9 @@ public abstract class TableStatisticsBase implements TableStatistics
 
 
     /**
-     * Selectivity of the column bound to the value among the rows of the group.
+     * Selectivity of the column bound to the value among the rows of the group: the frequency of the value when it is
+     * among the most common ones, and otherwise an equal share of the rows left to the other values, which are the rows
+     * that hold neither a most common value nor a null, as no value is equal to a null.
      *
      * @param request the current request
      * @param group the group of rows, or null if nothing is known about it
@@ -196,7 +199,7 @@ public abstract class TableStatisticsBase implements TableStatistics
         if(!Double.isNaN(frequency))
             return frequency;
 
-        double rest = Math.max(1 - statistics.mostCommonFraction(), 0);
+        double rest = Math.max(1 - statistics.nullFraction() - statistics.mostCommonFraction(), 0);
         double others = Math.max(statistics.distinct() - statistics.mostCommonCount(), 1);
 
         return rest / others;

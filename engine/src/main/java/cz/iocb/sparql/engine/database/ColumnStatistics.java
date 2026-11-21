@@ -8,9 +8,9 @@ package cz.iocb.sparql.engine.database;
  *
  * @param distinct number of distinct values of the column
  * @param effectiveDistinct effective number of distinct values, the inverse Simpson index of the frequencies of the
- *            values (the number of equally frequent values that would give the same probability of two rows sharing a
- *            value); equal to {@code distinct} when the values are equally frequent, smaller when they are skewed,
- *            {@code NaN} when unknown
+ *            values among the rows whose value is not null (the number of equally frequent values that would give the
+ *            same probability of two such rows sharing a value); equal to {@code distinct} when the values are equally
+ *            frequent, smaller when they are skewed, {@code NaN} when unknown
  * @param nullFraction fraction of the rows whose value is null
  * @param mostCommonFraction fraction of the rows holding one of the most common values kept
  * @param mostCommonCount number of the most common values kept
@@ -40,7 +40,9 @@ public record ColumnStatistics(double distinct, double effectiveDistinct, double
      * for a fraction of the rows, as in {@code pg_stats.n_distinct}), the fraction of null values and the list of the
      * most common values summarised by their number, the sum of their frequencies and the sum of the squares of their
      * frequencies, from which the effective number of distinct values is derived with the remaining values taken as
-     * equally frequent.
+     * equally frequent. The frequencies are fractions of all the rows, the null ones included, as the planner keeps
+     * them, whereas the effective number is that of the values among the rows that are not null: a null is no value, so
+     * the rows holding one are neither rows of the remaining values nor rows two of which could share a value.
      *
      * @param rows number of rows
      * @param distinct number of distinct values, or minus the fraction of the rows that are distinct
@@ -58,9 +60,15 @@ public record ColumnStatistics(double distinct, double effectiveDistinct, double
 
         distinct = Math.max(distinct, 1);
 
-        double rest = Math.max(1 - mostCommonFraction, 0);
+        // the rows that are not null, those of them holding none of the most common values, and the values they share
+        double present = Math.max(1 - nullFraction, 0);
+        double rest = Math.max(present - mostCommonFraction, 0);
         double others = Math.max(distinct - mostCommonCount, 1);
-        double effective = 1 / (mostCommonSquares + rest * rest / others);
+
+        // the probability that two rows share a value, whose inverse among the pairs of rows that are not null is the
+        // effective number
+        double shared = mostCommonSquares + rest * rest / others;
+        double effective = shared > 0 ? present * present / shared : distinct;
 
         return new ColumnStatistics(distinct, Math.min(effective, distinct), nullFraction, mostCommonFraction,
                 mostCommonCount);

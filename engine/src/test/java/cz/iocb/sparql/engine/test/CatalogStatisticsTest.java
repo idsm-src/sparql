@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.test;
 
+import static cz.iocb.sparql.engine.database.SqlType.BOOL;
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -33,9 +34,9 @@ import cz.iocb.sparql.testing.Database;
 
 /**
  * Statistics read from the database: the catalog statistics of an analysed table give its rows, the frequency of a most
- * common value, the average frequency of the other values and the distinct values of its columns; the grouped
- * statistics read the side tables for a bound group column and fall back to the catalog otherwise; the configuration
- * serves the registered statistics and the catalog statistics of other tables.
+ * common value, the average frequency of the other values and the distinct values of its columns, also where a column
+ * holds nulls or booleans; the grouped statistics read the side tables for a bound group column and fall back to the
+ * catalog otherwise; the configuration serves the registered statistics and the catalog statistics of other tables.
  */
 public class CatalogStatisticsTest
 {
@@ -55,11 +56,21 @@ public class CatalogStatisticsTest
      */
     private static final DatabaseTable valuesTable = new DatabaseTable("statistics_test", "triples_values");
 
+    /**
+     * The table of 1000 rows whose columns are mostly null: {@code flag} is true in 150 rows, false in 50 and null
+     * otherwise, {@code code} is 0 in 200 rows, distinct in another 200 and null otherwise.
+     */
+    private static final DatabaseTable entities = new DatabaseTable("statistics_test", "entities");
+
     private static final TableColumn p = new TableColumn("p", VARCHAR);
 
     private static final TableColumn s = new TableColumn("s", INT4);
 
     private static final TableColumn o = new TableColumn("o", INT4);
+
+    private static final TableColumn flag = new TableColumn("flag", BOOL);
+
+    private static final TableColumn code = new TableColumn("code", INT4);
 
     /**
      * Configuration of the test database.
@@ -68,7 +79,8 @@ public class CatalogStatisticsTest
 
 
     /**
-     * Creates the {@code statistics_test} schema: the table, analysed, and its side tables computed by SQL.
+     * Creates the {@code statistics_test} schema: the tables, analysed, and the side tables of the first one computed
+     * by SQL.
      */
     @BeforeAll
     static void init() throws SQLException
@@ -83,6 +95,12 @@ public class CatalogStatisticsTest
             statement.execute("insert into statistics_test.triples select case when i <= 900 then 'a' else 'b' end, "
                     + "case when i % 2 = 0 then 0 else i end, i % 10 from generate_series(1, 1000) as i");
             statement.execute("analyze statistics_test.triples");
+            statement.execute("create table statistics_test.entities (flag boolean, code integer)");
+            statement.execute("""
+                    insert into statistics_test.entities select case when i <= 150 then true \
+                    when i <= 200 then false end, case when i <= 200 then 0 when i <= 400 then i end \
+                    from generate_series(1, 1000) as i""");
+            statement.execute("analyze statistics_test.entities");
             statement.execute("""
                     create table statistics_test.triples_statistics as select p as key_value, \
                     column_name, row_count, distinct_count, effective_count from (select p, 's' as column_name, \
@@ -161,6 +179,44 @@ public class CatalogStatisticsTest
 
             // capped by the rows
             assertThat(statistics.estimateDistinct(request, s, equal(o, "3")), lessThan(101.0));
+        }
+    }
+
+
+    @Test
+    public void catalogBooleanValues() throws SQLException
+    {
+        TableStatistics statistics = new CatalogStatistics(entities);
+
+        try(Request request = new Engine(config).getRequest())
+        {
+            // a boolean is found among the most common values, which hold it in another form than its cast to text
+            assertThat(statistics.estimateRows(request, equal(flag, "true")), closeTo(150, 5));
+            assertThat(statistics.estimateRows(request, equal(flag, "false")), closeTo(50, 5));
+        }
+    }
+
+
+    @Test
+    public void catalogNullableColumn() throws SQLException
+    {
+        TableStatistics statistics = new CatalogStatistics(entities);
+
+        try(Request request = new Engine(config).getRequest())
+        {
+            assertThat(statistics.estimateRows(request, equal(code, "0")), closeTo(200, 5));
+
+            // a value outside the most common ones gets the average of the remaining ones among the rows that hold
+            // neither the most common value nor a null: 200 rows over 200 values
+            double other = statistics.estimateRows(request, equal(code, "300"));
+            assertThat(other, greaterThan(0.5));
+            assertThat(other, lessThan(2.0));
+
+            // 201 distinct values, half of the 400 rows that are not null sharing one of them: their effective number
+            // is about 4 (the null rows taken for rows of the other values would make it 23), and the number corrected
+            // for the skew is the geometric mean of the two
+            assertThat(statistics.estimateDistinct(request, code, new Conditions(true)),
+                    closeTo(Math.sqrt(201 * 4), 3));
         }
     }
 

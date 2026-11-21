@@ -12,9 +12,10 @@ import cz.iocb.sparql.engine.request.Request;
 /**
  * Arithmetic of the estimates over given statistics: the rows of a disjunct are the rows of its group multiplied by the
  * selectivities of its bound columns (the frequency of a most common value, the average of the remaining values
- * otherwise, the planner's default without statistics) and by the null fractions; the disjuncts add up; the distinct
- * values of a bound column are one, of a free column the skew-corrected count capped by the rows; a group column is
- * accounted for by its group; the effective number of distinct values follows from the frequencies.
+ * otherwise, which share the rows that are not null, the planner's default without statistics) and by the null
+ * fractions; the disjuncts add up; the distinct values of a bound column are one, of a free column the skew-corrected
+ * count capped by the rows; a group column is accounted for by its group; the effective number of distinct values
+ * follows from the frequencies among the rows that are not null.
  */
 public class TableStatisticsTest
 {
@@ -112,6 +113,20 @@ public class TableStatisticsTest
     {
         // the remaining 80 % of the rows over the remaining 99 values
         assertEquals(1000 * 0.8 / 99, new TestStatistics(false).estimateRows(null, conditions(equal(s, two))), 1e-9);
+    }
+
+
+    @Test
+    public void rowsOfAValueOfANullableColumn()
+    {
+        // the half of the rows that is not null over the two values
+        assertEquals(1000 * 0.5 / 2, new TestStatistics(false).estimateRows(null, conditions(equal(n, one))), 1e-9);
+
+        // a test of the same column for a null adds nothing
+        Condition condition = equal(n, one);
+        condition.addIsNotNull(n);
+
+        assertEquals(1000 * 0.5 / 2, new TestStatistics(false).estimateRows(null, conditions(condition)), 1e-9);
     }
 
 
@@ -237,5 +252,16 @@ public class TableStatisticsTest
 
         // the effective number never exceeds the number of distinct values
         assertEquals(1, ColumnStatistics.of(1000, 1, 0, 1, 1, 1).effectiveDistinct(), 1e-9);
+
+        // a null is no value: of the 400 rows that are not null, one value in a half and 200 others in the rest
+        ColumnStatistics nullable = ColumnStatistics.of(1000, 201, 0.6, 1, 0.2, 0.04);
+        assertEquals(0.4 * 0.4 / (0.04 + 0.2 * 0.2 / 200), nullable.effectiveDistinct(), 1e-9);
+
+        // so the number is that of the same values in a column without the null rows
+        assertEquals(ColumnStatistics.of(400, 201, 0, 1, 0.5, 0.25).effectiveDistinct(), nullable.effectiveDistinct(),
+                1e-9);
+
+        // a column of nulls alone
+        assertEquals(1, ColumnStatistics.of(1000, 0, 1, 0, 0, 0).effectiveDistinct(), 1e-9);
     }
 }

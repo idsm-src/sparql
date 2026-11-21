@@ -112,9 +112,12 @@ public final class CatalogStatistics extends TableStatisticsBase
 
     /**
      * Reads the frequency of the value in the column from the list of the most common values of the catalog, the value
-     * and the values of the list being compared by their text forms (so that a value whose text form the input of the
-     * type does not take back cannot fail the lookup); a failing lookup counts as the value not being among the most
-     * common ones, but for the lookup of a request that is out of time or cancelled, which is no answer at all.
+     * and the values of the list being compared by the text forms the output of their type gives them (so that a value
+     * whose text form the input of the type does not take back cannot fail the lookup). The catalog gives the list as
+     * an array, whose text holds such forms, and the value is written the same way, as the element of an array, because
+     * a cast to text gives another form for some types: a boolean is cast to {@code true} and written as {@code t}. A
+     * failing lookup counts as the value not being among the most common ones, but for the lookup of a request that is
+     * out of time or cancelled, which is no answer at all.
      *
      * @param request the current request
      * @param column the column
@@ -124,9 +127,9 @@ public final class CatalogStatistics extends TableStatisticsBase
      */
     private double readFrequency(Request request, TableColumn column, Column value)
     {
-        String sql = "SELECT s.most_common_freqs[array_position(s.most_common_vals::text::text[], (" + value
-                + ")::text)] FROM pg_stats s WHERE s.schemaname = " + literal(table.getSchema()) + " AND s.tablename = "
-                + literal(table.getName()) + " AND s.attname = " + literal(column.getName());
+        String sql = "SELECT s.most_common_freqs[array_position(s.most_common_vals::text::text[], ((ARRAY[" + value
+                + "])::text::text[])[1])] FROM pg_stats s WHERE s.schemaname = " + literal(table.getSchema())
+                + " AND s.tablename = " + literal(table.getName()) + " AND s.attname = " + literal(column.getName());
 
         try
         {
