@@ -53,7 +53,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * side is evaluated once, their equality is a disjunction the database could just compare pairwise, so the solutions
  * binding them are joined apart from the others, by a plain equality (see {@link #translateForBound}), with the
  * optimizer and without it; where the sides can be hashed by a variable both bind always, the optimizer tells them
- * apart as well when hashing them by the other variables too spares enough comparisons.
+ * apart as well when hashing them by the other variables too spares enough comparisons. Where the sides share a node of
+ * a join mapping that gives the term of a variable both ways, they are compared by the node, and the variable is left
+ * out of the comparison (see {@link SqlIntercode#leaveOutDetermined}).
  */
 public final class SqlLeftJoin extends SqlIntercode
 {
@@ -437,6 +439,11 @@ public final class SqlLeftJoin extends SqlIntercode
         addFilterConditions(request, rightRestrictions, optConditions, right.getVariableBindings());
         rightRestrictions.removeFilterConditions(optLeft.getVariableBindings().getVariables());
 
+        // the sides are compared by the nodes they share; inside an EXISTS pattern the right side is compared with the
+        // current solution by the variables
+        if(!extending)
+            leaveOutDetermined(request, optLeft, optRight, cndRestrictions, leftRestrictions, rightRestrictions);
+
 
         boolean offered = false;
 
@@ -514,6 +521,9 @@ public final class SqlLeftJoin extends SqlIntercode
             addFilterConditions(request, newRightRestrictions, optConditions, right.getVariableBindings());
             newRightRestrictions.removeFilterConditions(optLeft.getVariableBindings().getVariables());
 
+            if(!extending)
+                leaveOutDetermined(request, optLeft, optRight, newCndRestrictions, newLeftRestrictions,
+                        newRightRestrictions);
 
             if(newOptReduced == optReduced && newLeftRestrictions.equals(leftRestrictions)
                     && newRightRestrictions.equals(rightRestrictions))

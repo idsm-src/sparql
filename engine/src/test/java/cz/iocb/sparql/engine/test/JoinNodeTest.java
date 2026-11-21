@@ -244,6 +244,19 @@ public class JoinNodeTest
 
 
     /**
+     * Returns how many times the SQL code holds the text.
+     *
+     * @param sql the SQL code
+     * @param text the text
+     * @return the number of the occurrences of the text in the code
+     */
+    private static int count(String sql, String text)
+    {
+        return sql.split(Pattern.quote(text), -1).length - 1;
+    }
+
+
+    /**
      * Expected row of the terms.
      *
      * @param terms the terms
@@ -370,27 +383,27 @@ public class JoinNodeTest
         // only
         String query = "SELECT ?a WHERE { ?a ex:follows ?k MINUS { ?k ex:follows ?k } }";
 
-        assertThat(translate(shared, query).split(Pattern.quote(kindTable), -1).length - 1, is(1));
-        assertThat(translate(optimized, query).split(Pattern.quote(kindTable), -1).length - 1, is(1));
-        assertThat(translate(plain, query).split(Pattern.quote(kindTable), -1).length - 1, is(4));
+        assertThat(count(translate(shared, query), kindTable), is(1));
+        assertThat(count(translate(optimized, query), kindTable), is(1));
+        assertThat(count(translate(plain, query), kindTable), is(4));
         assertThat(check(query), containsInAnyOrder(row(kind("red"))));
 
         // a kind the query asks for is read for the solutions that are left
         String needed = "SELECT ?a ?k WHERE { ?a ex:follows ?k MINUS { ?k ex:follows ?k } }";
 
-        assertThat(translate(shared, needed).split(Pattern.quote(kindTable), -1).length - 1, is(2));
+        assertThat(count(translate(shared, needed), kindTable), is(2));
         assertThat(check(needed), containsInAnyOrder(row(kind("red"), kind("green"))));
 
         // two differences of one group, and a difference inside another one
         String two = "SELECT ?a WHERE { ?a ex:follows ?k . ?k ex:follows ?n MINUS { ?k ex:follows ?k } "
                 + "MINUS { ?n ex:follows ?m . ?m ex:follows ?m } }";
 
-        assertThat(translate(shared, two).split(Pattern.quote(kindTable), -1).length - 1, is(1));
+        assertThat(count(translate(shared, two), kindTable), is(1));
         check(two);
 
         String nested = "SELECT ?a WHERE { ?a ex:follows ?k MINUS { ?k ex:follows ?n MINUS { ?n ex:follows ?n } } }";
 
-        assertThat(translate(shared, nested).split(Pattern.quote(kindTable), -1).length - 1, is(1));
+        assertThat(count(translate(shared, nested), kindTable), is(1));
         check(nested);
 
         // a node named after another table of its mapping is not shared, and the sides are compared by the terms
@@ -401,6 +414,48 @@ public class JoinNodeTest
 
         // and so is one the right side binds in a group of its own
         check("SELECT ?i WHERE { ?i ex:kind ?k MINUS { { ?k ex:follows ?n } ?k ex:label ?l } }");
+    }
+
+
+    @Test
+    @DisplayName("the sides of an OPTIONAL are compared by the nodes of the variables they share")
+    void optionalByNodes() throws Exception
+    {
+        String kindTable = "\"join_node_test\".\"kind\"";
+
+        // the kind another follows and the kind others follow are given by their numbers on both sides, so the sides
+        // are compared by the numbers, and the table of the kinds is read only for the names the query asks for
+        String query = "SELECT ?a ?n WHERE { ?a ex:follows ?k OPTIONAL { ?k ex:follows ?n } }";
+
+        assertThat(count(translate(shared, query), kindTable), is(2));
+        assertThat(count(translate(optimized, query), kindTable), is(2));
+        assertThat(count(translate(plain, query), kindTable), is(4));
+        assertThat(check(query), hasSize(4));
+
+        // a shared kind the query asks for is read on the left side, which every solution has
+        String needed = "SELECT ?a ?k ?n WHERE { ?a ex:follows ?k OPTIONAL { ?k ex:follows ?n } }";
+
+        assertThat(count(translate(shared, needed), kindTable), is(3));
+        assertThat(check(needed), hasSize(4));
+
+        // and so is one a condition of the OPTIONAL refers to
+        check("SELECT ?a ?n WHERE { ?a ex:follows ?k OPTIONAL { ?k ex:follows ?n FILTER(?k != kind:green) } }");
+        check("SELECT ?a ?n WHERE { ?a ex:follows ?k OPTIONAL { ?k ex:follows ?n FILTER(?k != ?n) } }");
+
+        // an OPTIONAL inside another one, and one after another
+        String nested = "SELECT ?a ?m WHERE { ?a ex:follows ?k OPTIONAL { ?k ex:follows ?n "
+                + "OPTIONAL { ?n ex:follows ?m } } }";
+
+        assertThat(count(translate(shared, nested), kindTable), is(2));
+        check(nested);
+
+        check("SELECT ?a ?n ?m WHERE { ?a ex:follows ?k OPTIONAL { ?k ex:follows ?n } OPTIONAL { ?m ex:follows ?k } }");
+
+        // a variable the left side may leave unbound is compared as before
+        check("SELECT ?i ?n WHERE { ?i ex:kind ?x OPTIONAL { ?i ex:other ?o } OPTIONAL { ?o ex:follows ?n } }");
+
+        // the right side of a difference shares the nodes of an OPTIONAL before it
+        check("SELECT ?a ?n WHERE { ?a ex:follows ?k OPTIONAL { ?k ex:follows ?n } MINUS { ?n ex:follows ?n } }");
     }
 
 

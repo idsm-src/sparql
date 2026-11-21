@@ -51,6 +51,7 @@ import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.request.Request.NodeTerm;
 import cz.iocb.sparql.engine.translator.VariableBinding;
 import cz.iocb.sparql.engine.translator.VariableBindingPair;
 import cz.iocb.sparql.engine.translator.VariableBindingPair.ResourceClassPair;
@@ -1970,6 +1971,40 @@ public abstract class SqlIntercode extends SqlBaseClass
     protected static SqlCode translateConditions(ClassRelations relations, List<SqlExpressionIntercode> conditions)
     {
         return conditions.stream().map(c -> c.get(relations, xsdBoolean).get(0)).collect(SqlCode.joining(" AND "));
+    }
+
+
+    /**
+     * Leaves out of what the two sides of a difference or of a left join are asked for the variables that need not be
+     * compared, because the sides are compared by the nodes standing for their terms: a node that both sides bind
+     * always and that gives the term of a variable both ways (see {@link NodeTerm#determining}) agrees in two solutions
+     * exactly when the variable does, and the variable is bound wherever the node is. The right side is then not asked
+     * for the variable at all, as a solution of the left side has it, and the left side only when it is needed above
+     * the comparison, so neither side reads the terms for the comparison, like a table of the terms of numbered quads.
+     *
+     * @param request the current request
+     * @param left the left side
+     * @param right the right side
+     * @param needed what is needed of the variables above the comparison
+     * @param leftRestrictions what the left side is asked for
+     * @param rightRestrictions what the right side is asked for
+     */
+    protected static void leaveOutDetermined(Request request, SqlIntercode left, SqlIntercode right,
+            Restrictions needed, Restrictions leftRestrictions, Restrictions rightRestrictions)
+    {
+        for(VariableBinding node : left.getVariableBindings().getValues())
+        {
+            NodeTerm term = request.getNodeTerms().get(node.getVariable());
+            VariableBinding other = right.getVariable(node.getVariable());
+
+            if(term == null || !term.determining() || other == null || node.canBeNull() || other.canBeNull())
+                continue;
+
+            rightRestrictions.remove(term.variable());
+
+            if(!needed.containsVar(term.variable()))
+                leftRestrictions.remove(term.variable());
+        }
     }
 
 

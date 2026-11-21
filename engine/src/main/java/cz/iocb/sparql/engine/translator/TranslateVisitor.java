@@ -222,10 +222,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
     /**
      * Scopes of the patterns translated before whose nodes the patterns being translated share as well (see
-     * {@link #getJoinNode}): those of the left side of a MINUS, for the patterns of its right side. The sides are not
-     * joined, but a solution of the right side removes one of the left side that agrees with it in the variables they
-     * share, and they agree in a variable exactly when they agree in the node standing for its term, so the sides are
-     * compared by the nodes (see {@link SqlMinus}).
+     * {@link #getJoinNode}): those of the left side of a MINUS or an OPTIONAL, for the patterns of its right side. The
+     * sides are not joined like the patterns of one scope, but their solutions are compared in the variables they
+     * share, and two solutions agree in a variable exactly when they agree in the node standing for its term, so the
+     * sides are compared by the nodes (see {@link SqlIntercode#leaveOutDetermined}).
      */
     private List<Integer> sharedScopes = List.of();
 
@@ -1710,24 +1710,33 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 SqlIntercode translatedPattern = null;
                 LinkedList<Filter> optionalFilters = new LinkedList<>();
 
+                // the patterns of the right side share the nodes of the left side, which is the group so far
+                handedScopes = Stream.concat(sharedScopes.stream(), scopes.stream()).toList();
 
-                if(optionalPattern instanceof GroupGraph groupGraph)
+                try
                 {
-                    LinkedList<Pattern> optionalPatterns = new LinkedList<>();
-
-                    for(Pattern subpattern : groupGraph.getPatterns())
+                    if(optionalPattern instanceof GroupGraph groupGraph)
                     {
-                        if(subpattern instanceof Filter filter)
-                            optionalFilters.add(filter);
-                        else
-                            optionalPatterns.add(subpattern);
-                    }
+                        LinkedList<Pattern> optionalPatterns = new LinkedList<>();
 
-                    translatedPattern = translatePatternList(optionalPatterns, getGroupStart(optionalPatterns));
+                        for(Pattern subpattern : groupGraph.getPatterns())
+                        {
+                            if(subpattern instanceof Filter filter)
+                                optionalFilters.add(filter);
+                            else
+                                optionalPatterns.add(subpattern);
+                        }
+
+                        translatedPattern = translatePatternList(optionalPatterns, getGroupStart(optionalPatterns));
+                    }
+                    else
+                    {
+                        translatedPattern = visitElement(optionalPattern);
+                    }
                 }
-                else
+                finally
                 {
-                    translatedPattern = visitElement(optionalPattern);
+                    handedScopes = List.of();
                 }
 
                 // inside an EXISTS pattern, the optional solutions extend the current solution too

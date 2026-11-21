@@ -38,7 +38,7 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * With the join optimizer on, the engine chooses whether the right side is evaluated once or for every solution of the
  * left side (see {@link #translate}). Where the sides share a node of a join mapping that gives the term of a variable
  * both ways, they are compared by the node, and the variable is left out of the comparison (see
- * {@link #leaveOutDetermined}).
+ * {@link SqlIntercode#leaveOutDetermined}).
  */
 public final class SqlMinus extends SqlIntercode
 {
@@ -222,7 +222,9 @@ public final class SqlMinus extends SqlIntercode
         Restrictions rightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
                 optLeft.getVariableBindings(), new Restrictions(), true);
 
-        leaveOutDetermined(request, optLeft, optRight, restrictions, leftRestrictions, rightRestrictions);
+        // inside an EXISTS pattern the sides are compared with the current solution by the variables
+        if(solutionBound == null)
+            leaveOutDetermined(request, optLeft, optRight, restrictions, leftRestrictions, rightRestrictions);
 
         boolean offered = false;
 
@@ -271,7 +273,8 @@ public final class SqlMinus extends SqlIntercode
             Restrictions newRightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
                     Set.of(optLeft.getVariableBindings()), new Restrictions(), true, settlement.getClasses());
 
-            leaveOutDetermined(request, optLeft, optRight, restrictions, newLeftRestrictions, newRightRestrictions);
+            if(solutionBound == null)
+                leaveOutDetermined(request, optLeft, optRight, restrictions, newLeftRestrictions, newRightRestrictions);
 
             if(newLeftReduced == leftReduced && newLeftRestrictions.equals(leftRestrictions)
                     && newRightRestrictions.equals(rightRestrictions))
@@ -340,44 +343,6 @@ public final class SqlMinus extends SqlIntercode
             return this;
 
         return minus(request, optLeft, optRight, graph, optSolutionBound, restrictions);
-    }
-
-
-    /**
-     * Leaves out of what the sides are asked for the variables that need not be compared, because the sides are
-     * compared by the nodes standing for their terms: a node that both sides bind always and that gives the term of a
-     * variable both ways (see {@link NodeTerm#determining}) agrees in two solutions exactly when the variable does, and
-     * the variable is bound wherever the node is. The right side is then not asked for the variable at all, and the
-     * left side only when the parent needs it, so neither side reads the terms for the comparison, like a table of the
-     * terms of numbered quads. Inside an EXISTS pattern the sides are left as they are, as they are compared with the
-     * current solution by the variables.
-     *
-     * @param request the current request
-     * @param left the left side
-     * @param right the right side
-     * @param restrictions what the parent needs of the variables
-     * @param leftRestrictions what the left side is asked for
-     * @param rightRestrictions what the right side is asked for
-     */
-    private void leaveOutDetermined(Request request, SqlIntercode left, SqlIntercode right, Restrictions restrictions,
-            Restrictions leftRestrictions, Restrictions rightRestrictions)
-    {
-        if(solutionBound != null)
-            return;
-
-        for(VariableBinding node : left.getVariableBindings().getValues())
-        {
-            NodeTerm term = request.getNodeTerms().get(node.getVariable());
-            VariableBinding other = right.getVariable(node.getVariable());
-
-            if(term == null || !term.determining() || other == null || node.canBeNull() || other.canBeNull())
-                continue;
-
-            rightRestrictions.remove(term.variable());
-
-            if(!restrictions.containsVar(term.variable()))
-                leftRestrictions.remove(term.variable());
-        }
     }
 
 
