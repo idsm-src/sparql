@@ -415,6 +415,7 @@ public final class SqlSelect extends SqlIntercode
         Restrictions childRestrictions = new Restrictions(projections);
         childRestrictions.add(orderBy.keySet());
         childRestrictions.add(simpleOrderBy);
+        childRestrictions.setNeededRows(getNeededRows());
 
         // duplicates do not matter to a DISTINCT that is going to deduplicate the child over the projections below
         boolean childReduced = distinct && projections.containsAll(orderBy.keySet());
@@ -460,6 +461,21 @@ public final class SqlSelect extends SqlIntercode
     }
 
 
+    /**
+     * The number of the solutions of the child that the select reads at most: the rows up to the end of its slice when
+     * it picks them in no order and deduplicates nothing, and all of them otherwise.
+     *
+     * @return the number of the solutions of the child the select reads at most
+     */
+    private double getNeededRows()
+    {
+        if(limit == null || distinct || !orderBy.isEmpty() || !simpleOrderBy.isEmpty())
+            return Double.POSITIVE_INFINITY;
+
+        return limit.doubleValue() + (offset == null ? 0 : offset.doubleValue());
+    }
+
+
     @Override
     public SqlIntercode optimize(Request request, Scope scope, Restrictions restrictions, boolean reduced,
             boolean evalServices)
@@ -488,6 +504,7 @@ public final class SqlSelect extends SqlIntercode
         // not matter, the pattern has to keep them even when the parent needs none of them (COUNT(*) over a DISTINCT
         // sub-select)
         Restrictions patternRestrictions = new Restrictions(childRestrictions);
+        patternRestrictions.setNeededRows(getNeededRows());
 
         if(distinct && !childReduced)
             patternRestrictions.add(bindings.getVariables());

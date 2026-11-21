@@ -339,6 +339,58 @@ public class JoinOptimizerTest
 
 
     @Test
+    public void firstRows() throws Exception
+    {
+        String query = "SELECT ?x ?z WHERE { ?x ex:link ?y . ?y ex:link ?z }";
+        String distinct = "SELECT DISTINCT ?x ?z WHERE { ?x ex:link ?y . ?y ex:link ?z }";
+
+        // a join whose parent reads only its first solutions is planned for them: the many are looked up for the few
+        // rows read instead of being hashed whole
+        assertThat(getTree(explain(query)), containsString(" + "));
+        assertThat(getTree(explain(query + " LIMIT 10")), containsString(" -> "));
+        assertThat(getTree(explain(query + " OFFSET 100 LIMIT 10")), containsString(" -> "));
+
+        // a slice that takes most of the solutions, picks them in an order or deduplicates them reads them all
+        assertThat(getTree(explain(query + " LIMIT 19000")), containsString(" + "));
+        assertThat(getTree(explain(query + " OFFSET 19000 LIMIT 10")), containsString(" + "));
+        assertThat(getTree(explain(query + " ORDER BY ?x LIMIT 10")), containsString(" + "));
+        assertThat(getTree(explain(distinct + " LIMIT 10")), containsString(" + "));
+
+        // the slice of a sub-select
+        String nested = "SELECT ?x ?z ?l WHERE { { " + query + " LIMIT 10 } ?x ex:label ?l }";
+        Pattern sliced = Pattern.compile("select \\$x \\$z limit 10\\R.* join \\(\\d -> \\d\\)");
+        assertThat(sliced.matcher(explain(nested)).find(), is(true));
+
+        // the access the tree starts with is fenced, so that the database chooses its scan by all its rows
+        Pattern fenced = Pattern.compile(" FROM \\(SELECT [^()]* OFFSET 0\\) AS \"tab\\d\" CROSS JOIN LATERAL ");
+        assertThat(fenced.matcher(translate(optimized, query + " LIMIT 10")).find(), is(true));
+        assertThat(fenced.matcher(translate(optimized, "SELECT ?x ?y WHERE { ?x ex:tag ?t . ?x ex:link ?y }")).find(),
+                is(false));
+
+        // the tree does not start from the side that has to be read far for its first row with a solution: a fifth of
+        // the nodes have links, ten each, so the first solution takes five nodes, but a single link
+        String few = explain("SELECT ?x ?l ?y WHERE { ?x ex:label ?l . ?x ex:link ?y } LIMIT 1");
+        int links = getTables(few).indexOf("links");
+        assertThat(getTree(few), is("(" + links + " -> " + (1 - links) + ")"));
+
+        String more = explain("SELECT ?x ?l ?y WHERE { ?x ex:label ?l . ?x ex:link ?y } LIMIT 10");
+        assertThat(getTree(more), is("(" + (1 - links) + " -> " + links + ")"));
+
+        List<List<RdfTerm>> all = execute(plain, query);
+
+        for(String slice : List.of(query + " LIMIT 10", query + " OFFSET 100 LIMIT 10", nested))
+        {
+            List<List<RdfTerm>> rows = execute(optimized, slice);
+
+            assertThat(rows, hasSize(10));
+
+            for(List<RdfTerm> row : rows)
+                assertThat(all.contains(row.subList(0, 2)), is(true));
+        }
+    }
+
+
+    @Test
     public void treeOfThree() throws Exception
     {
         String query = "SELECT ?x ?l ?y WHERE { ?x ex:tag ?t . ?x ex:label ?l . ?x ex:link ?y }";

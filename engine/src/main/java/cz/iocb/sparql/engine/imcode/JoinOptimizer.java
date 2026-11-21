@@ -67,7 +67,10 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * index serves the condition, so they are the cost of the scan, which a lookup of the child spares; see
  * {@link #isServedByIndex}), and a condition requiring two variables taken from two children to be equal reduces every
  * join that holds both children, as a variable shared by them would; where it holds only for the same term, the
- * children are joined on it like on such a variable, by hashing or by an index lookup (see {@link Equality}).
+ * children are joined on it like on such a variable, by hashing or by an index lookup (see {@link Equality}). A join
+ * whose parent reads only its first solutions, like a slice in no order, is planned for them (see
+ * {@link #planFirstRows}): the database stops once the parent has its rows, which a tree of lookups reaches after a few
+ * rows, whereas a hash join reads a side whole first.
  *
  * The sides of an OPTIONAL keep their order, so only the method of their join is chosen (see {@link #planLeftJoin}):
  * the right side is evaluated once and the sides are hashed, or the right side is evaluated for every solution of the
@@ -181,6 +184,8 @@ final class JoinOptimizer
      * The join tree chosen for the children with the estimated number of rows of its result.
      *
      * @param root the root of the tree
+     * @param first the child whose scan a tree chosen for the first solutions of the join starts with (see
+     *            {@link #planFirstRows}), so that only a part of its rows is read; -1 when there is none
      * @param rows estimated number of rows of the result
      * @param cost estimated cost of the joins of the tree, together with the costs of the children when the tree is
      *            chosen for one of the rows the join is evaluated for (see {@link #estimateForRow})
@@ -188,7 +193,7 @@ final class JoinOptimizer
      * @param equalities the equalities of the filters above the join that the tree joins the children by, which the
      *            join compares in its own conditions (see {@link Equality})
      */
-    record Plan(Node root, double rows, double cost, boolean restricted, List<Equality> equalities)
+    record Plan(Node root, int first, double rows, double cost, boolean restricted, List<Equality> equalities)
     {
     }
 
@@ -463,16 +468,20 @@ final class JoinOptimizer
      * Such a condition that holds only for the same term joins the two children as well (see {@link #getEquality}). The
      * tree is chosen for the children and the joins so reduced; the estimated rows of the plan are those of the join
      * itself, as the filters are no part of it. When the join is evaluated for the rows of an outer table one by one,
-     * the tree is chosen for the children as they are evaluated for one of the rows (see {@link #estimateForRow}).
+     * the tree is chosen for the children as they are evaluated for one of the rows (see {@link #estimateForRow}). When
+     * the parent reads fewer solutions of the join than the join is estimated to have, like a slice taking its first
+     * rows in no order, the tree is chosen for the part it reads (see {@link #planFirstRows}).
      *
      * @param request the current request
      * @param childs the children
      * @param conditions per variable, the conditions the filters above keep the solutions of the join by
      * @param outer the rows the join is evaluated for one by one, or null when it is evaluated once
+     * @param needed the number of the solutions of the join that its parent reads at most when the join is evaluated
+     *            once; infinite when it reads them all
      * @return the join tree with the estimated rows of the join
      */
     static Plan plan(Request request, List<SqlIntercode> childs, Map<Variable, Set<SqlExpressionIntercode>> conditions,
-            Outer outer)
+            Outer outer, double needed)
     {
         int n = childs.size();
 
@@ -515,7 +524,7 @@ final class JoinOptimizer
         }
 
         if(decided.isEmpty() && equated.isEmpty())
-            return plan(request, childs, Filtering.none(n), outer);
+            return plan(request, childs, Filtering.none(n), outer, needed);
 
         double[] kept = new double[n];
         Arrays.fill(kept, 1);
@@ -555,9 +564,10 @@ final class JoinOptimizer
                         kept[index] : selectivity(request, child, single.getValue()));
         }
 
-        Plan plan = plan(request, childs, new Filtering(kept, read, values, equated, equalities), outer);
+        Plan plan = plan(request, childs, new Filtering(kept, read, values, equated, equalities), outer, needed);
 
-        return new Plan(plan.root(), plan(request, childs, Filtering.none(n), outer).rows(), plan.cost(),
+        return new Plan(plan.root(), plan.first(),
+                plan(request, childs, Filtering.none(n), outer, Double.POSITIVE_INFINITY).rows(), plan.cost(),
                 plan.restricted(), plan.equalities());
     }
 
@@ -679,9 +689,12 @@ final class JoinOptimizer
      * @param childs the children
      * @param filtering what the filters above the join leave of the solutions of the children
      * @param outer the rows the join is evaluated for one by one, or null when it is evaluated once
+     * @param needed the number of the solutions of the join, of those the filters leave, that its parent reads at most
+     *            when the join is evaluated once; infinite when it reads them all
      * @return the join tree with its estimated rows
      */
-    private static Plan plan(Request request, List<SqlIntercode> childs, Filtering filtering, Outer outer)
+    private static Plan plan(Request request, List<SqlIntercode> childs, Filtering filtering, Outer outer,
+            double needed)
     {
         int n = childs.size();
 
@@ -819,6 +832,7 @@ final class JoinOptimizer
                 getDetermined(request, childs, filtering, shared, filters, lookupable);
 
         Node root;
+        int first = -1;
 
         if(determined != 0)
         {
@@ -832,15 +846,42 @@ final class JoinOptimizer
         }
         else if(n <= EXHAUSTIVE_LIMIT)
         {
-            root = planExhaustively(n, rows, dropped, adjacent, hashableAdjacent, lookupable, sizes);
+            Node[] trees = planExhaustively(n, rows, dropped, adjacent, hashableAdjacent, lookupable, sizes);
+
+            // the part of the solutions of the join that its parent reads
+            double fraction = needed / sizes.get((1 << n) - 1);
+
+            if(outer == null && fraction < 1)
+            {
+                boolean[] streamed = new boolean[n];
+
+                for(int i = 0; i < n; i++)
+                    streamed[i] = childs.get(i) instanceof SqlTableAccess access && !access.isDeduplicating();
+
+                root = planFirstRows(n, rows, dropped, streamed, adjacent, hashableAdjacent, lookupable, sizes, trees,
+                        fraction);
+
+                // the child the tree starts with
+                Node start = root;
+
+                while(!(start instanceof Leaf))
+                    start = start instanceof Lookup lookup ? lookup.outer() : ((HashJoin) start).left();
+
+                if(streamed[((Leaf) start).child()])
+                    first = ((Leaf) start).child();
+            }
+            else
+            {
+                root = trees[trees.length - 1];
+            }
         }
         else
         {
             root = planGreedily(n, dropped, adjacent, hashableAdjacent, lookupable, sizes);
         }
 
-        return new Plan(root, sizes.get((1 << n) - 1), cost(root, costs, hashableAdjacent, sizes).cost(), restricted,
-                filtering.equalities());
+        return new Plan(root, first, sizes.get((1 << n) - 1), cost(root, costs, hashableAdjacent, sizes).cost(),
+                restricted, filtering.equalities());
     }
 
 
@@ -942,7 +983,7 @@ final class JoinOptimizer
 
         Node root = n <= EXHAUSTIVE_LIMIT ?
                 planExhaustively(n, memberRows, memberDropped, memberAdjacent, memberHashableAdjacent, memberLookupable,
-                        sizes) :
+                        sizes)[(1 << n) - 1] :
                 planGreedily(n, memberDropped, memberAdjacent, memberHashableAdjacent, memberLookupable, sizes);
 
         return renumber(root, members);
@@ -1251,6 +1292,23 @@ final class JoinOptimizer
          */
         private final Map<Integer, Double> map;
 
+        /**
+         * Estimated numbers of distinct values of every shared variable in the join of every subset of the children, by
+         * the variable and the subset, once computed (see {@link #getMatched}).
+         */
+        private double[][] values = null;
+
+        /**
+         * The children binding every shared variable, as a bit per child, once computed (see {@link #getMatched}).
+         */
+        private int[] masks = null;
+
+        /**
+         * The shared variables that the children of every subset bind, as a bit per variable for the first
+         * {@link Long#SIZE} of them, by the subset, once computed (see {@link #getMatched}).
+         */
+        private long[] bound = null;
+
 
         /**
          * Creates the sizes.
@@ -1292,6 +1350,74 @@ final class JoinOptimizer
             }
 
             return map.computeIfAbsent(mask, this::compute);
+        }
+
+
+        /**
+         * Estimated part of the solutions of the join of a subset of the children that have a solution of the join of
+         * another subset to be joined with: the values of a variable the two share are taken to be among those of the
+         * side having more of them, as the sizes of the joins take them (see {@link #compute}), so the side of fewer
+         * values is matched whole and the other one by the ratio of the numbers of the values, a join having the values
+         * of the child with the fewest; the least part over the shared variables. Only for the children few enough for
+         * all their subsets to be kept.
+         *
+         * @param left the subset
+         * @param right the other subset
+         * @return estimated part of the solutions of the left subset that the right one has a solution for
+         */
+        double getMatched(int left, int right)
+        {
+            if(values == null)
+            {
+                values = new double[shared.size()][1 << n];
+                masks = new int[shared.size()];
+
+                for(int v = 0; v < values.length; v++)
+                {
+                    Shared variable = shared.get(v);
+
+                    masks[v] = variable.mask();
+                    values[v][0] = Double.POSITIVE_INFINITY;
+
+                    for(int mask = 1; mask < values[v].length; mask++)
+                    {
+                        int lowest = mask & -mask;
+                        double rest = values[v][mask ^ lowest];
+
+                        values[v][mask] = (variable.mask() & lowest) == 0 ? rest :
+                                Math.min(rest, variable.distinct()[Integer.numberOfTrailingZeros(lowest)]);
+                    }
+                }
+
+                bound = new long[1 << n];
+
+                for(int mask = 1; mask < bound.length; mask++)
+                {
+                    int lowest = mask & -mask;
+
+                    bound[mask] = bound[mask ^ lowest];
+
+                    for(int v = 0; v < Math.min(masks.length, Long.SIZE); v++)
+                        if((masks[v] & lowest) != 0)
+                            bound[mask] |= 1L << v;
+                }
+            }
+
+            double matched = 1;
+
+            // the variables both subsets bind
+            for(long common = bound[left] & bound[right]; common != 0; common &= common - 1)
+            {
+                int v = Long.numberOfTrailingZeros(common);
+
+                matched = Math.min(matched, values[v][right] / values[v][left]);
+            }
+
+            for(int v = Long.SIZE; v < masks.length; v++)
+                if((masks[v] & left) != 0 && (masks[v] & right) != 0)
+                    matched = Math.min(matched, values[v][right] / values[v][left]);
+
+            return matched;
         }
 
 
@@ -1402,13 +1528,26 @@ final class JoinOptimizer
      */
     private static double hashCost(int left, int right, int[] hashableAdjacent, Sizes sizes)
     {
-        boolean hashable = false;
+        return hashCost(isHashable(left, right, hashableAdjacent), sizes.get(left), sizes.get(right),
+                sizes.get(left | right));
+    }
 
+
+    /**
+     * Whether an equality between two subsets of the children can be hashed.
+     *
+     * @param left the left subset
+     * @param right the right subset
+     * @param hashableAdjacent the children adjacent to each child through a hashable variable
+     * @return true if a child of the left subset is adjacent to a child of the right one through a hashable variable
+     */
+    private static boolean isHashable(int left, int right, int[] hashableAdjacent)
+    {
         for(int i = 0; i < hashableAdjacent.length; i++)
             if((left >> i & 1) != 0 && (hashableAdjacent[i] & right) != 0)
-                hashable = true;
+                return true;
 
-        return hashCost(hashable, sizes.get(left), sizes.get(right), sizes.get(left | right));
+        return false;
     }
 
 
@@ -1489,20 +1628,15 @@ final class JoinOptimizer
      * @param hashableAdjacent the children adjacent to each child through a hashable variable
      * @param lookupable the children whose rows can be the outer rows of an index lookup into each child
      * @param sizes the sizes of the joins
-     * @return the join tree
+     * @return the join tree of every subset of the children, by the subset as a bit per child; the last one is the tree
+     *         of all the children
      */
-    private static Node planExhaustively(int n, double[] rows, double[] dropped, int[] adjacent, int[] hashableAdjacent,
-            int[] lookupable, Sizes sizes)
+    private static Node[] planExhaustively(int n, double[] rows, double[] dropped, int[] adjacent,
+            int[] hashableAdjacent, int[] lookupable, Sizes sizes)
     {
         int full = (1 << n) - 1;
 
-        int[] neighbours = new int[full + 1];
-
-        for(int mask = 1; mask <= full; mask++)
-        {
-            int lowest = mask & -mask;
-            neighbours[mask] = neighbours[mask ^ lowest] | adjacent[Integer.numberOfTrailingZeros(lowest)];
-        }
+        int[] neighbours = getNeighbours(n, adjacent);
 
         double[] costs = new double[full + 1];
         Node[] trees = new Node[full + 1];
@@ -1554,6 +1688,162 @@ final class JoinOptimizer
                 {
                     costs[mask] = bestCost;
                     trees[mask] = bestTree;
+                    break;
+                }
+            }
+        }
+
+        return trees;
+    }
+
+
+    /**
+     * The children adjacent to the children of every subset of the children through a shared variable.
+     *
+     * @param n number of children
+     * @param adjacent the children adjacent to each child through a shared variable
+     * @return the children adjacent to a child of each subset, by the subset as a bit per child
+     */
+    private static int[] getNeighbours(int n, int[] adjacent)
+    {
+        int[] neighbours = new int[1 << n];
+
+        for(int mask = 1; mask < neighbours.length; mask++)
+        {
+            int lowest = mask & -mask;
+            neighbours[mask] = neighbours[mask ^ lowest] | adjacent[Integer.numberOfTrailingZeros(lowest)];
+        }
+
+        return neighbours;
+    }
+
+
+    /**
+     * The cheapest join tree for a parent that reads only a part of the solutions of the join, like a slice taking its
+     * first rows in no order: the database stops evaluating the join once the parent has its rows, so a tree costs what
+     * it has done by then. The solutions are taken to come evenly, so a join giving a part of its solutions has read
+     * that part of the side it reads row by row: the outer rows of the lookups of a child, the side probing a hashed
+     * one, the rows of a table access that is scanned (and the same part of the rows the filters above drop). It has to
+     * read at least as far as the first row the other side has a solution for, though (see {@link Sizes#getMatched}): a
+     * tree starting from a dictionary, few of whose terms are predicates, would look the triples up for term after term
+     * in vain. What the tree of that side costs by the part read is taken to grow with the part. The other side of a
+     * hash join, and of a pairwise comparison, is evaluated whole before the first solution, by its cheapest tree (see
+     * {@link #planExhaustively}), and so is a child that is no access to a table, or a deduplicating one. A child that
+     * is looked up is read only for the rows looked up, so the lookups of a dictionary for the few terms a slice
+     * returns cost far less than hashing it whole, however cheap the hashing is for all the solutions. The costs are
+     * otherwise those of {@link #planExhaustively}, and for the whole of the solutions the two give trees of the same
+     * costs.
+     *
+     * @param n number of children
+     * @param rows estimated rows of each child
+     * @param dropped the rows a scan of each child reads beyond the rows the child gives the joins
+     * @param streamed the children a scan of which gives its first rows without reading the others
+     * @param adjacent the children adjacent to each child through a shared variable
+     * @param hashableAdjacent the children adjacent to each child through a hashable variable
+     * @param lookupable the children whose rows can be the outer rows of an index lookup into each child
+     * @param sizes the sizes of the joins
+     * @param whole the cheapest tree of every subset of the children for all its solutions
+     * @param fraction the part of the solutions of the join that the parent reads
+     * @return the join tree
+     */
+    private static Node planFirstRows(int n, double[] rows, double[] dropped, boolean[] streamed, int[] adjacent,
+            int[] hashableAdjacent, int[] lookupable, Sizes sizes, Node[] whole, double fraction)
+    {
+        int full = (1 << n) - 1;
+
+        int[] neighbours = getNeighbours(n, adjacent);
+        int[] hashableNeighbours = getNeighbours(n, hashableAdjacent);
+
+        // what a child costs as a leaf of a tree evaluated whole
+        double[] scans = new double[n];
+
+        // what the cheapest tree of a subset costs when evaluated whole, computed on demand
+        double[] wholeCosts = new double[full + 1];
+        Arrays.fill(wholeCosts, Double.NaN);
+
+        // what the tree of a subset costs before it gives its first solution, and by the part of its solutions read
+        double[] fixed = new double[full + 1];
+        double[] read = new double[full + 1];
+        Node[] trees = new Node[full + 1];
+
+        for(int i = 0; i < n; i++)
+        {
+            scans[i] = rows[i] + dropped[i];
+            fixed[1 << i] = streamed[i] ? 0 : scans[i];
+            read[1 << i] = streamed[i] ? fraction * scans[i] : 0;
+            trees[1 << i] = new Leaf(i);
+        }
+
+        for(int mask = 1; mask <= full; mask++)
+        {
+            if(trees[mask] != null)
+                continue;
+
+            double size = sizes.get(mask);
+
+            for(boolean connected : new boolean[] { true, false })
+            {
+                double bestFixed = Double.POSITIVE_INFINITY;
+                double bestRead = Double.POSITIVE_INFINITY;
+                int bestLeft = 0;
+                boolean bestLookup = false;
+
+                // the left side is read row by row, the right one is evaluated whole or looked up
+                for(int left = mask - 1 & mask; left > 0; left = left - 1 & mask)
+                {
+                    int right = mask ^ left;
+
+                    if(connected && (neighbours[left] & right) == 0)
+                        continue;
+
+                    if(Double.isNaN(wholeCosts[right]))
+                        wholeCosts[right] = cost(whole[right], scans, hashableAdjacent, sizes).cost();
+
+                    double leftSize = sizes.get(left);
+                    double rightSize = sizes.get(right);
+
+                    // the part of the left side that is read: at least up to its first row matched on the right
+                    double part = Math.min(Math.max(fraction, 1 / (sizes.getMatched(left, right) * leftSize)), 1);
+                    double leftRead = part / fraction * read[left];
+
+                    // the right side is hashed whole and probed, or compared, with the rows read of the left one
+                    boolean hashable = (hashableNeighbours[left] & right) != 0;
+
+                    double joinFixed = fixed[left] + wholeCosts[right] + (hashable ? HASH_COST * rightSize : 0);
+                    double joinRead = leftRead + fraction * size
+                            + part * leftSize * (hashable ? 1 : rightSize * COMPARISON_COST);
+
+                    boolean lookup = false;
+
+                    if((right & right - 1) == 0 && (lookupable[Integer.numberOfTrailingZeros(right)] & left) != 0)
+                    {
+                        double lookupRead = leftRead + part * leftSize * LOOKUP_COST + fraction * 2 * size;
+
+                        if(fixed[left] + lookupRead < joinFixed + joinRead)
+                        {
+                            joinFixed = fixed[left];
+                            joinRead = lookupRead;
+                            lookup = true;
+                        }
+                    }
+
+                    if(joinFixed + joinRead < bestFixed + bestRead)
+                    {
+                        bestFixed = joinFixed;
+                        bestRead = joinRead;
+                        bestLeft = left;
+                        bestLookup = lookup;
+                    }
+                }
+
+                if(bestLeft != 0)
+                {
+                    int right = mask ^ bestLeft;
+
+                    fixed[mask] = bestFixed;
+                    read[mask] = bestRead;
+                    trees[mask] = bestLookup ? new Lookup(trees[bestLeft], Integer.numberOfTrailingZeros(right)) :
+                            new HashJoin(trees[bestLeft], whole[right]);
                     break;
                 }
             }
@@ -2038,7 +2328,7 @@ final class JoinOptimizer
      * those too, when the comparisons spared cost more than the second join it takes, by a margin (see
      * {@link #SECOND_JOIN_MARGIN}). The left side gives the join only the solutions that the conditions of the filters
      * above keep, as far as one of its variables decides them alone (see {@link #getFilters}), because the database
-     * evaluates such a condition on the left side (see {@link #plan(Request, List, Map, Outer)}).
+     * evaluates such a condition on the left side (see {@link #plan(Request, List, Map, Outer, double)}).
      *
      * @param request the current request
      * @param left the left side

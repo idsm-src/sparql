@@ -125,6 +125,11 @@ public abstract class SqlIntercode extends SqlBaseClass
         private final Map<Variable, Set<SqlExpressionIntercode>> filterConditions = new HashMap<>();
 
         /**
+         * The number of solutions the parent reads at most (see {@link #getNeededRows}).
+         */
+        private double neededRows = Double.POSITIVE_INFINITY;
+
+        /**
          * Creates empty restrictions (nothing is needed).
          */
         public Restrictions()
@@ -133,7 +138,9 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
         /**
-         * Copy constructor.
+         * Copy constructor. The number of solutions the parent reads (see {@link #getNeededRows}) is not copied: it
+         * holds for the node the restrictions are given to, and a node hands it on only where it reads as many of the
+         * solutions of its child as its parent reads of its own.
          *
          * @param restrictions what the parent needs of the variables
          */
@@ -701,6 +708,30 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
         /**
+         * The number of solutions the parent reads at most, whichever they are: the rows of a slice that picks them in
+         * no order. A join then chooses its tree for the first solutions (see {@link JoinOptimizer}). Infinite when the
+         * parent reads all the solutions.
+         *
+         * @return the number of solutions the parent reads at most
+         */
+        public double getNeededRows()
+        {
+            return neededRows;
+        }
+
+
+        /**
+         * Sets the number of solutions the parent reads at most (see {@link #getNeededRows}).
+         *
+         * @param rows the number of solutions the parent reads at most
+         */
+        public void setNeededRows(double rows)
+        {
+            neededRows = rows;
+        }
+
+
+        /**
          * Requires nothing of the variable any more.
          *
          * @param var the variable
@@ -728,7 +759,8 @@ public abstract class SqlIntercode extends SqlBaseClass
                     && acceptedClasses.equals(((Restrictions) other).acceptedClasses)
                     && acceptedValues.equals(((Restrictions) other).acceptedValues)
                     && acceptedTerms.equals(((Restrictions) other).acceptedTerms)
-                    && filterConditions.equals(((Restrictions) other).filterConditions);
+                    && filterConditions.equals(((Restrictions) other).filterConditions)
+                    && neededRows == ((Restrictions) other).neededRows;
         }
 
 

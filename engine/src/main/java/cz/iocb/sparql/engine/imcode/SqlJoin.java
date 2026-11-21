@@ -81,6 +81,12 @@ public final class SqlJoin extends SqlIntercode
     private final Map<Variable, Set<SqlExpressionIntercode>> filterConditions;
 
     /**
+     * The number of the solutions of the join that the parent reads at most (see {@link Restrictions#getNeededRows}),
+     * which the optimizer chooses the join tree for.
+     */
+    private final double neededRows;
+
+    /**
      * The join tree chosen by the optimizer (see {@link #getPlan}), once computed.
      */
     private JoinOptimizer.Plan plan;
@@ -105,9 +111,11 @@ public final class SqlJoin extends SqlIntercode
      * @param bindings the variable bindings
      * @param columnMap the column map
      * @param filterConditions per variable, the conditions the filters above keep the solutions by
+     * @param neededRows the number of the solutions of the join that the parent reads at most
      */
     protected SqlJoin(List<SqlIntercode> childs, List<AliasTable> tables, VariableBindings bindings,
-            Map<Column, Column> columnMap, Map<Variable, Set<SqlExpressionIntercode>> filterConditions)
+            Map<Column, Column> columnMap, Map<Variable, Set<SqlExpressionIntercode>> filterConditions,
+            double neededRows)
     {
         super(bindings, childs.stream().allMatch(c -> c.isDeterministic()));
 
@@ -115,6 +123,7 @@ public final class SqlJoin extends SqlIntercode
         this.columnMap = columnMap;
         this.tables = tables;
         this.filterConditions = filterConditions;
+        this.neededRows = neededRows;
     }
 
 
@@ -161,7 +170,8 @@ public final class SqlJoin extends SqlIntercode
         List<VariableBindings> allVars = childs.stream().map(c -> c.getVariableBindings()).toList();
         VariableBindings bindings = getJoinVariableBindings(request, allVars, tables, restrictions, columnMap);
 
-        return new SqlJoin(childs, tables, bindings, columnMap, getFilterConditions(childs, restrictions));
+        return new SqlJoin(childs, tables, bindings, columnMap, getFilterConditions(childs, restrictions),
+                restrictions == null ? Double.POSITIVE_INFINITY : restrictions.getNeededRows());
     }
 
 
@@ -457,7 +467,8 @@ public final class SqlJoin extends SqlIntercode
 
 
         if(fullChilds.equals(childs) && restrictions.isOptimized(relations, bindings)
-                && filterConditions.equals(getFilterConditions(fullChilds, restrictions)))
+                && filterConditions.equals(getFilterConditions(fullChilds, restrictions))
+                && neededRows == restrictions.getNeededRows())
             return this;
 
         return join(request, fullChilds, restrictions);
@@ -1086,7 +1097,7 @@ public final class SqlJoin extends SqlIntercode
     JoinOptimizer.Plan getPlan(Request request)
     {
         if(plan == null)
-            plan = JoinOptimizer.plan(request, childs, filterConditions, null);
+            plan = JoinOptimizer.plan(request, childs, filterConditions, null, neededRows);
 
         return plan;
     }
@@ -1108,7 +1119,7 @@ public final class SqlJoin extends SqlIntercode
 
         if(!outer.equals(rowOuter))
         {
-            rowPlan = JoinOptimizer.plan(request, childs, filterConditions, outer);
+            rowPlan = JoinOptimizer.plan(request, childs, filterConditions, outer, Double.POSITIVE_INFINITY);
             rowOuter = outer;
         }
 
@@ -1169,7 +1180,7 @@ public final class SqlJoin extends SqlIntercode
 
             JoinOptimizer.Plan plan = getPlan(request, outer);
 
-            translateTree(request, scope, plan.root(), plan.equalities(), joined, outer, builder);
+            translateTree(request, scope, plan.root(), plan.first(), plan.equalities(), joined, outer, builder);
             return builder.toCode();
         }
 
@@ -1208,17 +1219,23 @@ public final class SqlJoin extends SqlIntercode
      * compared where its children meet, like a variable they share: in the condition of their hash join, or in the
      * restriction of the access looked up. When the join is evaluated for the rows of an outer table one by one, every
      * child is (see {@link #translateForRow}), a looked up access being restricted by the values of the row as well.
+     * The access that a tree chosen for the first solutions of the join starts with (see
+     * {@link JoinOptimizer#planFirstRows}) is fenced by {@code OFFSET 0}: the planner then chooses how to read it by
+     * all the rows of the access, whereas it takes the rows meeting the conditions of an access it reads the first rows
+     * of to lie evenly in the table and scans the table for them, also where they all lie at its end, like the triples
+     * of a predicate in a table ordered by the predicate.
      *
      * @param request the current request
      * @param scope the scope of the join
      * @param node the tree
+     * @param first the child whose scan a tree chosen for the first solutions of the join starts with, or -1
      * @param equalities the equalities of the filters above the join that the children are joined on
      * @param joined classes per variable in the whole join (see {@link #getJoinedClasses})
      * @param outer the rows the join is evaluated for one by one, or null when it is evaluated once
      * @param builder the SQL code being built
      * @return the children of the tree, as a bit per child
      */
-    private int translateTree(Request request, Scope scope, JoinOptimizer.Node node,
+    private int translateTree(Request request, Scope scope, JoinOptimizer.Node node, int first,
             List<JoinOptimizer.Equality> equalities, Map<Variable, Set<ResourceClass>> joined,
             JoinOptimizer.Outer outer, SqlBuilder builder)
     {
@@ -1228,6 +1245,10 @@ public final class SqlJoin extends SqlIntercode
         {
             builder.append("(");
             builder.append(translateChild(request, scope, childs.get(leaf.child()), outer));
+
+            if(leaf.child() == first)
+                builder.append(" OFFSET 0");
+
             builder.append(") AS ");
             builder.append(tables.get(leaf.child()));
 
@@ -1236,7 +1257,7 @@ public final class SqlJoin extends SqlIntercode
 
         if(node instanceof JoinOptimizer.Lookup lookup)
         {
-            int outerChilds = translateTree(request, scope, lookup.outer(), equalities, joined, outer, builder);
+            int outerChilds = translateTree(request, scope, lookup.outer(), first, equalities, joined, outer, builder);
             SqlTableAccess access = (SqlTableAccess) childs.get(lookup.child());
 
             List<SqlCode> conditions = new ArrayList<>();
@@ -1299,10 +1320,10 @@ public final class SqlJoin extends SqlIntercode
 
         JoinOptimizer.HashJoin join = (JoinOptimizer.HashJoin) node;
 
-        int left = translateTree(request, scope, join.left(), equalities, joined, outer, builder);
+        int left = translateTree(request, scope, join.left(), first, equalities, joined, outer, builder);
 
         SqlBuilder rightBuilder = new SqlBuilder();
-        int right = translateTree(request, scope, join.right(), equalities, joined, outer, rightBuilder);
+        int right = translateTree(request, scope, join.right(), first, equalities, joined, outer, rightBuilder);
 
         List<SqlCode> conditions = new ArrayList<>();
 
@@ -1873,7 +1894,7 @@ public final class SqlJoin extends SqlIntercode
         if(!Objects.equals(new Multiset<>(childs), new Multiset<>(imcode.childs)))
             return false;
 
-        if(!filterConditions.equals(imcode.filterConditions))
+        if(!filterConditions.equals(imcode.filterConditions) || neededRows != imcode.neededRows)
             return false;
 
         return true;

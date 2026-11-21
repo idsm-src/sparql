@@ -735,6 +735,18 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Returns whether the access deduplicates its rows itself, so that it reads them all before it gives the first one:
+     * a deduplication is requested and the duplicates matter to the parent.
+     *
+     * @return true if the access deduplicates its rows
+     */
+    boolean isDeduplicating()
+    {
+        return !reduced && !distinctColumns.isEmpty();
+    }
+
+
     @Override
     public boolean isDistinct(Request request, Collection<Variable> selected)
     {
@@ -748,7 +760,7 @@ public final class SqlTableAccess extends SqlIntercode
             return true;
 
         // the access deduplicates its rows itself, unless the duplicates do not matter to its parent
-        return !reduced && !distinctColumns.isEmpty() && columns.containsAll(distinctColumns);
+        return isDeduplicating() && columns.containsAll(distinctColumns);
     }
 
 
@@ -2855,7 +2867,7 @@ public final class SqlTableAccess extends SqlIntercode
 
 
         // when the duplicates do not matter to the parent, the deduplication is left out entirely
-        boolean distinct = !reduced && !distinctColumns.isEmpty();
+        boolean distinct = isDeduplicating();
 
         Set<Column> columns = getVariableBindings().getNonConstantColumns();
 
