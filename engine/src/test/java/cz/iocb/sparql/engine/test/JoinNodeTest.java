@@ -7,6 +7,7 @@ import static java.util.Arrays.asList;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
@@ -655,5 +656,72 @@ public class JoinNodeTest
         assertThat(check("SELECT ?k (COUNT(DISTINCT ?n) AS ?c) WHERE { ?k ex:follows ?n } GROUP BY ?k"), hasSize(3));
         assertThat(check("SELECT ?a WHERE { SELECT DISTINCT ?a ?b WHERE { ?a ex:follows ?k . ?k ex:follows ?b } }"),
                 hasSize(3));
+    }
+
+
+    @Test
+    @DisplayName("a deduplication and a grouping by the nodes of variables whose terms are read afterwards")
+    void termsReadAfterwards() throws Exception
+    {
+        String kindTable = "\"join_node_test\".\"kind\"";
+        String byNumber = " GROUP BY \"b\"";
+
+        // the kinds that others follow are deduplicated by their numbers, and the table of the kinds, which gives
+        // their names, is read for the deduplicated numbers
+        String distinct = "SELECT DISTINCT ?k WHERE { ?a ex:follows ?k }";
+
+        for(SparqlDatabaseConfiguration config : List.of(shared, optimized))
+        {
+            assertThat(count(translate(config, distinct), kindTable), is(1));
+            assertThat(translate(config, distinct), containsString(byNumber));
+        }
+
+        assertThat(translate(plain, distinct), not(containsString(byNumber)));
+        assertThat(check(distinct), containsInAnyOrder(row(kind("green")), row(kind("blue"))));
+
+        // the kinds are grouped by their numbers, and their names are read for the groups
+        String grouped = "SELECT ?k (COUNT(?a) AS ?c) WHERE { ?a ex:follows ?k } GROUP BY ?k";
+
+        for(SparqlDatabaseConfiguration config : List.of(shared, optimized))
+        {
+            assertThat(count(translate(config, grouped), kindTable), is(1));
+            assertThat(translate(config, grouped), containsString(byNumber));
+        }
+
+        assertThat(translate(plain, grouped), not(containsString(byNumber)));
+        assertThat(check(grouped), containsInAnyOrder(row(kind("green"), integer(1)), row(kind("blue"), integer(3))));
+
+        // a key the query does not return is not read at all
+        String unread = "SELECT (COUNT(?a) AS ?c) WHERE { ?a ex:follows ?k } GROUP BY ?k";
+
+        assertThat(count(translate(shared, unread), kindTable), is(0));
+        assertThat(check(unread), containsInAnyOrder(row(integer(1)), row(integer(3))));
+
+        // several keys, of which the query returns some
+        String keys = "SELECT ?a ?b (COUNT(*) AS ?c) WHERE { ?a ex:follows ?k . ?k ex:follows ?b } GROUP BY ?a ?b";
+
+        assertThat(check(keys), hasSize(3));
+        assertThat(check("SELECT ?a (COUNT(*) AS ?c) WHERE { ?a ex:follows ?k . ?k ex:follows ?b } GROUP BY ?a ?b"),
+                hasSize(3));
+
+        // a key that an aggregate reads, one that a condition above restricts and one used in an expression
+        assertThat(check("SELECT ?k (SAMPLE(?k) AS ?x) (MAX(?a) AS ?m) WHERE { ?a ex:follows ?k } GROUP BY ?k"),
+                hasSize(2));
+        assertThat(check("SELECT ?k (COUNT(?a) AS ?c) WHERE { ?a ex:follows ?k } GROUP BY ?k HAVING(?k = kind:blue)"),
+                contains(row(kind("blue"), integer(3))));
+        assertThat(check("SELECT (STR(?k) AS ?n) (COUNT(?a) AS ?c) WHERE { ?a ex:follows ?k } GROUP BY ?k"),
+                hasSize(2));
+        assertThat(check("SELECT ?k WHERE { { " + distinct + " } FILTER(?k != kind:blue) }"),
+                contains(row(kind("green"))));
+
+        // an ordered slice of the groups, and a sub-select joined by its key
+        assertThat(check(grouped + " ORDER BY DESC(?c) LIMIT 1"), contains(row(kind("blue"), integer(3))));
+        assertThat(check("SELECT ?k ?c ?l WHERE { { SELECT ?k (COUNT(?a) AS ?c) WHERE { ?a ex:follows ?k } "
+                + "GROUP BY ?k } ?k ex:label ?l }"), hasSize(1));
+
+        // a variable the solutions may leave unbound is grouped over as before
+        String optional = "?k ex:label ?l OPTIONAL { ?k ex:follows ?n }";
+
+        assertThat(check("SELECT ?n (COUNT(*) AS ?c) WHERE { " + optional + " } GROUP BY ?n"), hasSize(3));
     }
 }

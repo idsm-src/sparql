@@ -2068,6 +2068,99 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
     /**
+     * The nodes that the solutions of a node deduplicated or grouped over the given variables may be deduplicated or
+     * grouped over in place of the variables (see {@link #getDeterminingNodes}), so that the child need not read the
+     * terms of the variables: the terms of the groups are read afterwards (see {@link NodeTerm#reader}). A variable by
+     * which the parent restricts the solutions keeps its term in the child, which looks its rows up by the restriction,
+     * whereas the solutions of all the nodes would be read to be restricted afterwards.
+     *
+     * @param request the current request
+     * @param variables the variables the solutions are deduplicated or grouped over
+     * @param restrictions what the parent needs of the variables
+     * @return the nodes that can stand in for each variable that has some, ordered by their names
+     */
+    protected static Map<Variable, List<Variable>> getStandInNodes(Request request, Collection<Variable> variables,
+            Restrictions restrictions)
+    {
+        Map<Variable, List<Variable>> nodes = new LinkedHashMap<>();
+
+        for(Variable variable : variables.stream().sorted(Comparator.comparing(Variable::getName)).toList())
+        {
+            if(restrictions.getAcceptedClasses(variable) != null || restrictions.getAcceptedValue(variable) != null
+                    || restrictions.getAcceptedTerms(variable) != null
+                    || !restrictions.getFilterConditions(variable).isEmpty())
+                continue;
+
+            List<Variable> candidates = getDeterminingNodes(request, variable);
+
+            if(!candidates.isEmpty())
+                nodes.put(variable, candidates);
+        }
+
+        return nodes;
+    }
+
+
+    /**
+     * The nodes that stand in for the variables in the solutions of a child (see {@link #getStandInNodes}): the first
+     * candidate node of a variable that the solutions bind always, like the variable itself, so that two of them agree
+     * in the node exactly when they agree in the variable.
+     *
+     * @param child the child, asked for the candidate nodes as well
+     * @param nodes the nodes that can stand in for each variable
+     * @return the node standing in for each variable that has one in the solutions of the child
+     */
+    protected static Map<Variable, Variable> getStandIns(SqlIntercode child, Map<Variable, List<Variable>> nodes)
+    {
+        Map<Variable, Variable> standIns = new LinkedHashMap<>();
+
+        for(Entry<Variable, List<Variable>> entry : nodes.entrySet())
+        {
+            VariableBinding binding = child.getVariable(entry.getKey());
+
+            if(binding == null || binding.canBeNull())
+                continue;
+
+            for(Variable node : entry.getValue())
+            {
+                if(child.getVariable(node) == null || child.getVariable(node).canBeNull())
+                    continue;
+
+                standIns.put(entry.getKey(), node);
+                break;
+            }
+        }
+
+        return standIns;
+    }
+
+
+    /**
+     * The solutions of a node deduplicated or grouped over nodes standing in for variables (see {@link #getStandIns})
+     * with the terms of the variables the parent needs read by their nodes (see {@link NodeTerm#reader}): every
+     * solution has the one row of its node, as the solutions come from the rows of the table of the term.
+     *
+     * @param request the current request
+     * @param solutions the solutions deduplicated or grouped over the nodes
+     * @param standIns the node standing in for each variable
+     * @param restrictions what the parent needs of the variables
+     * @return the solutions joined with the terms of the variables the parent needs
+     */
+    protected static SqlIntercode readTerms(Request request, SqlIntercode solutions, Map<Variable, Variable> standIns,
+            Restrictions restrictions)
+    {
+        List<SqlIntercode> childs = new ArrayList<>();
+        childs.add(solutions);
+
+        for(Entry<Variable, Variable> entry : standIns.entrySet())
+            if(restrictions.containsVar(entry.getKey()))
+                childs.add(request.getNodeTerms().get(entry.getValue()).reader());
+
+        return childs.size() == 1 ? solutions : SqlJoin.join(request, childs);
+    }
+
+
+    /**
      * True if the solutions projected to the selected variables are known to contain no duplicates.
      *
      * @param request the current request

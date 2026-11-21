@@ -149,6 +149,10 @@ public final class SqlAggregation extends SqlIntercode
 
         Restrictions childRestrictions = getChildRestrictions(relations, groupVariables, optAggregations, restrictions);
 
+        // a grouping variable can be grouped over by a node standing in for its term, which the child is asked for as
+        // well, because the solutions may come to bind it always only once they are optimised
+        getGroupNodes(request, optAggregations, restrictions).values().forEach(childRestrictions::add);
+
         while(true)
         {
             optChild = optChild.optimize(request, scope, childRestrictions, childReduce, evalServices);
@@ -160,6 +164,7 @@ public final class SqlAggregation extends SqlIntercode
 
             Restrictions newChildRestrictions = getChildRestrictions(relations, groupVariables, optAggregations,
                     restrictions);
+            getGroupNodes(request, optAggregations, restrictions).values().forEach(newChildRestrictions::add);
 
             if(newChildReduce == childReduce && newChildRestrictions.equals(childRestrictions))
                 break;
@@ -171,6 +176,21 @@ public final class SqlAggregation extends SqlIntercode
         // no solutions make no group of a GROUP BY clause, whereas without the clause they make the one group there is
         if(optChild.equals(SqlNoSolution.get()) && !groupVariables.isEmpty())
             return SqlNoSolution.get();
+
+        // the solutions binding a grouping variable and a node standing in for its term always make the same groups
+        // whether grouped over the variable or over the node, and the child grouped over the node reads no term; the
+        // terms the parent needs are read for the groups
+        Map<Variable, Variable> standIns = getStandIns(optChild, getGroupNodes(request, optAggregations, restrictions));
+
+        if(!standIns.isEmpty())
+        {
+            Set<Variable> replaced = new HashSet<>(groupVariables);
+            replaced.removeAll(standIns.keySet());
+            replaced.addAll(standIns.values());
+
+            return readTerms(request, aggregate(request, replaced, optAggregations, optChild), standIns, restrictions)
+                    .optimize(request, scope, restrictions, reduced, evalServices);
+        }
 
         /* expand union if its child are grouped by disjoint values */
         if(optChild instanceof SqlUnion union && !optChild.hasConstantVariables(groupVariables))
@@ -264,8 +284,10 @@ public final class SqlAggregation extends SqlIntercode
             List<SqlExpressionIntercode> args = List
                     .of(SqlVariable.create(relations, child.getVariable(var.getVariable())));
 
+            // a variable bound always is counted by the deduplicated solutions, which then need not give its term
             Map<Variable, SqlExpressionIntercode> subAggregations = Map.of(optAggregations.keySet().iterator().next(),
-                    SqlBuiltinCall.create(request, "count", false, args));
+                    var.canBeNull() ? SqlBuiltinCall.create(request, "count", false, args) :
+                            SqlBuiltinCall.create(request, "card", false, List.of()));
 
             return aggregate(request, groupVariables, subAggregations, child).optimize(request, scope, restrictions,
                     reduced, evalServices);
@@ -290,6 +312,28 @@ public final class SqlAggregation extends SqlIntercode
             return this;
 
         return aggregate(request, groupVariables, optAggregations, optChild, restrictions);
+    }
+
+
+    /**
+     * The nodes that the solutions may be grouped over in place of the grouping variables (see
+     * {@link #getStandInNodes}): those of the grouping variables that no aggregate refers to, as an aggregate reads the
+     * terms of the solutions of a group.
+     *
+     * @param request the current request
+     * @param aggregations aggregate expression of each result variable
+     * @param restrictions what the parent needs of the variables
+     * @return the nodes that can stand in for each grouping variable that has some
+     */
+    private Map<Variable, List<Variable>> getGroupNodes(Request request,
+            Map<Variable, SqlExpressionIntercode> aggregations, Restrictions restrictions)
+    {
+        Set<Variable> keys = new HashSet<>(groupVariables);
+
+        for(SqlExpressionIntercode aggregation : aggregations.values())
+            keys.removeAll(aggregation.getReferencedVariables());
+
+        return getStandInNodes(request, keys, restrictions);
     }
 
 

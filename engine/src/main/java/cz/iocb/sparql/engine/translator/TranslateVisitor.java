@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
@@ -2473,10 +2474,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      * @param resourceClass class the columns hold the term in
      * @param columns the columns of the table holding the term, which contain a key of the table
      * @param joinColumns the columns the table is joined by
+     * @param reader gives, for the node and its class, the access to the table that binds the node to the join columns
+     *            and the variable to the term
      * @return the node joining the table by the row of the term
      */
     JoinNode getJoinNode(Variable variable, SourceTable table, ResourceClass resourceClass, List<Column> columns,
-            List<Column> joinColumns)
+            List<Column> joinColumns, BiFunction<Variable, InternalResourceClass, SqlIntercode> reader)
     {
         InternalResourceClass nodeClass = joinClasses.computeIfAbsent(List.of(table, joinColumns),
                 _ -> new InternalResourceClass(joinColumns.stream().map(Column::getType).toList()));
@@ -2496,8 +2499,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         // the term gives the row, and so does the node when the join columns are a key of the table too: solutions then
         // agree in the node exactly when they agree in the term
-        request.getNodeTerms().put(node, new NodeTerm(variable,
-                request.getConfiguration().getDatabaseSchema().isKey(table, new HashSet<>(joinColumns))));
+        request.getNodeTerms().computeIfAbsent(node,
+                _ -> new NodeTerm(variable,
+                        request.getConfiguration().getDatabaseSchema().isKey(table, new HashSet<>(joinColumns)),
+                        reader.apply(node, nodeClass)));
 
         return new JoinNode(node, nodeClass);
     }

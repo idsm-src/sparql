@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
@@ -768,8 +769,21 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 List<Column> columns = termMapping.getColumns(request);
 
-                if(columns.stream().allMatch(c -> c instanceof TableColumn) && schema.isKey(table, Set.copyOf(columns)))
-                    return parent.getJoinNode(variable, table, termMapping.getResourceClass(request), columns, joined);
+                if(!columns.stream().allMatch(c -> c instanceof TableColumn)
+                        || !schema.isKey(table, Set.copyOf(columns)))
+                    continue;
+
+                // the row of the term is read by the node without the conditions of the mapping, which the solutions
+                // giving the node have met
+                BiFunction<Variable, InternalResourceClass, SqlIntercode> reader = (node, nodeClass) -> {
+                    List<MappedTerm> maps = List.of(new MappedTerm(variable, termMapping),
+                            new MappedTerm(node, new InternalNodeMapping(nodeClass, joined)));
+
+                    return getTableAccess(request, table, new Conditions(true), maps, false);
+                };
+
+                return parent.getJoinNode(variable, table, termMapping.getResourceClass(request), columns, joined,
+                        reader);
             }
         }
 

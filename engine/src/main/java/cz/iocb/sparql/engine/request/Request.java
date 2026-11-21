@@ -28,6 +28,7 @@ import cz.iocb.sparql.engine.error.MessageCategory;
 import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.error.TranslateMessage;
+import cz.iocb.sparql.engine.imcode.SqlIntercode;
 import cz.iocb.sparql.engine.imcode.SqlSelect;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
 import cz.iocb.sparql.engine.mapping.classes.DerivedClass;
@@ -211,8 +212,10 @@ public class Request implements AutoCloseable
      * @param determining whether the node gives the term as well, the join columns being a key of the table too: two
      *            solutions binding the node then agree in it exactly when they agree in the variable, so the node can
      *            be compared in place of the term
+     * @param reader the access to the table that binds the node to its join columns and the variable to the term the
+     *            row holds, which gives the terms of the nodes of solutions deduplicated or grouped by the node
      */
-    public record NodeTerm(Variable variable, boolean determining)
+    public record NodeTerm(Variable variable, boolean determining, SqlIntercode reader)
     {
     }
 
