@@ -155,6 +155,9 @@ public final class SqlBind extends SqlIntercode
             Restrictions expressionRequirements = optExpression.getRequirements(relations);
             Restrictions childRestrictions = new Restrictions(restrictions, expressionRequirements);
 
+            // every solution of the child is a solution of the bind, so the parent reads as many of them
+            childRestrictions.setNeededRows(restrictions.getNeededRows());
+
             // the variable takes its value here, so the value the parent accepts for it does not restrict the child
             childRestrictions.removeAcceptedValue(variable);
 

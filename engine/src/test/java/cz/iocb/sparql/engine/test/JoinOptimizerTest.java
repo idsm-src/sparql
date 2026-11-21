@@ -391,6 +391,48 @@ public class JoinOptimizerTest
 
 
     @Test
+    public void firstRowsThroughNodes() throws Exception
+    {
+        String pattern = "?x ex:link ?y . ?y ex:link ?z";
+
+        // a bind gives a solution for every solution of its child, so the join is planned for the rows of the slice
+        String bind = "SELECT ?x ?z ?b WHERE { " + pattern + " BIND(STR(?z) AS ?b) }";
+        assertThat(getTree(explain(bind)), containsString(" + "));
+        assertThat(getTree(explain(bind + " LIMIT 10")), containsString(" -> "));
+
+        // so does an OPTIONAL for every solution of its left side
+        String optional = "SELECT ?x ?z ?l WHERE { " + pattern + " OPTIONAL { ?z ex:label ?l } }";
+        assertThat(getTree(explain(optional)), containsString(" + "));
+        assertThat(getTree(explain(optional + " LIMIT 10")), containsString(" -> "));
+
+        // the right side is looked up for the few solutions read of the left side instead of being hashed whole
+        String looked = "SELECT ?x ?l ?y WHERE { ?x ex:label ?l OPTIONAL { ?x ex:link ?y } }";
+        assertThat(translate(optimized, looked), not(containsString(" LEFT JOIN LATERAL ")));
+        assertThat(translate(optimized, looked + " LIMIT 10"), containsString(" LEFT JOIN LATERAL "));
+        assertThat(translate(optimized, looked + " ORDER BY ?l LIMIT 10"), not(containsString(" LEFT JOIN LATERAL ")));
+
+        // a sub-select reads at most the rows its parent reads of it
+        String select = "SELECT ?x ?z WHERE { " + pattern + " } LIMIT 5000";
+        String nested = "SELECT ?x ?z WHERE { { " + select + " } } LIMIT 10";
+        assertThat(getTree(explain(select)), containsString(" + "));
+        assertThat(getTree(explain(nested)), containsString(" -> "));
+
+        for(String query : List.of(bind, optional, looked))
+        {
+            List<List<RdfTerm>> all = execute(plain, query);
+            List<List<RdfTerm>> rows = execute(optimized, query + " LIMIT 10");
+
+            assertThat(rows, hasSize(10));
+
+            for(List<RdfTerm> row : rows)
+                assertThat(all.contains(row), is(true));
+        }
+
+        assertThat(execute(optimized, nested), hasSize(10));
+    }
+
+
+    @Test
     public void treeOfThree() throws Exception
     {
         String query = "SELECT ?x ?l ?y WHERE { ?x ex:tag ?t . ?x ex:label ?l . ?x ex:link ?y }";

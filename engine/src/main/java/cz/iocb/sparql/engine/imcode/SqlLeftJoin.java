@@ -120,6 +120,12 @@ public final class SqlLeftJoin extends SqlIntercode
      */
     private final Map<Variable, Set<SqlExpressionIntercode>> filterConditions;
 
+    /**
+     * The number of the solutions of the join that the parent reads at most (see {@link Restrictions#getNeededRows}),
+     * which the optimizer chooses the method of the join for.
+     */
+    private final double neededRows;
+
 
     /**
      * Creates the node.
@@ -135,10 +141,12 @@ public final class SqlLeftJoin extends SqlIntercode
      * @param columnMap the column map
      * @param filterConditions per variable the left side binds always, the conditions the filters above keep the
      *            solutions by
+     * @param neededRows the number of the solutions of the join that the parent reads at most
      */
     protected SqlLeftJoin(VariableBindings bindings, SqlIntercode left, SqlIntercode right,
             List<SqlExpressionIntercode> conditions, boolean extending, InputTable leftTable, InputTable rightTable,
-            Map<Column, Column> columnMap, Map<Variable, Set<SqlExpressionIntercode>> filterConditions)
+            Map<Column, Column> columnMap, Map<Variable, Set<SqlExpressionIntercode>> filterConditions,
+            double neededRows)
     {
         super(bindings, left.isDeterministic() && right.isDeterministic()
                 && conditions.stream().allMatch(c -> c.isDeterministic()));
@@ -151,6 +159,7 @@ public final class SqlLeftJoin extends SqlIntercode
         this.rightTable = rightTable;
         this.columnMap = columnMap;
         this.filterConditions = filterConditions;
+        this.neededRows = neededRows;
     }
 
 
@@ -212,7 +221,8 @@ public final class SqlLeftJoin extends SqlIntercode
                 setCanBeNull(right.getVariableBindings()), leftTable, rightTable, restrictions, map);
 
         return new SqlLeftJoin(bindings, left, right, conditions, extending, leftTable, rightTable, map,
-                getFilterConditions(left, restrictions));
+                getFilterConditions(left, restrictions),
+                restrictions == null ? Double.POSITIVE_INFINITY : restrictions.getNeededRows());
     }
 
 
@@ -428,6 +438,10 @@ public final class SqlLeftJoin extends SqlIntercode
 
         Restrictions leftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
                 optRight.getVariableBindings(), cndRestrictions, false);
+
+        // every solution of the left side gives a solution of the join, so the join reads at most as many of them as
+        // the parent reads of its own
+        leftRestrictions.setNeededRows(restrictions.getNeededRows());
         Restrictions rightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
                 optLeft.getVariableBindings(), cndRestrictions, true);
         rightRestrictions.retainAcceptedClasses(getNonNullVariables(optLeft.getVariableBindings()));
@@ -513,6 +527,7 @@ public final class SqlLeftJoin extends SqlIntercode
 
             Restrictions newLeftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
                     Set.of(optRight.getVariableBindings()), newCndRestrictions, false, settlement.getClasses());
+            newLeftRestrictions.setNeededRows(restrictions.getNeededRows());
             Restrictions newRightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
                     Set.of(optLeft.getVariableBindings()), newCndRestrictions, true, settlement.getClasses());
             newRightRestrictions.retainAcceptedClasses(getNonNullVariables(optLeft.getVariableBindings()));
@@ -636,7 +651,8 @@ public final class SqlLeftJoin extends SqlIntercode
 
         if(optLeft == left && optRight == right && optConditions.equals(conditions)
                 && restrictions.isOptimized(relations, bindings)
-                && filterConditions.equals(getFilterConditions(optLeft, restrictions)))
+                && filterConditions.equals(getFilterConditions(optLeft, restrictions))
+                && neededRows == restrictions.getNeededRows())
             return this;
 
         return leftJoin(request, scope, optLeft, optRight, optConditions, extending, restrictions);
@@ -825,7 +841,8 @@ public final class SqlLeftJoin extends SqlIntercode
      */
     JoinOptimizer.LeftJoinPlan getPlan(Request request, JoinOptimizer.Outer outer)
     {
-        return JoinOptimizer.planLeftJoin(request, left, right, leftTable, filterConditions, outer);
+        return JoinOptimizer.planLeftJoin(request, left, right, leftTable, filterConditions, outer,
+                outer == null ? neededRows : Double.POSITIVE_INFINITY);
     }
 
 
@@ -1274,7 +1291,7 @@ public final class SqlLeftJoin extends SqlIntercode
         if(extending != imcode.extending)
             return false;
 
-        if(!filterConditions.equals(imcode.filterConditions))
+        if(!filterConditions.equals(imcode.filterConditions) || neededRows != imcode.neededRows)
             return false;
 
         if(!Objects.equals(left, imcode.left))

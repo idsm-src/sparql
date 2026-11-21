@@ -415,7 +415,7 @@ public final class SqlSelect extends SqlIntercode
         Restrictions childRestrictions = new Restrictions(projections);
         childRestrictions.add(orderBy.keySet());
         childRestrictions.add(simpleOrderBy);
-        childRestrictions.setNeededRows(getNeededRows());
+        childRestrictions.setNeededRows(getNeededRows(Double.POSITIVE_INFINITY));
 
         // duplicates do not matter to a DISTINCT that is going to deduplicate the child over the projections below
         boolean childReduced = distinct && projections.containsAll(orderBy.keySet());
@@ -462,17 +462,20 @@ public final class SqlSelect extends SqlIntercode
 
 
     /**
-     * The number of the solutions of the child that the select reads at most: the rows up to the end of its slice when
-     * it picks them in no order and deduplicates nothing, and all of them otherwise.
+     * The number of the solutions of the child that the select reads at most: when it picks its rows in no order and
+     * deduplicates nothing, the rows its parent reads of it, at most those of its limit, after the ones its offset
+     * skips; all of them otherwise.
      *
+     * @param needed the number of the solutions of the select that its parent reads at most
      * @return the number of the solutions of the child the select reads at most
      */
-    private double getNeededRows()
+    private double getNeededRows(double needed)
     {
-        if(limit == null || distinct || !orderBy.isEmpty() || !simpleOrderBy.isEmpty())
+        if(distinct || !orderBy.isEmpty() || !simpleOrderBy.isEmpty())
             return Double.POSITIVE_INFINITY;
 
-        return limit.doubleValue() + (offset == null ? 0 : offset.doubleValue());
+        return (limit == null ? needed : Math.min(needed, limit.doubleValue()))
+                + (offset == null ? 0 : offset.doubleValue());
     }
 
 
@@ -504,7 +507,7 @@ public final class SqlSelect extends SqlIntercode
         // not matter, the pattern has to keep them even when the parent needs none of them (COUNT(*) over a DISTINCT
         // sub-select)
         Restrictions patternRestrictions = new Restrictions(childRestrictions);
-        patternRestrictions.setNeededRows(getNeededRows());
+        patternRestrictions.setNeededRows(getNeededRows(restrictions.getNeededRows()));
 
         if(distinct && !childReduced)
             patternRestrictions.add(bindings.getVariables());

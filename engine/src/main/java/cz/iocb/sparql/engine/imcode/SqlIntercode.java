@@ -139,8 +139,8 @@ public abstract class SqlIntercode extends SqlBaseClass
 
         /**
          * Copy constructor. The number of solutions the parent reads (see {@link #getNeededRows}) is not copied: it
-         * holds for the node the restrictions are given to, and a node hands it on only where it reads as many of the
-         * solutions of its child as its parent reads of its own.
+         * holds for the node the restrictions are given to, and a node hands it on only where it reads no more of the
+         * solutions of its child than its parent reads of its own.
          *
          * @param restrictions what the parent needs of the variables
          */
@@ -709,8 +709,8 @@ public abstract class SqlIntercode extends SqlBaseClass
 
         /**
          * The number of solutions the parent reads at most, whichever they are: the rows of a slice that picks them in
-         * no order. A join then chooses its tree for the first solutions (see {@link JoinOptimizer}). Infinite when the
-         * parent reads all the solutions.
+         * no order. A join then chooses its tree, and an OPTIONAL its method, for the first solutions (see
+         * {@link JoinOptimizer}). Infinite when the parent reads all the solutions.
          *
          * @return the number of solutions the parent reads at most
          */

@@ -1569,6 +1569,30 @@ final class JoinOptimizer
 
 
     /**
+     * Cost of joining the sides of a left join by hashing, or by comparing them pairwise when no equality between them
+     * can be hashed, when the join reads only some of the solutions of its left side: the right side is then the one
+     * hashed, whole, whatever its size, and probed with the solutions read, because the left side would be read whole
+     * to be hashed. When all the solutions of the left side are read, the smaller side is hashed (see
+     * {@link #hashCost(boolean, double, double, double)}).
+     *
+     * @param hashable whether an equality between the sides can be hashed
+     * @param leftRows estimated rows of the left side
+     * @param read the rows of the left side that the join reads
+     * @param rightRows estimated rows of the right side
+     * @param fanout estimated rows of the join for a row of the left side
+     * @return the cost of the join
+     */
+    private static double leftHashCost(boolean hashable, double leftRows, double read, double rightRows, double fanout)
+    {
+        if(read >= leftRows)
+            return hashCost(hashable, leftRows, rightRows, leftRows * fanout);
+
+        return hashable ? HASH_COST * rightRows + read + read * fanout :
+                read * rightRows * COMPARISON_COST + read * fanout;
+    }
+
+
+    /**
      * Cost of joining a subset of the children with a child looked up by an index for every row of the subset.
      *
      * @param left the outer subset
@@ -2328,7 +2352,10 @@ final class JoinOptimizer
      * those too, when the comparisons spared cost more than the second join it takes, by a margin (see
      * {@link #SECOND_JOIN_MARGIN}). The left side gives the join only the solutions that the conditions of the filters
      * above keep, as far as one of its variables decides them alone (see {@link #getFilters}), because the database
-     * evaluates such a condition on the left side (see {@link #plan(Request, List, Map, Outer, double)}).
+     * evaluates such a condition on the left side (see {@link #plan(Request, List, Map, Outer, double)}). When the
+     * parent reads only the first solutions of the join, like a slice in no order, the join reads only the solutions of
+     * the left side that give them, each of which gives a solution, so the lookups cost by those, whereas the hashing
+     * reads the right side whole all the same (see {@link #leftHashCost}).
      *
      * @param request the current request
      * @param left the left side
@@ -2337,10 +2364,12 @@ final class JoinOptimizer
      * @param conditions per variable the left side binds always, the conditions the filters above keep the solutions of
      *            the join by
      * @param outer the rows the whole join is evaluated for one by one, or null when it is evaluated once
+     * @param needed the number of the solutions of the join that its parent reads at most when the join is evaluated
+     *            once; infinite when it reads them all
      * @return the method chosen for the join
      */
     static LeftJoinPlan planLeftJoin(Request request, SqlIntercode left, SqlIntercode right, Table leftTable,
-            Map<Variable, Set<SqlExpressionIntercode>> conditions, Outer outer)
+            Map<Variable, Set<SqlExpressionIntercode>> conditions, Outer outer, double needed)
     {
         double kept = selectivity(request, left, conditions);
 
@@ -2379,7 +2408,11 @@ final class JoinOptimizer
         Set<Variable> split = hashable ? Set.of() : unbound;
 
         double rows = leftRows * Math.max(fanout, 1);
-        double hashed = hashCost(hashable || !split.isEmpty(), leftRows, rightRows, rows)
+
+        // the solutions of the left side the join reads for the solutions its parent reads
+        double read = Math.min(Math.max(needed / Math.max(fanout, 1), 1), leftRows);
+
+        double hashed = leftHashCost(hashable || !split.isEmpty(), leftRows, read, rightRows, Math.max(fanout, 1))
                 + estimateRead(request, right);
 
         LeftJoinPlan plan = new LeftJoinPlan(null, null, split, rows, hashed);
@@ -2392,7 +2425,7 @@ final class JoinOptimizer
         if(!solutions.bindings().getVariables().isEmpty())
         {
             Evaluation evaluation = estimateForRow(request, right, solutions);
-            double lookedUp = leftRows * evaluation.cost();
+            double lookedUp = read * evaluation.cost();
 
             // a right side that no solution of the left side restricts would be evaluated whole for each of them
             if(evaluation.restricted() && lookedUp < hashed)
@@ -2407,7 +2440,7 @@ final class JoinOptimizer
                 && bound.bindings().getVariables().size() > solutions.bindings().getVariables().size())
         {
             Evaluation evaluation = estimateForRow(request, right, bound);
-            double lookedUp = leftRows * evaluation.cost();
+            double lookedUp = read * evaluation.cost();
 
             // lookups that only may cost less than a pairwise comparison are not worth the risk of a scan
             double margin = plan.outer() != null || !split.isEmpty() ? 1 : PAIRWISE_MARGIN;
@@ -2422,8 +2455,8 @@ final class JoinOptimizer
         // with the pass over the right side it reads
         if(plan.outer() == null && plan.bound() == null && hashable && !unbound.isEmpty())
         {
-            double spared = (leftRows * Math.max(candidates, 1) - rows) * COMPARISON_COST;
-            double second = hashCost(true, leftRows, rightRows, 0) + rightRows;
+            double spared = (read * Math.max(candidates, 1) - read * Math.max(fanout, 1)) * COMPARISON_COST;
+            double second = leftHashCost(true, leftRows, read, rightRows, 0) + rightRows;
 
             if(spared > SECOND_JOIN_MARGIN * second)
                 plan = new LeftJoinPlan(null, null, unbound, rows, plan.cost() + second);
