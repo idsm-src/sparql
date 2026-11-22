@@ -274,6 +274,9 @@ public final class SqlJoin extends SqlIntercode
             List<SqlIntercode> newChilds = reduceDistinctUnion(relations,
                     reduceJoin(request, optimized, newRestrictions), schema);
 
+            if(reduced)
+                newChilds = reduceSubsumed(newChilds);
+
             newChilds = expandLeadingOptionals(request, scope, newChilds, evalServices);
             newChilds = seedWalks(request, scope, newChilds, newRestrictions);
             newChilds = shareSeeds(request, scope, newChilds, evalServices);
@@ -994,6 +997,65 @@ public final class SqlJoin extends SqlIntercode
 
             return newChilds;
         }
+    }
+
+
+    /**
+     * Leaves out the children that only repeat what another child gives, where duplicate solutions do not matter (an
+     * elimination inspired by the self-join elimination of Ontop over the same terms in a cardinality-insensitive
+     * context): an access whose rows are all rows of another access to the same table, giving the same values (see
+     * {@link SqlTableAccess#isSubsumedBy}), and a union that has such an access among its branches and binds no
+     * variable the other access does not bind. For every solution of the other access, the row it is made of gives the
+     * child left out a solution agreeing with it, and every solution of the child agrees with it in all its variables,
+     * so the join with the child gives the solutions of the other access only, some of them several times. No key of
+     * the table is needed for that, unlike for a merge of the two accesses (see {@link SqlTableAccess#tryReduceJoin}).
+     *
+     * @param childs the children of a join whose duplicate solutions do not matter
+     * @return the children without the ones that only repeat what another child gives
+     */
+    private static List<SqlIntercode> reduceSubsumed(List<SqlIntercode> childs)
+    {
+        List<SqlIntercode> result = new ArrayList<>(childs);
+
+        loop:
+        for(int i = 0; i < result.size(); i++)
+        {
+            SqlIntercode child = result.get(i);
+
+            for(int j = 0; j < result.size(); j++)
+            {
+                if(i != j && result.get(j) instanceof SqlTableAccess other && isSubsumedBy(child, other))
+                {
+                    result.remove(i);
+                    i--;
+                    continue loop;
+                }
+            }
+        }
+
+        return result;
+    }
+
+
+    /**
+     * True if the child only repeats what the access gives where duplicate solutions do not matter (see
+     * {@link #reduceSubsumed}).
+     *
+     * @param child the child
+     * @param access the access
+     * @return true if the child only repeats what the access gives
+     */
+    private static boolean isSubsumedBy(SqlIntercode child, SqlTableAccess access)
+    {
+        if(child instanceof SqlTableAccess other)
+            return other.isSubsumedBy(access);
+
+        if(!(child instanceof SqlUnion union)
+                || !access.getVariableBindings().getVariables().containsAll(union.getVariableBindings().getVariables()))
+            return false;
+
+        return union.getChilds().stream()
+                .anyMatch(b -> b instanceof SqlTableAccess branch && branch.isSubsumedBy(access));
     }
 
 

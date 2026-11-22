@@ -794,6 +794,28 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
+     * True if every row of the other access to the same table is a row of this access and gives its variables the same
+     * values: the other access binds every variable of this one alike, its conditions imply the conditions of this one,
+     * and it is restricted to every value this one is restricted to. A join with this access then gives the solutions
+     * of the other access, each at least once (see {@link SqlJoin}).
+     *
+     * @param other the other access
+     * @return true if every row of the other access is a row of this access giving its variables the same values
+     */
+    boolean isSubsumedBy(SqlTableAccess other)
+    {
+        if(table == null || !table.equals(other.table))
+            return false;
+
+        for(Variable variable : internal.getVariables())
+            if(!internal.get(variable).equals(other.internal.get(variable)))
+                return false;
+
+        return other.conditions.implies(conditions) && containsAll(other.values, values);
+    }
+
+
+    /**
      * True if the VALUES can be merged into the access: distinct rows, every variable bound also in the access and
      * never null on either side, and few enough rows to keep the conditions of the access small (see
      * {@link #disjunctLimit}; a single row adds no disjunct, so it is always few enough). The access has to bind a
