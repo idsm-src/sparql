@@ -1219,6 +1219,88 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
+     * The conditions without the requirements that the given columns be not null; everything else every disjunct
+     * requires is kept.
+     *
+     * @param conditions the conditions
+     * @param columns the columns no longer required to be not null
+     * @return the conditions without the requirements that the columns be not null
+     */
+    private static Conditions withoutIsNotNull(Conditions conditions, Set<Column> columns)
+    {
+        Conditions result = new Conditions(false);
+
+        for(Condition cnd : conditions.getConditions())
+        {
+            Condition condition = new Condition();
+
+            for(Column c : cnd.getIsNotNull())
+                if(!columns.contains(c))
+                    condition.addIsNotNull(c);
+
+            for(Column c : cnd.getIsNull())
+                condition.addIsNull(c);
+
+            for(ColumnComparison p : cnd.getAreEqual())
+                condition.addAreEqual(p.getLeft(), p.getRight());
+
+            for(ColumnComparison p : cnd.getAreNotDistinct())
+                condition.addAreNotDistinct(p.getLeft(), p.getRight());
+
+            for(ColumnComparison p : cnd.getAreNotEqual())
+                condition.addAreNotEqual(p.getLeft(), p.getRight());
+
+            result.add(condition);
+        }
+
+        return result;
+    }
+
+
+    /**
+     * The binding of a variable of an optional part of a merged access whose part holds only in the rows in which the
+     * given column is not null: every other column of the binding is null in the other rows too, so that the variable
+     * is unbound there.
+     *
+     * @param binding the binding of the variable in the access of the optional part
+     * @param column the column the optional part requires to be not null, or null when it requires nothing more than
+     *            the merged access does
+     * @return the binding of the variable in the merged access
+     */
+    private static VariableBinding toOptional(VariableBinding binding, Column column)
+    {
+        if(column == null)
+            return binding;
+
+        Map<ResourceClass, List<Column>> mappings = new HashMap<>();
+
+        for(Entry<ResourceClass, List<Column>> entry : binding.getMappings().entrySet())
+        {
+            if(entry.getValue() == null)
+            {
+                mappings.put(entry.getKey(), null);
+                continue;
+            }
+
+            List<Column> modified = new ArrayList<>(entry.getValue().size());
+
+            for(Column col : entry.getValue())
+            {
+                if(col.equals(column))
+                    modified.add(col);
+                else
+                    modified.add(new ExpressionColumn(
+                            SqlCode.of("CASE WHEN ", column, " IS NOT NULL THEN ", col, " END"), col.getType()));
+            }
+
+            mappings.put(entry.getKey(), modified);
+        }
+
+        return new VariableBinding(binding.getVariable(), mappings, true);
+    }
+
+
+    /**
      * True if a left join of two accesses to the same table on a key can be merged: at most one extra not-null
      * condition on the right side and no other right-side conditions.
      *
@@ -1246,30 +1328,7 @@ public final class SqlTableAccess extends SqlIntercode
 
 
         // conditions added by right table
-        Conditions rightConditions = new Conditions(false);
-
-        for(Condition cnd : right.conditions.getConditions())
-        {
-            Condition condition = new Condition();
-
-            for(Column c : cnd.getIsNotNull())
-                if(!extraNotNulls.contains(c))
-                    condition.addIsNotNull(c);
-
-            for(Column c : cnd.getIsNull())
-                condition.addIsNull(c);
-
-            for(ColumnComparison p : cnd.getAreEqual())
-                condition.addAreEqual(p.getLeft(), p.getRight());
-
-            for(ColumnComparison p : cnd.getAreNotDistinct())
-                condition.addAreNotDistinct(p.getLeft(), p.getRight());
-
-            for(ColumnComparison p : cnd.getAreNotEqual())
-                condition.addAreNotEqual(p.getLeft(), p.getRight());
-
-            rightConditions.add(condition);
-        }
+        Conditions rightConditions = withoutIsNotNull(right.conditions, extraNotNulls);
 
         // condition added by the join
         Condition joinCondition = new Condition();
@@ -1593,35 +1652,8 @@ public final class SqlTableAccess extends SqlIntercode
         VariableBindings bindings = new VariableBindings(left.internal);
 
         for(Variable var : right.internal.getVariables())
-        {
             if(left.internal.get(var) == null)
-            {
-                VariableBinding rightBinding = right.internal.get(var);
-
-                ResourceClass resClass = rightBinding.getClasses().iterator().next();
-                List<Column> columns = rightBinding.getMapping(resClass);
-
-                if(extraCondition != null)
-                {
-                    List<Column> modified = new ArrayList<>(columns.size());
-
-                    for(Column col : columns)
-                    {
-                        if(col.equals(extraCondition))
-                            modified.add(col);
-                        else
-                            modified.add(new ExpressionColumn(
-                                    SqlCode.of("CASE WHEN ", extraCondition, " IS NOT NULL THEN ", col, " END"),
-                                    col.getType()));
-                    }
-
-                    columns = modified;
-                }
-
-                boolean canBeNull = rightBinding.canBeNull() || extraCondition != null;
-                bindings.add(new VariableBinding(var, resClass, columns, canBeNull));
-            }
-        }
+                bindings.add(toOptional(right.internal.get(var), extraCondition));
 
         bindings = bindings.restrict(relations, restrictions);
 
@@ -1757,6 +1789,82 @@ public final class SqlTableAccess extends SqlIntercode
             return SqlTableAccess.leftJoinByPrimaryKey(relations, left, right, restrictions);
 
         return null;
+    }
+
+
+    /**
+     * Merges two accesses to the same table, each the right side of an OPTIONAL of the same solutions, into the access
+     * of a single OPTIONAL, or returns null (a merge inspired by the merging of left joins in Ontop). Both accesses
+     * have to be joined to those solutions by the given variables only, bound alike on both sides and holding a key of
+     * the table, so that they read the same row of a solution, if any; their conditions have to be the same but for a
+     * requirement that a column of their own be not null, at most one on each side. The merged access reads the row by
+     * the conditions they share, and a variable of one side only is unbound in a row in which the column that side
+     * requires to be not null is null (see {@link #toOptional}), as it is unbound when that OPTIONAL has no solution.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param schema the database schema
+     * @param first the access of one OPTIONAL
+     * @param second the access of the other OPTIONAL
+     * @param shared the variables both accesses share with the solutions they extend
+     * @return the merged access, or null
+     */
+    public static SqlTableAccess tryMergeOptionals(ClassRelations relations, DatabaseSchema schema,
+            SqlTableAccess first, SqlTableAccess second, Set<Variable> shared)
+    {
+        if(first.table == null || !first.table.equals(second.table) || !first.hasSameValues(second))
+            return null;
+
+        Set<Variable> common = new HashSet<>(first.internal.getVariables());
+        common.retainAll(second.internal.getVariables());
+
+        if(!common.equals(shared))
+            return null;
+
+        Set<Column> columns = new HashSet<>();
+
+        for(Variable variable : shared)
+        {
+            VariableBinding binding = first.internal.get(variable);
+
+            if(binding.canBeNull() || !binding.equals(second.internal.get(variable)) || binding.hasExpressionColumn())
+                return null;
+
+            columns.addAll(binding.getNonConstantColumns());
+        }
+
+        if(schema.getCompatibleKey(first.table,
+                first.getKnownNotNull(schema, first.getCoveredColumns(columns))) == null)
+            return null;
+
+        Set<Column> firstExtra = new HashSet<>(first.conditions.getIsNotNull());
+        firstExtra.removeAll(second.conditions.getIsNotNull());
+
+        Set<Column> secondExtra = new HashSet<>(second.conditions.getIsNotNull());
+        secondExtra.removeAll(first.conditions.getIsNotNull());
+
+        if(firstExtra.size() > 1 || secondExtra.size() > 1)
+            return null;
+
+        Conditions conditions = withoutIsNotNull(first.conditions, firstExtra);
+
+        if(!conditions.equals(withoutIsNotNull(second.conditions, secondExtra)))
+            return null;
+
+        Column firstColumn = firstExtra.isEmpty() ? null : firstExtra.iterator().next();
+        Column secondColumn = secondExtra.isEmpty() ? null : secondExtra.iterator().next();
+
+        VariableBindings bindings = new VariableBindings();
+
+        for(Variable variable : first.internal.getVariables())
+            bindings.add(shared.contains(variable) ? first.internal.get(variable) :
+                    toOptional(first.internal.get(variable), firstColumn));
+
+        for(Variable variable : second.internal.getVariables())
+            if(!shared.contains(variable))
+                bindings.add(toOptional(second.internal.get(variable), secondColumn));
+
+        return new SqlTableAccess(first.schema, first.table, conditions, bindings, first.reduced && second.reduced,
+                union(first.distinctColumns, second.distinctColumns), first.values);
     }
 
 

@@ -649,6 +649,16 @@ public final class SqlLeftJoin extends SqlIntercode
                 return merge;
         }
 
+        // an OPTIONAL reading the row of a table that another OPTIONAL of the same solutions reads by a key is merged
+        // into it (inspired by Ontop)
+        if(optLeft instanceof SqlLeftJoin join && optRight instanceof SqlTableAccess access && optConditions.isEmpty())
+        {
+            SqlIntercode merged = join.mergeOptional(request, scope, access, extending);
+
+            if(merged != null)
+                return merged.optimize(request, scope, restrictions, optReduced, evalServices);
+        }
+
 
         if(optLeft == left && optRight == right && optConditions.equals(conditions)
                 && restrictions.isOptimized(relations, bindings)
@@ -657,6 +667,86 @@ public final class SqlLeftJoin extends SqlIntercode
             return this;
 
         return leftJoin(request, scope, optLeft, optRight, optConditions, extending, restrictions);
+    }
+
+
+    /**
+     * The left join of the solutions of this left join with the given access, the access being merged into the access
+     * of an OPTIONAL of this join or of the left joins on its left side (see {@link SqlTableAccess#tryMergeOptionals}),
+     * or null when no access can take it in. The merge follows the merging of left joins in Ontop: two OPTIONALs of the
+     * same solutions reading one row of a table by a key are one OPTIONAL reading both parts of the row. The access is
+     * joined to the solutions by variables that the left side of the OPTIONAL it is merged into binds always, as does
+     * the access of that OPTIONAL, and by no other variable, and it commutes with the OPTIONALs between them, which
+     * share no other variable with it, neither by their right sides nor by their conditions.
+     *
+     * @param request the current request
+     * @param scope the scope of the join
+     * @param access the right side of the OPTIONAL over the solutions of this join
+     * @param extending whether every solution of the access extends the current solution of the pattern the joins lie
+     *            in
+     * @return the left join with the access merged into the access of another OPTIONAL, or null
+     */
+    private SqlIntercode mergeOptional(Request request, Scope scope, SqlTableAccess access, boolean extending)
+    {
+        ClassRelations relations = request.getConfiguration();
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+
+        Set<Variable> shared = new HashSet<>(access.getVariableBindings().getVariables());
+        shared.retainAll(getVariableBindings().getVariables());
+
+        Set<Variable> own = new HashSet<>(access.getVariableBindings().getVariables());
+        own.removeAll(shared);
+
+        List<SqlLeftJoin> skipped = new ArrayList<>();
+        SqlIntercode node = this;
+
+        while(node instanceof SqlLeftJoin join && join.extending == extending && join.right.isDeterministic())
+        {
+            SqlIntercode right = join.right instanceof SqlStripConstantColumns strip ? strip.getChild() : join.right;
+
+            if(join.conditions.isEmpty() && right instanceof SqlTableAccess other && joinsBy(join.left, other, shared)
+                    && joinsBy(join.left, access, shared))
+            {
+                SqlTableAccess merged = SqlTableAccess.tryMergeOptionals(relations, schema, other, access, shared);
+
+                if(merged != null)
+                {
+                    SqlIntercode result = leftJoin(request, scope, join.left, merged, List.of(), extending, null);
+
+                    for(SqlLeftJoin above : skipped.reversed())
+                        result = leftJoin(request, scope, result, above.right, above.conditions, extending, null);
+
+                    return result;
+                }
+            }
+
+            if(!Collections.disjoint(own, right.getVariableBindings().getVariables()) || join.conditions.stream()
+                    .anyMatch(c -> c.hasPattern() || !Collections.disjoint(own, c.getReferencedVariables())))
+                return null;
+
+            skipped.add(join);
+            node = join.left;
+        }
+
+        return null;
+    }
+
+
+    /**
+     * True if the node joins the solutions by exactly the given variables, which they bind always.
+     *
+     * @param solutions the solutions
+     * @param node the node
+     * @param variables the variables
+     * @return true if the node joins the solutions by exactly the given variables, bound always by the solutions
+     */
+    private static boolean joinsBy(SqlIntercode solutions, SqlIntercode node, Set<Variable> variables)
+    {
+        Set<Variable> common = new HashSet<>(node.getVariableBindings().getVariables());
+        common.retainAll(solutions.getVariableBindings().getVariables());
+
+        return common.equals(variables)
+                && variables.stream().allMatch(v -> !solutions.getVariableBindings().get(v).canBeNull());
     }
 
 
