@@ -659,6 +659,13 @@ public final class SqlLeftJoin extends SqlIntercode
                 return merged.optimize(request, scope, restrictions, optReduced, evalServices);
         }
 
+        // an OPTIONAL, or a part of it, reading the row of a member of the left side by a key is moved to the left side
+        // (inspired by Ontop)
+        SqlIntercode transferred = transfer(request, scope, optLeft, optRight, optConditions, restrictions);
+
+        if(transferred != null)
+            return transferred.optimize(request, scope, restrictions, optReduced, evalServices);
+
         // an OPTIONAL reading the row of a table that a foreign key of the solutions references is a join (inspired by
         // Ontop)
         if(optRight instanceof SqlTableAccess access && optConditions.isEmpty())
@@ -740,6 +747,128 @@ public final class SqlLeftJoin extends SqlIntercode
         }
 
         return null;
+    }
+
+
+    /**
+     * The left join with an access of its right side that reads the row of an access of its left side by a key moved to
+     * that access, or null when there is none (inspired by the join transfer of Ontop). The access of the left side is
+     * the left side itself or a member of the join it is, and it binds always the variables by which the access of the
+     * right side joins the left side. When the right side is that access alone, it becomes an optional part of the
+     * access of the left side (see {@link SqlTableAccess#tryReduceLeftJoin}), which leaves no left join. When it is a
+     * member of the join the right side is, which restricts the row no further (see
+     * {@link SqlTableAccess#tryTransfer}), it is joined with the access of the left side, and the rest of the right
+     * side stays optional: its other variables are bound always and become variables of the left side, so the parent
+     * must not need them, as the left side binds them also where the rest of the right side has no solution. The
+     * variables of its own that an access moved to the left side brings must not be bound by the other members of the
+     * left side.
+     *
+     * @param request the current request
+     * @param scope the scope of the join
+     * @param left the left side
+     * @param right the right side
+     * @param conditions the conditions of the join
+     * @param restrictions what the parent needs of the variables
+     * @return the left join, or the left side, with an access of the right side moved to the left side, or null
+     */
+    private SqlIntercode transfer(Request request, Scope scope, SqlIntercode left, SqlIntercode right,
+            List<SqlExpressionIntercode> conditions, Restrictions restrictions)
+    {
+        ClassRelations relations = request.getConfiguration();
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+
+        List<SqlIntercode> members = left instanceof SqlJoin join ? join.getChilds() : List.of(left);
+        Set<Variable> variables = left.getVariableBindings().getVariables();
+
+        for(int i = 0; i < members.size(); i++)
+        {
+            if(!(members.get(i) instanceof SqlTableAccess access))
+                continue;
+
+            List<SqlIntercode> others = new ArrayList<>(members);
+            others.remove(i);
+
+            // a single access left of the OPTIONAL takes an access right of it in the common way
+            if(!others.isEmpty() && conditions.isEmpty() && right instanceof SqlTableAccess optional
+                    && isMovable(access, optional, variables, others))
+            {
+                SqlIntercode merged = SqlTableAccess.tryReduceLeftJoin(relations, schema, access, optional, null);
+
+                if(merged != null)
+                    return SqlJoin.join(request, replace(members, i, merged));
+            }
+
+            if(extending || !(right instanceof SqlJoin join))
+                continue;
+
+            for(int j = 0; j < join.getChilds().size(); j++)
+            {
+                if(!(join.getChilds().get(j) instanceof SqlTableAccess part)
+                        || !isMovable(access, part, variables, others))
+                    continue;
+
+                // the variables the part shares with the rest of the right side only are bound always
+                boolean bound = part.getVariableBindings().getValues().stream()
+                        .filter(b -> !variables.contains(b.getVariable()))
+                        .allMatch(b -> !b.canBeNull() && !restrictions.containsVar(b.getVariable()));
+
+                SqlTableAccess moved = bound ? SqlTableAccess.tryTransfer(relations, schema, access, part) : null;
+
+                if(moved != null)
+                {
+                    List<SqlIntercode> rest = new ArrayList<>(join.getChilds());
+                    rest.remove(j);
+
+                    SqlIntercode newLeft = others.isEmpty() ? moved : SqlJoin.join(request, replace(members, i, moved));
+                    SqlIntercode newRight = rest.size() == 1 ? rest.get(0) : SqlJoin.join(request, rest);
+
+                    return leftJoin(request, scope, newLeft, newRight, conditions, extending, null);
+                }
+            }
+        }
+
+        return null;
+    }
+
+
+    /**
+     * True if the access of the right side of a left join can be moved to the access of its left side: it joins the
+     * left side by variables that the access of the left side binds always, and the other members of the left side bind
+     * none of its other variables.
+     *
+     * @param access the access of the left side
+     * @param moved the access of the right side
+     * @param variables the variables of the left side
+     * @param others the other members of the left side
+     * @return true if the access can be moved to the access of the left side, false otherwise
+     */
+    private static boolean isMovable(SqlTableAccess access, SqlTableAccess moved, Set<Variable> variables,
+            List<SqlIntercode> others)
+    {
+        Set<Variable> shared = new HashSet<>(moved.getVariableBindings().getVariables());
+        shared.retainAll(variables);
+
+        Set<Variable> own = new HashSet<>(moved.getVariableBindings().getVariables());
+        own.removeAll(shared);
+
+        return joinsBy(access, moved, shared)
+                && others.stream().allMatch(o -> Collections.disjoint(own, o.getVariableBindings().getVariables()));
+    }
+
+
+    /**
+     * The list with the element at the index replaced.
+     *
+     * @param list the list
+     * @param index the index
+     * @param element the new element
+     * @return the list with the element at the index replaced
+     */
+    private static List<SqlIntercode> replace(List<SqlIntercode> list, int index, SqlIntercode element)
+    {
+        List<SqlIntercode> result = new ArrayList<>(list);
+        result.set(index, element);
+        return result;
     }
 
 

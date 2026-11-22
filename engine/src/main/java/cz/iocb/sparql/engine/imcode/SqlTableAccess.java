@@ -1302,7 +1302,7 @@ public final class SqlTableAccess extends SqlIntercode
 
     /**
      * True if a left join of two accesses to the same table on a key can be merged: at most one extra not-null
-     * condition on the right side and no other right-side conditions.
+     * condition on the right side and no other right-side conditions than those every row of the left side meets.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param schema the database schema
@@ -1351,13 +1351,10 @@ public final class SqlTableAccess extends SqlIntercode
             }
         }
 
-        // check that nothing has been added
+        // check that nothing has been added: every row of the left side meets the conditions of the right side
         Conditions conditions = Conditions.and(rightConditions, joinCondition);
 
-        if(!conditions.equals(left.conditions))
-            return false;
-
-        return true;
+        return left.conditions.implies(conditions);
     }
 
 
@@ -1789,6 +1786,29 @@ public final class SqlTableAccess extends SqlIntercode
             return SqlTableAccess.leftJoinByPrimaryKey(relations, left, right, restrictions);
 
         return null;
+    }
+
+
+    /**
+     * The access joined with the access of a part of an OPTIONAL that reads the row of the access by a key and
+     * restricts it no further, or null: the part has a row for every row of the access, so a left join may take it from
+     * its right side to its left side (inspired by the join transfer of Ontop), see
+     * {@link #canBeLeftJoinedByPrimaryKey}.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param schema the database schema
+     * @param access the access of the left side
+     * @param part the access of a part of the OPTIONAL
+     * @return the access joined with the part, or null
+     */
+    public static SqlTableAccess tryTransfer(ClassRelations relations, DatabaseSchema schema, SqlTableAccess access,
+            SqlTableAccess part)
+    {
+        if(!canBeLeftJoinedByPrimaryKey(relations, schema, access, part)
+                || !access.conditions.getIsNotNull().containsAll(part.conditions.getIsNotNull()))
+            return null;
+
+        return joinByPrimaryKey(relations, access, part, null) instanceof SqlTableAccess joined ? joined : null;
     }
 
 
