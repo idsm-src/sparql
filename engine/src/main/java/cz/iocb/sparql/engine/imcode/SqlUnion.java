@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import static java.util.Objects.isNull;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,7 @@ import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.Multiset;
 import cz.iocb.sparql.engine.translator.VariableBinding;
+import cz.iocb.sparql.engine.translator.VariableBindingPair;
 import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
@@ -485,6 +487,72 @@ public final class SqlUnion extends SqlIntercode
                 return j;
 
         return -1;
+    }
+
+
+    /**
+     * The solutions of the union are distinct over the selected variables when those of every branch are and no two
+     * branches give the same solution (an inference inspired by Ontop, which takes a union of disjoint branches with
+     * distinct solutions for distinct), see {@link #areDisjoint}.
+     */
+    @Override
+    public boolean isDistinct(Request request, Collection<Variable> selected)
+    {
+        ClassRelations relations = request.getConfiguration();
+
+        for(int i = 0; i < childs.size(); i++)
+        {
+            if(!childs.get(i).isDistinct(request, selected))
+                return false;
+
+            for(int j = i + 1; j < childs.size(); j++)
+                if(!areDisjoint(relations, childs.get(i), childs.get(j), selected))
+                    return false;
+        }
+
+        return true;
+    }
+
+
+    /**
+     * True if no solution of one branch agrees with a solution of the other one in all the selected variables: one of
+     * them is bound in every solution of one branch and in no solution of the other one, or the two branches bind it
+     * always and never to the same term, by disjoint classes or differing constants (see
+     * {@link VariableBindingPair#isJoinable}). A binding lacking the columns of a class tells nothing.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param first one branch
+     * @param second the other branch
+     * @param selected the selected variables
+     * @return true if the two branches are known to have no solution in common over the selected variables
+     */
+    private static boolean areDisjoint(ClassRelations relations, SqlIntercode first, SqlIntercode second,
+            Collection<Variable> selected)
+    {
+        for(Variable variable : selected)
+        {
+            VariableBinding a = first.getVariable(variable);
+            VariableBinding b = second.getVariable(variable);
+
+            if(a == null && b == null)
+                continue;
+
+            if(a == null || b == null)
+            {
+                if(a == null ? !b.canBeNull() : !a.canBeNull())
+                    return true;
+
+                continue;
+            }
+
+            if(a.getMappings().containsValue(null) || b.getMappings().containsValue(null))
+                continue;
+
+            if(!new VariableBindingPair(relations, variable, a, b).isJoinable())
+                return true;
+        }
+
+        return false;
     }
 
 

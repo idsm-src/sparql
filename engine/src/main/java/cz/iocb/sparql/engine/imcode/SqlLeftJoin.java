@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -1228,6 +1229,49 @@ public final class SqlLeftJoin extends SqlIntercode
     public final List<SqlExpressionIntercode> getConditions()
     {
         return conditions;
+    }
+
+
+    /**
+     * The solutions of the left join are distinct over the selected variables when those of its left side are, as far
+     * as they give the join its values, and every solution of the left side is extended by at most one solution of the
+     * right side (an inference inspired by the unique constraints Ontop derives for its left joins): the right side has
+     * distinct solutions over the variables in which the solutions extending one solution of the left side agree, which
+     * are the variables both sides bind always, as both take their values from the left side, the selected variables
+     * the left side does not bind, and the selected variables the right side binds always, which take the value of the
+     * left side where it binds them and of the right side otherwise. A solution of the left side no solution of the
+     * right side extends is the only one made of it.
+     */
+    @Override
+    public boolean isDistinct(Request request, Collection<Variable> selected)
+    {
+        VariableBindings leftBindings = left.getVariableBindings();
+        VariableBindings rightBindings = right.getVariableBindings();
+
+        // a variable both sides may bind takes its value from the left side only where that side binds it always
+        Set<Variable> leftSelected = new HashSet<>();
+
+        for(VariableBinding binding : leftBindings.getValues())
+            if(selected.contains(binding.getVariable())
+                    && (!binding.canBeNull() || rightBindings.get(binding.getVariable()) == null))
+                leftSelected.add(binding.getVariable());
+
+        if(!left.isDistinct(request, leftSelected))
+            return false;
+
+        Set<Variable> rightAgreed = new HashSet<>();
+
+        for(VariableBinding binding : rightBindings.getValues())
+        {
+            Variable variable = binding.getVariable();
+            VariableBinding leftBinding = leftBindings.get(variable);
+
+            if(leftBinding == null ? selected.contains(variable) :
+                    !binding.canBeNull() && (!leftBinding.canBeNull() || selected.contains(variable)))
+                rightAgreed.add(variable);
+        }
+
+        return right.isDistinct(request, rightAgreed);
     }
 
 

@@ -4,11 +4,13 @@ import static java.util.stream.Collectors.toSet;
 import java.sql.SQLException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -1844,6 +1846,86 @@ public final class SqlJoin extends SqlIntercode
     public final List<SqlIntercode> getChilds()
     {
         return childs;
+    }
+
+
+    /**
+     * The solutions of the join are distinct over the selected variables when the children are (see
+     * {@link #isDistinct(Request, List, Collection)}), so that a deduplication over them is left out.
+     */
+    @Override
+    public boolean isDistinct(Request request, Collection<Variable> selected)
+    {
+        return isDistinct(request, childs, selected);
+    }
+
+
+    /**
+     * True if the solutions of a join of the children projected to the selected variables contain no duplicates. The
+     * inference is inspired by the unique constraints that Ontop derives for the joins of its intermediate queries: two
+     * solutions of the join that agree in the selected variables are made of the same solution of every child when the
+     * children can be taken one by one so that each has distinct solutions over variables the two solutions are known
+     * to agree in, which are the selected ones at first and then also the variables of every child taken, as the same
+     * solution of a child gives them the same values. So a child joined by a key of its solutions to the children taken
+     * before (a table referenced by a foreign key, a grouping by the shared variable) keeps the solutions of the join
+     * distinct, and so does a child that a constant restricts to a single solution. A variable tells the solutions of a
+     * child apart only where the child gives the join its value (see {@link #getGivenVariables}).
+     *
+     * @param request the current request
+     * @param childs the children of the join
+     * @param selected the selected variables
+     * @return true if the solutions of the join projected to the selected variables are known to contain no duplicates,
+     *         false otherwise
+     */
+    static boolean isDistinct(Request request, List<SqlIntercode> childs, Collection<Variable> selected)
+    {
+        Set<Variable> agreed = new HashSet<>(selected);
+        List<Integer> undetermined = new ArrayList<>(IntStream.range(0, childs.size()).boxed().toList());
+        boolean progress = true;
+
+        while(progress && !undetermined.isEmpty())
+        {
+            progress = false;
+
+            for(Iterator<Integer> iterator = undetermined.iterator(); iterator.hasNext();)
+            {
+                int index = iterator.next();
+                Set<Variable> given = getGivenVariables(childs, index);
+                Set<Variable> known = new HashSet<>(given);
+                known.retainAll(agreed);
+
+                if(childs.get(index).isDistinct(request, known))
+                {
+                    iterator.remove();
+                    agreed.addAll(given);
+                    progress = true;
+                }
+            }
+        }
+
+        return undetermined.isEmpty();
+    }
+
+
+    /**
+     * The variables whose values in a solution of a join are those of the solution of the child at the index it is made
+     * of: the variables the child binds always, which the other children may only agree with, and those no other child
+     * binds, which the join takes from the child also where it leaves them unbound.
+     *
+     * @param childs the children of the join
+     * @param index the index of the child
+     * @return the variables whose values in a solution of the join are those of the child
+     */
+    private static Set<Variable> getGivenVariables(List<SqlIntercode> childs, int index)
+    {
+        Set<Variable> given = new HashSet<>();
+
+        for(VariableBinding binding : childs.get(index).getVariableBindings().getValues())
+            if(!binding.canBeNull() || IntStream.range(0, childs.size())
+                    .noneMatch(i -> i != index && childs.get(i).getVariable(binding.getVariable()) != null))
+                given.add(binding.getVariable());
+
+        return given;
     }
 
 

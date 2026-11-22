@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryArithmetic.Arithm
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -598,6 +599,28 @@ public final class SqlAggregation extends SqlIntercode
     public final Set<Variable> getGroupVariables()
     {
         return groupVariables;
+    }
+
+
+    /**
+     * Every group gives a single solution (as Ontop takes the grouping variables of an aggregation for its unique
+     * constraint), so the solutions are distinct over the selected variables when they hold every grouping variable
+     * that the groups tell apart by columns and that the solutions keep; a grouping variable without such columns has
+     * the same value in every group.
+     */
+    @Override
+    public boolean isDistinct(Request request, Collection<Variable> selected)
+    {
+        for(Variable variable : groupVariables)
+        {
+            VariableBinding binding = child.getVariableBindings().get(variable);
+
+            if(binding != null && !binding.getNonConstantColumns().isEmpty()
+                    && (!selected.contains(variable) || getVariableBindings().get(variable) == null))
+                return false;
+        }
+
+        return true;
     }
 
 

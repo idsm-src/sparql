@@ -50,6 +50,7 @@ import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -451,6 +452,11 @@ public final class SqlSelect extends SqlIntercode
             optDistinct = false;
         }
 
+        // solutions distinct over the projections by themselves (see SqlIntercode#isDistinct) need no grouping to be
+        // ordered by a variable the select does not project
+        if(optDistinct && optChild.isDistinct(request, projections))
+            optDistinct = false;
+
 
         if(!optDistinct && stripedSimpleOrderBy.isEmpty())
         {
@@ -639,6 +645,9 @@ public final class SqlSelect extends SqlIntercode
                     childRestrictions, childReduced, evalServices);
             optDistinct = false;
         }
+
+        if(optDistinct && optChild.isDistinct(request, bindings.getVariables()))
+            optDistinct = false;
 
 
         if(optChild.equals(SqlNoSolution.get()))
@@ -1385,6 +1394,26 @@ public final class SqlSelect extends SqlIntercode
     public Map<Variable, List<ResourceClass>> getResultDescription()
     {
         return description;
+    }
+
+
+    /**
+     * A sub-select gives the solutions of its child projected to its variables, or the slice of them it picks, so they
+     * are distinct over the selected variables it projects when those of the child are, and over all its variables when
+     * it deduplicates them itself.
+     */
+    @Override
+    public boolean isDistinct(Request request, Collection<Variable> selected)
+    {
+        if(isTopLevel())
+            return false;
+
+        Set<Variable> projected = bindings.getVariables();
+
+        if(distinct && selected.containsAll(projected))
+            return true;
+
+        return child.isDistinct(request, selected.stream().filter(projected::contains).toList());
     }
 
 
