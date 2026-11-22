@@ -10,6 +10,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -61,8 +62,8 @@ import cz.iocb.sparql.testing.Database;
 
 /**
  * Tests of quad mappings over virtual tables: the tables are attached to the generated statements as common table
- * expressions (in dependency order), their declared keys and foreign keys drive the optimiser, and their definitions
- * are validated when the configuration is built.
+ * expressions (in dependency order), not materialized unless their definitions say otherwise, their declared keys and
+ * foreign keys drive the optimiser, and their definitions are validated when the configuration is built.
  */
 public class VirtualTableTest
 {
@@ -168,12 +169,31 @@ public class VirtualTableTest
      */
     private static SparqlDatabaseConfiguration createConfiguration() throws SQLException
     {
+        return createConfiguration(true);
+    }
+
+
+    /**
+     * Configuration mapping the compound table and both virtual tables, whose queries the statements evaluate at every
+     * place reading them, or only where a single place reads them.
+     *
+     * @param inlined whether the statements evaluate the queries of the virtual tables at every place reading them
+     * @return the configuration
+     * @throws SQLException on database errors
+     */
+    private static SparqlDatabaseConfiguration createConfiguration(boolean inlined) throws SQLException
+    {
         SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool, schema, true);
         config.addPrefix("ex", "http://example.org/");
         config.addIriClass(new IntegerUserIriClass("compound", INT4, "http://example.org/compound/"));
 
-        config.addVirtualTable(synonyms, synonymsDefinition());
-        config.addVirtualTable(labeled, labeledDefinition());
+        VirtualTableDefinition synonymsDefinition = synonymsDefinition();
+        synonymsDefinition.setInlined(inlined);
+        VirtualTableDefinition labeledDefinition = labeledDefinition();
+        labeledDefinition.setInlined(inlined);
+
+        config.addVirtualTable(synonyms, synonymsDefinition);
+        config.addVirtualTable(labeled, labeledDefinition);
 
         ConstantIriMapping graph = config.createIriMapping("<http://example.org/graph>");
 
@@ -203,7 +223,25 @@ public class VirtualTableTest
     private static List<List<RdfTerm>> execute(String query)
             throws SQLException, TranslateExceptions, LimitExceedException, ServiceException
     {
-        Engine engine = new Engine(createConfiguration());
+        return execute(createConfiguration(), query);
+    }
+
+
+    /**
+     * Runs the query against the given configuration and collects the rows.
+     *
+     * @param config the configuration
+     * @param query the query without the prefix declaration
+     * @return the result rows
+     * @throws SQLException on database errors
+     * @throws TranslateExceptions if the query has errors
+     * @throws LimitExceedException if a configured limit is exceeded
+     * @throws ServiceException if a federated SERVICE call fails
+     */
+    private static List<List<RdfTerm>> execute(SparqlDatabaseConfiguration config, String query)
+            throws SQLException, TranslateExceptions, LimitExceedException, ServiceException
+    {
+        Engine engine = new Engine(config);
 
         try(Request request = engine.getRequest(); Result result = request.execute(prefix + query))
         {
@@ -226,7 +264,21 @@ public class VirtualTableTest
      */
     private static String translate(String query) throws Exception
     {
-        Engine engine = new Engine(createConfiguration());
+        return translate(createConfiguration(), query);
+    }
+
+
+    /**
+     * The SQL statement the query is translated to under the given configuration.
+     *
+     * @param config the configuration
+     * @param query the query without the prefix declaration
+     * @return the SQL statement
+     * @throws Exception if the query cannot be translated
+     */
+    private static String translate(SparqlDatabaseConfiguration config, String query) throws Exception
+    {
+        Engine engine = new Engine(config);
 
         try(Request request = engine.getRequest())
         {
@@ -378,7 +430,7 @@ public class VirtualTableTest
 
         assertThat(execute(query), containsInAnyOrder(row(string("first"), bool(true)),
                 row(string("second"), bool(true)), row(string("third"), bool(false))));
-        assertThat(translate(query), startsWith("WITH \"compound_synonyms\" AS ("));
+        assertThat(translate(query), startsWith("WITH \"compound_synonyms\" AS NOT MATERIALIZED ("));
     }
 
 
@@ -391,7 +443,7 @@ public class VirtualTableTest
 
         assertThat(execute(query), containsInAnyOrder(row(string("first"), string("first")),
                 row(string("second"), null), row(string("third"), null)));
-        assertThat(translate(query), startsWith("WITH \"compound_synonyms\" AS ("));
+        assertThat(translate(query), startsWith("WITH \"compound_synonyms\" AS NOT MATERIALIZED ("));
     }
 
 
@@ -402,7 +454,7 @@ public class VirtualTableTest
         String query = "SELECT (SUM(IF(EXISTS { ?s ex:synonym ?o }, 1, 0)) AS ?c) WHERE { ?s ex:label ?l }";
 
         assertThat(execute(query), containsInAnyOrder(row(integer(2))));
-        assertThat(translate(query), startsWith("WITH \"compound_synonyms\" AS ("));
+        assertThat(translate(query), startsWith("WITH \"compound_synonyms\" AS NOT MATERIALIZED ("));
     }
 
 
@@ -417,7 +469,7 @@ public class VirtualTableTest
 
         // the statement declares the virtual table and the inline table, each once, which the patterns only read
         String sql = translate(query);
-        assertThat(sql, startsWith("WITH \"compound_synonyms\" AS ("));
+        assertThat(sql, startsWith("WITH \"compound_synonyms\" AS NOT MATERIALIZED ("));
         assertThat(sql, containsString(", \"cte0\" AS (SELECT * FROM (VALUES"));
         assertThat(sql.indexOf(" AS (SELECT * FROM (VALUES"), is(sql.lastIndexOf(" AS (SELECT * FROM (VALUES")));
         assertThat(sql.indexOf("WITH "), is(sql.lastIndexOf("WITH ")));
@@ -445,14 +497,41 @@ public class VirtualTableTest
             // another virtual table; each table follows the tables its query reads
             SqlCode code = new SqlBuilder().append("SELECT x FROM ").append(second).toCode();
 
-            assertEquals("WITH \"compound_synonyms\" AS (" + synonymsDefinition().getQuery()
-                    + "), \"labeled_synonyms\" AS (" + labeledDefinition().getQuery()
+            assertEquals("WITH \"compound_synonyms\" AS NOT MATERIALIZED (" + synonymsDefinition().getQuery()
+                    + "), \"labeled_synonyms\" AS NOT MATERIALIZED (" + labeledDefinition().getQuery()
                     + "), \"cte0\" AS (SELECT 1 AS x), \"cte1\" AS (SELECT x FROM \"cte0\", \"labeled_synonyms\") ",
                     SqlSelect.translateWithClause(request, code));
 
             // a table the code does not read is not declared, even when the text spells its name
             assertEquals("", SqlSelect.translateWithClause(request, new SqlCode("SELECT '\"cte2\"'")));
         }
+    }
+
+
+    @Test
+    @DisplayName("a virtual table read at two places is evaluated at each of them")
+    void notMaterialized() throws Exception
+    {
+        String query = "SELECT ?s ?t WHERE { ?s ex:synonym ?w . ?t ex:synonym ?w FILTER(?s != ?t) }";
+
+        assertThat(execute(query), containsInAnyOrder(row(compound(1), compound(2)), row(compound(2), compound(1))));
+
+        String sql = translate(query);
+        assertThat(sql, startsWith("WITH \"compound_synonyms\" AS NOT MATERIALIZED ("));
+        assertThat(sql.indexOf("FROM \"compound_synonyms\""), not(is(sql.lastIndexOf("FROM \"compound_synonyms\""))));
+    }
+
+
+    @Test
+    @DisplayName("a virtual table whose definition asks for it is left to the database to keep its result")
+    void leftToDatabase() throws Exception
+    {
+        SparqlDatabaseConfiguration config = createConfiguration(false);
+        String query = "SELECT ?s ?t WHERE { ?s ex:synonym ?w . ?t ex:synonym ?w FILTER(?s != ?t) }";
+
+        assertThat(execute(config, query),
+                containsInAnyOrder(row(compound(1), compound(2)), row(compound(2), compound(1))));
+        assertThat(translate(config, query), startsWith("WITH \"compound_synonyms\" AS (SELECT "));
     }
 
 
@@ -552,5 +631,10 @@ public class VirtualTableTest
 
         assertThrows(IllegalArgumentException.class,
                 () -> config.addVirtualTable(synonyms, new VirtualTableDefinition("SELECT 1")));
+
+        VirtualTableDefinition kept = synonymsDefinition();
+        kept.setInlined(false);
+
+        assertThrows(IllegalArgumentException.class, () -> config.addVirtualTable(synonyms, kept));
     }
 }

@@ -715,10 +715,11 @@ public final class SqlSelect extends SqlIntercode
     /**
      * {@code WITH} clause of a statement made of the code: it declares the declared tables the code reads (see
      * {@link SqlCode}) and, transitively, those their own queries read. The virtual tables come first, each one after
-     * the virtual tables its definition reads; the common table expressions follow in the order they were asked for, so
-     * that each one follows the ones its query reads (see {@link CommonTable}), a table whose result the database has
-     * to keep being declared as materialized (see {@link Request#getMaterializedTableExpression}). Empty when there is
-     * nothing to declare.
+     * the virtual tables its definition reads, declared as not materialized unless the definition says otherwise (see
+     * {@link VirtualTableDefinition#setInlined}); the common table expressions follow in the order they were asked for,
+     * so that each one follows the ones its query reads (see {@link CommonTable}), a table whose result the database
+     * has to keep being declared as materialized (see {@link Request#getMaterializedTableExpression}). Empty when there
+     * is nothing to declare.
      *
      * @param request the current request
      * @param code the SQL code of the statement without the clause
@@ -741,8 +742,10 @@ public final class SqlSelect extends SqlIntercode
         for(VirtualTable table : virtual.stream().sorted(comparing(VirtualTable::getName)).toList())
             orderVirtualTable(request.getConfiguration(), table, ordered, new HashSet<>());
 
-        Stream<String> definitions = ordered.entrySet().stream()
-                .map(e -> e.getKey() + " AS (" + e.getValue().getQuery() + ")");
+        // the database evaluates the query of a virtual table at every place reading it, unless its definition says
+        // otherwise (see VirtualTableDefinition#setInlined)
+        Stream<String> definitions = ordered.entrySet().stream().map(e -> e.getKey()
+                + (e.getValue().isInlined() ? " AS NOT MATERIALIZED (" : " AS (") + e.getValue().getQuery() + ")");
 
         Stream<String> expressions = common.stream()
                 .map(t -> t + (t.isMaterialized() ? " AS MATERIALIZED (" : " AS (") + t.getQuery().getText() + ")");

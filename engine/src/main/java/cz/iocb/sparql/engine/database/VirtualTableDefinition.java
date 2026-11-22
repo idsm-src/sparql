@@ -13,7 +13,9 @@ import java.util.Set;
  * (so that the {@code WITH} clause of a generated statement can list them first), and the facts about the table that
  * the optimiser cannot read from the catalog: the columns with their types, nullable columns, unique keys, foreign keys
  * and column pairs that never join. The facts are stated the same way as in {@link DatabaseSchema} and are merged into
- * the schema of the configuration when the table is registered; a mapping may use only the declared columns.
+ * the schema of the configuration when the table is registered; a mapping may use only the declared columns. A
+ * statement declares the table as a common table expression that the database evaluates at every place reading it,
+ * unless the definition says otherwise (see {@link #setInlined}).
  */
 public class VirtualTableDefinition
 {
@@ -81,6 +83,11 @@ public class VirtualTableDefinition
      * Column lists declared never to join.
      */
     private final List<UnjoinableColumns> unjoinableColumns = new ArrayList<>();
+
+    /**
+     * Whether the statements evaluate the query at every place reading the table (see {@link #setInlined}).
+     */
+    private boolean inlined = true;
 
 
     /**
@@ -186,6 +193,24 @@ public class VirtualTableDefinition
 
 
     /**
+     * Sets whether the statements evaluate the query at every place reading the table, which they do by default: the
+     * table is declared {@code AS NOT MATERIALIZED}, so the database evaluates the query in place, with the conditions
+     * of the place, and looks the rows up by the indexes of the tables the query reads, also where a statement reads
+     * the table at several places, whose results it would keep otherwise, reading each of them whole. A table whose
+     * query is expensive and is read whole at several places, or that calls a function that is not deterministic
+     * without being declared volatile, is better declared without it, so that the database keeps the result of the
+     * query read at several places and evaluates in place only a query read at a single place. A query calling a
+     * volatile function is never evaluated in place: the database keeps its result in either case.
+     *
+     * @param inlined whether the statements evaluate the query at every place reading the table
+     */
+    public void setInlined(boolean inlined)
+    {
+        this.inlined = inlined;
+    }
+
+
+    /**
      * SQL query computing the rows of the table.
      *
      * @return SQL query computing the rows of the table
@@ -262,6 +287,17 @@ public class VirtualTableDefinition
     }
 
 
+    /**
+     * Whether the statements evaluate the query at every place reading the table (see {@link #setInlined}).
+     *
+     * @return true if the statements evaluate the query at every place reading the table, false otherwise
+     */
+    public boolean isInlined()
+    {
+        return inlined;
+    }
+
+
     @Override
     public int hashCode()
     {
@@ -282,6 +318,7 @@ public class VirtualTableDefinition
 
         return query.equals(other.query) && dependencies.equals(other.dependencies) && columns.equals(other.columns)
                 && nullableColumns.equals(other.nullableColumns) && primaryKeys.equals(other.primaryKeys)
-                && foreignKeys.equals(other.foreignKeys) && unjoinableColumns.equals(other.unjoinableColumns);
+                && foreignKeys.equals(other.foreignKeys) && unjoinableColumns.equals(other.unjoinableColumns)
+                && inlined == other.inlined;
     }
 }
