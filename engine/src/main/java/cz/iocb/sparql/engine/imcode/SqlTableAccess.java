@@ -1869,6 +1869,70 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
+     * The access of an OPTIONAL as a member of an inner join with the solutions it extends, or null (inspired by Ontop,
+     * which turns a left join into an inner one where a foreign key guarantees the right side a row). The solutions are
+     * made of rows of the referencing access, which binds the shared variables always from the columns of a foreign key
+     * referencing a key of the table of the OPTIONAL by exactly the columns that access binds them from, so every
+     * solution has its row. The access of the OPTIONAL may require nothing more of the row but that one column of its
+     * own be not null, and a variable of its own is unbound in a row in which that column is null (see
+     * {@link #toOptional}), as it is unbound when the OPTIONAL has no solution.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param schema the database schema
+     * @param referencing an access the solutions are made of, binding the shared variables always
+     * @param optional the access of the OPTIONAL
+     * @param shared the variables the access of the OPTIONAL shares with the solutions, bound always by both
+     * @return the access of the OPTIONAL as a member of an inner join, or null
+     */
+    public static SqlTableAccess tryJoinByForeignKey(ClassRelations relations, DatabaseSchema schema,
+            SqlTableAccess referencing, SqlTableAccess optional, Set<Variable> shared)
+    {
+        if(optional.table == null || referencing.table == null || !optional.values.isEmpty())
+            return null;
+
+        Set<Column> columns = new HashSet<>();
+
+        for(Variable variable : shared)
+        {
+            VariableBinding binding = optional.internal.get(variable);
+            VariableBinding other = referencing.internal.get(variable);
+
+            if(binding == null || other == null || binding.canBeNull() || other.canBeNull())
+                return null;
+
+            columns.addAll(binding.getNonConstantColumns());
+        }
+
+        Set<ColumnPair> pairs = getJoinColumnPairs(relations, optional, referencing).stream()
+                .filter(p -> referencing.isKnownNotNull(schema, p.getRight())).collect(toSet());
+
+        if(columns.isEmpty()
+                || schema.getCompatibleForeignKey(optional.table, referencing.table, pairs, columns) == null)
+            return null;
+
+        // the referenced row may be required to hold a column of its own only, besides its key
+        Set<Column> extra = new HashSet<>(optional.conditions.getIsNotNull());
+        extra.removeAll(columns);
+
+        Set<Column> required = new HashSet<>(extra);
+        required.addAll(columns);
+
+        if(extra.size() > 1 || !withoutIsNotNull(optional.conditions, required).isTrue())
+            return null;
+
+        Column column = extra.isEmpty() ? null : extra.iterator().next();
+        VariableBindings bindings = new VariableBindings();
+
+        for(Variable variable : optional.internal.getVariables())
+            bindings.add(shared.contains(variable) ? optional.internal.get(variable) :
+                    toOptional(optional.internal.get(variable), column));
+
+        return new SqlTableAccess(optional.schema, optional.table, withoutIsNotNull(optional.conditions, extra),
+                bindings, optional.reduced, optional.distinctColumns, optional.values);
+    }
+
+
+    /**
      * Merges a distinct union of two accesses related by a foreign key into one access; null otherwise.
      *
      * @param relations declarations which unrelated user IRI classes may overlap

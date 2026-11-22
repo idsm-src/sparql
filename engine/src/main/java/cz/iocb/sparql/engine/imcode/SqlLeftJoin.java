@@ -659,6 +659,17 @@ public final class SqlLeftJoin extends SqlIntercode
                 return merged.optimize(request, scope, restrictions, optReduced, evalServices);
         }
 
+        // an OPTIONAL reading the row of a table that a foreign key of the solutions references is a join (inspired by
+        // Ontop)
+        if(optRight instanceof SqlTableAccess access && optConditions.isEmpty())
+        {
+            SqlTableAccess joined = joinByForeignKey(request, optLeft, access);
+
+            if(joined != null)
+                return SqlJoin.join(request, optLeft, joined).optimize(request, scope, restrictions, optReduced,
+                        evalServices);
+        }
+
 
         if(optLeft == left && optRight == right && optConditions.equals(conditions)
                 && restrictions.isOptimized(relations, bindings)
@@ -729,6 +740,66 @@ public final class SqlLeftJoin extends SqlIntercode
         }
 
         return null;
+    }
+
+
+    /**
+     * The access of an OPTIONAL over the solutions as a member of an inner join with them, when a foreign key of an
+     * access the solutions are made of guarantees every solution a row of its table (see
+     * {@link SqlTableAccess#tryJoinByForeignKey}), or null.
+     *
+     * @param request the current request
+     * @param solutions the solutions the OPTIONAL extends
+     * @param access the access of the OPTIONAL
+     * @return the access as a member of an inner join with the solutions, or null
+     */
+    private static SqlTableAccess joinByForeignKey(Request request, SqlIntercode solutions, SqlTableAccess access)
+    {
+        ClassRelations relations = request.getConfiguration();
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+
+        Set<Variable> shared = new HashSet<>(access.getVariableBindings().getVariables());
+        shared.retainAll(solutions.getVariableBindings().getVariables());
+
+        if(shared.isEmpty() || !joinsBy(solutions, access, shared))
+            return null;
+
+        for(SqlTableAccess referencing : getMadeOf(solutions, shared))
+        {
+            SqlTableAccess joined = SqlTableAccess.tryJoinByForeignKey(relations, schema, referencing, access, shared);
+
+            if(joined != null)
+                return joined;
+        }
+
+        return null;
+    }
+
+
+    /**
+     * The table accesses every solution of the node is made of a row of, which bind the given variables always and give
+     * the solution their values: the node itself, the members of a join, the child of a filter or of a deduplication,
+     * and the left side of a left join or of a difference, as far as each of them binds the variables always.
+     *
+     * @param node the node
+     * @param variables the variables
+     * @return the table accesses every solution of the node is made of, binding the variables always
+     */
+    private static List<SqlTableAccess> getMadeOf(SqlIntercode node, Set<Variable> variables)
+    {
+        if(variables.stream().anyMatch(v -> node.getVariable(v) == null || node.getVariable(v).canBeNull()))
+            return List.of();
+
+        return switch(node)
+        {
+            case SqlTableAccess access -> List.of(access);
+            case SqlJoin join -> join.getChilds().stream().flatMap(c -> getMadeOf(c, variables).stream()).toList();
+            case SqlFilter filter -> getMadeOf(filter.getChild(), variables);
+            case SqlDistinct distinct -> getMadeOf(distinct.getChild(), variables);
+            case SqlLeftJoin join -> getMadeOf(join.left, variables);
+            case SqlMinus minus -> getMadeOf(minus.getLeft(), variables);
+            default -> List.of();
+        };
     }
 
 
