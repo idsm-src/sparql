@@ -430,6 +430,34 @@ public class SqlType
 
 
     /**
+     * SQL condition that two not-null values of the type are identical (see {@link #equal(Column, Column)}), written
+     * for a row of a table looked up by a value of another table: the value of the row is compared with an array
+     * holding the other value, {@code column = ANY(ARRAY[value])}. The database estimates the comparison as the
+     * equality and an index of the column serves it alike, but it can neither hash nor merge two tables by it, nor take
+     * the two values for members of one class of equal values, from which it would derive an equality to join the
+     * tables by; so it can join the tables only by a nested loop looking the rows up for every row of the other table.
+     * A comparison with a constant, which joins nothing, is the equality itself.
+     *
+     * @param column the value of the row looked up, which an index may hold
+     * @param value the value the row is looked up by
+     * @return SQL condition that two not-null values of the type are identical
+     */
+    public SqlCode equalToAny(Column column, Column value)
+    {
+        if(column instanceof ConstantColumn || value instanceof ConstantColumn)
+            return equal(column, value);
+
+        SqlCode any = SqlCode.of("(", column, hasIdentityOperators() ? " operator(sparql.@=) " : " = ", "ANY(ARRAY[",
+                value, "])");
+
+        if(!isFloatingPoint())
+            return SqlCode.of(any, ")");
+
+        return SqlCode.of(any, " AND (", column, " <> '0'::", name, " OR ", image(column), " = ", image(value), "))");
+    }
+
+
+    /**
      * SQL condition that two nullable values of the type are identical or both NULL, the null-safe variant of
      * {@link #equal(Column, Column)}.
      *

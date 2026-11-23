@@ -2817,21 +2817,28 @@ public final class SqlTableAccess extends SqlIntercode
     @Override
     public SqlCode translate(Request request, Scope scope)
     {
-        return translateAccess(request, null, Set.of());
+        return translateAccess(request, null, Set.of(), true);
     }
 
 
     /**
      * The access restricted to the rows compatible with the row of the outer table and fenced like a looked up access
-     * (see {@link #translateLateral}), so that the database looks them up through an index of the table for every row.
+     * (see {@link #translateLateral}), so that the database looks them up through an index of the table for every row;
+     * written in place instead (see {@link #translateInPlace}) when the node is written in place for the rows and the
+     * access can be looked up so (see {@link #canBeLookedUpInPlace}).
      */
     @Override
     SqlCode translateForRow(Request request, Scope scope, JoinOptimizer.Outer outer)
     {
         SqlCode condition = getRowCondition(request.getConfiguration(), outer);
 
-        return condition == null ? translate(request, scope) :
-                translateLateral(request, condition, getRowComparedColumns(request.getConfiguration(), outer));
+        if(condition == null)
+            return translate(request, scope);
+
+        Set<Column> compared = getRowComparedColumns(request.getConfiguration(), outer);
+
+        return outer.inPlace() && canBeLookedUpInPlace() ? translateInPlace(request, condition, compared) :
+                translateLateral(request, condition, compared);
     }
 
 
@@ -2939,6 +2946,29 @@ public final class SqlTableAccess extends SqlIntercode
     SqlCode getLookupCondition(ClassRelations relations, VariableBindings outer, Table table,
             Map<Variable, Set<ResourceClass>> joined)
     {
+        return getLookupCondition(relations, outer, table, joined, false);
+    }
+
+
+    /**
+     * SQL condition that a row of the access is compatible with a row of an outer table, by which the access is looked
+     * up for that row (see {@link #getLookupCondition(ClassRelations, VariableBindings, Table, Map)}), for an access
+     * looked up in place (see {@link #translateInPlace}) or as a subquery of its own (see {@link #translateLateral}).
+     * In place, the values are compared by conditions the database cannot hash (see {@link #generateLookupCondition}),
+     * so that it still looks the rows up for every outer row when it merges the access into its join with the outer
+     * rows.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param outer bindings of the outer rows
+     * @param table alias the columns of the outer rows are addressed through
+     * @param joined classes per variable in the whole join the access is a child of (see {@link #getJoinedClasses}); a
+     *            variable without an entry compares all its classes
+     * @param inPlace whether the access is looked up in place
+     * @return SQL condition over the columns of the table and of the outer table, or null
+     */
+    SqlCode getLookupCondition(ClassRelations relations, VariableBindings outer, Table table,
+            Map<Variable, Set<ResourceClass>> joined, boolean inPlace)
+    {
         // the values converted to the classes of the columns, addressed through the alias already, and the columns
         // they are compared with; the other variables are compared as a join compares them
         VariableBindings converted = new VariableBindings();
@@ -2965,10 +2995,34 @@ public final class SqlTableAccess extends SqlIntercode
             held.add(new VariableBinding(value.getVariable(), inner.getMappings(), false));
         }
 
-        SqlCode direct = generateJoinCondition(relations, converted, held, null, null, joined);
-        SqlCode general = generateJoinCondition(relations, others, internal, table, null, joined);
+        SqlCode direct = inPlace ? generateLookupCondition(relations, converted, held, null, null, joined) :
+                generateJoinCondition(relations, converted, held, null, null, joined);
+        SqlCode general = inPlace ? generateLookupCondition(relations, others, internal, table, null, joined) :
+                generateJoinCondition(relations, others, internal, table, null, joined);
 
         return direct == null ? general : general == null ? direct : SqlCode.of(direct, " AND ", general);
+    }
+
+
+    /**
+     * The variables whose values in the rows of an outer table the condition looking the access up for a row (see
+     * {@link #getLookupCondition}) converts to the class of the columns of the access (see {@link #isConvertedFor}):
+     * every row binds them, and the condition compares them with the columns strictly, so the solutions of the lookup
+     * hold the same value of such a variable in the access and in the outer row.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param outer bindings of the outer rows
+     * @return the variables whose values the lookup converts to the class of the columns of the access
+     */
+    Set<Variable> getConvertedVariables(ClassRelations relations, VariableBindings outer)
+    {
+        Set<Variable> variables = new HashSet<>();
+
+        for(VariableBinding value : outer.getValues())
+            if(internal.get(value.getVariable()) != null && isConvertedFor(relations, value))
+                variables.add(value.getVariable());
+
+        return variables;
     }
 
 
@@ -3025,7 +3079,9 @@ public final class SqlTableAccess extends SqlIntercode
 
     /**
      * SQL condition restricting the rows of the access to those compatible with a row of the outer table: its columns
-     * equal the values of the row (see {@link #getRowVariables}). Null when no variable restricts the access.
+     * equal the values of the row (see {@link #getRowVariables}), compared as an access looked up in place compares
+     * them when the node is written in place for the rows and the access can be looked up so (see
+     * {@link #canBeLookedUpInPlace}). Null when no variable restricts the access.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param outer the rows the access is evaluated for one by one
@@ -3038,7 +3094,8 @@ public final class SqlTableAccess extends SqlIntercode
         for(Variable variable : getRowVariables(relations, outer))
             values.add(outer.bindings().get(variable));
 
-        return getLookupCondition(relations, values, outer.table(), Map.of());
+        return getLookupCondition(relations, values, outer.table(), Map.of(),
+                outer.inPlace() && canBeLookedUpInPlace());
     }
 
 
@@ -3075,21 +3132,79 @@ public final class SqlTableAccess extends SqlIntercode
      */
     public SqlCode translateLateral(Request request, SqlCode correlatedCondition, Set<Column> compared)
     {
-        return translateAccess(request, correlatedCondition, compared);
+        return translateAccess(request, correlatedCondition, compared, true);
     }
 
 
     /**
-     * SQL code of the access, restricted and fenced for a lateral join when the correlated condition is given (see
-     * {@link #translateLateral}). It reads the table of the access, which the statement has to declare when it is a
-     * virtual one.
+     * SQL code of the access looked up in place for a row of the outer tables: restricted by the correlated condition
+     * as by {@link #translateLateral}, but not fenced, so that the database merges the subquery into its join with the
+     * outer tables. The condition compares the values of the outer row by conditions the database cannot hash (see
+     * {@link #getLookupCondition(ClassRelations, VariableBindings, Table, Map, boolean)}), so the database still looks
+     * the rows up through an index of the table for every outer row, now by a nested loop of the join itself, which it
+     * can hand to parallel workers, whereas it evaluates a fenced subquery reading the outer row only in the process
+     * reading the outer rows. Only an access that can be looked up so is written so (see
+     * {@link #canBeLookedUpInPlace}).
+     *
+     * @param request the current request
+     * @param correlatedCondition SQL condition over the columns of the table and of the outer tables
+     * @param compared columns of the access that the correlated condition compares strictly, rejecting a row whose
+     *            column is null (see {@link #getLookupComparedColumns}), so that their null tests are left out
+     * @return SQL code of the access looked up in place for a row of the outer tables
+     */
+    SqlCode translateInPlace(Request request, SqlCode correlatedCondition, Set<Column> compared)
+    {
+        return translateAccess(request, correlatedCondition, compared, false);
+    }
+
+
+    /**
+     * True if the access can be looked up in place (see {@link #translateInPlace}): it reads a table of the database,
+     * as a virtual table may be a query the database does not merge into the query reading it, which a condition
+     * comparing it with another table then does not reach, and it neither deduplicates its rows nor tests whether the
+     * table has a row, so that the database merges its subquery into the query around it.
+     *
+     * @return true if the access can be looked up in place, false otherwise
+     */
+    boolean canBeLookedUpInPlace()
+    {
+        return table instanceof DatabaseTable && !isDeduplicating() && !isExistenceTest();
+    }
+
+
+    /**
+     * True if the access just tests whether the table has a row meeting its conditions: it is reduced and binds
+     * constants only, so it is written as an existence test of the table (see {@link #translateAccess}).
+     *
+     * @return true if the access tests whether the table has a row, false otherwise
+     */
+    private boolean isExistenceTest()
+    {
+        if(!reduced || table == null)
+            return false;
+
+        for(VariableBinding binding : bindings.getValues())
+            for(List<Column> columns : binding.getMappings().values())
+                if(columns != null && !columns.stream().allMatch(column -> column instanceof ConstantColumn))
+                    return false;
+
+        return true;
+    }
+
+
+    /**
+     * SQL code of the access, restricted for a lateral join when the correlated condition is given, and fenced then
+     * unless it is looked up in place (see {@link #translateLateral} and {@link #translateInPlace}). It reads the table
+     * of the access, which the statement has to declare when it is a virtual one.
      *
      * @param request the current request
      * @param correlatedCondition SQL condition over the columns of the table and of the outer tables, or null
      * @param correlatedColumns columns of the access that the correlated condition compares strictly
+     * @param fenced whether the access restricted by the correlated condition is fenced by {@code OFFSET 0}
      * @return SQL code of the access
      */
-    private SqlCode translateAccess(Request request, SqlCode correlatedCondition, Set<Column> correlatedColumns)
+    private SqlCode translateAccess(Request request, SqlCode correlatedCondition, Set<Column> correlatedColumns,
+            boolean fenced)
     {
         // the values of the current solution restrict the rows along with the conditions
         SqlCode valueCondition = translateValues(request.getConfiguration());
@@ -3100,14 +3215,6 @@ public final class SqlTableAccess extends SqlIntercode
                 correlatedCondition == null ? valueCondition : SqlCode.of(valueCondition, " AND ", correlatedCondition);
 
         Map<Column, Column> rev = getExpressions();
-
-        boolean canBeLimited = reduced;
-
-        for(VariableBinding binding : bindings.getValues())
-            for(List<Column> columns : binding.getMappings().values())
-                canBeLimited &= columns == null
-                        || columns.stream().allMatch(column -> column instanceof ConstantColumn);
-
 
         // when the duplicates do not matter to the parent, the deduplication is left out entirely
         boolean distinct = isDeduplicating();
@@ -3135,7 +3242,7 @@ public final class SqlTableAccess extends SqlIntercode
         // a reduced access binding constants only just tests whether the table has a matching row; the test is an
         // EXISTS subquery and not a LIMIT 1, because a subquery with LIMIT is never parallel-safe for the planner and
         // one such member makes the whole UNION ALL or join around it sequential
-        boolean existence = canBeLimited && table != null;
+        boolean existence = isExistenceTest();
 
         SqlBuilder builder = new SqlBuilder();
 
@@ -3171,7 +3278,7 @@ public final class SqlTableAccess extends SqlIntercode
         if(existence)
             builder.append(")");
 
-        if(correlatedCondition != null)
+        if(correlatedCondition != null && fenced)
             builder.append(" OFFSET 0");
 
         return builder.toCode();

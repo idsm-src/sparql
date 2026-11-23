@@ -336,6 +336,11 @@ public class Request implements AutoCloseable
     private long timeout;
 
     /**
+     * Whether the database may evaluate the statement of the request by parallel workers (see {@link #isParallel}).
+     */
+    private boolean parallel;
+
+    /**
      * Whether the request was cancelled; set by another thread than the one evaluating the request.
      */
     private volatile boolean canceled;
@@ -556,6 +561,11 @@ public class Request implements AutoCloseable
             BigInteger newLimit = syntaxTree instanceof AskQuery || limit <= 0 ? null : BigInteger.valueOf(limit);
 
             commonTableExpressions.clear();
+
+            // the database evaluates a statement by parallel workers only when it is read whole, as it evaluates one
+            // read by fetches without them, and when the session allows them; the joins the optimizer has chosen are
+            // then written so that the workers can evaluate them (see SqlJoin.translateTree)
+            parallel = config.isJoinOptimizerEnabled() && fetchSize == 0 && allowsParallelWorkers();
 
             TranslateVisitor translateVisitor = new TranslateVisitor(this);
             SqlSelect imcode = translateVisitor.translate(syntaxTree, newOffset, newLimit, order);
@@ -1487,5 +1497,45 @@ public class Request implements AutoCloseable
     public boolean isServiceReorderEnabled()
     {
         return serviceReorder;
+    }
+
+
+    /**
+     * True if the database may evaluate the statement of the request by parallel workers, which is decided before the
+     * query is translated (see {@link #execute(PreparedQuery, List, int, int, int, long, int)}): the join optimizer is
+     * on, the statement is read whole, as the database evaluates a statement read by fetches without workers, and the
+     * session allows workers ({@code max_parallel_workers_per_gather}). The lookups the optimizer has chosen are then
+     * written so that the workers can do them (see {@link cz.iocb.sparql.engine.imcode.SqlTableAccess}), whereas
+     * otherwise they stay subqueries of their own, which the database evaluates only in the process reading the rows
+     * they are looked up for, but whose comparisons cost less and whose results it may keep for the values looked up.
+     * False for a query translated without being executed.
+     *
+     * @return true if the database may evaluate the statement of the request by parallel workers, false otherwise
+     */
+    public boolean isParallel()
+    {
+        return parallel;
+    }
+
+
+    /**
+     * True if the session of the request allows the database to evaluate a statement by parallel workers.
+     *
+     * @return true if the session allows parallel workers, false otherwise
+     * @throws SQLException when the setting cannot be read, or with the SQL state 57014 when the time limit of the
+     *             request has elapsed, or when the request has been cancelled (see {@link #getStatement(int)})
+     */
+    private boolean allowsParallelWorkers() throws SQLException
+    {
+        try
+        {
+            return lookup(List.of("SELECT current_setting('max_parallel_workers_per_gather')::integer > 0"),
+                    result -> result.next() && result.getBoolean(1)).get(0);
+        }
+        catch(SQLRuntimeException e)
+        {
+            // the statement of an elapsed or cancelled request
+            throw(SQLException) e.getCause();
+        }
     }
 }

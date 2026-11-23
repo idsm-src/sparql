@@ -1855,12 +1855,60 @@ public abstract class SqlIntercode extends SqlBaseClass
     public static SqlCode generateJoinCondition(ClassRelations relations, VariableBindings left, VariableBindings right,
             Table leftTable, Table rightTable, Map<Variable, Set<ResourceClass>> joined)
     {
+        return generateCondition(relations, left, right, leftTable, rightTable, joined, false);
+    }
+
+
+    /**
+     * SQL condition that every variable a node looked up for the rows of an outer table shares with the rows is
+     * compatible on both sides, as
+     * {@link #generateJoinCondition(ClassRelations, VariableBindings, VariableBindings, Table, Table, Map)} writes it,
+     * except that the values it compares by an equality (see {@link SqlType#equal}) are compared by
+     * {@link SqlType#equalToAny}, the value of the node with the value of the row: the database can then join the node
+     * with the rows only by a nested loop that looks the node up for every row, through an index of the node where one
+     * serves the comparison, and as the node need not be a subquery of its own reading the row as a parameter, which
+     * the database evaluates only in the process reading the rows, it can hand that loop to parallel workers.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param outer bindings of the outer rows
+     * @param node bindings of the node looked up
+     * @param outerTable alias the columns of the outer rows are addressed through, or null
+     * @param nodeTable alias the columns of the node are addressed through, or null
+     * @param joined classes per variable in the whole join; a variable without an entry compares all its classes
+     * @return SQL condition that every shared variable is compatible on both sides, or null if it always holds
+     */
+    public static SqlCode generateLookupCondition(ClassRelations relations, VariableBindings outer,
+            VariableBindings node, Table outerTable, Table nodeTable, Map<Variable, Set<ResourceClass>> joined)
+    {
+        return generateCondition(relations, outer, node, outerTable, nodeTable, joined, true);
+    }
+
+
+    /**
+     * SQL condition that every shared variable of two sides is compatible on both of them, comparing only the pairs of
+     * classes that meet a class the variable takes in the whole join, or null if it always holds (see
+     * {@link #generateJoinCondition(ClassRelations, VariableBindings, VariableBindings, Table, Table, Map)} and
+     * {@link #generateLookupCondition}).
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param left bindings of the left side
+     * @param right bindings of the right side
+     * @param leftTable the left table
+     * @param rightTable the right table
+     * @param joined classes per variable in the whole join; a variable without an entry compares all its classes
+     * @param lookup whether the right side is looked up for the rows of the left one, so that the values compared by an
+     *            equality are compared by {@link SqlType#equalToAny}
+     * @return SQL condition that every shared variable is compatible on both sides, or null if it always holds
+     */
+    private static SqlCode generateCondition(ClassRelations relations, VariableBindings left, VariableBindings right,
+            Table leftTable, Table rightTable, Map<Variable, Set<ResourceClass>> joined, boolean lookup)
+    {
         Set<SqlCode> join = new HashSet<>();
 
         for(VariableBindingPair pair : VariableBindingPair.getPairs(relations, left, right))
         {
             SqlCode condition = generateJoinCondition(relations, pair, leftTable, rightTable,
-                    joined.get(pair.getVariable()));
+                    joined.get(pair.getVariable()), lookup);
 
             if(condition != null)
                 join.add(condition);
@@ -1891,7 +1939,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             return null;
 
         return generateJoinCondition(relations, new VariableBindingPair(relations, leftBinding, rightBinding),
-                leftTable, rightTable, null);
+                leftTable, rightTable, null, false);
     }
 
 
@@ -1906,10 +1954,12 @@ public abstract class SqlIntercode extends SqlBaseClass
      * @param leftTable the left table
      * @param rightTable the right table
      * @param joined classes the variable takes in the whole join, or null to compare all pairs of classes
+     * @param lookup whether the right side is looked up for the rows of the left one, so that the values compared by an
+     *            equality are compared by {@link SqlType#equalToAny}
      * @return SQL condition that the paired variable is compatible on both sides, or null if it always holds
      */
     private static SqlCode generateJoinCondition(ClassRelations relations, VariableBindingPair pair, Table leftTable,
-            Table rightTable, Set<ResourceClass> joined)
+            Table rightTable, Set<ResourceClass> joined, boolean lookup)
     {
         VariableBinding leftBinding = pair.getLeftVariableBinding();
         VariableBinding rightBinding = pair.getRightVariableBinding();
@@ -1957,7 +2007,7 @@ public abstract class SqlIntercode extends SqlBaseClass
                 }
                 else if(!unionClass.isOptionalColumn(i))
                 {
-                    compare.add(type.equal(leftCol, rightCol));
+                    compare.add(lookup ? type.equalToAny(rightCol, leftCol) : type.equal(leftCol, rightCol));
                 }
                 else if(leftCol instanceof NullColumn)
                 {
@@ -1969,7 +2019,7 @@ public abstract class SqlIntercode extends SqlBaseClass
                 }
                 else if(!leftCol.canBeNull() || !rightCol.canBeNull())
                 {
-                    compare.add(type.equal(leftCol, rightCol));
+                    compare.add(lookup ? type.equalToAny(rightCol, leftCol) : type.equal(leftCol, rightCol));
                 }
                 else
                 {

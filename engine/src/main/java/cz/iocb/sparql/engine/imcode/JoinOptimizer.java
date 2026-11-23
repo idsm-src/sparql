@@ -240,9 +240,37 @@ final class JoinOptimizer
      * @param bindings bindings of the variables by whose values in a row the node can be restricted to its solutions
      *            compatible with the row: the variables every row binds, in a single class
      * @param table alias the columns of the rows are addressed through
+     * @param inPlace whether the node is written in place for the rows: its accesses compare their columns with the
+     *            values of the row by conditions the database cannot hash, without a fence (see
+     *            {@link SqlTableAccess#translateInPlace}), so that the database merges the node into its join with the
+     *            rows, which it can hand to parallel workers, whereas it evaluates a fenced subquery reading the row
+     *            only in the process reading the rows
      */
-    record Outer(VariableBindings bindings, Table table)
+    record Outer(VariableBindings bindings, Table table, boolean inPlace)
     {
+        /**
+         * The rows with the given bindings, for a node written as a subquery of its own, fenced where it reads the row.
+         *
+         * @param bindings bindings of the variables by whose values in a row the node can be restricted
+         * @param table alias the columns of the rows are addressed through
+         */
+        Outer(VariableBindings bindings, Table table)
+        {
+            this(bindings, table, false);
+        }
+
+
+        /**
+         * The same rows for a node written in place (see {@link #inPlace}).
+         *
+         * @return the same rows for a node written in place
+         */
+        Outer withInPlace()
+        {
+            return new Outer(bindings, table, true);
+        }
+
+
         /**
          * The rows with the given bindings for a node with the given bindings: of the variables the node binds too,
          * those are kept that every row binds in a single class, because the value of such a variable is compared with
@@ -294,7 +322,8 @@ final class JoinOptimizer
         /**
          * The rows a child of a node is evaluated for when the node is evaluated for these rows and only the given
          * variables restrict the child the way they restrict the node: the rows with the bindings of those variables
-         * alone, or null when none of them is left, so that the child is evaluated whole.
+         * alone, for a child written in place when the node is, or null when none of them is left, so that the child is
+         * evaluated whole.
          *
          * @param variables the variables whose values restrict the child
          * @return the rows the child is evaluated for one by one, or null when it is evaluated whole
@@ -307,7 +336,7 @@ final class JoinOptimizer
                 if(variables.contains(binding.getVariable()))
                     kept.add(binding);
 
-            return kept.getVariables().isEmpty() ? null : new Outer(kept, table);
+            return kept.getVariables().isEmpty() ? null : new Outer(kept, table, inPlace);
         }
     }
 

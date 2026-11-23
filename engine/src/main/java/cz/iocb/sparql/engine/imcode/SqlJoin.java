@@ -1251,7 +1251,8 @@ public final class SqlJoin extends SqlIntercode
 
             JoinOptimizer.Plan plan = getPlan(request, outer);
 
-            translateTree(request, scope, plan.root(), plan.first(), plan.equalities(), joined, outer, builder);
+            translateTree(request, scope, plan.root(), plan.first(), plan.equalities(), joined, outer, new HashMap<>(),
+                    builder);
             return builder.toCode();
         }
 
@@ -1295,6 +1296,19 @@ public final class SqlJoin extends SqlIntercode
      * all the rows of the access, whereas it takes the rows meeting the conditions of an access it reads the first rows
      * of to lie evenly in the table and scans the table for them, also where they all lie at its end, like the triples
      * of a predicate in a table ordered by the predicate.
+     * <p>
+     * Where the database may evaluate the statement by parallel workers (see {@link Request#isParallel}), or the join
+     * is written in place for the rows of an outer table (see {@link JoinOptimizer.Outer#inPlace}), an access that can
+     * be looked up in place is looked up so (see {@link SqlTableAccess#translateInPlace}): the database merges it into
+     * the join and looks it up by a nested loop it can hand to the workers, whereas it evaluates a fenced subquery
+     * reading the outer tree only in the process reading the tree. The comparisons of such a lookup are no equalities
+     * to the database, but the database would take the equalities that a hash join above compares a variable of the
+     * access and of another child of its side by, both with a third child, for members of one class of equal values,
+     * and derive from it an equality of the access and the other child, by which it would hash them instead of looking
+     * the access up. So a hash join leaves the variables that such a lookup compares strictly out of the comparisons of
+     * the access: the child of the outer tree it compares them with is on the same side of the hash join and holds the
+     * same values, and the hash join compares that child (or, where that one is looked up in place by the variable as
+     * well, the child it is looked up by).
      *
      * @param request the current request
      * @param scope the scope of the join
@@ -1303,12 +1317,15 @@ public final class SqlJoin extends SqlIntercode
      * @param equalities the equalities of the filters above the join that the children are joined on
      * @param joined classes per variable in the whole join (see {@link #getJoinedClasses})
      * @param outer the rows the join is evaluated for one by one, or null when it is evaluated once
+     * @param replaced the variables of each child looked up in place that its lookup compares strictly with a child of
+     *            the outer tree (see {@link SqlTableAccess#getConvertedVariables}), which the hash joins above compare
+     *            by the other child; filled in as the lookups of the tree are written
      * @param builder the SQL code being built
      * @return the children of the tree, as a bit per child
      */
     private int translateTree(Request request, Scope scope, JoinOptimizer.Node node, int first,
             List<JoinOptimizer.Equality> equalities, Map<Variable, Set<ResourceClass>> joined,
-            JoinOptimizer.Outer outer, SqlBuilder builder)
+            JoinOptimizer.Outer outer, Map<Integer, Set<Variable>> replaced, SqlBuilder builder)
     {
         ClassRelations relations = request.getConfiguration();
 
@@ -1328,8 +1345,12 @@ public final class SqlJoin extends SqlIntercode
 
         if(node instanceof JoinOptimizer.Lookup lookup)
         {
-            int outerChilds = translateTree(request, scope, lookup.outer(), first, equalities, joined, outer, builder);
+            int outerChilds = translateTree(request, scope, lookup.outer(), first, equalities, joined, outer, replaced,
+                    builder);
             SqlTableAccess access = (SqlTableAccess) childs.get(lookup.child());
+
+            // the access is looked up in place where the database may hand the nested loop to parallel workers
+            boolean inPlace = (outer == null ? request.isParallel() : outer.inPlace()) && access.canBeLookedUpInPlace();
 
             List<SqlCode> conditions = new ArrayList<>();
 
@@ -1342,13 +1363,17 @@ public final class SqlJoin extends SqlIntercode
                     continue;
 
                 SqlCode condition = access.getLookupCondition(relations, childs.get(i).getVariableBindings(),
-                        tables.get(i), joined);
+                        tables.get(i), joined, inPlace);
 
                 if(condition != null)
                 {
                     conditions.add(condition);
                     compared.addAll(access.getLookupComparedColumns(relations, childs.get(i).getVariableBindings()));
                 }
+
+                if(inPlace)
+                    replaced.computeIfAbsent(lookup.child(), _ -> new HashSet<>())
+                            .addAll(access.getConvertedVariables(relations, childs.get(i).getVariableBindings()));
             }
 
             // the values an outer child gives a variable that a filter requires to be the variable of the access
@@ -1363,7 +1388,7 @@ public final class SqlJoin extends SqlIntercode
                 VariableBindings value = new VariableBindings();
                 value.add(equality.getRenamed(childs, other));
 
-                SqlCode condition = access.getLookupCondition(relations, value, tables.get(other), Map.of());
+                SqlCode condition = access.getLookupCondition(relations, value, tables.get(other), Map.of(), inPlace);
 
                 if(condition != null)
                 {
@@ -1380,9 +1405,12 @@ public final class SqlJoin extends SqlIntercode
                 compared.addAll(access.getRowComparedColumns(relations, outer));
             }
 
+            SqlCode condition = conditions.isEmpty() ? SqlCode.TRUE :
+                    conditions.stream().collect(SqlCode.joining(" AND ", "(", ")"));
+
             builder.append(" CROSS JOIN LATERAL (");
-            builder.append(access.translateLateral(request, conditions.isEmpty() ? SqlCode.TRUE :
-                    conditions.stream().collect(SqlCode.joining(" AND ", "(", ")")), compared));
+            builder.append(inPlace ? access.translateInPlace(request, condition, compared) :
+                    access.translateLateral(request, condition, compared));
             builder.append(") AS ");
             builder.append(tables.get(lookup.child()));
 
@@ -1391,10 +1419,11 @@ public final class SqlJoin extends SqlIntercode
 
         JoinOptimizer.HashJoin join = (JoinOptimizer.HashJoin) node;
 
-        int left = translateTree(request, scope, join.left(), first, equalities, joined, outer, builder);
+        int left = translateTree(request, scope, join.left(), first, equalities, joined, outer, replaced, builder);
 
         SqlBuilder rightBuilder = new SqlBuilder();
-        int right = translateTree(request, scope, join.right(), first, equalities, joined, outer, rightBuilder);
+        int right = translateTree(request, scope, join.right(), first, equalities, joined, outer, replaced,
+                rightBuilder);
 
         List<SqlCode> conditions = new ArrayList<>();
 
@@ -1408,8 +1437,10 @@ public final class SqlJoin extends SqlIntercode
                 if((right >> j & 1) == 0)
                     continue;
 
-                SqlCode condition = generateJoinCondition(relations, childs.get(i).getVariableBindings(),
-                        childs.get(j).getVariableBindings(), tables.get(i), tables.get(j), joined);
+                SqlCode condition = generateJoinCondition(relations,
+                        withoutVariables(childs.get(i).getVariableBindings(), replaced.get(i)),
+                        withoutVariables(childs.get(j).getVariableBindings(), replaced.get(j)), tables.get(i),
+                        tables.get(j), joined);
 
                 if(condition != null)
                     conditions.add(condition);
@@ -1467,6 +1498,28 @@ public final class SqlJoin extends SqlIntercode
     private static SqlCode translateChild(Request request, Scope scope, SqlIntercode child, JoinOptimizer.Outer outer)
     {
         return outer == null ? child.translate(request, scope) : child.translateForRow(request, scope, outer);
+    }
+
+
+    /**
+     * The bindings without those of the given variables (see {@link #translateTree}).
+     *
+     * @param bindings the bindings
+     * @param variables the variables left out, or null for none
+     * @return the bindings without those of the variables
+     */
+    private static VariableBindings withoutVariables(VariableBindings bindings, Set<Variable> variables)
+    {
+        if(variables == null || variables.isEmpty())
+            return bindings;
+
+        VariableBindings result = new VariableBindings();
+
+        for(VariableBinding binding : bindings.getValues())
+            if(!variables.contains(binding.getVariable()))
+                result.add(binding);
+
+        return result;
     }
 
 

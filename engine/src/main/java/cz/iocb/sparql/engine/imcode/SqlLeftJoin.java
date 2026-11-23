@@ -1209,6 +1209,12 @@ public final class SqlLeftJoin extends SqlIntercode
         if(apart != null)
             return apart;
 
+        // the right side evaluated for every solution of the left side is written in place where the database may hand
+        // the nested loop to parallel workers (see SqlJoin.translateTree), and the shared variables are then compared
+        // by conditions the database can neither hash nor merge, which would let it hash the sides instead
+        boolean inPlace = plan != null && plan.bound() == null && plan.outer() != null
+                && (outer == null ? request.isParallel() : outer.inPlace());
+
         SqlBuilder builder = new SqlBuilder();
 
         Set<Column> columns = bindings.getNonConstantColumns();
@@ -1235,7 +1241,7 @@ public final class SqlLeftJoin extends SqlIntercode
         else if(plan != null && plan.outer() != null)
         {
             builder.append(" LEFT JOIN LATERAL (");
-            builder.append(right.translateForRow(request, scope, plan.outer()));
+            builder.append(right.translateForRow(request, scope, inPlace ? plan.outer().withInPlace() : plan.outer()));
         }
         else
         {
@@ -1246,7 +1252,7 @@ public final class SqlLeftJoin extends SqlIntercode
         builder.append(" ) AS ");
         builder.appendAlias(rightTable);
         builder.append(" ON ");
-        appendCondition(builder, relations, left.bindings);
+        appendCondition(builder, relations, left.bindings, inPlace);
 
         return builder.toCode();
     }
@@ -1262,8 +1268,28 @@ public final class SqlLeftJoin extends SqlIntercode
      */
     private void appendCondition(SqlBuilder builder, ClassRelations relations, VariableBindings leftBindings)
     {
-        SqlCode condition = generateJoinCondition(relations, leftBindings, right.getVariableBindings(), leftTable,
-                rightTable);
+        appendCondition(builder, relations, leftBindings, false);
+    }
+
+
+    /**
+     * Appends the condition of the join (see {@link #appendCondition(SqlBuilder, ClassRelations, VariableBindings)}),
+     * for a right side looked up for every solution of the left side in place (see {@link JoinOptimizer.Outer#inPlace})
+     * or not: in place, the shared variables are compared as the right side is compared with the solutions it is looked
+     * up for (see {@link #generateLookupCondition}).
+     *
+     * @param builder the builder of the SQL code
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param leftBindings bindings of the left side
+     * @param inPlace whether the right side is looked up for every solution of the left side in place
+     */
+    private void appendCondition(SqlBuilder builder, ClassRelations relations, VariableBindings leftBindings,
+            boolean inPlace)
+    {
+        SqlCode condition = inPlace ?
+                generateLookupCondition(relations, leftBindings, right.getVariableBindings(), leftTable, rightTable,
+                        Map.of()) :
+                generateJoinCondition(relations, leftBindings, right.getVariableBindings(), leftTable, rightTable);
 
         if(condition != null)
             builder.append(condition);

@@ -246,7 +246,8 @@ public class LookupTest
         {
             int before = calls.get();
 
-            // an evaluation adds a call setting the planner up for the joins the engine has chosen and the query itself
+            // an evaluation adds a call asking whether the session allows parallel workers, a call setting the planner
+            // up for the joins the engine has chosen and the query itself
             try(Result result = request.execute(prefix + query))
             {
                 int rows = 0;
@@ -257,7 +258,7 @@ public class LookupTest
                 assertThat(rows, is(40));
             }
 
-            assertThat(calls.get() - before, is(3));
+            assertThat(calls.get() - before, is(4));
         }
     }
 }
