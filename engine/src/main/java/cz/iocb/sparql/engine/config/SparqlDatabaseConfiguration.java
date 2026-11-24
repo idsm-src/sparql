@@ -242,6 +242,12 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     protected boolean joinOptimizer = false;
 
     /**
+     * Whether the planner is made to keep the joins the join optimizer chooses by plan advice (see
+     * {@link #setPlanAdvice}).
+     */
+    protected boolean planAdvice = false;
+
+    /**
      * Settings of the calls of the remote SERVICE endpoints that have no settings of their own.
      */
     protected ServiceSettings serviceSettings = ServiceSettings.DEFAULT;
@@ -2197,6 +2203,42 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     public boolean isJoinOptimizerEnabled()
     {
         return joinOptimizer;
+    }
+
+
+    /**
+     * Chooses how the planner is made to keep the joins the join optimizer chooses (see {@link #setJoinOptimizer}).
+     * Without plan advice, the default, the statement runs under settings that make the planner keep the order of the
+     * joins as written and hash every join it can, and an index lookup is written as a lateral subquery fenced by
+     * {@code OFFSET 0}, which the database evaluates in the process reading the outer rows, or, where the database may
+     * evaluate the statement by parallel workers, merged into the join and compared by conditions it cannot hash (see
+     * {@link cz.iocb.sparql.engine.request.Request#isParallel}). With plan advice, the lookups are plain joins of the
+     * statement, which the database can hand to the workers and cache by the values they are looked up by (Memoize),
+     * and the advice of the module {@code pg_plan_advice} makes the planner look them up by nested loops (see
+     * {@link cz.iocb.sparql.engine.database.PlanAdvice}); a statement with a lookup is planned once more for it, for
+     * the planner to tell the identifiers of its relations, and once again when a lookup is memoized. The module comes
+     * with PostgreSQL 19 and later and has to be loaded in the sessions of the data source, by
+     * {@code session_preload_libraries} or {@code shared_preload_libraries}, as only a superuser may load it in a
+     * session. The tables looked up are given aliases of their own, so the expressions of the mappings must not qualify
+     * the columns by the names of their tables.
+     *
+     * @param enabled whether the planner is made to keep the joins by plan advice
+     */
+    public void setPlanAdvice(boolean enabled)
+    {
+        planAdvice = enabled;
+    }
+
+
+    /**
+     * True if the planner is made to keep the joins the join optimizer chooses by plan advice (see
+     * {@link #setPlanAdvice}).
+     *
+     * @return true if the planner is made to keep the joins by plan advice, false otherwise
+     */
+    public boolean isPlanAdviceEnabled()
+    {
+        return planAdvice;
     }
 
 

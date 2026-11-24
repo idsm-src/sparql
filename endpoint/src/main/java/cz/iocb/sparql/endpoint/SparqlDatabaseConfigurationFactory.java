@@ -12,15 +12,19 @@ import javax.naming.RefAddr;
 import javax.naming.Reference;
 import javax.naming.spi.ObjectFactory;
 import javax.sql.DataSource;
+import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 
 
 
 /**
- * JNDI object factory creating the deployment's {@link cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration}: the
- * class named by the reference is instantiated through its {@code (String service, DataSource, DatabaseSchema)}
- * constructor, with the data source looked up by the {@code datasource} address and the optional {@code service} IRI
- * address of the reference.
+ * JNDI object factory creating the deployment's {@link SparqlDatabaseConfiguration}: the class named by the reference
+ * is instantiated through its {@code (String service, DataSource, DatabaseSchema)} constructor, with the data source
+ * looked up by the {@code datasource} address and the optional {@code service} IRI address of the reference. The
+ * optional {@code join-optimizer} address overrides what the configuration says about the join optimizer of the engine:
+ * {@code off} turns it off, {@code settings} turns it on with its joins kept by the settings of the planner, and
+ * {@code advice} turns it on with its joins kept by plan advice (see
+ * {@link SparqlDatabaseConfiguration#setPlanAdvice}).
  */
 public class SparqlDatabaseConfigurationFactory implements ObjectFactory
 {
@@ -42,6 +46,7 @@ public class SparqlDatabaseConfigurationFactory implements ObjectFactory
         Reference ref = (Reference) object;
         RefAddr datasource = ref.get("datasource");
         RefAddr service = ref.get("service");
+        RefAddr optimizer = ref.get("join-optimizer");
 
         if(datasource == null)
             return null;
@@ -58,12 +63,39 @@ public class SparqlDatabaseConfigurationFactory implements ObjectFactory
             Constructor<?> constructor = objectClass.getConstructor(String.class, DataSource.class,
                     DatabaseSchema.class);
 
-            return constructor.newInstance(service == null ? null : (String) service.getContent(), connectionPool,
-                    new DatabaseSchema(connectionPool));
+            Object config = constructor.newInstance(service == null ? null : (String) service.getContent(),
+                    connectionPool, new DatabaseSchema(connectionPool));
+
+            if(optimizer != null)
+                setJoinOptimizer((SparqlDatabaseConfiguration) config, (String) optimizer.getContent());
+
+            return config;
         }
         catch(SQLException e)
         {
             throw new InvocationTargetException(e);
+        }
+    }
+
+
+    /**
+     * Sets the join optimizer of the configuration as the {@code join-optimizer} address of the reference says.
+     *
+     * @param config the configuration
+     * @param value the content of the address: {@code off}, {@code settings} or {@code advice}
+     * @throws IllegalArgumentException if the value is none of them
+     */
+    private static void setJoinOptimizer(SparqlDatabaseConfiguration config, String value)
+    {
+        switch(value)
+        {
+            case "off" -> config.setJoinOptimizer(false);
+            case "settings", "advice" ->
+            {
+                config.setJoinOptimizer(true);
+                config.setPlanAdvice(value.equals("advice"));
+            }
+            default -> throw new IllegalArgumentException("unknown join-optimizer value: " + value);
         }
     }
 }

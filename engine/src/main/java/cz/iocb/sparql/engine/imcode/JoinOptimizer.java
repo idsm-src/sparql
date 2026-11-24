@@ -117,6 +117,15 @@ final class JoinOptimizer
     static final double SECOND_JOIN_MARGIN = 2;
 
     /**
+     * How many times a table access has to be looked up for every combination of the values it is looked up by, on
+     * average, for the database to keep the rows found for the values (Memoize) where plan advice makes it look the
+     * access up (see {@link cz.iocb.sparql.engine.database.PlanAdvice#MEMOIZED_LOOKUP}): a lookup found in the cache
+     * costs a part of an index lookup, one that is not costs about half a lookup more, so the cache pays when about a
+     * third of the lookups find their rows there.
+     */
+    static final double MEMOIZE_RATIO = 2;
+
+    /**
      * Rows of a child nothing is known about.
      */
     static final double DEFAULT_ROWS = 1000;
@@ -194,8 +203,11 @@ final class JoinOptimizer
      * @param restricted whether the row the tree is chosen for restricts a child (see {@link Evaluation})
      * @param equalities the equalities of the filters above the join that the tree joins the children by, which the
      *            join compares in its own conditions (see {@link Equality})
+     * @param memoized the children looked up by the tree for rows repeating the values they are looked up by (see
+     *            {@link #MEMOIZE_RATIO}), as a bit per child
      */
-    record Plan(Node root, int first, double rows, double cost, boolean restricted, List<Equality> equalities)
+    record Plan(Node root, int first, double rows, double cost, boolean restricted, List<Equality> equalities,
+            int memoized)
     {
     }
 
@@ -241,12 +253,15 @@ final class JoinOptimizer
      *            compatible with the row: the variables every row binds, in a single class
      * @param table alias the columns of the rows are addressed through
      * @param inPlace whether the node is written in place for the rows: its accesses compare their columns with the
-     *            values of the row by conditions the database cannot hash, without a fence (see
-     *            {@link SqlTableAccess#translateInPlace}), so that the database merges the node into its join with the
-     *            rows, which it can hand to parallel workers, whereas it evaluates a fenced subquery reading the row
-     *            only in the process reading the rows
+     *            values of the row without a fence (see {@link SqlTableAccess#translateInPlace}), so that the database
+     *            merges the node into its join with the rows, which it can hand to parallel workers, whereas it
+     *            evaluates a fenced subquery reading the row only in the process reading the rows; by conditions the
+     *            database cannot hash, or by plain equalities where plan advice makes the planner look the accesses up
+     *            (see {@link Request#isAdvised})
+     * @param memoized whether an access written in place for the rows under plan advice is looked up by a nested loop
+     *            that keeps the rows found for the values of a row (see {@link #MEMOIZE_RATIO})
      */
-    record Outer(VariableBindings bindings, Table table, boolean inPlace)
+    record Outer(VariableBindings bindings, Table table, boolean inPlace, boolean memoized)
     {
         /**
          * The rows with the given bindings, for a node written as a subquery of its own, fenced where it reads the row.
@@ -256,18 +271,20 @@ final class JoinOptimizer
          */
         Outer(VariableBindings bindings, Table table)
         {
-            this(bindings, table, false);
+            this(bindings, table, false, false);
         }
 
 
         /**
          * The same rows for a node written in place (see {@link #inPlace}).
          *
+         * @param memoized whether an access written in place under plan advice keeps the rows found for the values of a
+         *            row (see {@link #memoized})
          * @return the same rows for a node written in place
          */
-        Outer withInPlace()
+        Outer withInPlace(boolean memoized)
         {
-            return new Outer(bindings, table, true);
+            return new Outer(bindings, table, true, memoized);
         }
 
 
@@ -336,7 +353,7 @@ final class JoinOptimizer
                 if(variables.contains(binding.getVariable()))
                     kept.add(binding);
 
-            return kept.getVariables().isEmpty() ? null : new Outer(kept, table, inPlace);
+            return kept.getVariables().isEmpty() ? null : new Outer(kept, table, inPlace, memoized);
         }
     }
 
@@ -599,7 +616,7 @@ final class JoinOptimizer
 
         return new Plan(plan.root(), plan.first(),
                 plan(request, childs, Filtering.none(n), outer, Double.POSITIVE_INFINITY).rows(), plan.cost(),
-                plan.restricted(), plan.equalities());
+                plan.restricted(), plan.equalities(), plan.memoized());
     }
 
 
@@ -912,7 +929,89 @@ final class JoinOptimizer
         }
 
         return new Plan(root, first, sizes.get((1 << n) - 1), cost(root, costs, hashableAdjacent, sizes).cost(),
-                restricted, filtering.equalities());
+                restricted, filtering.equalities(), getMemoized(root, shared, sizes));
+    }
+
+
+    /**
+     * The children that a tree looks up for rows repeating the values they are looked up by (see
+     * {@link #MEMOIZE_RATIO}): the rows of the outer tree of a lookup hold at most as many combinations of the values
+     * of the variables the child shares with them as the product of the fewest distinct values of each variable among
+     * the children of the outer tree binding it.
+     *
+     * @param node the tree
+     * @param shared the variables shared by several children
+     * @param sizes the sizes of the joins of the subsets of the children
+     * @return the children looked up for rows repeating their values, as a bit per child
+     */
+    private static int getMemoized(Node node, List<Shared> shared, Sizes sizes)
+    {
+        return switch(node)
+        {
+            case Leaf _ -> 0;
+            case HashJoin join -> getMemoized(join.left(), shared, sizes) | getMemoized(join.right(), shared, sizes);
+            case Lookup lookup ->
+            {
+                int outer = collect(lookup.outer(), new ArrayList<>());
+                double values = 1;
+
+                for(Shared variable : shared)
+                {
+                    int binding = variable.mask() & outer;
+
+                    if((variable.mask() >> lookup.child() & 1) == 0 || binding == 0)
+                        continue;
+
+                    double fewest = Double.POSITIVE_INFINITY;
+
+                    for(int i = 0; i < variable.distinct().length; i++)
+                        if((binding >> i & 1) != 0)
+                            fewest = Math.min(fewest, variable.distinct()[i]);
+
+                    values *= Math.max(fewest, 1);
+                }
+
+                yield getMemoized(lookup.outer(), shared, sizes)
+                        | (isMemoized(sizes.get(outer), values) ? 1 << lookup.child() : 0);
+            }
+        };
+    }
+
+
+    /**
+     * True if a node looked up for the rows of another one by the given number of combinations of values is looked up
+     * by a nested loop keeping the rows found for each combination (see {@link #MEMOIZE_RATIO}).
+     *
+     * @param rows estimated number of rows the node is looked up for
+     * @param values estimated number of the combinations of the values the rows hold of the variables the node is
+     *            looked up by
+     * @return true if the rows found for each combination are worth keeping, false otherwise
+     */
+    private static boolean isMemoized(double rows, double values)
+    {
+        return values * MEMOIZE_RATIO <= rows;
+    }
+
+
+    /**
+     * True if a node looked up for the solutions of another one, the outer node, is looked up by a nested loop keeping
+     * the rows found for the values of a solution (see {@link #MEMOIZE_RATIO}).
+     *
+     * @param request the current request
+     * @param node the outer node
+     * @param variables the variables the node looked up is restricted by
+     * @param outer the rows the outer node is evaluated for one by one, or null when it is evaluated once
+     * @return true if the rows found for the values of a solution are worth keeping, false otherwise
+     */
+    static boolean isMemoized(Request request, SqlIntercode node, Collection<Variable> variables, Outer outer)
+    {
+        double rows = outer == null ? estimateRows(request, node) : estimateForRow(request, node, outer).rows();
+        double values = 1;
+
+        for(Variable variable : variables)
+            values *= Math.max(estimateDistinct(request, node, variable), 1);
+
+        return isMemoized(rows, values);
     }
 
 

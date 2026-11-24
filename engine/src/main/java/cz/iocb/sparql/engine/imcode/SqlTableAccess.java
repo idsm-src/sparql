@@ -24,6 +24,7 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
+import cz.iocb.sparql.engine.database.PlanAdvice;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.SqlBuilder;
@@ -2817,7 +2818,7 @@ public final class SqlTableAccess extends SqlIntercode
     @Override
     public SqlCode translate(Request request, Scope scope)
     {
-        return translateAccess(request, null, Set.of(), true);
+        return translateAccess(request, null, Set.of(), true, null);
     }
 
 
@@ -2830,14 +2831,15 @@ public final class SqlTableAccess extends SqlIntercode
     @Override
     SqlCode translateForRow(Request request, Scope scope, JoinOptimizer.Outer outer)
     {
-        SqlCode condition = getRowCondition(request.getConfiguration(), outer);
+        SqlCode condition = getRowCondition(request, outer);
 
         if(condition == null)
             return translate(request, scope);
 
         Set<Column> compared = getRowComparedColumns(request.getConfiguration(), outer);
 
-        return outer.inPlace() && canBeLookedUpInPlace() ? translateInPlace(request, condition, compared) :
+        return outer.inPlace() && canBeLookedUpInPlace() ?
+                translateInPlace(request, condition, compared, outer.memoized()) :
                 translateLateral(request, condition, compared);
     }
 
@@ -2956,18 +2958,18 @@ public final class SqlTableAccess extends SqlIntercode
      * looked up in place (see {@link #translateInPlace}) or as a subquery of its own (see {@link #translateLateral}).
      * In place, the values are compared by conditions the database cannot hash (see {@link #generateLookupCondition}),
      * so that it still looks the rows up for every outer row when it merges the access into its join with the outer
-     * rows.
+     * rows, unless plan advice makes it look them up (see {@link Request#isAdvised}).
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param outer bindings of the outer rows
      * @param table alias the columns of the outer rows are addressed through
      * @param joined classes per variable in the whole join the access is a child of (see {@link #getJoinedClasses}); a
      *            variable without an entry compares all its classes
-     * @param inPlace whether the access is looked up in place
+     * @param unhashable whether the values are compared by conditions the database cannot hash
      * @return SQL condition over the columns of the table and of the outer table, or null
      */
     SqlCode getLookupCondition(ClassRelations relations, VariableBindings outer, Table table,
-            Map<Variable, Set<ResourceClass>> joined, boolean inPlace)
+            Map<Variable, Set<ResourceClass>> joined, boolean unhashable)
     {
         // the values converted to the classes of the columns, addressed through the alias already, and the columns
         // they are compared with; the other variables are compared as a join compares them
@@ -2995,9 +2997,9 @@ public final class SqlTableAccess extends SqlIntercode
             held.add(new VariableBinding(value.getVariable(), inner.getMappings(), false));
         }
 
-        SqlCode direct = inPlace ? generateLookupCondition(relations, converted, held, null, null, joined) :
+        SqlCode direct = unhashable ? generateLookupCondition(relations, converted, held, null, null, joined) :
                 generateJoinCondition(relations, converted, held, null, null, joined);
-        SqlCode general = inPlace ? generateLookupCondition(relations, others, internal, table, null, joined) :
+        SqlCode general = unhashable ? generateLookupCondition(relations, others, internal, table, null, joined) :
                 generateJoinCondition(relations, others, internal, table, null, joined);
 
         return direct == null ? general : general == null ? direct : SqlCode.of(direct, " AND ", general);
@@ -3061,19 +3063,20 @@ public final class SqlTableAccess extends SqlIntercode
      * them when the node is written in place for the rows and the access can be looked up so (see
      * {@link #canBeLookedUpInPlace}). Null when no variable restricts the access.
      *
-     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param request the current request
      * @param outer the rows the access is evaluated for one by one
      * @return SQL condition over the columns of the table and of the outer table, or null
      */
-    SqlCode getRowCondition(ClassRelations relations, JoinOptimizer.Outer outer)
+    SqlCode getRowCondition(Request request, JoinOptimizer.Outer outer)
     {
+        ClassRelations relations = request.getConfiguration();
         VariableBindings values = new VariableBindings();
 
         for(Variable variable : getRowVariables(relations, outer))
             values.add(outer.bindings().get(variable));
 
         return getLookupCondition(relations, values, outer.table(), Map.of(),
-                outer.inPlace() && canBeLookedUpInPlace());
+                outer.inPlace() && canBeLookedUpInPlace() && !request.isAdvised());
     }
 
 
@@ -3110,7 +3113,7 @@ public final class SqlTableAccess extends SqlIntercode
      */
     public SqlCode translateLateral(Request request, SqlCode correlatedCondition, Set<Column> compared)
     {
-        return translateAccess(request, correlatedCondition, compared, true);
+        return translateAccess(request, correlatedCondition, compared, true, null);
     }
 
 
@@ -3121,18 +3124,27 @@ public final class SqlTableAccess extends SqlIntercode
      * {@link #getLookupCondition(ClassRelations, VariableBindings, Table, Map, boolean)}), so the database still looks
      * the rows up through an index of the table for every outer row, now by a nested loop of the join itself, which it
      * can hand to parallel workers, whereas it evaluates a fenced subquery reading the outer row only in the process
-     * reading the outer rows. Only an access that can be looked up so is written so (see
+     * reading the outer rows. Where plan advice makes the planner look the access up (see {@link Request#isAdvised}),
+     * the condition is a plain equality and the table is given the alias by which the advice finds the access (see
+     * {@link PlanAdvice#LOOKUP} and {@link PlanAdvice#MEMOIZED_LOOKUP}), so the database may also keep the rows it
+     * finds for the values looked up. Only an access that can be looked up so is written so (see
      * {@link #canBeLookedUpInPlace}).
      *
      * @param request the current request
      * @param correlatedCondition SQL condition over the columns of the table and of the outer tables
      * @param compared columns of the access that the correlated condition compares strictly, rejecting a row whose
      *            column is null (see {@link #getLookupComparedColumns}), so that their null tests are left out
+     * @param memoized whether plan advice makes the planner keep the rows found for the values looked up
      * @return SQL code of the access looked up in place for a row of the outer tables
      */
-    SqlCode translateInPlace(Request request, SqlCode correlatedCondition, Set<Column> compared)
+    SqlCode translateInPlace(Request request, SqlCode correlatedCondition, Set<Column> compared, boolean memoized)
     {
-        return translateAccess(request, correlatedCondition, compared, false);
+        String alias = !request.isAdvised() ? null : memoized ? PlanAdvice.MEMOIZED_LOOKUP : PlanAdvice.LOOKUP;
+
+        if(alias != null)
+            request.addAdvisedLookup(memoized);
+
+        return translateAccess(request, correlatedCondition, compared, false, alias);
     }
 
 
@@ -3179,10 +3191,11 @@ public final class SqlTableAccess extends SqlIntercode
      * @param correlatedCondition SQL condition over the columns of the table and of the outer tables, or null
      * @param correlatedColumns columns of the access that the correlated condition compares strictly
      * @param fenced whether the access restricted by the correlated condition is fenced by {@code OFFSET 0}
+     * @param alias alias of the table, or null when the table is read under its name
      * @return SQL code of the access
      */
     private SqlCode translateAccess(Request request, SqlCode correlatedCondition, Set<Column> correlatedColumns,
-            boolean fenced)
+            boolean fenced, String alias)
     {
         // the values of the current solution restrict the rows along with the conditions
         SqlCode valueCondition = translateValues(request.getConfiguration());
@@ -3243,6 +3256,9 @@ public final class SqlTableAccess extends SqlIntercode
         {
             builder.append(" FROM ");
             builder.append(table);
+
+            if(alias != null)
+                builder.append(" AS ").append(alias);
         }
 
         appendConditions(builder, conditions, extraCondition, compared);

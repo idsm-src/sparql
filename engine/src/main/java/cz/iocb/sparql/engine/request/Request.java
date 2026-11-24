@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.request;
 
 import java.math.BigInteger;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLTimeoutException;
@@ -22,6 +23,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.CommonTable;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.LateralTable;
+import cz.iocb.sparql.engine.database.PlanAdvice;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.error.MessageCategory;
@@ -341,6 +343,18 @@ public class Request implements AutoCloseable
     private boolean parallel;
 
     /**
+     * Whether an access that plan advice has to make the planner look up has been written for the statement of the
+     * request (see {@link #addAdvisedLookup}).
+     */
+    private boolean advisedLookups;
+
+    /**
+     * Whether an access that plan advice has to make the planner look up by a memoized nested loop has been written for
+     * the statement of the request (see {@link #addAdvisedLookup}).
+     */
+    private boolean memoizedLookups;
+
+    /**
      * Whether the request was cancelled; set by another thread than the one evaluating the request.
      */
     private volatile boolean canceled;
@@ -561,11 +575,14 @@ public class Request implements AutoCloseable
             BigInteger newLimit = syntaxTree instanceof AskQuery || limit <= 0 ? null : BigInteger.valueOf(limit);
 
             commonTableExpressions.clear();
+            advisedLookups = false;
+            memoizedLookups = false;
 
             // the database evaluates a statement by parallel workers only when it is read whole, as it evaluates one
             // read by fetches without them, and when the session allows them; the joins the optimizer has chosen are
-            // then written so that the workers can evaluate them (see SqlJoin.translateTree)
-            parallel = config.isJoinOptimizerEnabled() && fetchSize == 0 && allowsParallelWorkers();
+            // then written so that the workers can evaluate them (see SqlJoin.translateTree), as they are anyway when
+            // plan advice makes the planner keep them
+            parallel = config.isJoinOptimizerEnabled() && !isAdvised() && fetchSize == 0 && allowsParallelWorkers();
 
             TranslateVisitor translateVisitor = new TranslateVisitor(this);
             SqlSelect imcode = translateVisitor.translate(syntaxTree, newOffset, newLimit, order);
@@ -624,6 +641,10 @@ public class Request implements AutoCloseable
                     // settings last until the end of the transaction of the request
                     getStatement().execute("SET LOCAL join_collapse_limit = 1; SET LOCAL enable_nestloop = off; "
                             + "SET LOCAL enable_mergejoin = off");
+
+                    // or the lookups are plain joins, which plan advice makes the planner look up (see PlanAdvice)
+                    if(advisedLookups)
+                        advise(code);
                 }
 
                 return new Result(type, imcode.getResultDescription(), getStatement(fetchSize).executeQuery(code),
@@ -1515,6 +1536,114 @@ public class Request implements AutoCloseable
     public boolean isParallel()
     {
         return parallel;
+    }
+
+
+    /**
+     * True if plan advice makes the planner keep the joins the join optimizer chooses (see
+     * {@link SparqlDatabaseConfiguration#setPlanAdvice}): the lookups the optimizer has chosen are then written as
+     * plain joins of the statement (see {@link cz.iocb.sparql.engine.imcode.SqlTableAccess}), which the advice makes
+     * the planner evaluate by nested loops.
+     *
+     * @return true if plan advice makes the planner keep the joins, false otherwise
+     */
+    public boolean isAdvised()
+    {
+        return config.isJoinOptimizerEnabled() && config.isPlanAdviceEnabled();
+    }
+
+
+    /**
+     * Records that an access that plan advice has to make the planner look up has been written for the statement of the
+     * request (see {@link PlanAdvice#LOOKUP} and {@link PlanAdvice#MEMOIZED_LOOKUP}), so that the statement is planned
+     * for the advice before it runs (see {@link #isAdvised}); a statement without such an access is the one the
+     * settings of the join optimizer alone make the planner keep, and it is not planned for the advice.
+     *
+     * @param memoized whether the advice has to make the planner look the access up by a memoized nested loop
+     */
+    public void addAdvisedLookup(boolean memoized)
+    {
+        advisedLookups = true;
+        memoizedLookups |= memoized;
+    }
+
+
+    /**
+     * Sets the plan advice that makes the planner look up the accesses the join optimizer looks up (see
+     * {@link PlanAdvice}), with the settings of the join optimizer in effect: the statement is planned for the advice
+     * the planner generates for it, which names its relations as the planner identifies them, and the advice made of it
+     * is set for the transaction of the request. A statement with a memoized lookup needs the nested loops allowed, so
+     * it is planned once more with that advice, for the hash joins the planner chooses with the lookups advised, and
+     * its advice keeps those as well.
+     *
+     * @param code SQL code of the statement
+     * @throws SQLException when the statement cannot be planned, as when the module {@code pg_plan_advice} is not
+     *             loaded in the session, or with the SQL state 57014 when the time limit of the request has elapsed, or
+     *             when the request has been cancelled (see {@link #getStatement(int)})
+     */
+    private void advise(String code) throws SQLException
+    {
+        String advice = PlanAdvice.build(explainAdvice(code), false);
+        setAdvice(advice, false);
+
+        if(memoizedLookups)
+        {
+            advice = PlanAdvice.build(explainAdvice(code), true);
+            setAdvice(advice, true);
+        }
+
+        logger.trace("plan advice: {}", advice);
+    }
+
+
+    /**
+     * The advice the planner generates for the statement under the settings in effect (see {@link PlanAdvice}).
+     *
+     * @param code SQL code of the statement
+     * @return the generated advice, empty when there is none
+     * @throws SQLException when the statement cannot be planned, as when the module {@code pg_plan_advice} is not
+     *             loaded in the session
+     */
+    private String explainAdvice(String code) throws SQLException
+    {
+        StringBuilder generated = new StringBuilder();
+
+        try(ResultSet result = getStatement().executeQuery("EXPLAIN (COSTS OFF, PLAN_ADVICE) " + code))
+        {
+            boolean advice = false;
+
+            // the generated advice closes the plan, one item or a part of one on every line
+            while(result.next())
+            {
+                String line = result.getString(1);
+
+                if(advice)
+                    generated.append(line).append('\n');
+                else
+                    advice = line.equals("Generated Plan Advice:");
+            }
+        }
+
+        return generated.toString();
+    }
+
+
+    /**
+     * Sets the plan advice for the transaction of the request.
+     *
+     * @param advice the advice
+     * @param nestedLoops whether the nested loops are allowed as well
+     * @throws SQLException when the advice cannot be set
+     */
+    private void setAdvice(String advice, boolean nestedLoops) throws SQLException
+    {
+        try(PreparedStatement settings = getConnection().prepareStatement(
+                "SELECT set_config('pg_plan_advice.advice', ?, true), set_config('enable_nestloop', ?, true)"))
+        {
+            settings.setString(1, advice);
+            settings.setString(2, nestedLoops ? "on" : "off");
+            settings.execute();
+        }
     }
 
 

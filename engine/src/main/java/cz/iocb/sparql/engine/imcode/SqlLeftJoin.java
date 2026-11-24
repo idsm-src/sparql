@@ -1211,9 +1211,17 @@ public final class SqlLeftJoin extends SqlIntercode
 
         // the right side evaluated for every solution of the left side is written in place where the database may hand
         // the nested loop to parallel workers (see SqlJoin.translateTree), and the shared variables are then compared
-        // by conditions the database can neither hash nor merge, which would let it hash the sides instead
+        // by conditions the database can neither hash nor merge, which would let it hash the sides instead; where plan
+        // advice makes the planner look the right side up, it is written in place when it is a table access, which the
+        // advice finds by its alias, and compared by plain equalities
+        boolean advised = request.isAdvised();
         boolean inPlace = plan != null && plan.bound() == null && plan.outer() != null
-                && (outer == null ? request.isParallel() : outer.inPlace());
+                && (advised ? right instanceof SqlTableAccess access && access.canBeLookedUpInPlace() :
+                        outer == null ? request.isParallel() : outer.inPlace());
+
+        // the rows found for the values of a solution are kept where the solutions repeat them
+        boolean memoized = inPlace && advised && JoinOptimizer.isMemoized(request, left,
+                ((SqlTableAccess) right).getRowVariables(relations, plan.outer()), outer);
 
         SqlBuilder builder = new SqlBuilder();
 
@@ -1241,7 +1249,8 @@ public final class SqlLeftJoin extends SqlIntercode
         else if(plan != null && plan.outer() != null)
         {
             builder.append(" LEFT JOIN LATERAL (");
-            builder.append(right.translateForRow(request, scope, inPlace ? plan.outer().withInPlace() : plan.outer()));
+            builder.append(
+                    right.translateForRow(request, scope, inPlace ? plan.outer().withInPlace(memoized) : plan.outer()));
         }
         else
         {
@@ -1252,7 +1261,7 @@ public final class SqlLeftJoin extends SqlIntercode
         builder.append(" ) AS ");
         builder.appendAlias(rightTable);
         builder.append(" ON ");
-        appendCondition(builder, relations, left.bindings, inPlace);
+        appendCondition(builder, relations, left.bindings, inPlace && !advised);
 
         return builder.toCode();
     }
@@ -1275,18 +1284,19 @@ public final class SqlLeftJoin extends SqlIntercode
     /**
      * Appends the condition of the join (see {@link #appendCondition(SqlBuilder, ClassRelations, VariableBindings)}),
      * for a right side looked up for every solution of the left side in place (see {@link JoinOptimizer.Outer#inPlace})
-     * or not: in place, the shared variables are compared as the right side is compared with the solutions it is looked
-     * up for (see {@link #generateLookupCondition}).
+     * by conditions the database cannot hash, or not: then the shared variables are compared as the right side is
+     * compared with the solutions it is looked up for (see {@link #generateLookupCondition}).
      *
      * @param builder the builder of the SQL code
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param leftBindings bindings of the left side
-     * @param inPlace whether the right side is looked up for every solution of the left side in place
+     * @param unhashable whether the right side is looked up for every solution of the left side in place by conditions
+     *            the database cannot hash
      */
     private void appendCondition(SqlBuilder builder, ClassRelations relations, VariableBindings leftBindings,
-            boolean inPlace)
+            boolean unhashable)
     {
-        SqlCode condition = inPlace ?
+        SqlCode condition = unhashable ?
                 generateLookupCondition(relations, leftBindings, right.getVariableBindings(), leftTable, rightTable,
                         Map.of()) :
                 generateJoinCondition(relations, leftBindings, right.getVariableBindings(), leftTable, rightTable);
