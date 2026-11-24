@@ -72,6 +72,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isRtlLangStri
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isStringLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isTripleTerm;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isUserLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexByte;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexDate;
@@ -149,6 +150,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SqlBuilder;
@@ -166,6 +168,7 @@ import cz.iocb.sparql.engine.mapping.classes.DateTimeInZone;
 import cz.iocb.sparql.engine.mapping.classes.DateTimeInZoneBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DateTimeInZoneClass;
 import cz.iocb.sparql.engine.mapping.classes.DirLangStringWithTagClass;
+import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.LangStringWithTagClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
@@ -503,6 +506,20 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
             case "min":
             case "max":
+            {
+                SqlExpressionIntercode argument = arguments.get(0);
+
+                if(argument.equals(SqlNull.get()))
+                    return SqlNull.get();
+
+                ResourceClass resultClass = getExpressionClass(argument.getResourceClasses());
+                Column value = argument.get(relations, resultClass).get(0);
+
+                List<Column> result = List.of(getExtremeValue(request, function, distinct, resultClass, value));
+
+                return new SqlBuiltinCall(function, distinct, arguments, Map.of(resultClass, result), true);
+            }
+
             case "sample":
             {
                 SqlExpressionIntercode argument = arguments.get(0);
@@ -514,16 +531,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                 SqlBuilder builder = new SqlBuilder();
 
-                if(function.equals("sample"))
-                    builder.append("sparql.sample");
-                else if(function.equals("min"))
-                    builder.append("sparql.min");
-                else if(resultClass.getEffectiveClass().equals(box))
-                    builder.append("sparql.max_rdfbox");
-                else
-                    builder.append("max");
-
-                builder.append("(");
+                builder.append("sparql.sample(");
 
                 if(distinct)
                     builder.append("DISTINCT ");
@@ -3220,6 +3228,59 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 .of(new ExpressionColumn(SqlCode.of("CASE WHEN count(*) = 0 THEN ", value, " END"), value.getType()));
 
         return new SqlBuiltinCall(function, distinct, arguments, singletonMap(resultClass, result), true);
+    }
+
+
+    /**
+     * The least or the greatest of the values of the class (MIN, MAX) in the order of ORDER BY, which is the order of
+     * the box (see {@code SqlSelect.translateOrderBy}). The values of an IRI class are compared by its order columns
+     * (see {@link IriClass#toOrderColumns}), from which the value of the least or the greatest of them is got back (see
+     * {@link IriClass#fromOrderColumns}), as the stored values need not be ordered as the IRIs are: the ids of a
+     * mapping table, the numbers written without padding, whose digits are ordered as text, the ids followed by a
+     * suffix. A character value is compared by code points like in the box: unless the default collation of the
+     * database orders so, in the collation {@code "C"}, and the result gets the default collation back, which it would
+     * have as any other computed value; a user literal keeps the order of its SQL type, which ORDER BY takes through
+     * its {@code ubox}. A constant is the same value in every solution and needs no order.
+     *
+     * @param request the current request
+     * @param function {@code min} or {@code max}
+     * @param distinct the DISTINCT flag
+     * @param resultClass the class of the values, of a single column
+     * @param value the column of the values
+     * @return column of the least or the greatest of the values
+     */
+    private static Column getExtremeValue(Request request, String function, boolean distinct, ResourceClass resultClass,
+            Column value)
+    {
+        boolean constant = value instanceof ConstantColumn;
+        IriClass iriClass = !constant && resultClass.getEffectiveClass() instanceof IriClass c ? c : null;
+        Column key = iriClass != null ? iriClass.toOrderColumns(List.of(value)).get(0) : value;
+
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+        boolean codepoints = schema != null && schema.hasCodepointDefaultCollation();
+        boolean collated = !constant && !codepoints && key.getType().isCharacter() && !isUserLiteral(resultClass);
+
+        SqlBuilder builder = new SqlBuilder();
+
+        if(collated)
+            builder.append("(");
+
+        if(function.equals("min"))
+            builder.append("sparql.min(");
+        else if(resultClass.getEffectiveClass().equals(box))
+            builder.append("sparql.max_rdfbox(");
+        else
+            builder.append("max(");
+
+        if(distinct)
+            builder.append("DISTINCT ");
+
+        builder.append(key);
+        builder.append(collated ? " COLLATE \"C\")) COLLATE \"default\"" : ")");
+
+        Column extreme = new ExpressionColumn(builder.toCode(), key.getType());
+
+        return key.equals(value) ? extreme : iriClass.fromOrderColumns(List.of(extreme)).get(0);
     }
 
 

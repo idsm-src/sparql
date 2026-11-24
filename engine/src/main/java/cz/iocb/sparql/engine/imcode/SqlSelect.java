@@ -1,9 +1,6 @@
 package cz.iocb.sparql.engine.imcode;
 
-import static cz.iocb.sparql.engine.database.SqlType.CHAR;
-import static cz.iocb.sparql.engine.database.SqlType.TEXT;
 import static cz.iocb.sparql.engine.database.SqlType.TIMESTAMPTZ;
-import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.determineResultClass;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genBoolean;
@@ -1069,8 +1066,7 @@ public final class SqlSelect extends SqlIntercode
         if(column instanceof ConstantColumn)
             return;
 
-        SqlType type = column.getType();
-        boolean character = type.equals(VARCHAR) || type.equals(TEXT) || type.equals(CHAR);
+        boolean character = column.getType().isCharacter();
 
         keys.add(character && !codepoints ? SqlCode.of(column, " COLLATE \"C\"") : column.getCode());
     }

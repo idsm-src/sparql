@@ -228,6 +228,18 @@ public class SqlType
 
 
     /**
+     * True if the type holds character strings ({@code varchar}, {@code text} and {@code char}), whose order depends on
+     * the collation they are compared in.
+     *
+     * @return true if the type holds character strings, false otherwise
+     */
+    public final boolean isCharacter()
+    {
+        return equals(VARCHAR) || equals(TEXT) || equals(CHAR);
+    }
+
+
+    /**
      * True if the type is one of the types of the pgsparql extension ({@code sparql.rdfbox}, {@code sparql.ubox},
      * {@code sparql.zoneddate} and {@code sparql.zoneddatetime}), whose {@code =} is the value equality and whose
      * operator classes are built on the identity operators {@code @=} and {@code @<>} of the schema {@code sparql}.

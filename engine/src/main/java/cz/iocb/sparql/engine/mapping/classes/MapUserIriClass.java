@@ -361,6 +361,20 @@ public class MapUserIriClass extends SimpleUserIriClass
 
 
     @Override
+    public List<Column> fromOrderColumns(List<Column> columns)
+    {
+        String access = String.format("(SELECT %s as \"@from\", %s as \"@to\" FROM %s) as \"@rctab\"", from, to, table);
+        Column code = columns.get(0);
+
+        if(suffix != null)
+            code = expression(VARCHAR, "left(%s, -%d)::varchar", code, sqlLength(suffix));
+
+        return List.of(expression(sqlTypes.get(0), "(SELECT \"@from\"::%s FROM %s WHERE \"@to\" = %s)", sqlTypes.get(0),
+                access, code));
+    }
+
+
+    @Override
     public String getPrefix(List<Column> columns)
     {
         return prefix != null ? prefix : "";

@@ -236,6 +236,16 @@ public class StringUserIriClass extends SimpleUserIriClass
 
 
     @Override
+    public List<Column> fromOrderColumns(List<Column> columns)
+    {
+        if(suffix == null)
+            return columns;
+
+        return List.of(expression(VARCHAR, "left(%s, -%d)::varchar", columns.get(0), sqlLength(suffix)));
+    }
+
+
+    @Override
     public String getPrefix(List<Column> columns)
     {
         if(columns.get(0) instanceof ValueColumn col)

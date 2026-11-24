@@ -341,6 +341,21 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
 
     @Override
+    public List<Column> fromOrderColumns(List<Column> columns)
+    {
+        if(length > 0)
+            return columns;
+
+        SqlType sqlType = sqlTypes.get(0);
+
+        if(suffix == null)
+            return List.of(expression(sqlType, "(%s)::%s", columns.get(0), sqlType));
+
+        return List.of(expression(sqlType, "left(%s, -%d)::%s", columns.get(0), sqlLength(suffix), sqlType));
+    }
+
+
+    @Override
     public String getPrefix(List<Column> columns)
     {
         return prefix;

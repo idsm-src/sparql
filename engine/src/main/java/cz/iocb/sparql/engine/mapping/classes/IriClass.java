@@ -93,14 +93,27 @@ public sealed abstract class IriClass extends PrimitiveResourceClass
 
     /**
      * Columns whose SQL ordering agrees with the code-point ordering of the full IRIs, used in ORDER BY instead of
-     * rebuilding the IRIs.
+     * rebuilding the IRIs, and in MIN and MAX; a class of a single column has a single order column.
      *
      * @param columns the columns
      * @return columns whose SQL ordering agrees with the code-point ordering of the full IRIs, used in ORDER BY instead
-     *         of rebuilding the IRIs
+     *         of rebuilding the IRIs, and in MIN and MAX
      */
     public List<Column> toOrderColumns(List<Column> columns)
     {
         return toGeneralClass(iri, columns, true);
+    }
+
+
+    /**
+     * Columns of this class holding the IRI whose order columns (see {@link #toOrderColumns}) are given, so that MIN
+     * and MAX, which compare the order columns of the IRIs, get the IRI of the least or the greatest of them back.
+     *
+     * @param columns the order columns
+     * @return columns of this class holding the IRI whose order columns are given
+     */
+    public List<Column> fromOrderColumns(List<Column> columns)
+    {
+        return fromGeneralClass(iri, columns, true);
     }
 }
