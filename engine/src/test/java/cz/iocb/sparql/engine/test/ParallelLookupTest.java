@@ -20,6 +20,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,7 @@ import cz.iocb.sparql.testing.Database;
  * neither hash nor merge, so it still looks the rows up by an index, now by a nested loop it hands to the workers; a
  * hash join above a lookup does not compare the variable the lookup compares, from which the database would derive an
  * equality to hash the lookup by; the right side of an OPTIONAL looked up for every solution is written so too. A
+ * lookup in place compares a variable with one child only, and a lookup by the values of two children stays fenced. A
  * statement read by fetches, or a session allowing no workers, keeps the fenced lookups. The solutions are those of the
  * joins left to the planner.
  */
@@ -78,9 +80,10 @@ public class ParallelLookupTest
 
 
     /**
-     * Creates the {@code parallel_lookup} schema: the nodes 1 to 2000 of ten kinds, two links from every node (indexed
-     * by the source) and ten marks of every node (not indexed), analysed; and the two configurations mapping
-     * {@code ex:kind}, {@code ex:link} and {@code ex:mark} over them.
+     * Creates the {@code parallel_lookup} schema: the nodes 1 to 2000 of ten kinds, two links from every node and the
+     * links from the node 3 to 13 and from 13 to 23 (indexed by the source), ten marks of every node (not indexed), and
+     * fifty pairs of every node, among them the pair of 23 and 3 (indexed), analysed; and the two configurations
+     * mapping {@code ex:kind}, {@code ex:link}, {@code ex:mark} and {@code ex:pair} over them.
      */
     @BeforeAll
     static void init() throws SQLException
@@ -95,11 +98,19 @@ public class ParallelLookupTest
             statement.execute("create table parallel_lookup.links (src integer not null, dst integer not null)");
             statement.execute("insert into parallel_lookup.links select i % 2000 + 1, (i * 7) % 2000 + 1 "
                     + "from generate_series(1, 4000) as i");
+            statement.execute("insert into parallel_lookup.links values (3, 13), (13, 23)");
             statement.execute("create index on parallel_lookup.links (src)");
             statement.execute("create table parallel_lookup.marks (id integer not null, mark integer not null)");
             statement.execute("insert into parallel_lookup.marks select i % 2000 + 1, i % 7 "
                     + "from generate_series(1, 20000) as i");
-            statement.execute("analyze parallel_lookup.nodes, parallel_lookup.links, parallel_lookup.marks");
+            statement.execute("create table parallel_lookup.pairs (a integer not null, b integer not null)");
+            statement.execute("insert into parallel_lookup.pairs select i % 2000 + 1, (i * 13) % 2000 + 1 "
+                    + "from generate_series(1, 100000) as i");
+            statement.execute("insert into parallel_lookup.pairs values (23, 3)");
+            statement.execute("create index on parallel_lookup.pairs (a, b)");
+            statement.execute("""
+                    analyze parallel_lookup.nodes, parallel_lookup.links, parallel_lookup.marks, \
+                    parallel_lookup.pairs""");
         }
 
         DatabaseSchema schema = new DatabaseSchema(connectionPool);
@@ -125,6 +136,7 @@ public class ParallelLookupTest
         DatabaseTable nodes = new DatabaseTable("parallel_lookup", "nodes");
         DatabaseTable links = new DatabaseTable("parallel_lookup", "links");
         DatabaseTable marks = new DatabaseTable("parallel_lookup", "marks");
+        DatabaseTable pairs = new DatabaseTable("parallel_lookup", "pairs");
 
         config.addQuadMapping(nodes, null, config.createIriMapping("node", "id"), config.createIriMapping("ex:kind"),
                 config.createLiteralMapping(xsdInt, "kind"));
@@ -132,6 +144,8 @@ public class ParallelLookupTest
                 config.createIriMapping("node", "dst"));
         config.addQuadMapping(marks, null, config.createIriMapping("node", "id"), config.createIriMapping("ex:mark"),
                 config.createLiteralMapping(xsdInt, "mark"));
+        config.addQuadMapping(pairs, null, config.createIriMapping("node", "a"), config.createIriMapping("ex:pair"),
+                config.createIriMapping("node", "b"));
 
         return config;
     }
@@ -361,6 +375,38 @@ public class ParallelLookupTest
         assertThat(plan, containsString("Seq Scan on marks"));
         assertThat(plan, not(containsString("Seq Scan on links")));
         assertThat(plan, containsString("= ANY (ARRAY["));
+    }
+
+
+    @Test
+    public void variableComparedOnce() throws Exception
+    {
+        String query = "SELECT ?x ?y ?z WHERE { ?x ex:kind \"3\"^^xsd:int . ?x ex:link ?y . ?x ex:link ?z }";
+
+        // the second lookup compares the node with one of the two children giving it, whose values are equal, so that
+        // the database does not take the two comparisons for independent conditions
+        String sql = check(query, 0, true, true);
+        assertThat(sql.split(Pattern.quote("\"src\" = ANY(ARRAY["), -1).length - 1, is(2));
+        assertThat(sql, not(containsString(" OFFSET 0")));
+
+        String plan = explain(sql, true);
+        assertThat(plan, containsString("Gather"));
+        assertThat(plan, not(containsString("Join Filter")));
+        assertThat(plan, not(containsString("Seq Scan on links")));
+    }
+
+
+    @Test
+    public void lookupByTwoChildrenFenced() throws Exception
+    {
+        String query = "SELECT ?x ?y ?z WHERE { ?x ex:kind \"3\"^^xsd:int . ?x ex:link ?y . ?y ex:link ?z . "
+                + "?z ex:pair ?x }";
+
+        // the pair is looked up by the node the second link leads to and by the first node, which no child gives
+        // together, so it stays fenced, comparing both in its index condition, while the links are looked up in place
+        String sql = check(query, 0, true, true);
+        assertThat(sql.split(Pattern.quote(" OFFSET 0) AS "), -1).length - 1, is(1));
+        assertThat(sql, containsString("ANY(ARRAY["));
     }
 
 

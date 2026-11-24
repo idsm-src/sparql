@@ -26,6 +26,7 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
+import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
@@ -1308,7 +1309,9 @@ public final class SqlJoin extends SqlIntercode
      * the access up. So a hash join leaves the variables that such a lookup compares strictly out of the comparisons of
      * the access: the child of the outer tree it compares them with is on the same side of the hash join and holds the
      * same values, and the hash join compares that child (or, where that one is looked up in place by the variable as
-     * well, the child it is looked up by).
+     * well, the child it is looked up by). Such a lookup compares a variable with one source of its values only, and an
+     * access the database could look up only by the values of several sources is fenced as before (see
+     * {@link #getLeftOut}).
      *
      * @param request the current request
      * @param scope the scope of the join
@@ -1317,9 +1320,9 @@ public final class SqlJoin extends SqlIntercode
      * @param equalities the equalities of the filters above the join that the children are joined on
      * @param joined classes per variable in the whole join (see {@link #getJoinedClasses})
      * @param outer the rows the join is evaluated for one by one, or null when it is evaluated once
-     * @param replaced the variables of each child looked up in place that its lookup compares strictly with a child of
-     *            the outer tree (see {@link SqlTableAccess#getConvertedVariables}), which the hash joins above compare
-     *            by the other child; filled in as the lookups of the tree are written
+     * @param replaced the variables of each child looked up in place that its lookup compares with a child of the outer
+     *            tree giving them a value that is never unbound (see {@link #getLeftOut}), which the hash joins above
+     *            compare by the other child; filled in as the lookups of the tree are written
      * @param builder the SQL code being built
      * @return the children of the tree, as a bit per child
      */
@@ -1349,34 +1352,15 @@ public final class SqlJoin extends SqlIntercode
                     builder);
             SqlTableAccess access = (SqlTableAccess) childs.get(lookup.child());
 
-            // the access is looked up in place where the database may hand the nested loop to parallel workers
-            boolean inPlace = (outer == null ? request.isParallel() : outer.inPlace()) && access.canBeLookedUpInPlace();
-
-            List<SqlCode> conditions = new ArrayList<>();
-
-            // the columns of the access the conditions compare strictly, whose null tests the access leaves out
-            Set<Column> compared = new HashSet<>();
+            // the values the access is looked up by: those of the children of the outer tree, those an outer child
+            // gives a variable that a filter requires to be the variable of the access, and those of the row the join
+            // is evaluated for
+            List<LookupSource> sources = new ArrayList<>();
 
             for(int i = 0; i < childs.size(); i++)
-            {
-                if((outerChilds >> i & 1) == 0)
-                    continue;
+                if((outerChilds >> i & 1) != 0)
+                    sources.add(new LookupSource(i, childs.get(i).getVariableBindings(), tables.get(i), joined));
 
-                SqlCode condition = access.getLookupCondition(relations, childs.get(i).getVariableBindings(),
-                        tables.get(i), joined, inPlace);
-
-                if(condition != null)
-                {
-                    conditions.add(condition);
-                    compared.addAll(access.getLookupComparedColumns(relations, childs.get(i).getVariableBindings()));
-                }
-
-                if(inPlace)
-                    replaced.computeIfAbsent(lookup.child(), _ -> new HashSet<>())
-                            .addAll(access.getConvertedVariables(relations, childs.get(i).getVariableBindings()));
-            }
-
-            // the values an outer child gives a variable that a filter requires to be the variable of the access
             for(JoinOptimizer.Equality equality : equalities)
             {
                 int other = equality.left() == lookup.child() ? equality.right() :
@@ -1387,22 +1371,51 @@ public final class SqlJoin extends SqlIntercode
 
                 VariableBindings value = new VariableBindings();
                 value.add(equality.getRenamed(childs, other));
+                sources.add(new LookupSource(-1, value, tables.get(other), Map.of()));
+            }
 
-                SqlCode condition = access.getLookupCondition(relations, value, tables.get(other), Map.of(), inPlace);
+            if(outer != null)
+            {
+                VariableBindings row = new VariableBindings();
+
+                for(Variable variable : access.getRowVariables(relations, outer))
+                    row.add(outer.bindings().get(variable));
+
+                sources.add(new LookupSource(-1, row, outer.table(), Map.of()));
+            }
+
+            // the access is looked up in place where the database may hand the nested loop to parallel workers, unless
+            // it is looked up by the values of several sources (see getLeftOut)
+            Map<Integer, Set<Variable>> leftOut = (outer == null ? request.isParallel() : outer.inPlace())
+                    && access.canBeLookedUpInPlace() ? getLeftOut(relations, access, sources) : null;
+            boolean inPlace = leftOut != null;
+
+            List<SqlCode> conditions = new ArrayList<>();
+
+            // the columns of the access the conditions compare strictly, whose null tests the access leaves out
+            Set<Column> compared = new HashSet<>();
+
+            for(int s = 0; s < sources.size(); s++)
+            {
+                LookupSource source = sources.get(s);
+                VariableBindings values = inPlace ? withoutVariables(source.bindings(), leftOut.get(s)) :
+                        source.bindings();
+
+                SqlCode condition = access.getLookupCondition(relations, values, source.table(), source.joined(),
+                        inPlace);
 
                 if(condition != null)
                 {
                     conditions.add(condition);
-                    compared.addAll(access.getLookupComparedColumns(relations, value));
+                    compared.addAll(access.getLookupComparedColumns(relations, values));
                 }
-            }
 
-            SqlCode rowCondition = outer == null ? null : access.getRowCondition(relations, outer);
-
-            if(rowCondition != null)
-            {
-                conditions.add(rowCondition);
-                compared.addAll(access.getRowComparedColumns(relations, outer));
+                // the variables the access is compared by with the child giving them a value that is never unbound,
+                // which the hash joins above compare instead of the access
+                if(inPlace && source.child() >= 0)
+                    for(VariableBinding value : values.getValues())
+                        if(!value.canBeNull() && access.getVariable(value.getVariable()) != null)
+                            replaced.computeIfAbsent(lookup.child(), _ -> new HashSet<>()).add(value.getVariable());
             }
 
             SqlCode condition = conditions.isEmpty() ? SqlCode.TRUE :
@@ -1520,6 +1533,112 @@ public final class SqlJoin extends SqlIntercode
                 result.add(binding);
 
         return result;
+    }
+
+
+    /**
+     * A source of the values an access is looked up by (see {@link #translateTree}): a child of the outer tree, the
+     * value an outer child gives a variable that a filter requires to be the variable of the access, or the row the
+     * join is evaluated for.
+     *
+     * @param child the index of the child of the outer tree, or -1 for a value of a filter or of the row
+     * @param bindings the bindings of the values, under the names of the variables of the access
+     * @param table alias the columns of the values are addressed through
+     * @param joined classes per variable in the whole join that the comparisons are restricted to (see
+     *            {@link #getJoinedClasses})
+     */
+    private record LookupSource(int child, VariableBindings bindings, Table table,
+            Map<Variable, Set<ResourceClass>> joined)
+    {
+    }
+
+
+    /**
+     * The comparisons that an access looked up in place leaves out (see {@link SqlTableAccess#translateInPlace}), per
+     * source of the values it is looked up by, or null when the access is to be fenced as before.
+     * <p>
+     * A child of the outer tree compares the variables it shares with every other child of the outer tree, by the joins
+     * of that tree, so where a child gives a variable a value that is never unbound, the other children hold the same
+     * value of the variable or leave it unbound, and comparing the access with that child, the representative of the
+     * variable, gives the solutions that comparing it with every child gives. A comparison of each of them is left out:
+     * the database would take the comparisons by arrays for independent conditions, unlike equalities, which it puts
+     * into one class of equal values, and multiply their selectivities, so that it would look the access up by an index
+     * of fewer columns, filtering the rows of the others. Where the representative can serve the lookup, the comparison
+     * of a value of a filter or of the row is left out as well, as the filter above the join or the condition of the
+     * left join the row comes from compares it. A child the access can be looked up by every such variable by is the
+     * representative of them all.
+     * <p>
+     * The database parameterises a looked up access by any subset of the tables it is looked up by, and where it takes
+     * fewer rows for the lookup by one of them than there are, it looks the access up by that table only and filters
+     * the rows by the others, which then cost what scanning the access for every row costs; the fenced subquery reads
+     * the values of all of them as its parameters, which its index condition compares together. So an access that would
+     * be looked up by the values of two or more sources stays fenced.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param access the access looked up
+     * @param sources the sources of the values the access is looked up by
+     * @return the variables left out of the comparisons of the access per source, by its index in the sources, or null
+     *         when the access is to be fenced
+     */
+    private static Map<Integer, Set<Variable>> getLeftOut(ClassRelations relations, SqlTableAccess access,
+            List<LookupSource> sources)
+    {
+        // per variable, the children giving it a value that is never unbound, and those of them the access can be
+        // looked up by
+        Map<Variable, List<Integer>> bound = new HashMap<>();
+        Map<Variable, List<Integer>> lookedUp = new HashMap<>();
+
+        for(int s = 0; s < sources.size(); s++)
+        {
+            if(sources.get(s).child() < 0)
+                continue;
+
+            for(VariableBinding value : sources.get(s).bindings().getValues())
+            {
+                if(access.getVariable(value.getVariable()) == null || value.canBeNull())
+                    continue;
+
+                bound.computeIfAbsent(value.getVariable(), _ -> new ArrayList<>()).add(s);
+
+                if(access.isLookedUpBy(relations, value))
+                    lookedUp.computeIfAbsent(value.getVariable(), _ -> new ArrayList<>()).add(s);
+            }
+        }
+
+        // a child the access can be looked up by every variable a child can look it up by
+        int single = IntStream.range(0, sources.size())
+                .filter(s -> !lookedUp.isEmpty() && lookedUp.values().stream().allMatch(l -> l.contains(s))).findFirst()
+                .orElse(-1);
+
+        Map<Integer, Set<Variable>> leftOut = new HashMap<>();
+
+        // the sources whose values the access is looked up by
+        Set<Integer> lookups = new HashSet<>();
+
+        for(Entry<Variable, List<Integer>> entry : bound.entrySet())
+        {
+            Variable variable = entry.getKey();
+            List<Integer> candidates = lookedUp.get(variable);
+            int representative = candidates == null ? entry.getValue().get(0) :
+                    single != -1 ? single : candidates.get(0);
+
+            if(candidates != null)
+                lookups.add(representative);
+
+            for(int s = 0; s < sources.size(); s++)
+                if(s != representative && sources.get(s).bindings().get(variable) != null
+                        && (sources.get(s).child() != -1 || candidates != null))
+                    leftOut.computeIfAbsent(s, _ -> new HashSet<>()).add(variable);
+        }
+
+        for(int s = 0; s < sources.size(); s++)
+            if(sources.get(s).child() == -1)
+                for(VariableBinding value : sources.get(s).bindings().getValues())
+                    if(!leftOut.getOrDefault(s, Set.of()).contains(value.getVariable())
+                            && access.getVariable(value.getVariable()) != null && access.isLookedUpBy(relations, value))
+                        lookups.add(s);
+
+        return lookups.size() > 1 ? null : leftOut;
     }
 
 

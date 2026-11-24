@@ -3005,28 +3005,6 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * The variables whose values in the rows of an outer table the condition looking the access up for a row (see
-     * {@link #getLookupCondition}) converts to the class of the columns of the access (see {@link #isConvertedFor}):
-     * every row binds them, and the condition compares them with the columns strictly, so the solutions of the lookup
-     * hold the same value of such a variable in the access and in the outer row.
-     *
-     * @param relations declarations which unrelated user IRI classes may overlap
-     * @param outer bindings of the outer rows
-     * @return the variables whose values the lookup converts to the class of the columns of the access
-     */
-    Set<Variable> getConvertedVariables(ClassRelations relations, VariableBindings outer)
-    {
-        Set<Variable> variables = new HashSet<>();
-
-        for(VariableBinding value : outer.getValues())
-            if(internal.get(value.getVariable()) != null && isConvertedFor(relations, value))
-                variables.add(value.getVariable());
-
-        return variables;
-    }
-
-
-    /**
      * The columns of the access that the condition looking it up for a row of an outer table (see
      * {@link #getLookupCondition}) compares strictly, rejecting a row whose column is null: the columns of the
      * variables whose values are converted to the class of the columns (see {@link #isConvertedFor}), except the
