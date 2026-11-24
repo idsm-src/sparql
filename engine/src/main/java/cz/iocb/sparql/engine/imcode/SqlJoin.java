@@ -1317,7 +1317,11 @@ public final class SqlJoin extends SqlIntercode
      * (see {@link cz.iocb.sparql.engine.database.PlanAdvice}), which keeps the rows found for the values looked up
      * where the tree says the values repeat (see {@link JoinOptimizer.Plan#memoized}). An access looked up by the
      * values of several sources stays fenced then too: the database looks such an access up by the values of a part of
-     * the sources wherever it takes the other comparisons for cheap filters.
+     * the sources wherever it takes the other comparisons for cheap filters. So does an access of a join evaluated for
+     * every row of an outer table, like the pattern of a test (see {@link #translateForRow}), or lying in a pattern of
+     * an expression (see {@link Scope#isWithinExpression}): the database evaluates such a join for every row anew, and
+     * in place it reads the rows of the access by its constants alone wherever it takes them for few, whereas a fenced
+     * subquery looks them up by all the values.
      *
      * @param request the current request
      * @param scope the scope of the join
@@ -1389,17 +1393,17 @@ public final class SqlJoin extends SqlIntercode
                 sources.add(new LookupSource(-1, row, outer.table(), Map.of()));
             }
 
-            // the access is looked up in place where plan advice makes the planner look it up and where the database
-            // may hand the nested loop to parallel workers, unless it is looked up by the values of several sources
-            // (see getLeftOut)
-            boolean advised = request.isAdvised();
+            // the access is looked up in place where plan advice makes the planner look it up, in a join evaluated once
+            // outside a pattern of an expression, and where the database may hand the nested loop to parallel workers,
+            // unless it is looked up by the values of several sources (see getLeftOut)
+            boolean advised = request.isAdvised() && outer == null && !scope.isWithinExpression();
             Map<Integer, Set<Variable>> leftOut = (advised || (outer == null ? request.isParallel() : outer.inPlace()))
                     && access.canBeLookedUpInPlace() ? getLeftOut(relations, access, sources) : null;
             boolean inPlace = leftOut != null;
 
             // in place, the values are compared by conditions the database cannot hash, unless the advice makes the
             // planner look the access up
-            boolean unhashable = inPlace && !advised;
+            boolean unhashable = inPlace && !request.isAdvised();
 
             List<SqlCode> conditions = new ArrayList<>();
 

@@ -47,7 +47,8 @@ import cz.iocb.sparql.testing.Database;
  * loop, which the database hands to parallel workers, and caches by the values looked up where the optimizer expects
  * them to repeat; the joins the optimizer hashes are hashed, and every item of the advice is followed. A statement read
  * by fetches is advised as well, and so is the right side of an OPTIONAL looked up for every solution; a lookup by the
- * values of two children stays fenced. The solutions are those of the joins left to the planner.
+ * values of two children stays fenced, and so does a lookup in the pattern of an expression. The solutions are those of
+ * the joins left to the planner.
  */
 public class PlanAdviceLookupTest
 {
@@ -485,6 +486,33 @@ public class PlanAdviceLookupTest
         assertFollowed(plan);
         assertThat(plan, containsString("Memoize"));
         assertThat(plan, containsString("on items " + PlanAdvice.MEMOIZED_LOOKUP));
+    }
+
+
+    @Test
+    public void lookupInExistsFenced() throws Exception
+    {
+        String query = "SELECT ?x WHERE { ?x ex:kind \"3\"^^xsd:int FILTER EXISTS { ?x ex:link ?y . ?y ex:link ?z } }";
+
+        // the lookup in the pattern of the expression, which the database evaluates for every node, stays fenced, so
+        // the statement is not planned for advice
+        List<List<RdfTerm>> expected = expected(query);
+
+        try(Request request = new Engine(advised).getRequest())
+        {
+            int before = queries.size();
+
+            try(Result result = request.execute(prefix + query))
+            {
+                assertThat(read(result), containsInAnyOrder(expected.toArray()));
+            }
+
+            String sql = queries.getLast();
+            assertThat(sql, containsString(" OFFSET 0) AS "));
+            assertThat(sql, not(containsString(" AS " + PlanAdvice.LOOKUP + " ")));
+            assertThat(queries.subList(before, queries.size()).stream().anyMatch(q -> q.startsWith("EXPLAIN")),
+                    is(false));
+        }
     }
 
 

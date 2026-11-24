@@ -1213,8 +1213,9 @@ public final class SqlLeftJoin extends SqlIntercode
         // the nested loop to parallel workers (see SqlJoin.translateTree), and the shared variables are then compared
         // by conditions the database can neither hash nor merge, which would let it hash the sides instead; where plan
         // advice makes the planner look the right side up, it is written in place when it is a table access, which the
-        // advice finds by its alias, and compared by plain equalities
-        boolean advised = request.isAdvised();
+        // advice finds by its alias, and compared by plain equalities, in a left join evaluated once outside a pattern of
+        // an expression, as the lookups of a join are (see SqlJoin.translateTree)
+        boolean advised = request.isAdvised() && outer == null && !scope.isWithinExpression();
         boolean inPlace = plan != null && plan.bound() == null && plan.outer() != null
                 && (advised ? right instanceof SqlTableAccess access && access.canBeLookedUpInPlace() :
                         outer == null ? request.isParallel() : outer.inPlace());
@@ -1261,7 +1262,7 @@ public final class SqlLeftJoin extends SqlIntercode
         builder.append(" ) AS ");
         builder.appendAlias(rightTable);
         builder.append(" ON ");
-        appendCondition(builder, relations, left.bindings, inPlace && !advised);
+        appendCondition(builder, relations, left.bindings, inPlace && !request.isAdvised());
 
         return builder.toCode();
     }
