@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
@@ -18,6 +19,21 @@ import cz.iocb.sparql.engine.request.Request;
 public sealed abstract class IriClass extends PrimitiveResourceClass
         permits IriScalarClass, UnsupportedIriClass, UserIriClass
 {
+    /**
+     * Table holding the order column (see {@link IriClass#toOrderColumns}) of the IRIs of a class by the values of the
+     * class, like a mapping table pairing the stored values with the ids of the IRIs; an IRI is the prefix followed by
+     * its order column.
+     *
+     * @param table the table
+     * @param values the columns of the table holding the values of the class
+     * @param order the order column of the IRI a row holds, written over the columns of the table
+     * @param prefix the text before the order column in the IRIs
+     */
+    public record OrderTable(DatabaseTable table, List<Column> values, Column order, String prefix)
+    {
+    }
+
+
     /**
      * Creates the class with its name, column types and superclasses.
      *
@@ -115,5 +131,18 @@ public sealed abstract class IriClass extends PrimitiveResourceClass
     public List<Column> fromOrderColumns(List<Column> columns)
     {
         return fromGeneralClass(iri, columns, true);
+    }
+
+
+    /**
+     * The table holding the order column of the IRIs of this class by the values of the class (see
+     * {@link #toOrderColumns}), from which a join reads it along with the values, or null when the order columns are
+     * computed from the values themselves.
+     *
+     * @return the table holding the order column of the IRIs of this class by the values of the class, or null
+     */
+    public OrderTable getOrderTable()
+    {
+        return null;
     }
 }

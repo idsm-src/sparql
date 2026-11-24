@@ -375,6 +375,13 @@ public class MapUserIriClass extends SimpleUserIriClass
 
 
     @Override
+    public OrderTable getOrderTable()
+    {
+        return new OrderTable(table, List.of(from), addPrefixAndSuffix(null, to, suffix), prefix != null ? prefix : "");
+    }
+
+
+    @Override
     public String getPrefix(List<Column> columns)
     {
         return prefix != null ? prefix : "";

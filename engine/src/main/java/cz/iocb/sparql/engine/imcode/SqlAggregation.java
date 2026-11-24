@@ -13,7 +13,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.Condition;
+import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
@@ -25,6 +28,9 @@ import cz.iocb.sparql.engine.imcode.expression.SqlLiteral;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
+import cz.iocb.sparql.engine.mapping.classes.InternalResourceClass;
+import cz.iocb.sparql.engine.mapping.classes.IriClass;
+import cz.iocb.sparql.engine.mapping.classes.IriClass.OrderTable;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -177,6 +183,13 @@ public final class SqlAggregation extends SqlIntercode
         // no solutions make no group of a GROUP BY clause, whereas without the clause they make the one group there is
         if(optChild.equals(SqlNoSolution.get()) && !groupVariables.isEmpty())
             return SqlNoSolution.get();
+
+        // MIN and MAX compare the IRIs of a class whose order column a table holds by the order column that an
+        // OPTIONAL of the solutions reads from the table, instead of looking it up for every solution
+        SqlIntercode ordered = readOrderColumns(request, scope, optAggregations, optChild);
+
+        if(ordered != null)
+            return ordered.optimize(request, scope, restrictions, reduced, evalServices);
 
         // the solutions binding a grouping variable and a node standing in for its term always make the same groups
         // whether grouped over the variable or over the node, and the child grouped over the node reads no term; the
@@ -335,6 +348,138 @@ public final class SqlAggregation extends SqlIntercode
             keys.removeAll(aggregation.getReferencedVariables());
 
         return getStandInNodes(request, keys, restrictions);
+    }
+
+
+    /**
+     * The aggregation of the solutions extended by the order column of the IRIs that MIN and MAX compare, read from the
+     * table holding it (see {@link IriClass#getOrderTable}), or null when no aggregate compares such IRIs. For a
+     * variable that the solutions bind always, in a single IRI class with such a table, and not to a constant, where
+     * the table holds a value in a single row at most, an OPTIONAL of the solutions reads the order column from the row
+     * of the table holding the value into an internal variable, which the aggregates of the variable take as their
+     * second argument, giving the IRI of the least or the greatest order column (see {@link SqlBuiltinCall}). The
+     * OPTIONAL is merged into an access to the table that the solutions are made of, which then reads the order column
+     * from the rows it reads anyway (see {@link SqlLeftJoin}), and the database joins the table otherwise, whereas a
+     * lookup of the order column of every value is a correlated subquery, which it evaluates row by row and never in
+     * parallel workers. A value that no row holds has no order column, as a lookup finds none for it.
+     *
+     * @param request the current request
+     * @param scope the scope of the aggregation
+     * @param aggregations aggregate expression of each result variable
+     * @param child the child node
+     * @return the aggregation of the solutions extended by the order column of the compared IRIs, or null
+     */
+    private SqlIntercode readOrderColumns(Request request, Scope scope,
+            Map<Variable, SqlExpressionIntercode> aggregations, SqlIntercode child)
+    {
+        ClassRelations relations = request.getConfiguration();
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+
+        if(schema == null)
+            return null;
+
+        Map<Variable, Variable> keys = new HashMap<>();
+        SqlIntercode solutions = child;
+
+        for(SqlExpressionIntercode aggregation : aggregations.values())
+        {
+            Variable variable = getComparedVariable(aggregation);
+            VariableBinding binding = variable == null ? null : child.getVariable(variable);
+
+            // a solution leaving the variable unbound would be compatible with every row of the table
+            if(binding == null || binding.canBeNull() || keys.containsKey(variable) || binding.getClasses().size() != 1
+                    || binding.getNonConstantColumns().isEmpty())
+                continue;
+
+            ResourceClass resClass = binding.getClasses().iterator().next();
+            IriClass iriClass = resClass.getEffectiveClass() instanceof IriClass c ? c : null;
+            OrderTable table = iriClass != null ? iriClass.getOrderTable() : null;
+            Variable key = new Variable("@order_" + variable.getName());
+
+            // a value held by several rows would make several solutions of one
+            if(table == null || !schema.isKey(table.table(), new HashSet<>(table.values()))
+                    || child.getVariable(key) != null)
+                continue;
+
+            SqlIntercode access = getOrderAccess(request, table, variable, resClass, key);
+
+            solutions = SqlLeftJoin.leftJoin(request, scope, solutions, access, List.of(), false, null);
+            keys.put(variable, key);
+        }
+
+        if(keys.isEmpty())
+            return null;
+
+        Map<Variable, SqlExpressionIntercode> extended = new LinkedHashMap<>();
+
+        for(Entry<Variable, SqlExpressionIntercode> entry : aggregations.entrySet())
+        {
+            Variable variable = getComparedVariable(entry.getValue());
+
+            if(keys.containsKey(variable) && entry.getValue() instanceof SqlBuiltinCall call)
+            {
+                List<SqlExpressionIntercode> arguments = List.of(
+                        SqlVariable.create(relations, solutions.getVariable(variable)),
+                        SqlVariable.create(relations, solutions.getVariable(keys.get(variable))));
+
+                extended.put(entry.getKey(),
+                        SqlBuiltinCall.create(request, call.getFunction(), call.isDistinct(), arguments));
+            }
+            else
+            {
+                extended.put(entry.getKey(), entry.getValue());
+            }
+        }
+
+        return aggregate(request, groupVariables, extended, solutions);
+    }
+
+
+    /**
+     * The variable whose values MIN or MAX compares by the order columns computed from them, or null when the aggregate
+     * is another one, or one of something else than a variable, or one comparing the order column read along with the
+     * values already.
+     *
+     * @param aggregation the aggregate expression
+     * @return the variable whose values the aggregate compares by the order columns computed from them, or null
+     */
+    private static Variable getComparedVariable(SqlExpressionIntercode aggregation)
+    {
+        return aggregation instanceof SqlBuiltinCall call
+                && (call.getFunction().equals("min") || call.getFunction().equals("max"))
+                && call.getArguments().size() == 1 && call.getArguments().get(0) instanceof SqlVariable argument ?
+                        argument.getVariable() : null;
+    }
+
+
+    /**
+     * Access to the table holding the order column of the IRIs of a class (see {@link IriClass#getOrderTable}) that
+     * binds the variable to the values of the class the rows hold, and the internal variable to the order column of the
+     * IRIs of the values, in a class of its own; a row holding a null in their columns is left out.
+     *
+     * @param request the current request
+     * @param table the table holding the order column
+     * @param variable the variable of the values
+     * @param resClass the class the solutions bind the variable in
+     * @param key the internal variable of the order column
+     * @return the access to the table holding the order column
+     */
+    private static SqlIntercode getOrderAccess(Request request, OrderTable table, Variable variable,
+            ResourceClass resClass, Variable key)
+    {
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+        Condition condition = new Condition();
+
+        for(Column column : Stream.concat(table.values().stream(), Stream.of(table.order())).toList())
+            if(schema.isNullableColumn(table.table(), column))
+                condition.addIsNotNull(column);
+
+        VariableBindings bindings = new VariableBindings();
+        bindings.add(new VariableBinding(variable, resClass, table.values(), false));
+        bindings.add(new VariableBinding(key, new InternalResourceClass(List.of(table.order().getType())),
+                List.of(table.order()), false));
+
+        return SqlTableAccess.create(request, table.table(), new Conditions(condition), bindings);
     }
 
 

@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.test;
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
@@ -52,9 +53,11 @@ import cz.iocb.sparql.testing.Database;
  * their text, also where the stored values of an IRI class are ordered otherwise: the ids of a mapping table, the
  * numbers of IRIs written without padding or padded to a minimal width, whose digits are ordered as text, the ids
  * followed by a suffix, and the stored values of an enumeration. A class whose stored values are ordered as its IRIs,
- * like the numbers of a fixed width, is aggregated as it is stored. Where the default collation of the database does
- * not order by code points, the character keys are compared in the collation "C", and the values get the default
- * collation back, so that they can be compared with a column of another code-point collation.
+ * like the numbers of a fixed width, is aggregated as it is stored. The order column of the IRIs of a mapping table is
+ * read by a join with the table, or along with the rows of the table that the solutions read, and not looked up for
+ * every solution. Where the default collation of the database does not order by code points, the character keys are
+ * compared in the collation "C", and the values get the default collation back, so that they can be compared with a
+ * column of another code-point collation.
  */
 public class MinMaxOrderTest
 {
@@ -67,6 +70,11 @@ public class MinMaxOrderTest
      * Engine over the configuration mapping the test tables.
      */
     private static Engine engine = null;
+
+    /**
+     * Engine over the same mappings with the join optimizer.
+     */
+    private static Engine optimizedEngine = null;
 
     /**
      * Engines over the same mappings with a schema taking the default collation of the database for one that does not
@@ -109,6 +117,7 @@ public class MinMaxOrderTest
         }
 
         engine = new Engine(configuration(connectionPool, new DatabaseSchema(connectionPool), false));
+        optimizedEngine = new Engine(configuration(connectionPool, new DatabaseSchema(connectionPool), true));
 
         DatabaseSchema collated = new DatabaseSchema(connectionPool)
         {
@@ -124,7 +133,7 @@ public class MinMaxOrderTest
 
     /**
      * Configuration mapping the groups of the items as {@code :group}, their values by a predicate named after the IRI
-     * class of the values, and the labels as {@code :label}.
+     * class of the values, the labels as {@code :label}, and the names of the codes as {@code :name}.
      *
      * @param connectionPool the connection pool
      * @param schema schema of the test database
@@ -163,6 +172,10 @@ public class MinMaxOrderTest
         config.addQuadMapping(new DatabaseTable("min_max_order_test", "label"), graph,
                 config.createIriMapping("item", "id"), config.createIriMapping(":label"),
                 config.createIriMapping("word", "word"));
+
+        config.addQuadMapping(new DatabaseTable("min_max_order_test", "codes"), graph,
+                config.createIriMapping("code", "id"), config.createIriMapping(":name"),
+                config.createLiteralMapping(xsdString, "name"));
 
         config.setJoinOptimizer(joinOptimizer);
 
@@ -296,7 +309,14 @@ public class MinMaxOrderTest
     @DisplayName("the ids of a mapping table are ordered as the IRIs they stand for")
     void mappedIds() throws Exception
     {
-        assertExtremes(engine, "code", iri("code/alpha"), iri("code/zeta"));
+        for(Engine tested : List.of(engine, optimizedEngine))
+        {
+            assertExtremes(tested, "code", iri("code/alpha"), iri("code/zeta"));
+
+            // the order column of the IRIs is read by a join with the mapping table, and the IRIs are made of it
+            assertThat(translate(tested, "SELECT (MIN(?v) AS ?min) (MAX(?v) AS ?max) WHERE { ?s :code ?v }"),
+                    not(containsString("@rctab")));
+        }
     }
 
 
@@ -304,7 +324,41 @@ public class MinMaxOrderTest
     @DisplayName("the ids of a mapping table are ordered as the IRIs with their suffix")
     void mappedIdsWithSuffix() throws Exception
     {
-        assertExtremes(engine, "page", iri("page/a-.html"), iri("page/a.html"));
+        for(Engine tested : List.of(engine, optimizedEngine))
+        {
+            assertExtremes(tested, "page", iri("page/a-.html"), iri("page/a.html"));
+
+            assertThat(translate(tested, "SELECT (MIN(?v) AS ?min) (MAX(?v) AS ?max) WHERE { ?s :page ?v }"),
+                    not(containsString("@rctab")));
+        }
+    }
+
+
+    @Test
+    @DisplayName("the order column of the IRIs read along with the rows of the mapping table the solutions read")
+    void mappedIdsOfTheSolutions() throws Exception
+    {
+        String query = "SELECT (MIN(?c) AS ?min) (MAX(?c) AS ?max) WHERE { ?c :name ?n }";
+
+        for(Engine tested : List.of(engine, optimizedEngine))
+        {
+            assertEquals(List.of(row(iri("code/alpha"), iri("code/zeta"))), execute(tested, query));
+
+            // the access of the solutions reads the order column along, without a join or a lookup
+            String sql = translate(tested, query);
+            assertThat(sql, not(containsString("@rctab")));
+            assertThat(sql, not(containsString("JOIN")));
+        }
+    }
+
+
+    @Test
+    @DisplayName("the IRIs of two variables of mapping tables")
+    void twoMappedVariables() throws Exception
+    {
+        for(Engine tested : List.of(engine, optimizedEngine))
+            assertEquals(List.of(row(iri("code/alpha"), iri("page/a.html"), iri("code/zeta"))), execute(tested,
+                    "SELECT (MIN(?c) AS ?a) (MAX(?p) AS ?b) (MAX(?c) AS ?d) WHERE { ?s :code ?c ; :page ?p }"));
     }
 
 
@@ -333,8 +387,9 @@ public class MinMaxOrderTest
         List<RdfTerm> second = row(new TypedLiteral("2", xsdIntIri), new TypedLiteral("1", xsdIntegerIri),
                 iri("code/alpha"), iri("code/alpha"));
 
-        assertEquals(List.of(first, second), execute(engine, "SELECT ?g (COUNT(?v) AS ?count) (MIN(?v) AS ?min) "
-                + "(MAX(?v) AS ?max) WHERE { ?s :group ?g ; :code ?v } GROUP BY ?g ORDER BY ?g"));
+        for(Engine tested : List.of(engine, optimizedEngine))
+            assertEquals(List.of(first, second), execute(tested, "SELECT ?g (COUNT(?v) AS ?count) (MIN(?v) AS ?min) "
+                    + "(MAX(?v) AS ?max) WHERE { ?s :group ?g ; :code ?v } GROUP BY ?g ORDER BY ?g"));
     }
 
 
@@ -342,8 +397,9 @@ public class MinMaxOrderTest
     @DisplayName("an unbound value makes MIN an error, whereas MAX passes it by")
     void unboundValue() throws Exception
     {
-        assertEquals(List.of(row(null, iri("code/zeta"))), execute(engine,
-                "SELECT (MIN(?v) AS ?min) (MAX(?v) AS ?max) WHERE { ?s :group ?g OPTIONAL { ?s :code ?v } }"));
+        for(Engine tested : List.of(engine, optimizedEngine))
+            assertEquals(List.of(row(null, iri("code/zeta"))), execute(tested,
+                    "SELECT (MIN(?v) AS ?min) (MAX(?v) AS ?max) WHERE { ?s :group ?g OPTIONAL { ?s :code ?v } }"));
     }
 
 
