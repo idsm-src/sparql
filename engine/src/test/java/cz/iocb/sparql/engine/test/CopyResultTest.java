@@ -21,6 +21,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -46,11 +47,12 @@ import cz.iocb.sparql.testing.Database;
 
 /**
  * The rows of a result read in parts, which the database copies to the client where the driver lets it: the database
- * evaluates the copied statement by parallel workers and sends its rows as they are read, a cancellation of the request
+ * evaluates the copied statement by parallel workers and sends its rows as they are read; a cancellation of the request
  * and its time limit end the copy, also a cancellation that comes before the statement of the copy reaches the
- * database, a result closed before its end leaves the request usable, the time limit of a copied statement does not
- * hold for the next statement of the request, the warnings the database raises while it copies are those of the result,
- * and the terms are those of the result read whole.
+ * database; a result closed before its end leaves the request usable, and one whose end has come with the rows read
+ * already is closed without a cancellation; the time limit of a copied statement does not hold for the next statement
+ * of the request; the warnings the database raises while it copies are those of the result; and the terms are those of
+ * the result read whole.
  *
  * The table {@code copy_result.texts} holds 100000 texts of 200 characters, mapped by ex:text; the virtual table
  * {@code slow} gives its row after 30 seconds, mapped by ex:slow, and the virtual table {@code pause} gives its row
@@ -86,6 +88,16 @@ public class CopyResultTest
      */
     private static volatile Request cancelled = null;
 
+    /**
+     * Engine over the configuration mapping the tables over connections that count the cancellations they send.
+     */
+    private static Engine counting = null;
+
+    /**
+     * Number of the cancellations the connections of {@link #delaying} and {@link #counting} have sent.
+     */
+    private static final AtomicInteger cancellations = new AtomicInteger();
+
 
     /**
      * Creates the {@code copy_result} schema with the texts and the engines over the configurations mapping it and the
@@ -106,7 +118,8 @@ public class CopyResultTest
         }
 
         engine = new Engine(configure(connectionPool));
-        delaying = new Engine(configure(delay(DataSource.class, connectionPool)));
+        delaying = new Engine(configure(wrap(DataSource.class, connectionPool, true)));
+        counting = new Engine(configure(wrap(DataSource.class, connectionPool, false)));
     }
 
 
@@ -146,26 +159,30 @@ public class CopyResultTest
 
 
     /**
-     * Wraps a connection pool, a connection or a connection of the driver so that the copy API of the connection of the
-     * driver cancels the request {@link #cancelled} just before it sends the statement of a copy, which it sends 300
-     * milliseconds later; the connections it gives are wrapped likewise.
+     * Wraps a connection pool, a connection or a connection of the driver so that the connection of the driver counts
+     * the cancellations it sends and, when it delays, its copy API cancels the request {@link #cancelled} just before
+     * it sends the statement of a copy, which it sends 300 milliseconds later; the connections it gives are wrapped
+     * likewise.
      */
-    private static <T> T delay(Class<T> type, T target)
+    private static <T> T wrap(Class<T> type, T target, boolean delays)
     {
         return type.cast(Proxy.newProxyInstance(CopyResultTest.class.getClassLoader(), new Class<?>[] { type },
                 (_, method, arguments) -> {
-                    if(target instanceof PGConnection driver && method.getName().equals("getCopyAPI"))
+                    if(target instanceof PGConnection driver && method.getName().equals("getCopyAPI") && delays)
                         return delayedCopyManager(driver);
+
+                    if(target instanceof PGConnection && method.getName().equals("cancelQuery"))
+                        cancellations.incrementAndGet();
 
                     try
                     {
                         Object result = method.invoke(target, arguments);
 
                         if(result instanceof Connection connection && method.getName().equals("getConnection"))
-                            return delay(Connection.class, connection);
+                            return wrap(Connection.class, connection, delays);
 
                         if(result instanceof PGConnection driver && method.getName().equals("unwrap"))
-                            return delay(PGConnection.class, driver);
+                            return wrap(PGConnection.class, driver, delays);
 
                         return result;
                     }
@@ -178,7 +195,7 @@ public class CopyResultTest
 
 
     /**
-     * The copy API of the connection of the driver for {@link #delay}.
+     * The copy API of the connection of the driver for {@link #wrap}.
      */
     private static CopyManager delayedCopyManager(PGConnection driver) throws SQLException
     {
@@ -414,6 +431,46 @@ public class CopyResultTest
         }
 
         assertThat(running("pg_sleep(30)"), is(0));
+    }
+
+
+    @Test
+    @DisplayName("a copy whose end has come with the rows read already is closed without a cancellation")
+    void closedAfterItsEnd() throws Exception
+    {
+        try(Request request = counting.getRequest())
+        {
+            String few = prefix + "SELECT ?s ?t WHERE { ?s ex:text ?t } LIMIT 20";
+            String all = prefix + "SELECT ?s ?t WHERE { ?s ex:text ?t }";
+            int before = cancellations.get();
+
+            // the database sends the few rows together with the end of the copy
+            try(Result result = request.execute(few, null, 0, -1, 10, 0))
+            {
+                assertThat(result.next(), is(true));
+            }
+
+            assertThat(cancellations.get() - before, is(0));
+
+            // whereas a copy of all the texts still runs when one of them has been read
+            try(Result result = request.execute(all, null, 0, -1, 1000, 0))
+            {
+                assertThat(result.next(), is(true));
+            }
+
+            assertThat(cancellations.get() - before, is(1));
+
+            // and the request goes on in either case
+            try(Result result = request.execute(few, null, 0, -1, 10, 0))
+            {
+                int rows = 0;
+
+                while(result.next())
+                    rows++;
+
+                assertThat(rows, is(20));
+            }
+        }
     }
 
 

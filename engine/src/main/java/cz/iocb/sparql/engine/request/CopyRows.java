@@ -32,9 +32,10 @@ import cz.iocb.sparql.engine.database.SqlType;
  * characters with names in C that a value holds are written by a backslash and a character (a tab by {@code \t}, a line
  * feed by {@code \n}), so no field holds a tab or a line feed. The field of a value is its text, which is read as the
  * driver reads the text of a value of a result set. The connection runs nothing else while it copies: rows that are
- * closed before their end has been read cancel the copy and read and drop the rows the database has sent before it took
- * the cancellation, and the error that ends the copy, so that the connection can run the next statement, and roll the
- * transaction, which the cancellation aborts, back to the savepoint the request has made before the statement (see
+ * closed before their end has been read drop the rows the database has sent already, and cancel a copy that has not
+ * ended with them, reading and dropping the rows the database sends before it takes the cancellation, and the error
+ * that ends the copy, so that the connection can run the next statement; they roll the transaction, which the
+ * cancellation aborts, back to the savepoint the request has made before the statement (see
  * {@link Request#rollBackStatement}), so that the request can go on as it can after a result set closed before its end.
  * The request cancels the copy, which no statement of the driver runs, through the connection of the driver, and only
  * until the end of the copy has been read (see {@link Request#cancel}), so that a cancellation reaches no later
@@ -46,6 +47,12 @@ final class CopyRows implements ResultRows
      * Logger of the copies.
      */
     private static final Logger logger = LoggerFactory.getLogger(CopyRows.class);
+
+    /**
+     * Time in nanoseconds for which rows closed before their end read the rows the database has sent already, about
+     * what a cancellation of the copy takes, as it opens a connection of its own (see {@link #close}).
+     */
+    private static final long DRAIN_TIME = 2_000_000;
 
     /**
      * The request whose statement is copied.
@@ -340,9 +347,12 @@ final class CopyRows implements ResultRows
 
 
     /**
-     * {@inheritDoc} A copy whose end has not been read is cancelled, the rows the database has sent before it took the
-     * cancellation are read and dropped, as is the error ending the copy, and the transaction is rolled back to the
-     * savepoint made before the statement.
+     * {@inheritDoc} The rows of a copy whose end has not been read are read and dropped as far as the database has sent
+     * them, without waiting for more, though for {@link #DRAIN_TIME} at most, as the database may go on sending them as
+     * they are read. A copy that has not ended with them is cancelled, and the rows the database sends before it takes
+     * the cancellation are dropped as well, as is the error ending the copy; the transaction that an error has aborted
+     * is rolled back to the savepoint made before the statement. So a copy whose end has come with the rows read, like
+     * the copy of a few rows read in part, ends without the cancellation and without rolling back.
      */
     @Override
     public void close() throws SQLException
@@ -351,35 +361,46 @@ final class CopyRows implements ResultRows
             return;
 
         SQLException failure = null;
+        boolean aborted = false;
         long dropped = 0;
 
         try
         {
-            cancel();
-        }
-        catch(SQLException e)
-        {
-            // the copy is read to its end then
-            failure = e;
-        }
+            long deadline = System.nanoTime() + DRAIN_TIME;
 
-        try
-        {
-            while(copy.readFromCopy() != null)
+            while(System.nanoTime() < deadline && copy.readFromCopy(false) != null)
                 dropped++;
+
+            if(copy.isActive())
+            {
+                try
+                {
+                    cancel();
+                }
+                catch(SQLException e)
+                {
+                    // the copy is read to its end then
+                    failure = e;
+                }
+
+                while(copy.readFromCopy() != null)
+                    dropped++;
+            }
         }
         catch(SQLException e)
         {
-            // the error ending the cancelled copy
+            // the error ending the copy
+            aborted = true;
         }
         finally
         {
             end();
         }
 
-        logger.trace("copy cancelled, {} rows dropped", dropped);
+        logger.trace("copy closed before its end, {} rows dropped", dropped);
 
-        request.rollBackStatement();
+        if(aborted)
+            request.rollBackStatement();
 
         if(failure != null)
             throw failure;
