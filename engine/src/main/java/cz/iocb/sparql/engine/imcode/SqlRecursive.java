@@ -1,5 +1,9 @@
 package cz.iocb.sparql.engine.imcode;
 
+import static cz.iocb.sparql.engine.database.Table.toTableColumns;
+import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.falseValue;
+import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
@@ -23,11 +27,14 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
+import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.ValueColumn;
+import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlNull;
+import cz.iocb.sparql.engine.imcode.expression.SqlUnaryLogical;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -1725,11 +1732,14 @@ public final class SqlRecursive extends SqlIntercode
         VariableBindings tmp = new VariableBindings(carried);
         tmp.add(new VariableBinding(joinVar, endBinding.getMappings(), endBinding.canBeNull()));
 
+        // a row of the step leading back to the node it departs from is left out of every form of the join (see
+        // getNoLoopCondition)
         if(lateral)
         {
             builder.append(" CROSS JOIN LATERAL (");
-            builder.append(((SqlUnion) next).translate(request, scope, (branch,
-                    alias) -> generateJoinCondition(relations, tmp, branch.getVariableBindings(), left, alias)));
+            builder.append(((SqlUnion) next).translate(request, scope, (branch, alias) -> and(
+                    generateJoinCondition(relations, tmp, branch.getVariableBindings(), left, alias),
+                    getNoLoopCondition(request, branch.getVariable(joinVar), branch.getVariable(endVar), alias))));
             builder.append(") AS ");
             builder.append(right);
         }
@@ -1740,11 +1750,13 @@ public final class SqlRecursive extends SqlIntercode
             // up laterally through an index of the table for every row of the recursion instead of being hashed whole
             // in every round (see JoinOptimizer); the node reached is converted to the class of the columns of the
             // step, so that the index serves the lookup also when the path leads through nodes of another class
-            SqlCode condition = access.getLookupCondition(relations, tmp, left, Map.of());
+            SqlCode lookup = access.getLookupCondition(relations, tmp, left, Map.of());
+            SqlCode condition = and(lookup, getNoLoopCondition(request, access.getInternalVariableBinding(joinVar),
+                    access.getInternalVariableBinding(endVar), null));
 
             builder.append(" CROSS JOIN LATERAL (");
             builder.append(access.translateLateral(request, condition != null ? condition : SqlCode.TRUE,
-                    condition != null ? access.getLookupComparedColumns(relations, tmp) : Set.of()));
+                    lookup != null ? access.getLookupComparedColumns(relations, tmp) : Set.of()));
             builder.append(") AS ");
             builder.append(right);
         }
@@ -1755,7 +1767,8 @@ public final class SqlRecursive extends SqlIntercode
             builder.append(") AS ");
             builder.append(right);
 
-            SqlCode condition = generateJoinCondition(relations, tmp, next.getVariableBindings(), left, right);
+            SqlCode condition = and(generateJoinCondition(relations, tmp, next.getVariableBindings(), left, right),
+                    getNoLoopCondition(request, next.getVariable(joinVar), next.getVariable(endVar), right));
 
             if(condition != null)
             {
@@ -1783,6 +1796,84 @@ public final class SqlRecursive extends SqlIntercode
         }
 
         return builder.toCode();
+    }
+
+
+    /**
+     * SQL condition that a row of the step leads to another node than the one it departs from. A row leading back to
+     * its node gives the recursion the pair of a start and a node that it holds already, with the same carried
+     * variables, which the union of the recursion would drop as a duplicate, so the row is left out before the database
+     * joins it with the rows of the recursion and looks the pair up among them; a property every node of which is
+     * related to itself makes as many such rows as the walk has solutions. The nodes are compared as {@code sameTerm}
+     * compares them, as equal values of some types are different terms (see {@link SqlType#getGroupingKey}). Null when
+     * a node may be missing or when the two nodes never take the same term.
+     *
+     * @param request the current request
+     * @param from binding of the node the step departs from, or null
+     * @param to binding of the node the step reaches, or null
+     * @param table alias the columns of the bindings are addressed through, or null when they are written as they are
+     * @return SQL condition over the columns of the step, or null when no row has to be left out
+     */
+    private static SqlCode getNoLoopCondition(Request request, VariableBinding from, VariableBinding to, Table table)
+    {
+        if(from == null || to == null || from.canBeNull() || to.canBeNull())
+            return null;
+
+        ClassRelations relations = request.getConfiguration();
+
+        SqlExpressionIntercode same = SqlBuiltinCall.create(request, "sameterm", false,
+                List.of(SqlVariable.create(relations, qualify(from, table)),
+                        SqlVariable.create(relations, qualify(to, table))));
+
+        SqlExpressionIntercode different = SqlUnaryLogical.create(relations, same);
+
+        if(different.equals(trueValue))
+            return null;
+
+        if(different.equals(falseValue))
+            return SqlCode.FALSE;
+
+        return different.get(relations, xsdBoolean).get(0).getCode();
+    }
+
+
+    /**
+     * The binding with its columns addressed through the table.
+     *
+     * @param binding the binding
+     * @param table the alias of the table, or null to keep the columns as they are
+     * @return the binding with its columns addressed through the table
+     */
+    private static VariableBinding qualify(VariableBinding binding, Table table)
+    {
+        if(table == null)
+            return binding;
+
+        VariableBinding qualified = new VariableBinding(binding.getVariable(), binding.canBeNull());
+
+        for(Entry<ResourceClass, List<Column>> entry : binding.getMappings().entrySet())
+            qualified.addMapping(entry.getKey(), toTableColumns(table, entry.getValue()));
+
+        return qualified;
+    }
+
+
+    /**
+     * Conjunction of two SQL conditions, either of which may be absent.
+     *
+     * @param first the first condition, or null
+     * @param second the second condition, or null
+     * @return conjunction of the conditions, or null when both are absent
+     */
+    private static SqlCode and(SqlCode first, SqlCode second)
+    {
+        if(first == null)
+            return second;
+
+        if(second == null)
+            return first;
+
+        return SqlCode.of(first, " AND ", second);
     }
 
 
