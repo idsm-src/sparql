@@ -94,6 +94,16 @@ public final class SqlRecursive extends SqlIntercode
     private static final AliasTable stepTable = new AliasTable("step");
 
     /**
+     * Alias of the distinct starts of a walk evaluated for every start by itself (see {@link #isWalkedPerStart}).
+     */
+    private static final AliasTable startsTable = new AliasTable("starts");
+
+    /**
+     * Alias of the recursion of a walk evaluated for every start by itself, joined laterally with the start.
+     */
+    private static final AliasTable pathsTable = new AliasTable("paths");
+
+    /**
      * Solutions starting the recursion.
      */
     public final SqlIntercode init;
@@ -1478,15 +1488,35 @@ public final class SqlRecursive extends SqlIntercode
 
 
     /**
-     * True if the branch of the step is a table access whose rows with a given start node can be looked up by an index
+     * True if the node is a table access, or a union of table accesses, whose rows with a given value of the variable
+     * can be looked up by an index of each table (see {@link #canLookUp}).
+     *
+     * @param request the current request
+     * @param node the initial solutions or the step
+     * @param variable the variable whose value the rows are looked up by
+     * @return true if the rows of the node with a given value of the variable can be looked up by an index
+     */
+    private boolean canLookUpEvery(Request request, SqlIntercode node, Variable variable)
+    {
+        if(node instanceof SqlUnion union)
+            return union.getChilds().stream().allMatch(branch -> canLookUp(request, branch, variable));
+
+        return canLookUp(request, node, variable);
+    }
+
+
+    /**
+     * True if the branch is a table access whose rows with a given value of the variable can be looked up by an index
      * of the table, the columns of the carried graph and the columns compared with constants counting as bound (see
      * {@link DatabaseSchema#canLookUp}).
      *
      * @param request the current request
-     * @param branch a branch of the step
-     * @return true if the rows of the branch with a given start node can be looked up by an index
+     * @param branch a branch of the initial solutions or of the step
+     * @param variable the variable whose value the rows are looked up by: the start variable of the initial solutions,
+     *            or the variable of the step bound to the node it departs from
+     * @return true if the rows of the branch with a given value of the variable can be looked up by an index
      */
-    private boolean canLookUpStep(Request request, SqlIntercode branch)
+    private boolean canLookUp(Request request, SqlIntercode branch, Variable variable)
     {
         DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
 
@@ -1511,7 +1541,7 @@ public final class SqlRecursive extends SqlIntercode
                 if(column instanceof TableColumn)
                     bound.add(column);
 
-        VariableBinding start = access.getInternalVariableBinding(joinVar);
+        VariableBinding start = access.getInternalVariableBinding(variable);
         Set<Column> columns = start != null ? start.getNonConstantColumns() : Set.of();
 
         return columns.size() == 1 && columns.iterator().next() instanceof TableColumn column
@@ -1519,10 +1549,168 @@ public final class SqlRecursive extends SqlIntercode
     }
 
 
+    /**
+     * True if the walk is evaluated for every start by itself (see {@link #translate}): the recursion deduplicates the
+     * pairs of a start and a node it has reached, so the database keeps every pair the walk has found in a hash table
+     * that no setting of the memory limits it, and a walk between two variables from all the initial solutions keeps
+     * the whole closure (the pairs within a component of 31745 nodes related to each other took about 70 GB), whereas
+     * evaluated for one start, which the pairs of the other starts can never be equal to, it keeps only the nodes that
+     * start reaches. A walk is evaluated so when it starts from all its initial solutions (it is not seeded and starts
+     * from no values of expressions, either of which makes its starts few) and carries its start, and its graph, bound
+     * always in a single class, so that the starts are told apart by the plain comparison of their columns, and when
+     * both its initial solutions and its step can be looked up by an index (see {@link #canLookUpEvery}): the initial
+     * solutions are then read for one start at a time, and every step for the few nodes of one start, instead of being
+     * read whole for every start. Evaluated so, the walk of the nextProt terms related to each other took 15.6 minutes
+     * and 48 MB instead of an estimated 20 minutes and 70 to 90 GB; a walk of many starts each of which reaches a few
+     * nodes is evaluated about a tenth slower.
+     *
+     * @param request the current request
+     * @return true if the walk is evaluated for every start by itself, false otherwise
+     */
+    private boolean isWalkedPerStart(Request request)
+    {
+        if(beginVar == null || seeded || !start.isEmpty() || iv.isEmpty())
+            return false;
+
+        for(Variable variable : carried.getVariables())
+        {
+            VariableBinding binding = init.getVariable(variable);
+
+            if(binding == null || binding.canBeNull() || binding.getClasses().size() != 1
+                    || binding.getMappings().values().contains(null))
+                return false;
+        }
+
+        return canLookUpEvery(request, init, beginVar) && canLookUpEvery(request, next, joinVar);
+    }
+
+
+    /**
+     * SQL condition that a row of the initial solutions starts in the start of the walk evaluated for every start by
+     * itself (see {@link #isWalkedPerStart}): the columns of the carried variables in the initial solutions are the
+     * same terms as the columns of the start, by the identity of their types, which the database looks the initial
+     * solutions up by.
+     *
+     * @return SQL condition over the columns of the initial solutions and of the start
+     */
+    private SqlCode getStartRestriction()
+    {
+        List<SqlCode> conditions = new ArrayList<>();
+
+        for(VariableBinding binding : getCarriedInitBindings().getValues())
+        {
+            ResourceClass resClass = binding.getClasses().iterator().next();
+            List<Column> columns = binding.getMapping(resClass);
+
+            for(int i = 0; i < columns.size(); i++)
+            {
+                // a constant is the same in every initial solution
+                if(columns.get(i) instanceof ConstantColumn)
+                    continue;
+
+                Column left = columns.get(i).fromTable(initTable);
+                Column right = columns.get(i).fromTable(startsTable);
+                SqlType type = resClass.getSqlTypes().get(i);
+
+                conditions.add(resClass.isOptionalColumn(i) ? type.notDistinct(left, right) : type.equal(left, right));
+            }
+        }
+
+        return conditions.stream().collect(SqlCode.joining(" AND "));
+    }
+
+
+    /**
+     * Bindings of the carried variables in the initial solutions, the columns of which the distinct starts of a walk
+     * evaluated for every start by itself hold (see {@link #translate}).
+     *
+     * @return bindings of the carried variables in the initial solutions
+     */
+    private VariableBindings getCarriedInitBindings()
+    {
+        VariableBindings bindings = new VariableBindings();
+
+        for(Variable variable : carried.getVariables())
+            bindings.add(init.getVariable(variable));
+
+        return bindings;
+    }
+
+
+    /**
+     * The walk evaluated as a whole, from all its initial solutions, or for every start by itself (see
+     * {@link #isWalkedPerStart}): the distinct starts of the initial solutions (the carried columns, with the grouping
+     * keys of the values that are equal without being the same terms, see {@link SqlType#getGroupingKey}) joined
+     * laterally with the recursion whose initial solutions are restricted to the start (see
+     * {@link #getStartRestriction}).
+     */
     @Override
     public SqlCode translate(Request request, Scope scope)
     {
+        if(!isWalkedPerStart(request))
+            return translateRecursion(request, scope, false);
+
+        SqlBuilder builder = new SqlBuilder();
+
+        builder.append("SELECT ");
+
+        Set<Column> columns = getVariableBindings().getNonConstantColumns();
+
+        // the start and the graph are those of the start, the end is reached by the recursion
+        if(!columns.isEmpty())
+            builder.append(columns.stream().map(c -> ev.contains(c) ?
+                    SqlCode.of(iv.get(ev.indexOf(c)).fromTable(startsTable), " AS ", c) : c.fromTable(pathsTable))
+                    .collect(SqlCode.joining(", ")));
+        else
+            builder.append("1");
+
+        builder.append(" FROM (SELECT DISTINCT ");
+        builder.append(iv.stream().collect(SqlCode.joining(", ")));
+
+        for(Column column : iv)
+        {
+            if(column.getType().hasGroupingKey())
+            {
+                builder.append(", ");
+                builder.append(column.getType().getGroupingKey(column));
+            }
+        }
+
+        builder.append(" FROM (");
+        builder.append(init.translate(request, scope));
+        builder.append(") AS ");
+        builder.append(initTable);
+        builder.append(") AS ");
+        builder.append(startsTable);
+        builder.append(" CROSS JOIN LATERAL (");
+        builder.append(translateRecursion(request, scope, true));
+        builder.append(") AS ");
+        builder.append(pathsTable);
+
+        return builder.toCode();
+    }
+
+
+    /**
+     * SQL code of the recursion: the non-recursive term reading the initial solutions, and the recursive term joining
+     * the recursion with the step. The recursion of a walk evaluated for every start by itself (see
+     * {@link #isWalkedPerStart}) reads only the initial solutions of the start it is joined with laterally (see
+     * {@link #getStartRestriction}) and carries the end node alone, the start and the graph being the same in all its
+     * rows: the step is joined with the graph of the start.
+     *
+     * @param request the current request
+     * @param scope the scope of the walk
+     * @param perStart whether the walk is evaluated for every start by itself, joined laterally with the start
+     * @return SQL code of the recursion
+     */
+    private SqlCode translateRecursion(Request request, Scope scope, boolean perStart)
+    {
         ClassRelations relations = request.getConfiguration();
+
+        // the recursion of a walk evaluated for every start by itself carries neither the start nor the graph, the
+        // same in all its rows: they are read from the start the recursion is joined with
+        List<Column> carriedColumns = perStart ? List.of() : ev;
+        List<Column> initColumns = perStart ? List.of() : iv;
 
         List<ResourceClass> endVarClasses = new LinkedList<>(endBinding.getClasses()); // to stable order
 
@@ -1530,9 +1718,9 @@ public final class SqlRecursive extends SqlIntercode
 
         builder.append("WITH RECURSIVE recursion(");
 
-        builder.append(ev.stream().collect(SqlCode.joining(", ")));
+        builder.append(carriedColumns.stream().collect(SqlCode.joining(", ")));
 
-        boolean hasRecursionVariable = !ev.isEmpty();
+        boolean hasRecursionVariable = !carriedColumns.isEmpty();
 
         for(ResourceClass resClass : endVarClasses)
         {
@@ -1557,9 +1745,9 @@ public final class SqlRecursive extends SqlIntercode
         List<SqlCode> initKeys = new ArrayList<>();
         List<SqlCode> stepKeys = new ArrayList<>();
 
-        for(int i = 0; i < ev.size(); i++)
-            if(ev.get(i).getType().hasGroupingKey())
-                initKeys.add(ev.get(i).getType().getGroupingKey(iv.get(i)));
+        for(int i = 0; i < carriedColumns.size(); i++)
+            if(carriedColumns.get(i).getType().hasGroupingKey())
+                initKeys.add(carriedColumns.get(i).getType().getGroupingKey(initColumns.get(i)));
 
         int keys = initKeys.size();
 
@@ -1581,9 +1769,9 @@ public final class SqlRecursive extends SqlIntercode
 
         builder.append(") AS (SELECT ");
 
-        builder.append(iv.stream().collect(SqlCode.joining(", ")));
+        builder.append(initColumns.stream().collect(SqlCode.joining(", ")));
 
-        boolean hasInitSelect = !iv.isEmpty();
+        boolean hasInitSelect = !initColumns.isEmpty();
 
         Variable endVar = endBinding.getVariable();
         VariableBinding initEndBinding = init.getVariableBindings().get(endVar);
@@ -1648,8 +1836,9 @@ public final class SqlRecursive extends SqlIntercode
         Map<Variable, SqlExpressionIntercode> compared = new LinkedHashMap<>(start);
         compared.entrySet().removeIf(e -> init.isRestricted(e.getKey(), e.getValue()));
 
-        SqlCode startCondition = generateJoinCondition(relations, getStartBindings(compared),
-                init.getVariableBindings(), null, initTable);
+        // a walk evaluated for every start by itself takes only the initial solutions of that start
+        SqlCode startCondition = and(generateJoinCondition(relations, getStartBindings(compared),
+                init.getVariableBindings(), null, initTable), perStart ? getStartRestriction() : null);
 
         if(startCondition != null)
         {
@@ -1672,15 +1861,15 @@ public final class SqlRecursive extends SqlIntercode
         VariableBinding carriedGraph = graphVar != null ? carried.get(graphVar) : null;
         boolean lateral = next instanceof SqlUnion union
                 && (endBinding.getClasses().size() > 1 || (carriedGraph != null && carriedGraph.getClasses().size() > 1
-                        && union.getChilds().stream().allMatch(b -> canLookUpStep(request, b))));
+                        && union.getChilds().stream().allMatch(b -> canLookUp(request, b, joinVar))));
         AliasTable left = lateral ? walkTable : leftTable;
         AliasTable right = lateral ? stepTable : rightTable;
 
-        builder.append(ev.stream().map(c -> c.fromTable(left)).collect(SqlCode.joining(", ")));
+        builder.append(carriedColumns.stream().map(c -> c.fromTable(left)).collect(SqlCode.joining(", ")));
 
-        boolean hasUnionSelect = !ev.isEmpty();
+        boolean hasUnionSelect = !carriedColumns.isEmpty();
 
-        for(Column column : ev)
+        for(Column column : carriedColumns)
             if(column.getType().hasGroupingKey())
                 stepKeys.add(column.getType().getGroupingKey(column.fromTable(left)));
 
@@ -1728,9 +1917,11 @@ public final class SqlRecursive extends SqlIntercode
         builder.append(left);
 
         // the step is joined with the carried variables as the recursion holds them, so that a path stays in its graph
-        // also when the parent needs the graph variable in fewer classes or not at all
-        VariableBindings tmp = new VariableBindings(carried);
+        // also when the parent needs the graph variable in fewer classes or not at all; a walk evaluated for every
+        // start by itself joins it with them as the start holds them
+        VariableBindings tmp = perStart ? new VariableBindings() : new VariableBindings(carried);
         tmp.add(new VariableBinding(joinVar, endBinding.getMappings(), endBinding.canBeNull()));
+        VariableBindings starting = perStart ? getCarriedInitBindings() : new VariableBindings();
 
         // a row of the step leading back to the node it departs from is left out of every form of the join (see
         // getNoLoopCondition)
@@ -1738,7 +1929,9 @@ public final class SqlRecursive extends SqlIntercode
         {
             builder.append(" CROSS JOIN LATERAL (");
             builder.append(((SqlUnion) next).translate(request, scope, (branch, alias) -> and(
-                    generateJoinCondition(relations, tmp, branch.getVariableBindings(), left, alias),
+                    and(generateJoinCondition(relations, tmp, branch.getVariableBindings(), left, alias),
+                            generateJoinCondition(relations, starting, branch.getVariableBindings(), startsTable,
+                                    alias)),
                     getNoLoopCondition(request, branch.getVariable(joinVar), branch.getVariable(endVar), alias))));
             builder.append(") AS ");
             builder.append(right);
@@ -1750,13 +1943,17 @@ public final class SqlRecursive extends SqlIntercode
             // up laterally through an index of the table for every row of the recursion instead of being hashed whole
             // in every round (see JoinOptimizer); the node reached is converted to the class of the columns of the
             // step, so that the index serves the lookup also when the path leads through nodes of another class
-            SqlCode lookup = access.getLookupCondition(relations, tmp, left, Map.of());
+            SqlCode lookup = and(access.getLookupCondition(relations, tmp, left, Map.of()),
+                    access.getLookupCondition(relations, starting, startsTable, Map.of()));
             SqlCode condition = and(lookup, getNoLoopCondition(request, access.getInternalVariableBinding(joinVar),
                     access.getInternalVariableBinding(endVar), null));
 
+            Set<Column> strict = new HashSet<>(access.getLookupComparedColumns(relations, tmp));
+            strict.addAll(access.getLookupComparedColumns(relations, starting));
+
             builder.append(" CROSS JOIN LATERAL (");
             builder.append(access.translateLateral(request, condition != null ? condition : SqlCode.TRUE,
-                    lookup != null ? access.getLookupComparedColumns(relations, tmp) : Set.of()));
+                    lookup != null ? strict : Set.of()));
             builder.append(") AS ");
             builder.append(right);
         }
@@ -1767,7 +1964,9 @@ public final class SqlRecursive extends SqlIntercode
             builder.append(") AS ");
             builder.append(right);
 
-            SqlCode condition = and(generateJoinCondition(relations, tmp, next.getVariableBindings(), left, right),
+            SqlCode condition = and(
+                    and(generateJoinCondition(relations, tmp, next.getVariableBindings(), left, right),
+                            generateJoinCondition(relations, starting, next.getVariableBindings(), startsTable, right)),
                     getNoLoopCondition(request, next.getVariable(joinVar), next.getVariable(endVar), right));
 
             if(condition != null)
@@ -1779,7 +1978,11 @@ public final class SqlRecursive extends SqlIntercode
 
         builder.append(") SELECT ");
 
+        // the start and the graph of a walk evaluated for every start by itself are read from the start
         Set<Column> columns = getVariableBindings().getNonConstantColumns();
+
+        if(perStart)
+            columns.removeAll(ev);
 
         if(!columns.isEmpty())
             builder.append(columns.stream().collect(SqlCode.joining(", ")));
