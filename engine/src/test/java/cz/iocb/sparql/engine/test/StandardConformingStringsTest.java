@@ -6,6 +6,7 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdString
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -19,6 +20,7 @@ import org.apache.tomcat.jdbc.pool.PoolConfiguration;
 import org.apache.tomcat.jdbc.pool.PoolProperties;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
@@ -40,10 +42,10 @@ import cz.iocb.sparql.testing.Database;
 
 /**
  * The string constants of the generated SQL over connections whose setting {@code standard_conforming_strings} is off,
- * under which a backslash in a string constant would escape the next character: the engine writes the constants by the
- * standard rules and so turns the setting on for the transaction of a request, and a value holding backslashes and
- * quotes is then neither altered nor able to end its constant. The table {@code item} holds such values, mapped by
- * ex:v.
+ * under which a backslash in a plain string constant would escape the next character: the engine writes a text holding
+ * a backslash as an escape string constant, which means its text whatever the setting is, so a value holding
+ * backslashes and quotes is neither altered nor able to end its constant. The table {@code item} holds such values,
+ * mapped by ex:v. PostgreSQL 19 and newer do not accept the setting off, so the tests are skipped there.
  */
 public class StandardConformingStringsTest
 {
@@ -58,6 +60,11 @@ public class StandardConformingStringsTest
     private static final List<String> values = List.of("a\\b", "\\", "x\\'y", "\\n", "\\'); select 1; --");
 
     /**
+     * True if the test database accepts the setting off, which PostgreSQL 19 and newer reject.
+     */
+    private static boolean accepted = false;
+
+    /**
      * Pool of connections with the setting off.
      */
     private static DataSource legacyPool = null;
@@ -70,7 +77,8 @@ public class StandardConformingStringsTest
 
     /**
      * Creates the {@code standard_conforming_strings_test} schema with the table of the values, the pool of connections
-     * with the setting off, and the configuration mapping the table over that pool.
+     * with the setting off, and the configuration mapping the table over that pool, when the test database accepts the
+     * setting off.
      *
      * @throws SQLException on database errors
      */
@@ -78,6 +86,17 @@ public class StandardConformingStringsTest
     static void init() throws SQLException
     {
         DataSource pool = Database.getPool();
+
+        try(Connection connection = pool.getConnection();
+                Statement statement = connection.createStatement();
+                ResultSet result = statement.executeQuery("show server_version_num"))
+        {
+            result.next();
+            accepted = Integer.parseInt(result.getString(1)) < 190000;
+        }
+
+        if(!accepted)
+            return;
 
         try(Connection connection = pool.getConnection(); Statement statement = connection.createStatement())
         {
@@ -122,12 +141,23 @@ public class StandardConformingStringsTest
 
 
     /**
-     * Closes the pool of connections with the setting off.
+     * Closes the pool of connections with the setting off, if it has been created.
      */
     @AfterAll
     static void close()
     {
-        legacyPool.close();
+        if(legacyPool != null)
+            legacyPool.close();
+    }
+
+
+    /**
+     * Skips the test when the test database does not accept the setting off.
+     */
+    @BeforeEach
+    void requireSetting()
+    {
+        assumeTrue(accepted, "PostgreSQL 19 and newer do not accept standard_conforming_strings = off");
     }
 
 
