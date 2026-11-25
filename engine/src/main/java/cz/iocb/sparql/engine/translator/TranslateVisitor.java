@@ -135,6 +135,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.request.Request.NodeTerm;
@@ -2004,7 +2005,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
      * joined with it, because the database would otherwise run the function again for every solution. Inside an EXISTS
      * pattern, a parameter the context does not bind takes its value in the current solution the pattern is evaluated
      * for (see {@link #getOuterVariable}). The nodes standing for the parameters and the results are bound to blank
-     * nodes of the call (see {@link #bindNode}).
+     * nodes of the call (see {@link #bindNode}), and the terms written in the place of the results are matched against
+     * the results (see {@link #matchProcedureResult}).
      *
      * @param procedureCallBase the procedure call
      * @param context solutions the call is evaluated for
@@ -2127,31 +2129,64 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 parameterNode, resultNode, context);
 
         for(Entry<VariableNode, Node> entry : conditions.entrySet())
-        {
-            VariableNode fakeResult = entry.getKey();
-            Node result = entry.getValue();
-
-            VariableOrBlankNode var = null;
-
-            if(result instanceof Literal literal)
-            {
-                var = createVariableNode(variablePrefix);
-                intercode = SqlBind.bind(request, getVariable(var), SqlLiteral.create(request, literal), intercode);
-            }
-            else if(result instanceof IriNode iri)
-            {
-                var = createVariableNode(variablePrefix);
-                intercode = SqlBind.bind(request, getVariable(var), SqlIri.create(request, getIri(iri)), intercode);
-            }
-            else if(result instanceof VariableOrBlankNode variable)
-            {
-                var = variable;
-            }
-
-            intercode = SqlMerge.create(request, getVariable(var), getVariable(fakeResult), intercode);
-        }
+            intercode = matchProcedureResult(getTerm(entry.getValue()), getVariable(entry.getKey()), intercode);
 
         return intercode;
+    }
+
+
+    /**
+     * Matches the term written in the place of a result of a procedure call, or of a node standing for its parameters
+     * or its results, against the value that the call binds to the fresh variable standing in its place: a variable is
+     * merged with the value, so it has to agree with the value where it is bound already, a triple term is matched
+     * component by component (the values that are no triple terms are dropped), and an IRI or a literal has to be the
+     * value.
+     *
+     * @param term the term written in the place of the result
+     * @param value the fresh variable bound to the value
+     * @param intercode the solutions of the call
+     * @return the solutions of the call matching the term
+     */
+    private SqlIntercode matchProcedureResult(RdfTerm term, Variable value, SqlIntercode intercode)
+    {
+        ClassRelations relations = request.getConfiguration();
+
+        if(term instanceof Variable variable)
+            return SqlMerge.create(request, variable, value, intercode);
+
+        if(term instanceof TripleTerm triple)
+        {
+            SqlExpressionIntercode isTriple = SqlBuiltinCall.create(request, "istriple", false,
+                    List.of(SqlVariable.create(relations, intercode.getVariable(value))));
+            intercode = SqlFilter.filter(request, List.of(isTriple), intercode);
+
+            List<RdfTerm> terms = List.of(triple.getSubject(), triple.getPredicate(), triple.getObject());
+            List<String> functions = List.of("subject", "predicate", "object");
+
+            for(int i = 0; i < terms.size(); i++)
+            {
+                Variable component = createVariable(variablePrefix);
+                SqlExpressionIntercode part = SqlBuiltinCall.create(request, functions.get(i), false,
+                        List.of(SqlVariable.create(relations, intercode.getVariable(value))));
+
+                intercode = SqlBind.bind(request, component, part, intercode);
+                intercode = matchProcedureResult(terms.get(i), component, intercode);
+            }
+
+            return intercode;
+        }
+
+        SqlExpressionIntercode expression = switch(term)
+        {
+            case Iri iri -> SqlIri.create(request, iri);
+            case Literal literal -> SqlLiteral.create(request, literal);
+            default -> throw new IllegalArgumentException();
+        };
+
+        Variable constant = createVariable(variablePrefix);
+        intercode = SqlBind.bind(request, constant, expression, intercode);
+
+        return SqlMerge.create(request, constant, value, intercode);
     }
 
 
