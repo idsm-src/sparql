@@ -427,14 +427,19 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 SqlExpressionIntercode filter = SqlBuiltinCall.create(request, "bound", false, List.of(expression));
                 SqlIntercode source = SqlFilter.filter(request, List.of(filter), select);
 
+                // the variable is copied from the join of the solutions with the triples, where it may take the classes
+                // of the triples as well (the solutions may leave it unbound, as far as their bindings tell), so the
+                // copy reads the variable of the join, not of the solutions
                 SqlIntercode subjectPattern = visitor.translate(null, variable, predicate, object);
                 subjectPattern = SqlJoin.join(request, source, subjectPattern);
-                subjectPattern = SqlBind.bind(request, subject, expression, subjectPattern);
+                subjectPattern = SqlBind.bind(request, subject,
+                        SqlVariable.create(relations, subjectPattern.getVariable(variable)), subjectPattern);
                 unionList.add(subjectPattern);
 
                 SqlIntercode objectPattern = visitor.translate(null, subject, predicate, variable);
                 objectPattern = SqlJoin.join(request, source, objectPattern);
-                objectPattern = SqlBind.bind(request, object, expression, objectPattern);
+                objectPattern = SqlBind.bind(request, object,
+                        SqlVariable.create(relations, objectPattern.getVariable(variable)), objectPattern);
                 unionList.add(objectPattern);
             }
         }
