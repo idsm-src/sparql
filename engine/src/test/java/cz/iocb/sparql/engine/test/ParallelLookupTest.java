@@ -24,6 +24,10 @@ import java.util.regex.Pattern;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.postgresql.PGConnection;
+import org.postgresql.copy.CopyManager;
+import org.postgresql.copy.CopyOut;
+import org.postgresql.core.BaseConnection;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -45,7 +49,8 @@ import cz.iocb.sparql.testing.Database;
  * equality to hash the lookup by; the right side of an OPTIONAL looked up for every solution is written so too. A
  * lookup in place compares a variable with one child only, and a lookup by the values of two children stays fenced. A
  * statement read by fetches, or a session allowing no workers, keeps the fenced lookups, and a statement read by
- * fetches is planned without workers. The solutions are those of the joins left to the planner.
+ * fetches is planned without workers; a statement read in parts whose rows the database copies to the client is
+ * evaluated whole, as one read whole is. The solutions are those of the joins left to the planner.
  */
 public class ParallelLookupTest
 {
@@ -64,7 +69,8 @@ public class ParallelLookupTest
             "parallel_tuple_cost = 0", "min_parallel_table_scan_size = 0", "min_parallel_index_scan_size = 0");
 
     /**
-     * SQL code of the queries the statements of the optimized configuration have run, in their order.
+     * SQL code of the queries the statements of the optimized configurations have run, and of the statements whose rows
+     * they have copied, in their order.
      */
     private static final List<String> queries = new ArrayList<>();
 
@@ -72,6 +78,12 @@ public class ParallelLookupTest
      * Configuration with the join optimizer on, whose queries are recorded.
      */
     private static SparqlDatabaseConfiguration optimized = null;
+
+    /**
+     * Configuration with the join optimizer on, whose queries are recorded and whose connections do not give the
+     * connection of the driver, so that the rows of a statement read in parts are read by fetches.
+     */
+    private static SparqlDatabaseConfiguration fetching = null;
 
     /**
      * Configuration leaving the joins to the planner.
@@ -115,8 +127,11 @@ public class ParallelLookupTest
 
         DatabaseSchema schema = new DatabaseSchema(connectionPool);
 
-        optimized = configure(record(DataSource.class, connectionPool), schema);
+        optimized = configure(record(DataSource.class, connectionPool, true), schema);
         optimized.setJoinOptimizer(true);
+
+        fetching = configure(record(DataSource.class, connectionPool, false), schema);
+        fetching.setJoinOptimizer(true);
 
         plain = configure(connectionPool, schema);
     }
@@ -152,20 +167,22 @@ public class ParallelLookupTest
 
 
     /**
-     * Wraps a connection pool, a connection or a statement so that the SQL code of every query a statement runs is
-     * recorded; the connections and the statements it gives are wrapped likewise.
+     * Wraps a connection pool, a connection, a statement or a connection of the driver so that the SQL code of every
+     * query a statement runs, and of every statement whose rows the driver copies, is recorded; the connections and the
+     * statements it gives are wrapped likewise. Unless it copies, a connection does not give the connection of the
+     * driver.
      */
-    private static <T> T record(Class<T> type, T target)
+    private static <T> T record(Class<T> type, T target, boolean copies)
     {
         return type.cast(Proxy.newProxyInstance(ParallelLookupTest.class.getClassLoader(), new Class<?>[] { type },
-                (_, method, arguments) -> call(target, method, arguments)));
+                (_, method, arguments) -> call(target, method, arguments, copies)));
     }
 
 
     /**
      * Calls the method of the wrapped object for {@link #record}.
      */
-    private static Object call(Object target, Method method, Object[] arguments) throws Throwable
+    private static Object call(Object target, Method method, Object[] arguments, boolean copies) throws Throwable
     {
         if(target instanceof Statement && method.getName().equals("executeQuery"))
         {
@@ -175,15 +192,24 @@ public class ParallelLookupTest
             }
         }
 
+        if(target instanceof Connection && method.getName().equals("isWrapperFor") && !copies)
+            return false;
+
+        if(target instanceof PGConnection driver && method.getName().equals("getCopyAPI"))
+            return copyManager(driver);
+
         try
         {
             Object result = method.invoke(target, arguments);
 
             if(result instanceof Connection connection && method.getName().equals("getConnection"))
-                return record(Connection.class, connection);
+                return record(Connection.class, connection, copies);
 
             if(result instanceof Statement statement && method.getName().equals("createStatement"))
-                return record(Statement.class, statement);
+                return record(Statement.class, statement, copies);
+
+            if(result instanceof PGConnection driver && method.getName().equals("unwrap"))
+                return record(PGConnection.class, driver, copies);
 
             return result;
         }
@@ -191,6 +217,27 @@ public class ParallelLookupTest
         {
             throw e.getCause();
         }
+    }
+
+
+    /**
+     * The copy API of the connection of the driver, which records the SQL code of every statement whose rows it copies.
+     */
+    private static CopyManager copyManager(PGConnection driver) throws SQLException
+    {
+        return new CopyManager((BaseConnection) driver)
+        {
+            @Override
+            public CopyOut copyOut(String sql) throws SQLException
+            {
+                synchronized(queries)
+                {
+                    queries.add(sql.substring("COPY (".length(), sql.length() - ") TO STDOUT".length()));
+                }
+
+                return super.copyOut(sql);
+            }
+        };
     }
 
 
@@ -284,9 +331,32 @@ public class ParallelLookupTest
      */
     private static String check(String query, int fetchSize, boolean parallel, boolean workers) throws Exception
     {
+        return check(optimized, query, fetchSize, parallel, workers);
+    }
+
+
+    /**
+     * Runs the query over the optimized configuration whose rows read in parts are read by fetches, reading them in
+     * parts, checks that its solutions are those of the plain configuration and that the request has not been evaluated
+     * as one the database may evaluate by parallel workers, and returns the SQL code of the query it has run.
+     */
+    private static String checkFetched(String query) throws Exception
+    {
+        return check(fetching, query, 10, false, true);
+    }
+
+
+    /**
+     * Runs the query over the configuration with the join optimizer on with the given fetch size, checks that its
+     * solutions are those of the plain configuration and whether the request has been evaluated as one the database may
+     * evaluate by parallel workers, and returns the SQL code of the query it has run.
+     */
+    private static String check(SparqlDatabaseConfiguration config, String query, int fetchSize, boolean parallel,
+            boolean workers) throws Exception
+    {
         List<List<RdfTerm>> expected = expected(query);
 
-        try(Request request = new Engine(optimized).getRequest())
+        try(Request request = new Engine(config).getRequest())
         {
             if(!workers)
                 request.getStatement().execute("SET LOCAL max_parallel_workers_per_gather = 0");
@@ -310,13 +380,14 @@ public class ParallelLookupTest
 
 
     /**
-     * Runs the query over the optimized configuration with the given fetch size and with parallel plans made as cheap
-     * as possible, and returns the plan the database chooses for the SQL code of the query in the transaction of the
-     * request, under the settings the request has made for its statement.
+     * Runs the query over the configuration with the join optimizer on with the given fetch size and with parallel
+     * plans made as cheap as possible, and returns the plan the database chooses for the SQL code of the query in the
+     * transaction of the request, under the settings the request has made for its statement.
      */
-    private static String planInRequest(String query, int fetchSize) throws Exception
+    private static String planInRequest(SparqlDatabaseConfiguration config, String query, int fetchSize)
+            throws Exception
     {
-        try(Request request = new Engine(optimized).getRequest())
+        try(Request request = new Engine(config).getRequest())
         {
             request.getStatement().execute("SET LOCAL parallel_setup_cost = 0; SET LOCAL parallel_tuple_cost = 0; "
                     + "SET LOCAL min_parallel_table_scan_size = 0");
@@ -361,7 +432,7 @@ public class ParallelLookupTest
         }
 
         // whereas a fenced lookup is done by the process reading the nodes
-        String fenced = check(query, 10, false, true);
+        String fenced = checkFetched(query);
         assertThat(explain(fenced, true).indexOf("Nested Loop"), lessThan(explain(fenced, true).indexOf("Gather")));
     }
 
@@ -372,9 +443,21 @@ public class ParallelLookupTest
         String query = "SELECT ?x ?y WHERE { ?x ex:kind \"3\"^^xsd:int . ?x ex:link ?y }";
 
         // a statement read by fetches is evaluated without workers, so the lookup stays fenced
-        String sql = check(query, 10, false, true);
+        String sql = checkFetched(query);
         assertThat(sql, containsString(" OFFSET 0) AS "));
         assertThat(sql, not(containsString("ANY(ARRAY[")));
+    }
+
+
+    @Test
+    public void lookupCopied() throws Exception
+    {
+        String query = "SELECT ?x ?y WHERE { ?x ex:kind \"3\"^^xsd:int . ?x ex:link ?y }";
+
+        // whereas a statement whose rows the database copies is evaluated whole, so the lookup is written in place
+        String sql = check(query, 10, true, true);
+        assertThat(sql, containsString("ANY(ARRAY["));
+        assertThat(sql, not(containsString(" OFFSET 0")));
     }
 
 
@@ -395,11 +478,12 @@ public class ParallelLookupTest
     {
         String query = "SELECT ?x ?m WHERE { ?x ex:mark ?m }";
 
-        // the scan of the marks of a statement read whole is handed to the workers
-        assertThat(planInRequest(query, 0), containsString("Gather"));
+        // the scan of the marks of a statement read whole or copied is handed to the workers
+        assertThat(planInRequest(optimized, query, 0), containsString("Gather"));
+        assertThat(planInRequest(optimized, query, 10), containsString("Gather"));
 
         // whereas a statement read by fetches, which the database evaluates without workers, is planned without them
-        assertThat(planInRequest(query, 10), not(containsString("Gather")));
+        assertThat(planInRequest(fetching, query, 10), not(containsString("Gather")));
     }
 
 

@@ -26,6 +26,10 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.postgresql.PGConnection;
+import org.postgresql.copy.CopyManager;
+import org.postgresql.copy.CopyOut;
+import org.postgresql.core.BaseConnection;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -46,9 +50,10 @@ import cz.iocb.sparql.testing.Database;
  * plain equalities, and its table is read under an alias by which the advice makes the planner look it up by a nested
  * loop, which the database hands to parallel workers, and caches by the values looked up where the optimizer expects
  * them to repeat; the joins the optimizer hashes are hashed, and every item of the advice is followed. A statement read
- * by fetches is advised as well, and so is the right side of an OPTIONAL looked up for every solution; a lookup by the
- * values of two children stays fenced, and so does a lookup in the pattern of an expression. The solutions are those of
- * the joins left to the planner.
+ * by fetches is advised as well, and so is one whose rows the database copies to the client, which the database
+ * evaluates as advised, and the right side of an OPTIONAL looked up for every solution; a lookup by the values of two
+ * children stays fenced, and so does a lookup in the pattern of an expression. The solutions are those of the joins
+ * left to the planner.
  */
 public class PlanAdviceLookupTest
 {
@@ -72,7 +77,8 @@ public class PlanAdviceLookupTest
             + "set_config('enable_nestloop', ?, true)";
 
     /**
-     * SQL code of the queries the statements of the advised configuration have run, in their order.
+     * SQL code of the queries the statements of the advised configurations have run, and of the statements whose rows
+     * they have copied, in their order.
      */
     private static final List<String> queries = new ArrayList<>();
 
@@ -85,6 +91,13 @@ public class PlanAdviceLookupTest
      * Configuration with the join optimizer on and its joins kept by plan advice, whose queries are recorded.
      */
     private static SparqlDatabaseConfiguration advised = null;
+
+    /**
+     * Configuration with the join optimizer on and its joins kept by plan advice, whose queries are recorded and whose
+     * connections do not give the connection of the driver, so that the rows of a statement read in parts are read by
+     * fetches.
+     */
+    private static SparqlDatabaseConfiguration fetching = null;
 
     /**
      * Configuration leaving the joins to the planner.
@@ -150,9 +163,13 @@ public class PlanAdviceLookupTest
 
         DatabaseSchema schema = new DatabaseSchema(connectionPool);
 
-        advised = configure(record(DataSource.class, connectionPool), schema);
+        advised = configure(record(DataSource.class, connectionPool, true), schema);
         advised.setJoinOptimizer(true);
         advised.setPlanAdvice(true);
+
+        fetching = configure(record(DataSource.class, connectionPool, false), schema);
+        fetching.setJoinOptimizer(true);
+        fetching.setPlanAdvice(true);
 
         plain = configure(connectionPool, schema);
     }
@@ -204,20 +221,22 @@ public class PlanAdviceLookupTest
 
 
     /**
-     * Wraps a connection pool, a connection or a statement so that the SQL code of every query a statement runs is
-     * recorded; the connections and the statements it gives are wrapped likewise.
+     * Wraps a connection pool, a connection, a statement or a connection of the driver so that the SQL code of every
+     * query a statement runs, and of every statement whose rows the driver copies, is recorded; the connections and the
+     * statements it gives are wrapped likewise. Unless it copies, a connection does not give the connection of the
+     * driver.
      */
-    private static <T> T record(Class<T> type, T target)
+    private static <T> T record(Class<T> type, T target, boolean copies)
     {
         return type.cast(Proxy.newProxyInstance(PlanAdviceLookupTest.class.getClassLoader(), new Class<?>[] { type },
-                (_, method, arguments) -> call(target, method, arguments)));
+                (_, method, arguments) -> call(target, method, arguments, copies)));
     }
 
 
     /**
      * Calls the method of the wrapped object for {@link #record}.
      */
-    private static Object call(Object target, Method method, Object[] arguments) throws Throwable
+    private static Object call(Object target, Method method, Object[] arguments, boolean copies) throws Throwable
     {
         if(target instanceof Statement && method.getName().equals("executeQuery"))
         {
@@ -227,15 +246,24 @@ public class PlanAdviceLookupTest
             }
         }
 
+        if(target instanceof Connection && method.getName().equals("isWrapperFor") && !copies)
+            return false;
+
+        if(target instanceof PGConnection driver && method.getName().equals("getCopyAPI"))
+            return copyManager(driver);
+
         try
         {
             Object result = method.invoke(target, arguments);
 
             if(result instanceof Connection connection && method.getName().equals("getConnection"))
-                return record(Connection.class, connection);
+                return record(Connection.class, connection, copies);
 
             if(result instanceof Statement statement && method.getName().equals("createStatement"))
-                return record(Statement.class, statement);
+                return record(Statement.class, statement, copies);
+
+            if(result instanceof PGConnection driver && method.getName().equals("unwrap"))
+                return record(PGConnection.class, driver, copies);
 
             return result;
         }
@@ -243,6 +271,27 @@ public class PlanAdviceLookupTest
         {
             throw e.getCause();
         }
+    }
+
+
+    /**
+     * The copy API of the connection of the driver, which records the SQL code of every statement whose rows it copies.
+     */
+    private static CopyManager copyManager(PGConnection driver) throws SQLException
+    {
+        return new CopyManager((BaseConnection) driver)
+        {
+            @Override
+            public CopyOut copyOut(String sql) throws SQLException
+            {
+                synchronized(queries)
+                {
+                    queries.add(sql.substring("COPY (".length(), sql.length() - ") TO STDOUT".length()));
+                }
+
+                return super.copyOut(sql);
+            }
+        };
     }
 
 
@@ -280,9 +329,21 @@ public class PlanAdviceLookupTest
      */
     private static String check(String query, int fetchSize) throws Exception
     {
+        return check(advised, query, fetchSize);
+    }
+
+
+    /**
+     * Runs the query over the advised configuration given with the given fetch size, checks that its solutions are
+     * those of the plain configuration, that the request has been advised and not evaluated as one written for parallel
+     * workers by conditions the database cannot hash, and returns the SQL code of the query it has run, which the
+     * statement planned for the advice precedes.
+     */
+    private static String check(SparqlDatabaseConfiguration config, String query, int fetchSize) throws Exception
+    {
         List<List<RdfTerm>> expected = expected(query);
 
-        try(Request request = new Engine(advised).getRequest())
+        try(Request request = new Engine(config).getRequest())
         {
             int before = queries.size();
 
@@ -428,9 +489,38 @@ public class PlanAdviceLookupTest
     public void lookupReadByFetches() throws Exception
     {
         // a statement read by fetches is evaluated without workers, but its lookups are advised as well
-        String sql = check("SELECT ?x ?y WHERE { ?x ex:kind \"3\"^^xsd:int . ?x ex:link ?y }", 10);
+        String sql = check(fetching, "SELECT ?x ?y WHERE { ?x ex:kind \"3\"^^xsd:int . ?x ex:link ?y }", 10);
         assertThat(sql, containsString(" AS " + PlanAdvice.LOOKUP + " WHERE "));
         assertThat(sql, not(containsString(" OFFSET 0")));
+    }
+
+
+    @Test
+    public void lookupCopied() throws Exception
+    {
+        String query = "SELECT ?x ?y WHERE { ?x ex:kind \"3\"^^xsd:int . ?x ex:link ?y }";
+
+        // the lookups of a statement whose rows the database copies are advised as well, and the database evaluates
+        // the copy as advised: the plan of the copy, which the database reports when the copy ends, looks the links up
+        String sql = check(query, 10);
+        assertThat(sql, containsString(" AS " + PlanAdvice.LOOKUP + " WHERE "));
+
+        try(Request request = new Engine(advised).getRequest())
+        {
+            request.getStatement().execute("LOAD 'auto_explain'");
+            request.getStatement()
+                    .execute("SET LOCAL auto_explain.log_min_duration = 0; SET LOCAL auto_explain.log_level = notice");
+
+            try(Result result = request.execute(prefix + query, null, 0, -1, 10, 0))
+            {
+                assertThat(read(result), hasSize(greaterThan(0)));
+
+                String plan = String.join("\n", result.getWarnings());
+                assertThat(plan, containsString("Nested Loop"));
+                assertThat(plan, containsString("on links " + PlanAdvice.LOOKUP));
+                assertThat(plan, not(containsString("Seq Scan on links")));
+            }
+        }
     }
 
 

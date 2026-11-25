@@ -355,6 +355,13 @@ public class Request implements AutoCloseable
     private boolean memoizedLookups;
 
     /**
+     * The rows of the statement of the request while the database copies them to the client (see {@link CopyRows}),
+     * from just before the copy is started until its end has been read; null otherwise. The connection runs nothing
+     * else while it copies.
+     */
+    private CopyRows copying;
+
+    /**
      * Whether the request was cancelled; set by another thread than the one evaluating the request.
      */
     private volatile boolean canceled;
@@ -529,7 +536,9 @@ public class Request implements AutoCloseable
      * @param order variables to order the results by, applied on top of the query's own ORDER BY
      * @param offset number of results to skip on top of the query's own OFFSET (ignored if not positive)
      * @param limit maximum number of results on top of the query's own LIMIT (ignored if not positive)
-     * @param fetchSize JDBC fetch size; 0 fetches everything at once (forced for small or aggregated results)
+     * @param fetchSize number of rows read at once; 0 reads the result whole (forced for small or aggregated results),
+     *            a positive number reads it in parts, which the database copies to the client where the driver lets it
+     *            (see {@link CopyRows}) and the driver fetches otherwise
      * @param timeout time limit in nanoseconds for the whole execution including fetching; 0 for none
      * @param sqlSizeLimit maximum length of the generated SQL; 0 for none
      * @return the result cursor
@@ -543,6 +552,9 @@ public class Request implements AutoCloseable
         try
         {
             MDC.put("sparql", query.getQuery());
+
+            // the connection runs nothing else while it copies
+            closeCopy();
 
             Query syntaxTree = query.getSyntaxTree();
             ResultType type = query.getResultType();
@@ -568,6 +580,11 @@ public class Request implements AutoCloseable
 
             getConnection(); // time is measured after a connection is established
 
+            // a result read in parts is copied by the database where the driver lets it: the database evaluates a
+            // statement whose rows are read by fetches without parallel workers, and a copied one whole
+            boolean copied = fetchSize > 0 && CopyRows.isSupported(getConnection());
+            boolean fetched = fetchSize > 0 && !copied;
+
             this.timeout = timeout;
             this.begin = System.nanoTime();
 
@@ -578,11 +595,11 @@ public class Request implements AutoCloseable
             advisedLookups = false;
             memoizedLookups = false;
 
-            // the database evaluates a statement by parallel workers only when it is read whole, as it evaluates one
-            // read by fetches without them, and when the session allows them; the joins the optimizer has chosen are
-            // then written so that the workers can evaluate them (see SqlJoin.translateTree), as they are anyway when
-            // plan advice makes the planner keep them
-            parallel = config.isJoinOptimizerEnabled() && !isAdvised() && fetchSize == 0 && allowsParallelWorkers();
+            // the database evaluates a statement by parallel workers only when it is read whole or copied, as it
+            // evaluates one read by fetches without them, and when the session allows them; the joins the optimizer
+            // has chosen are then written so that the workers can evaluate them (see SqlJoin.translateTree), as they
+            // are anyway when plan advice makes the planner keep them
+            parallel = config.isJoinOptimizerEnabled() && !isAdvised() && !fetched && allowsParallelWorkers();
 
             TranslateVisitor translateVisitor = new TranslateVisitor(this);
             SqlSelect imcode = translateVisitor.translate(syntaxTree, newOffset, newLimit, order);
@@ -638,8 +655,12 @@ public class Request implements AutoCloseable
                 // the database evaluates a statement read by fetches without parallel workers, so the statement is
                 // planned without them, as a plan chosen for workers may cost more than a serial one when the process
                 // reading the rows evaluates it alone
-                if(fetchSize > 0)
+                if(fetched)
                     settings.add("max_parallel_workers_per_gather = 0");
+
+                // the database keeps the time limit of a copy, which runs in no statement of the driver
+                if(copied && timeout != 0)
+                    settings.add("statement_timeout = " + getMillisecondsLeft());
 
                 // the joins are written in the order and with the methods the engine has chosen: the planner must keep
                 // the order of the explicit joins and hash them (a merge join would sort the values, which is slow for
@@ -655,6 +676,9 @@ public class Request implements AutoCloseable
                 // or the lookups are plain joins, which plan advice makes the planner look up (see PlanAdvice)
                 if(advisedLookups)
                     advise(code);
+
+                if(copied)
+                    return new Result(type, imcode.getResultDescription(), copy(code), fetchSize, begin, timeout);
 
                 return new Result(type, imcode.getResultDescription(), getStatement(fetchSize).executeQuery(code),
                         begin, timeout);
@@ -834,11 +858,11 @@ public class Request implements AutoCloseable
 
 
     /**
-     * Cancels the request: the running database statement is cancelled, and a SERVICE call waiting for the answer of an
-     * endpoint gives the answer up within a fraction of a second (see
-     * {@link cz.iocb.sparql.engine.imcode.SqlServiceStub}), closing the connection; the request cannot be used
-     * afterwards. It may be called by another thread than the one evaluating the request, also once the request has
-     * been closed.
+     * Cancels the request: the running database statement, or the copy of the rows of the statement of the request (see
+     * {@link CopyRows}), is cancelled, and a SERVICE call waiting for the answer of an endpoint gives the answer up
+     * within a fraction of a second (see {@link cz.iocb.sparql.engine.imcode.SqlServiceStub}), closing the connection;
+     * the request cannot be used afterwards. It may be called by another thread than the one evaluating the request,
+     * also once the request has been closed.
      *
      * @throws SQLException on database errors
      */
@@ -846,23 +870,75 @@ public class Request implements AutoCloseable
     {
         canceled = true;
 
-        if(statement != null && !statement.isClosed())
+        try
         {
-            statement.cancel();
-            statement.close();
+            // a copy, which runs in no statement, is cancelled through the connection of the driver
+            if(copying != null)
+                cancelCopy(copying);
+        }
+        finally
+        {
+            if(statement != null && !statement.isClosed())
+            {
+                statement.cancel();
+                statement.close();
+            }
         }
     }
 
 
     /**
-     * Closes the statement, drops the temporary tables created for SERVICE results, rolls back and closes the
-     * connection.
+     * Cancels the copy of the rows of the statement of the request (see {@link #copying}). A cancellation that comes
+     * before the statement of the copy reaches the database has no effect, and the driver tells that the database has
+     * started the copy only when the database sends the first rows, so the cancellation is sent again every 100
+     * milliseconds by a thread of its own until then, unless the copy has ended; once the database has started the
+     * copy, the rows end at their next row, or close, as the request has been cancelled (see {@link CopyRows#next}).
+     *
+     * @param rows the rows of the copy
+     * @throws SQLException when the cancellation cannot be sent
+     */
+    private void cancelCopy(CopyRows rows) throws SQLException
+    {
+        rows.cancel();
+
+        if(rows.isStarted())
+            return;
+
+        Thread.ofVirtual().start(() -> {
+            try
+            {
+                while(true)
+                {
+                    Thread.sleep(100);
+
+                    synchronized(this)
+                    {
+                        if(copying != rows || rows.isStarted())
+                            return;
+
+                        rows.cancel();
+                    }
+                }
+            }
+            catch(InterruptedException | SQLException e)
+            {
+                logger.warn("copy cancellation failed: " + e.getMessage());
+            }
+        });
+    }
+
+
+    /**
+     * Ends the copy of rows that have not been closed, closes the statement, drops the temporary tables created for
+     * SERVICE results, rolls back and closes the connection.
      */
     @Override
     public synchronized void close() throws SQLException
     {
         try
         {
+            closeCopy();
+
             if(statement != null && !statement.isClosed())
                 statement.close();
         }
@@ -975,6 +1051,19 @@ public class Request implements AutoCloseable
         if(timeout == 0)
             return 0;
 
+        return getMillisecondsLeft();
+    }
+
+
+    /**
+     * Remaining time of the time limit of the request, which has one, in whole milliseconds rounded up, so that nothing
+     * is stopped by it before the time limit.
+     *
+     * @return remaining time of the time limit in whole milliseconds rounded up, a positive number
+     * @throws SQLTimeoutException with the SQL state 57014 of a cancelled statement if the time limit has elapsed
+     */
+    private int getMillisecondsLeft() throws SQLTimeoutException
+    {
         return (int) Math.min(Integer.MAX_VALUE, Math.ceilDiv(getRemainingTime(), 1_000_000L));
     }
 
@@ -1003,21 +1092,82 @@ public class Request implements AutoCloseable
 
 
     /**
+     * Starts the copy of the rows of the statement to the client (see {@link CopyRows}), which the driver of the
+     * connection of the request has to allow; a cancellation of the request cancels the copy from just before it is
+     * started (see {@link #cancelCopy}).
+     *
+     * @param code SQL code of the statement
+     * @return the rows of the statement
+     * @throws SQLException when the copy cannot be started, or when the request has been cancelled
+     */
+    CopyRows copy(String code) throws SQLException
+    {
+        CopyRows rows = new CopyRows(this, getConnection());
+
+        synchronized(this)
+        {
+            checkCanceled();
+            copying = rows;
+        }
+
+        try
+        {
+            rows.start(code);
+        }
+        catch(SQLException e)
+        {
+            endCopy();
+            throw e;
+        }
+
+        return rows;
+    }
+
+
+    /**
+     * Ends the copy of rows of the statement of the request that have not been closed (see {@link CopyRows#close}), as
+     * the connection runs nothing else while it copies; so the copy ends when the request runs another statement, as a
+     * result set does when its statement runs another one.
+     *
+     * @throws SQLException when the copy cannot be cancelled, or the transaction cannot be rolled back to the savepoint
+     *             made before it
+     */
+    private synchronized void closeCopy() throws SQLException
+    {
+        if(copying != null)
+            copying.close();
+    }
+
+
+    /**
+     * Records that the end of the copy of the rows of the statement of the request has been read (see
+     * {@link CopyRows}), after which a cancellation of the request does not cancel the copy. A cancellation holds the
+     * lock of the request while it sends itself, so it reaches the database before the connection runs anything after
+     * the copy, when the database ignores it, as it ignores a cancellation that comes while it waits for a statement.
+     */
+    synchronized void endCopy()
+    {
+        copying = null;
+    }
+
+
+    /**
      * The statement of the request (created on first use) with the given fetch size and the remaining part of the
-     * timeout set.
+     * timeout set; the copy of rows that have not been closed ends (see {@link #closeCopy}).
      *
      * @param fetchSize the JDBC fetch size
      * @return the statement of the request (created on first use) with the given fetch size and the remaining part of
      *         the timeout set
      * @throws SQLRuntimeException wrapping a {@link SQLTimeoutException} with the SQL state 57014 if the time limit of
-     *             the request has elapsed, or another {@link SQLException} if the request has been cancelled or the
-     *             statement cannot be created
+     *             the request has elapsed, or another {@link SQLException} if the request has been cancelled, a copy
+     *             cannot be ended or the statement cannot be created
      */
     public synchronized Statement getStatement(int fetchSize)
     {
         try
         {
             checkCanceled();
+            closeCopy();
 
             if(statement == null)
                 statement = getConnection().createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
@@ -1533,12 +1683,12 @@ public class Request implements AutoCloseable
     /**
      * True if the database may evaluate the statement of the request by parallel workers, which is decided before the
      * query is translated (see {@link #execute(PreparedQuery, List, int, int, int, long, int)}): the join optimizer is
-     * on, the statement is read whole, as the database evaluates a statement read by fetches without workers, and the
-     * session allows workers ({@code max_parallel_workers_per_gather}). The lookups the optimizer has chosen are then
-     * written so that the workers can do them (see {@link cz.iocb.sparql.engine.imcode.SqlTableAccess}), whereas
-     * otherwise they stay subqueries of their own, which the database evaluates only in the process reading the rows
-     * they are looked up for, but whose comparisons cost less and whose results it may keep for the values looked up.
-     * False for a query translated without being executed.
+     * on, the statement is read whole or copied (see {@link CopyRows}), as the database evaluates a statement read by
+     * fetches without workers, and the session allows workers ({@code max_parallel_workers_per_gather}). The lookups
+     * the optimizer has chosen are then written so that the workers can do them (see
+     * {@link cz.iocb.sparql.engine.imcode.SqlTableAccess}), whereas otherwise they stay subqueries of their own, which
+     * the database evaluates only in the process reading the rows they are looked up for, but whose comparisons cost
+     * less and whose results it may keep for the values looked up. False for a query translated without being executed.
      *
      * @return true if the database may evaluate the statement of the request by parallel workers, false otherwise
      */

@@ -37,6 +37,13 @@
       <version>2.0.20</version>
     </dependency>
     <dependency>
+      <!-- the copy API of the PostgreSQL driver, which the deployment provides with the database connections -->
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <version>42.7.13</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <!-- the test database shared with the endpoint tests -->
       <groupId>cz.iocb.sparql</groupId>
       <artifactId>sparql-testing</artifactId>
@@ -77,12 +84,6 @@
       <groupId>org.apache.tomcat</groupId>
       <artifactId>tomcat-jdbc</artifactId>
       <version>11.0.26</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.postgresql</groupId>
-      <artifactId>postgresql</artifactId>
-      <version>42.7.13</version>
       <scope>test</scope>
     </dependency>
     <dependency>

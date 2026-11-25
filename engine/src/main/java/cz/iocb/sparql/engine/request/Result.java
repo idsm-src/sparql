@@ -28,7 +28,6 @@ import static java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.SQLWarning;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -36,13 +35,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.mapping.classes.BooleanBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.BooleanClass;
 import cz.iocb.sparql.engine.mapping.classes.ByteBaseClass;
@@ -111,9 +108,9 @@ import info.adams.ryu.RyuFloat;
 
 
 /**
- * Cursor over the rows of an executed query that turns the SQL columns back into RDF terms: for every projected
- * variable, the row holds one column group per result class of the variable, and the first non-null group gives the
- * value. Also enforces the fetch timeout.
+ * Cursor over the rows of an executed query, read through a result set or a copy (see {@link ResultRows}), that turns
+ * the SQL columns back into RDF terms: for every projected variable, the row holds one column group per result class of
+ * the variable, and the first non-null group gives the value. Also enforces the fetch timeout.
  */
 public class Result implements AutoCloseable
 {
@@ -175,9 +172,9 @@ public class Result implements AutoCloseable
     protected RdfTerm[] rowData;
 
     /**
-     * Underlying JDBC result set.
+     * Rows of the result.
      */
-    private final ResultSet rs;
+    private final ResultRows rows;
 
     /**
      * Start of the execution in {@link System#nanoTime} units.
@@ -218,14 +215,31 @@ public class Result implements AutoCloseable
     public Result(ResultType type, Map<Variable, List<ResourceClass>> description, ResultSet rs, long begin,
             long timeout) throws SQLException
     {
-        this.rs = rs;
+        this(type, description, new ResultSetRows(rs), rs.getFetchSize(), begin, timeout);
+    }
+
+
+    /**
+     * Creates the cursor over the rows described by the given result classes.
+     *
+     * @param type form of the query
+     * @param description result classes of each projected variable
+     * @param rows the rows
+     * @param fetchSize number of rows read at once, 0 for all
+     * @param begin start of the execution in {@link System#nanoTime} units
+     * @param timeout time limit in nanoseconds, 0 for none
+     */
+    Result(ResultType type, Map<Variable, List<ResourceClass>> description, ResultRows rows, int fetchSize, long begin,
+            long timeout)
+    {
+        this.rows = rows;
         this.description = description;
         this.rowData = new RdfTerm[description.size()];
 
         this.type = type;
         this.begin = begin;
         this.timeout = timeout;
-        this.checkSize = Math.max(100, rs.getFetchSize());
+        this.checkSize = Math.max(100, fetchSize);
 
         for(Variable var : description.keySet())
         {
@@ -249,7 +263,7 @@ public class Result implements AutoCloseable
             throw new SQLException("fetch timeout", "57014", 0);
         }
 
-        if(!rs.next())
+        if(!rows.next())
             return false;
 
         Arrays.fill(rowData, null);
@@ -295,13 +309,13 @@ public class Result implements AutoCloseable
                 return null;
             }
 
-            Iri predicate = new Iri(rs.getString(column++));
+            Iri predicate = new Iri(rows.getString(column++));
             RdfTerm object = readTerm(tripleTerm.getObject());
 
             return new TripleTerm(subject, predicate, object);
         }
 
-        Object value = getValue(rs, column++, rc.getSqlTypes().get(0));
+        Object value = rows.getValue(column++, rc.getSqlTypes().get(0));
 
         if(value == null)
         {
@@ -323,13 +337,13 @@ public class Result implements AutoCloseable
 
             case IntBlankNodeClass _ ->
             {
-                int segment = rs.getInt(column++);
+                int segment = rows.getInt(column++);
                 yield new IntBlankNode((Integer) value, segment);
             }
 
             case StrBlankNodeClass _ ->
             {
-                int segment = rs.getInt(column++);
+                int segment = rows.getInt(column++);
                 yield new StrBlankNode((String) value, segment);
             }
 
@@ -340,7 +354,7 @@ public class Result implements AutoCloseable
 
             case BooleanBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdBooleanIri);
             }
 
@@ -351,7 +365,7 @@ public class Result implements AutoCloseable
 
             case ByteBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdByteIri);
             }
 
@@ -362,7 +376,7 @@ public class Result implements AutoCloseable
 
             case UnsignedByteBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdUnsignedByteIri);
             }
 
@@ -373,7 +387,7 @@ public class Result implements AutoCloseable
 
             case ShortBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdShortIri);
             }
 
@@ -384,7 +398,7 @@ public class Result implements AutoCloseable
 
             case UnsignedShortBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdUnsignedShortIri);
             }
 
@@ -395,7 +409,7 @@ public class Result implements AutoCloseable
 
             case IntBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdIntIri);
             }
 
@@ -406,7 +420,7 @@ public class Result implements AutoCloseable
 
             case UnsignedIntBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdUnsignedIntIri);
             }
 
@@ -417,7 +431,7 @@ public class Result implements AutoCloseable
 
             case LongBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 String str = lexical.isEmpty() ? value.toString() : lexical;
                 yield new TypedLiteral(str, xsdLongIri);
             }
@@ -429,7 +443,7 @@ public class Result implements AutoCloseable
 
             case UnsignedLongBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
                 String str = lexical.isEmpty() ? num.toPlainString() : lexical;
                 yield new TypedLiteral(str, xsdUnsignedLongIri);
@@ -442,7 +456,7 @@ public class Result implements AutoCloseable
 
             case IntegerBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
                 String str = lexical.isEmpty() ? num.toPlainString() : lexical;
                 yield new TypedLiteral(str, xsdIntegerIri);
@@ -456,7 +470,7 @@ public class Result implements AutoCloseable
 
             case NonPositiveIntegerBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
                 String str = lexical.isEmpty() ? num.toPlainString() : lexical;
                 yield new TypedLiteral(str, xsdNonPositiveIntegerIri);
@@ -470,7 +484,7 @@ public class Result implements AutoCloseable
 
             case NegativeIntegerBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
                 String str = lexical.isEmpty() ? num.toPlainString() : lexical;
                 yield new TypedLiteral(str, xsdNegativeIntegerIri);
@@ -484,7 +498,7 @@ public class Result implements AutoCloseable
 
             case NonNegativeIntegerBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
                 String str = lexical.isEmpty() ? num.toPlainString() : lexical;
                 yield new TypedLiteral(str, xsdNonNegativeIntegerIri);
@@ -498,7 +512,7 @@ public class Result implements AutoCloseable
 
             case PositiveIntegerBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
                 String str = lexical.isEmpty() ? num.toPlainString() : lexical;
                 yield new TypedLiteral(str, xsdPositiveIntegerIri);
@@ -511,7 +525,7 @@ public class Result implements AutoCloseable
 
             case DecimalBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 String str = lexical.isEmpty() ? decimalToString((BigDecimal) value) : lexical;
                 yield new TypedLiteral(str, xsdDecimalIri);
             }
@@ -523,7 +537,7 @@ public class Result implements AutoCloseable
 
             case FloatBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 String str = lexical.isEmpty() ? RyuFloat.floatToString((float) value) : lexical;
                 yield new TypedLiteral(str, xsdFloatIri);
             }
@@ -535,35 +549,35 @@ public class Result implements AutoCloseable
 
             case DoubleBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 String str = lexical.isEmpty() ? RyuDouble.doubleToString((double) value) : lexical;
                 yield new TypedLiteral(str, xsdDoubleIri);
             }
 
             case DateTimeCompositeClass _ ->
             {
-                int zone = rs.getInt(column++);
+                int zone = rows.getInt(column++);
                 yield new TypedLiteral(dateTimeToString((OffsetDateTime) value, zone), xsdDateTimeIri);
             }
 
             case DateTimeCompositeBaseClass _ ->
             {
-                int zone = rs.getInt(column++);
-                String lexical = rs.getString(column++);
+                int zone = rows.getInt(column++);
+                String lexical = rows.getString(column++);
                 String str = lexical.isEmpty() ? dateTimeToString((OffsetDateTime) value, zone) : lexical;
                 yield new TypedLiteral(str, xsdDateTimeIri);
             }
 
             case DateCompositeClass _ ->
             {
-                int zone = rs.getInt(column++);
+                int zone = rows.getInt(column++);
                 yield new TypedLiteral(dateToString((LocalDate) value, zone), xsdDateIri);
             }
 
             case DateCompositeBaseClass _ ->
             {
-                int zone = rs.getInt(column++);
-                String lexical = rs.getString(column++);
+                int zone = rows.getInt(column++);
+                String lexical = rows.getString(column++);
                 String str = lexical.isEmpty() ? dateToString((LocalDate) value, zone) : lexical;
                 yield new TypedLiteral(str, xsdDateIri);
             }
@@ -575,7 +589,7 @@ public class Result implements AutoCloseable
 
             case DayTimeDurationBaseClass _ ->
             {
-                String lexical = rs.getString(column++);
+                String lexical = rows.getString(column++);
                 String str = lexical.isEmpty() ? DayTimeDurationDatatype.getLexicalForm((Long) value) : lexical;
                 yield new TypedLiteral(str, xsdDayTimeDurationIri);
             }
@@ -587,33 +601,33 @@ public class Result implements AutoCloseable
 
             case LangStringClass _ ->
             {
-                String lang = rs.getString(column++);
+                String lang = rows.getString(column++);
                 yield new LangStringLiteral(value.toString(), lang);
             }
 
             case DirLangStringClass dirClass ->
             {
-                String lang = rs.getString(column++);
+                String lang = rows.getString(column++);
                 yield new DirLangStringLiteral(value.toString(), lang, dirClass.getDirection());
             }
 
             case UserLiteralCompositeClass _ ->
             {
-                String type = rs.getString(column++);
+                String type = rows.getString(column++);
                 yield new TypedLiteral(RdfBoxParser.userLiteralLexical((String) value), new Iri(type));
             }
 
             case UserLiteralCompositeBaseClass _ ->
             {
-                String type = rs.getString(column++);
-                String lexical = rs.getString(column++);
+                String type = rows.getString(column++);
+                String lexical = rows.getString(column++);
                 String str = lexical.isEmpty() ? RdfBoxParser.userLiteralLexical((String) value) : lexical;
                 yield new TypedLiteral(str, new Iri(type));
             }
 
             case UnsupportedLiteralClass _ ->
             {
-                String type = rs.getString(column++);
+                String type = rows.getString(column++);
                 yield new TypedLiteral(value.toString(), new Iri(type));
             }
 
@@ -623,26 +637,6 @@ public class Result implements AutoCloseable
                 throw new IllegalStateException();
             }
         };
-    }
-
-
-    /**
-     * Reads the column as the Java class of its SQL type. Text is read through {@link ResultSet#getString}, as the
-     * driver converts only its own types by class, so that the text forms of {@code sparql.rdfbox} and
-     * {@code sparql.ubox} can be read too.
-     *
-     * @param rs the result set
-     * @param index position of the column
-     * @param type SQL type of the column
-     * @return the value, or null if the column is NULL
-     * @throws SQLException on database errors
-     */
-    private static Object getValue(ResultSet rs, int index, SqlType type) throws SQLException
-    {
-        if(type.getJavaClass() == String.class)
-            return rs.getString(index);
-
-        return rs.getObject(index, type.getJavaClass());
     }
 
 
@@ -665,12 +659,7 @@ public class Result implements AutoCloseable
      */
     public List<String> getWarnings() throws SQLException
     {
-        LinkedList<String> warnings = new LinkedList<>();
-
-        for(SQLWarning warning = rs.getStatement().getWarnings(); warning != null; warning = warning.getNextWarning())
-            warnings.add(warning.getMessage());
-
-        return warnings;
+        return rows.getWarnings();
     }
 
 
@@ -739,7 +728,7 @@ public class Result implements AutoCloseable
     @Override
     public void close() throws SQLException
     {
-        rs.close();
+        rows.close();
     }
 
 
