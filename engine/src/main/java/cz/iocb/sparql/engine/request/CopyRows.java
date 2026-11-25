@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
-import java.sql.Savepoint;
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -35,10 +34,11 @@ import cz.iocb.sparql.engine.database.SqlType;
  * driver reads the text of a value of a result set. The connection runs nothing else while it copies: rows that are
  * closed before their end has been read cancel the copy and read and drop the rows the database has sent before it took
  * the cancellation, and the error that ends the copy, so that the connection can run the next statement, and roll the
- * transaction, which the cancellation aborts, back to the savepoint made before the copy, so that the request can go on
- * as it can after a result set closed before its end. The request cancels the copy, which no statement of the driver
- * runs, through the connection of the driver, and only until the end of the copy has been read (see
- * {@link Request#cancel}), so that a cancellation reaches no later statement.
+ * transaction, which the cancellation aborts, back to the savepoint the request has made before the statement (see
+ * {@link Request#rollBackStatement}), so that the request can go on as it can after a result set closed before its end.
+ * The request cancels the copy, which no statement of the driver runs, through the connection of the driver, and only
+ * until the end of the copy has been read (see {@link Request#cancel}), so that a cancellation reaches no later
+ * statement.
  */
 final class CopyRows implements ResultRows
 {
@@ -61,11 +61,6 @@ final class CopyRows implements ResultRows
      * The connection of the driver.
      */
     private final PGConnection driver;
-
-    /**
-     * The savepoint made before the copy.
-     */
-    private final Savepoint savepoint;
 
     /**
      * The copy, null until the database has started it.
@@ -95,20 +90,17 @@ final class CopyRows implements ResultRows
 
     /**
      * Creates the rows of a copy over the connection of the request, which has to give the connection of the driver
-     * (see {@link #isSupported}), and makes the savepoint the transaction is rolled back to when the rows are closed
-     * before their end.
+     * (see {@link #isSupported}).
      *
      * @param request the request
      * @param connection the connection of the request
-     * @throws SQLException when the connection does not give the connection of the driver, or when the savepoint cannot
-     *             be made
+     * @throws SQLException when the connection does not give the connection of the driver
      */
     CopyRows(Request request, Connection connection) throws SQLException
     {
         this.request = request;
         this.connection = connection;
         this.driver = connection.unwrap(PGConnection.class);
-        this.savepoint = connection.setSavepoint();
     }
 
 
@@ -350,7 +342,7 @@ final class CopyRows implements ResultRows
     /**
      * {@inheritDoc} A copy whose end has not been read is cancelled, the rows the database has sent before it took the
      * cancellation are read and dropped, as is the error ending the copy, and the transaction is rolled back to the
-     * savepoint made before the copy.
+     * savepoint made before the statement.
      */
     @Override
     public void close() throws SQLException
@@ -387,7 +379,7 @@ final class CopyRows implements ResultRows
 
         logger.trace("copy cancelled, {} rows dropped", dropped);
 
-        connection.rollback(savepoint);
+        request.rollBackStatement();
 
         if(failure != null)
             throw failure;

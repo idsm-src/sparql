@@ -258,6 +258,11 @@ public class Request implements AutoCloseable
     private static final Logger logger = LoggerFactory.getLogger(Request.class);
 
     /**
+     * Name of the savepoint made before the settings of a statement of the request (see {@link #saveStatement}).
+     */
+    private static final String SAVEPOINT = "request_statement";
+
+    /**
      * Configuration of the endpoint.
      */
     private final SparqlDatabaseConfiguration config;
@@ -360,6 +365,12 @@ public class Request implements AutoCloseable
      * else while it copies.
      */
     private CopyRows copying;
+
+    /**
+     * Whether the savepoint {@link #SAVEPOINT} has been made before the settings of the statement of the request (see
+     * {@link #saveStatement}).
+     */
+    private boolean saved;
 
     /**
      * Whether the request was cancelled; set by another thread than the one evaluating the request.
@@ -553,8 +564,10 @@ public class Request implements AutoCloseable
         {
             MDC.put("sparql", query.getQuery());
 
-            // the connection runs nothing else while it copies
+            // the connection runs nothing else while it copies, and the settings of the previous statement are taken
+            // back
             closeCopy();
+            restoreStatement();
 
             Query syntaxTree = query.getSyntaxTree();
             ResultType type = query.getResultType();
@@ -669,9 +682,10 @@ public class Request implements AutoCloseable
                     settings.addAll(
                             List.of("join_collapse_limit = 1", "enable_nestloop = off", "enable_mergejoin = off"));
 
-                // the settings last until the end of the transaction of the request
-                if(!settings.isEmpty())
-                    getStatement().execute("SET LOCAL " + String.join("; SET LOCAL ", settings));
+                // the settings, and the advice below, last for the statement only, and the rows of a copy closed before
+                // their end roll the transaction back to the savepoint made before them
+                if(!settings.isEmpty() || copied)
+                    saveStatement(settings);
 
                 // or the lookups are plain joins, which plan advice makes the planner look up (see PlanAdvice)
                 if(advisedLookups)
@@ -1093,7 +1107,8 @@ public class Request implements AutoCloseable
 
     /**
      * Starts the copy of the rows of the statement to the client (see {@link CopyRows}), which the driver of the
-     * connection of the request has to allow; a cancellation of the request cancels the copy from just before it is
+     * connection of the request has to allow, after the savepoint the rows closed before their end roll the transaction
+     * back to (see {@link #saveStatement}); a cancellation of the request cancels the copy from just before it is
      * started (see {@link #cancelCopy}).
      *
      * @param code SQL code of the statement
@@ -1102,6 +1117,9 @@ public class Request implements AutoCloseable
      */
     CopyRows copy(String code) throws SQLException
     {
+        if(!saved)
+            saveStatement(List.of());
+
         CopyRows rows = new CopyRows(this, getConnection());
 
         synchronized(this)
@@ -1121,6 +1139,69 @@ public class Request implements AutoCloseable
         }
 
         return rows;
+    }
+
+
+    /**
+     * Makes the savepoint {@link #SAVEPOINT} and then the settings of the statement of the request, in one call. The
+     * settings are local to the transaction of the request, so they would hold for its later statements as well; the
+     * transaction is therefore rolled back to the savepoint when the request runs another statement (see
+     * {@link #restoreStatement}), which takes back the settings, the plan advice made for the statement and an error
+     * that the statement has ended by, and when the rows of a copy are closed before their end (see
+     * {@link #rollBackStatement}). The temporary tables of SERVICE results, made before, are kept.
+     *
+     * @param settings the settings, each as {@code name = value}
+     * @throws SQLException when the savepoint or a setting cannot be made, or with the SQL state 57014 when the time
+     *             limit of the request has elapsed, or when the request has been cancelled (see
+     *             {@link #getStatement(int)})
+     */
+    private void saveStatement(List<String> settings) throws SQLException
+    {
+        StringBuilder builder = new StringBuilder("SAVEPOINT ").append(SAVEPOINT);
+
+        for(String setting : settings)
+            builder.append("; SET LOCAL ").append(setting);
+
+        getStatement().execute(builder.toString());
+        saved = true;
+    }
+
+
+    /**
+     * Rolls the transaction of the request back to the savepoint made before the settings of its previous statement and
+     * releases the savepoint (see {@link #saveStatement}), when there is one. A statement of the driver of its own runs
+     * it, as the statement of the request keeps the time limit of the previous statement.
+     *
+     * @throws SQLException when the transaction cannot be rolled back to the savepoint
+     */
+    private void restoreStatement() throws SQLException
+    {
+        if(!saved)
+            return;
+
+        saved = false;
+
+        try(Statement restore = getConnection().createStatement())
+        {
+            restore.execute("ROLLBACK TO SAVEPOINT " + SAVEPOINT + "; RELEASE SAVEPOINT " + SAVEPOINT);
+        }
+    }
+
+
+    /**
+     * Rolls the transaction of the request back to the savepoint made before the settings of the statement of the
+     * request (see {@link #saveStatement}), which the rows of a copy closed before their end do (see
+     * {@link CopyRows#close}), as the cancellation of the copy aborts the transaction. A statement of the driver of its
+     * own runs it, as the statement of the request is closed when the request is cancelled.
+     *
+     * @throws SQLException when the transaction cannot be rolled back to the savepoint
+     */
+    void rollBackStatement() throws SQLException
+    {
+        try(Statement rollback = getConnection().createStatement())
+        {
+            rollback.execute("ROLLBACK TO SAVEPOINT " + SAVEPOINT);
+        }
     }
 
 

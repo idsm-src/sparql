@@ -52,8 +52,8 @@ import cz.iocb.sparql.testing.Database;
  * them to repeat; the joins the optimizer hashes are hashed, and every item of the advice is followed. A statement read
  * by fetches is advised as well, and so is one whose rows the database copies to the client, which the database
  * evaluates as advised, and the right side of an OPTIONAL looked up for every solution; a lookup by the values of two
- * children stays fenced, and so does a lookup in the pattern of an expression. The solutions are those of the joins
- * left to the planner.
+ * children stays fenced, and so does a lookup in the pattern of an expression. The advice of a statement does not hold
+ * for the next statement of the request. The solutions are those of the joins left to the planner.
  */
 public class PlanAdviceLookupTest
 {
@@ -520,6 +520,44 @@ public class PlanAdviceLookupTest
                 assertThat(plan, containsString("on links " + PlanAdvice.LOOKUP));
                 assertThat(plan, not(containsString("Seq Scan on links")));
             }
+        }
+    }
+
+
+    @Test
+    public void adviceOfNextStatement() throws Exception
+    {
+        try(Request request = new Engine(advised).getRequest())
+        {
+            String query = "SELECT ?x ?y WHERE { ?x ex:kind \"3\"^^xsd:int . ?x ex:link ?y }";
+
+            try(Result result = request.execute(prefix + query))
+            {
+                assertThat(read(result), hasSize(greaterThan(0)));
+            }
+
+            assertThat(advice(request), containsString(PlanAdvice.LOOKUP));
+
+            // the next statement of the request, which looks nothing up, is not advised
+            try(Result result = request.execute(prefix + "SELECT ?x WHERE { ?x ex:kind \"3\"^^xsd:int }"))
+            {
+                assertThat(read(result), hasSize(greaterThan(0)));
+            }
+
+            assertThat(advice(request), is(""));
+        }
+    }
+
+
+    /**
+     * The plan advice in effect in the transaction of the request.
+     */
+    private static String advice(Request request) throws SQLException
+    {
+        try(ResultSet result = request.getStatement().executeQuery("SELECT current_setting('pg_plan_advice.advice')"))
+        {
+            result.next();
+            return result.getString(1);
         }
     }
 

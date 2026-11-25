@@ -49,8 +49,9 @@ import cz.iocb.sparql.testing.Database;
  * equality to hash the lookup by; the right side of an OPTIONAL looked up for every solution is written so too. A
  * lookup in place compares a variable with one child only, and a lookup by the values of two children stays fenced. A
  * statement read by fetches, or a session allowing no workers, keeps the fenced lookups, and a statement read by
- * fetches is planned without workers; a statement read in parts whose rows the database copies to the client is
- * evaluated whole, as one read whole is. The solutions are those of the joins left to the planner.
+ * fetches is planned without workers, which does not hold for the next statement of the request; a statement read in
+ * parts whose rows the database copies to the client is evaluated whole, as one read whole is. The solutions are those
+ * of the joins left to the planner.
  */
 public class ParallelLookupTest
 {
@@ -458,6 +459,31 @@ public class ParallelLookupTest
         String sql = check(query, 10, true, true);
         assertThat(sql, containsString("ANY(ARRAY["));
         assertThat(sql, not(containsString(" OFFSET 0")));
+    }
+
+
+    @Test
+    public void workersOfNextStatement() throws Exception
+    {
+        String query = prefix + "SELECT ?x ?y WHERE { ?x ex:kind \"3\"^^xsd:int . ?x ex:link ?y }";
+
+        try(Request request = new Engine(fetching).getRequest())
+        {
+            try(Result result = request.execute(query, null, 0, -1, 10, 0))
+            {
+                assertThat(read(result), hasSize(greaterThan(0)));
+            }
+
+            assertThat(request.isParallel(), is(false));
+
+            // the next statement of the request, read whole, may be evaluated by workers
+            try(Result result = request.execute(query, null, 0, -1, 0, 0))
+            {
+                assertThat(read(result), hasSize(greaterThan(0)));
+            }
+
+            assertThat(request.isParallel(), is(true));
+        }
     }
 
 

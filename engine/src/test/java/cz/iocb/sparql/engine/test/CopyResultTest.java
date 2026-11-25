@@ -48,11 +48,13 @@ import cz.iocb.sparql.testing.Database;
  * The rows of a result read in parts, which the database copies to the client where the driver lets it: the database
  * evaluates the copied statement by parallel workers and sends its rows as they are read, a cancellation of the request
  * and its time limit end the copy, also a cancellation that comes before the statement of the copy reaches the
- * database, a result closed before its end leaves the request usable, the warnings the database raises while it copies
- * are those of the result, and the terms are those of the result read whole.
+ * database, a result closed before its end leaves the request usable, the time limit of a copied statement does not
+ * hold for the next statement of the request, the warnings the database raises while it copies are those of the result,
+ * and the terms are those of the result read whole.
  *
  * The table {@code copy_result.texts} holds 100000 texts of 200 characters, mapped by ex:text; the virtual table
- * {@code slow} gives its row after 30 seconds, mapped by ex:slow.
+ * {@code slow} gives its row after 30 seconds, mapped by ex:slow, and the virtual table {@code pause} gives its row
+ * after 2 seconds, mapped by ex:pause.
  */
 public class CopyResultTest
 {
@@ -121,14 +123,25 @@ public class CopyResultTest
         config.addQuadMapping(new DatabaseTable("copy_result", "texts"), null, config.createIriMapping("item", "id"),
                 config.createIriMapping("ex:text"), config.createLiteralMapping(xsdString, "text"));
 
-        VirtualTable slow = new VirtualTable("slow");
-        VirtualTableDefinition definition = new VirtualTableDefinition("SELECT 1::int4 AS id FROM pg_sleep(30)");
-        definition.addColumn(new TableColumn("id", INT4));
-        config.addVirtualTable(slow, definition);
-        config.addQuadMapping(slow, null, config.createIriMapping("item", "id"), config.createIriMapping("ex:slow"),
-                config.createLiteralMapping(xsdInt, "id"));
+        addTable(config, "slow", "SELECT 1::int4 AS id FROM pg_sleep(30)");
+        addTable(config, "pause", "SELECT 1::int4 AS id FROM pg_sleep(2)");
 
         return config;
+    }
+
+
+    /**
+     * Maps a virtual table of one integer column {@code id} as the subjects and the objects of the triples of the
+     * predicate {@code ex:<name>}.
+     */
+    private static void addTable(SparqlDatabaseConfiguration config, String name, String query)
+    {
+        VirtualTable table = new VirtualTable(name);
+        VirtualTableDefinition definition = new VirtualTableDefinition(query);
+        definition.addColumn(new TableColumn("id", INT4));
+        config.addVirtualTable(table, definition);
+        config.addQuadMapping(table, null, config.createIriMapping("item", "id"), config.createIriMapping("ex:" + name),
+                config.createLiteralMapping(xsdInt, "id"));
     }
 
 
@@ -401,6 +414,33 @@ public class CopyResultTest
         }
 
         assertThat(running("pg_sleep(30)"), is(0));
+    }
+
+
+    @Test
+    @DisplayName("the time limit of a copied statement does not hold for the next statement of the request")
+    void timeLimitOfStatement() throws Exception
+    {
+        try(Request request = engine.getRequest())
+        {
+            String query = prefix + "SELECT ?s ?t WHERE { ?s ex:text ?t } LIMIT 2000";
+
+            try(Result result = request.execute(query, null, 0, -1, 1000, 1_000_000_000L))
+            {
+                int rows = 0;
+
+                while(result.next())
+                    rows++;
+
+                assertThat(rows, is(2000));
+            }
+
+            // the next statement, which has no time limit, takes 2 seconds
+            try(Result result = request.execute(prefix + "SELECT ?s ?v WHERE { ?s ex:pause ?v }", null, 0, -1, 0, 0))
+            {
+                assertThat(result.next(), is(true));
+            }
+        }
     }
 
 
