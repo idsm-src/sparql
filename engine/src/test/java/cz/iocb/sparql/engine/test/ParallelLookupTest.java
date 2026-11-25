@@ -44,8 +44,8 @@ import cz.iocb.sparql.testing.Database;
  * hash join above a lookup does not compare the variable the lookup compares, from which the database would derive an
  * equality to hash the lookup by; the right side of an OPTIONAL looked up for every solution is written so too. A
  * lookup in place compares a variable with one child only, and a lookup by the values of two children stays fenced. A
- * statement read by fetches, or a session allowing no workers, keeps the fenced lookups. The solutions are those of the
- * joins left to the planner.
+ * statement read by fetches, or a session allowing no workers, keeps the fenced lookups, and a statement read by
+ * fetches is planned without workers. The solutions are those of the joins left to the planner.
  */
 public class ParallelLookupTest
 {
@@ -309,6 +309,36 @@ public class ParallelLookupTest
     }
 
 
+    /**
+     * Runs the query over the optimized configuration with the given fetch size and with parallel plans made as cheap
+     * as possible, and returns the plan the database chooses for the SQL code of the query in the transaction of the
+     * request, under the settings the request has made for its statement.
+     */
+    private static String planInRequest(String query, int fetchSize) throws Exception
+    {
+        try(Request request = new Engine(optimized).getRequest())
+        {
+            request.getStatement().execute("SET LOCAL parallel_setup_cost = 0; SET LOCAL parallel_tuple_cost = 0; "
+                    + "SET LOCAL min_parallel_table_scan_size = 0");
+
+            try(Result result = request.execute(prefix + query, null, 0, -1, fetchSize, 0))
+            {
+                assertThat(read(result), hasSize(greaterThan(0)));
+            }
+
+            StringBuilder plan = new StringBuilder();
+
+            try(ResultSet result = request.getStatement().executeQuery("EXPLAIN (COSTS OFF) " + queries.getLast()))
+            {
+                while(result.next())
+                    plan.append(result.getString(1)).append('\n');
+            }
+
+            return plan.toString();
+        }
+    }
+
+
     @Test
     public void lookupInPlace() throws Exception
     {
@@ -357,6 +387,19 @@ public class ParallelLookupTest
         String sql = check(query, 0, false, false);
         assertThat(sql, containsString(" OFFSET 0) AS "));
         assertThat(sql, not(containsString("ANY(ARRAY[")));
+    }
+
+
+    @Test
+    public void readByFetchesPlannedWithoutWorkers() throws Exception
+    {
+        String query = "SELECT ?x ?m WHERE { ?x ex:mark ?m }";
+
+        // the scan of the marks of a statement read whole is handed to the workers
+        assertThat(planInRequest(query, 0), containsString("Gather"));
+
+        // whereas a statement read by fetches, which the database evaluates without workers, is planned without them
+        assertThat(planInRequest(query, 10), not(containsString("Gather")));
     }
 
 

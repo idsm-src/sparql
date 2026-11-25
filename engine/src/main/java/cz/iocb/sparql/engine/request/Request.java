@@ -633,19 +633,28 @@ public class Request implements AutoCloseable
 
             try
             {
-                if(config.isJoinOptimizerEnabled())
-                {
-                    // the joins are written in the order and with the methods the engine has chosen: the planner must
-                    // keep the order of the explicit joins and hash them (a merge join would sort the values, which is
-                    // slow for boxes), the index lookups being forced by lateral subqueries (see JoinOptimizer); the
-                    // settings last until the end of the transaction of the request
-                    getStatement().execute("SET LOCAL join_collapse_limit = 1; SET LOCAL enable_nestloop = off; "
-                            + "SET LOCAL enable_mergejoin = off");
+                List<String> settings = new ArrayList<>();
 
-                    // or the lookups are plain joins, which plan advice makes the planner look up (see PlanAdvice)
-                    if(advisedLookups)
-                        advise(code);
-                }
+                // the database evaluates a statement read by fetches without parallel workers, so the statement is
+                // planned without them, as a plan chosen for workers may cost more than a serial one when the process
+                // reading the rows evaluates it alone
+                if(fetchSize > 0)
+                    settings.add("max_parallel_workers_per_gather = 0");
+
+                // the joins are written in the order and with the methods the engine has chosen: the planner must keep
+                // the order of the explicit joins and hash them (a merge join would sort the values, which is slow for
+                // boxes), the index lookups being forced by lateral subqueries (see JoinOptimizer)
+                if(config.isJoinOptimizerEnabled())
+                    settings.addAll(
+                            List.of("join_collapse_limit = 1", "enable_nestloop = off", "enable_mergejoin = off"));
+
+                // the settings last until the end of the transaction of the request
+                if(!settings.isEmpty())
+                    getStatement().execute("SET LOCAL " + String.join("; SET LOCAL ", settings));
+
+                // or the lookups are plain joins, which plan advice makes the planner look up (see PlanAdvice)
+                if(advisedLookups)
+                    advise(code);
 
                 return new Result(type, imcode.getResultDescription(), getStatement(fetchSize).executeQuery(code),
                         begin, timeout);
