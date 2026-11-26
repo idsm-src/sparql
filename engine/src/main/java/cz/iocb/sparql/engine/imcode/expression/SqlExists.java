@@ -488,6 +488,45 @@ public final class SqlExists extends SqlExpressionIntercode
     }
 
 
+    /**
+     * True if the bindings of the solutions the expression is evaluated for bind one of the compared variables always
+     * in classes disjoint with those the current solution of the pattern the node holding the expression lies in binds
+     * it always (see {@link Scope#getCurrentSolution}). Every solution of a node inside a pattern extends the current
+     * solution of the pattern, so such bindings are the bindings of no solution, like the trial bindings of
+     * {@link SqlIntercode#addAcceptedClasses} binding a variable in a class that the current solution excludes; the
+     * current solution of the test would not extend the current solution of the pattern (see
+     * {@link #getCurrentSolution}), and the pattern, optimised for its earlier current solutions, would be compared
+     * with it in classes it holds without columns.
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param scope the scope of the node holding the expression
+     * @param bindings bindings of the solutions the expression is evaluated for
+     * @param variables the variables the test compares
+     * @return true if the bindings bind a compared variable always in classes disjoint with those the current solution
+     *         of the pattern the node lies in binds it always, false otherwise
+     */
+    private static boolean excludesEnclosingSolution(ClassRelations relations, Scope scope, VariableBindings bindings,
+            Set<Variable> variables)
+    {
+        VariableBindings enclosing = scope.getCurrentSolution();
+
+        if(enclosing == null)
+            return false;
+
+        for(Variable variable : variables)
+        {
+            VariableBinding own = bindings.get(variable);
+            VariableBinding other = enclosing.get(variable);
+
+            if(own != null && other != null && !own.canBeNull() && !other.canBeNull()
+                    && ResourceClass.areDisjunct(relations, own.getClasses(), other.getClasses()))
+                return true;
+        }
+
+        return false;
+    }
+
+
     @Override
     public SqlExpressionIntercode optimize(Request request, Scope scope, VariableBindings bindings,
             Restriction restriction, boolean evalServices)
@@ -503,9 +542,17 @@ public final class SqlExists extends SqlExpressionIntercode
             if(!replaced.contains(variable) && (bindings.get(variable) == null || bindings.get(variable).canBeNull()))
                 return this;
 
+        Set<Variable> compared = getComparedVariables(request, pattern, bindings, variables);
+
+        // surrounding bindings that cannot extend the current solution of the pattern the node holding the expression
+        // lies in are the bindings of no solution: the test is evaluated for nothing, and it is folded as a test no
+        // solution of whose pattern can agree with the current solution (see create)
+        if(chained && excludesEnclosingSolution(relations, scope, bindings, compared))
+            return negated ? trueValue : falseValue;
+
         // the current solution as the surrounding bindings provide it now
-        VariableBindings solution = this.solution == null ? null : getCurrentSolution(request, scope, bindings,
-                getComparedVariables(request, pattern, bindings, variables), chained);
+        VariableBindings solution = this.solution == null ? null :
+                getCurrentSolution(request, scope, bindings, compared, chained);
 
         // a pattern optimised for another current solution serves this one only if this one is not wider
         SqlIntercode base = solution == null || isNarrower(this.solution, solution) ? pattern : origin;
