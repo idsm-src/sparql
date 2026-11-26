@@ -64,6 +64,7 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.DefaultStatistics;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.SourceTable;
@@ -225,6 +226,12 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * catalog on first use (see {@link #getTableStatistics}).
      */
     protected final Map<SourceTable, TableStatistics> tableStatistics = new ConcurrentHashMap<>();
+
+    /**
+     * Function through which the extended statistics of the tables are read, or null (see
+     * {@link #setExtendedStatisticsFunction}).
+     */
+    protected Function extendedStatisticsFunction = null;
 
     /**
      * Tables whose rows the translation of a query may read (see {@link #addDictionaryTable}).
@@ -2114,6 +2121,51 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     {
         return tableStatistics.computeIfAbsent(table, t -> t instanceof DatabaseTable databaseTable ?
                 new CatalogStatistics(databaseTable) : new DefaultStatistics());
+    }
+
+
+    /**
+     * Sets the function through which the engine reads the numbers of the distinct combinations of the values of
+     * several columns that the extended statistics of the database keep for a table ({@code CREATE STATISTICS} of the
+     * kind {@code ndistinct}), like those of the columns of an IRI made of several parts (see
+     * {@link CatalogStatistics}). The database shows them in the view {@code pg_stats_ext} to the owner of the table
+     * only, so a role that may only read the tables needs a function declared {@code SECURITY DEFINER} by their owner:
+     * it takes the schema and the name of a table (both of the type {@code name}) and returns the text forms of the
+     * {@code n_distinct} of the extended statistics of the table ({@code SETOF text}), like
+     *
+     * <pre>
+     * CREATE FUNCTION stats.ndistinct(schema_name name, table_name name) RETURNS SETOF text
+     * LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, pg_temp
+     * AS $$ SELECT n_distinct::text FROM pg_stats_ext
+     *     WHERE schemaname = schema_name AND tablename = table_name
+     *     AND has_table_privilege(session_user, format('%I.%I', schema_name, table_name), 'SELECT') $$;
+     * REVOKE EXECUTE ON FUNCTION stats.ndistinct(name, name) FROM PUBLIC;
+     * GRANT EXECUTE ON FUNCTION stats.ndistinct(name, name) TO reader;
+     * </pre>
+     *
+     * which gives no more than the numbers, of the tables the role logged in to the database may read. Without a
+     * function the engine reads the view itself, which serves a role owning the tables. The statistics of a table are
+     * kept by the configuration once they have been read, so the function is to be set before the configuration serves
+     * requests.
+     *
+     * @param schema the schema of the function
+     * @param name the name of the function
+     */
+    public void setExtendedStatisticsFunction(String schema, String name)
+    {
+        extendedStatisticsFunction = new Function(schema, name);
+    }
+
+
+    /**
+     * The function through which the engine reads the extended statistics of the tables (see
+     * {@link #setExtendedStatisticsFunction}), or null when it reads the view {@code pg_stats_ext} itself.
+     *
+     * @return the function through which the engine reads the extended statistics of the tables, or null
+     */
+    public Function getExtendedStatisticsFunction()
+    {
+        return extendedStatisticsFunction;
     }
 
 

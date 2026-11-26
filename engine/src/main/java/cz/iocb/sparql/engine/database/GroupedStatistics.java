@@ -18,9 +18,10 @@ import cz.iocb.sparql.engine.request.Request;
  * values holds a row per group, column and value: {@code key_value}, {@code column_name text}, {@code value text} (the
  * text form of the value) and {@code row_count bigint}. A value absent from the most common ones is counted through an
  * index of the table when there is one (see {@link DatabaseSchema#canLookUp}). An access that does not bind the group
- * column to a value is estimated from the catalog statistics of the table (see {@link CatalogStatistics}). The side
- * tables are read and the counts made through the connection of the request as the groups and the values are first
- * asked for, and the results are kept for the life of the object.
+ * column to a value is estimated from the catalog statistics of the table (see {@link CatalogStatistics}), which alone
+ * give the distinct combinations of the values of several columns, of the table as a whole. The side tables are read
+ * and the counts made through the connection of the request as the groups and the values are first asked for, and the
+ * results are kept for the life of the object.
  */
 public final class GroupedStatistics extends TableStatisticsBase
 {
@@ -113,6 +114,14 @@ public final class GroupedStatistics extends TableStatisticsBase
 
             return frequency;
         });
+    }
+
+
+    @Override
+    protected double lookupDistinct(Request request, Group group, Set<TableColumn> columns)
+    {
+        // the side tables keep no combinations of columns, and those of the catalog are of the whole table
+        return group.key() == null ? catalog.lookupDistinct(request, group, columns) : Double.NaN;
     }
 
 

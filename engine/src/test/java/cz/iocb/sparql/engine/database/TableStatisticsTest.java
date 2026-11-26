@@ -15,9 +15,10 @@ import cz.iocb.sparql.engine.request.Request;
  * selectivities of its bound columns (the frequency of a most common value, the average of the remaining values
  * otherwise, which share the rows that are not null, the planner's default without statistics) and by the null
  * fractions, the columns required not to be null being null together; the disjuncts add up; the distinct values of a
- * bound column are one, of a free column the skew-corrected count capped by the rows, of several columns those of the
- * column that has the most of them; a group column is accounted for by its group; the effective number of distinct
- * values follows from the frequencies among the rows that are not null.
+ * bound column are one, of a free column the skew-corrected count capped by the rows, of several columns the
+ * combinations kept for the free ones together, else those of the column that has the most of them; a group column is
+ * accounted for by its group; the effective number of distinct values follows from the frequencies among the rows that
+ * are not null.
  */
 public class TableStatisticsTest
 {
@@ -42,7 +43,8 @@ public class TableStatisticsTest
      * Statistics of one group of 1000 rows: 100 distinct values of {@code s} with the value 1 held by a fifth of the
      * rows and the other values equally frequent, 10 distinct values of {@code o}, a column {@code n} of two values
      * null in half of the rows, a column {@code m} of four values null in four fifths of the rows and a column
-     * {@code u} nothing is known about; grouped by {@code p} when asked so.
+     * {@code u} nothing is known about, and 15 combinations of the values of {@code o} and {@code n} kept for the two
+     * columns together; grouped by {@code p} when asked so.
      */
     private static class TestStatistics extends TableStatisticsBase
     {
@@ -75,6 +77,12 @@ public class TableStatisticsTest
         protected double lookupFrequency(Request request, Group group, TableColumn column, Column value)
         {
             return column.equals(s) && value.equals(one) ? 0.2 : Double.NaN;
+        }
+
+        @Override
+        protected double lookupDistinct(Request request, Group group, Set<TableColumn> columns)
+        {
+            return columns.equals(Set.of(o, n)) ? 15 : Double.NaN;
         }
     }
 
@@ -307,6 +315,20 @@ public class TableStatisticsTest
 
         // a column nothing is known about has a value of its own in every row
         assertEquals(200, new TestStatistics(false).estimateDistinct(null, Set.of(o, u), conditions(equal(s, one))),
+                1e-9);
+    }
+
+
+    @Test
+    public void distinctOfColumnsTogether()
+    {
+        // the 15 combinations kept for o and n together, more than the 10 values of o
+        assertEquals(15, new TestStatistics(false).estimateDistinct(null, Set.of(o, n), new Conditions(true)), 1e-9);
+        assertEquals(15, new TestStatistics(false).estimateDistinct(null, Set.of(o, n), conditions(equal(s, one))),
+                1e-9);
+
+        // a column bound to a value is no part of the combination
+        assertEquals(2, new TestStatistics(false).estimateDistinct(null, Set.of(o, n), conditions(equal(o, one))),
                 1e-9);
     }
 

@@ -24,7 +24,9 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
  * optional {@code join-optimizer} address overrides what the configuration says about the join optimizer of the engine:
  * {@code off} turns it off, {@code settings} turns it on with its joins kept by the settings of the planner, and
  * {@code advice} turns it on with its joins kept by plan advice (see
- * {@link SparqlDatabaseConfiguration#setPlanAdvice}).
+ * {@link SparqlDatabaseConfiguration#setPlanAdvice}). The optional {@code statistics-function} address names the
+ * function through which the engine reads the extended statistics of the tables, its schema and its name joined by a
+ * dot (see {@link SparqlDatabaseConfiguration#setExtendedStatisticsFunction}).
  */
 public class SparqlDatabaseConfigurationFactory implements ObjectFactory
 {
@@ -47,6 +49,7 @@ public class SparqlDatabaseConfigurationFactory implements ObjectFactory
         RefAddr datasource = ref.get("datasource");
         RefAddr service = ref.get("service");
         RefAddr optimizer = ref.get("join-optimizer");
+        RefAddr statistics = ref.get("statistics-function");
 
         if(datasource == null)
             return null;
@@ -68,6 +71,9 @@ public class SparqlDatabaseConfigurationFactory implements ObjectFactory
 
             if(optimizer != null)
                 setJoinOptimizer((SparqlDatabaseConfiguration) config, (String) optimizer.getContent());
+
+            if(statistics != null)
+                setExtendedStatisticsFunction((SparqlDatabaseConfiguration) config, (String) statistics.getContent());
 
             return config;
         }
@@ -97,5 +103,24 @@ public class SparqlDatabaseConfigurationFactory implements ObjectFactory
             }
             default -> throw new IllegalArgumentException("unknown join-optimizer value: " + value);
         }
+    }
+
+
+    /**
+     * Sets the function through which the configuration reads the extended statistics of the tables as the
+     * {@code statistics-function} address of the reference names it.
+     *
+     * @param config the configuration
+     * @param value the content of the address: the schema and the name of the function joined by a dot
+     * @throws IllegalArgumentException if the value is no schema and name joined by a dot
+     */
+    private static void setExtendedStatisticsFunction(SparqlDatabaseConfiguration config, String value)
+    {
+        int dot = value.indexOf('.');
+
+        if(dot <= 0 || dot == value.length() - 1)
+            throw new IllegalArgumentException("unknown statistics-function value: " + value);
+
+        config.setExtendedStatisticsFunction(value.substring(0, dot), value.substring(dot + 1));
     }
 }

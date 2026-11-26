@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.database;
 
 import java.sql.SQLException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -19,9 +20,10 @@ import cz.iocb.sparql.engine.request.Request.ResultReader;
  * remaining values, which share the rows holding neither a most common value nor a null) and by the fraction of null or
  * not-null values of every column tested for them; the rows of a disjunction are the sum over its disjuncts. Unlike the
  * planner, which takes all those conditions for independent, the columns a disjunct requires not to be null are taken
- * to be null together (see {@link #estimateRows(Request, Condition)}). The distinct values of several columns are those
- * of the column that has the most of them (see {@link #estimateDistinct(Request, Set, Condition, double)}). Subclasses
- * supply the groups and the frequencies.
+ * to be null together (see {@link #estimateRows(Request, Condition)}). The distinct values of several columns are the
+ * combinations the statistics keep for the columns together, or those of the column that has the most of them (see
+ * {@link #estimateDistinct(Request, Set, Condition, double)}). Subclasses supply the groups, the frequencies and the
+ * combinations.
  */
 public abstract class TableStatisticsBase implements TableStatistics
 {
@@ -80,6 +82,22 @@ public abstract class TableStatisticsBase implements TableStatistics
 
 
     /**
+     * Number of the distinct combinations of the values of the columns among the rows of the group when the statistics
+     * keep it for those columns together, {@code NaN} otherwise; none are kept by default.
+     *
+     * @param request the current request
+     * @param group the group of rows
+     * @param columns the columns, at least two
+     * @return number of the distinct combinations of the values of the columns among the rows of the group, or
+     *         {@code NaN}
+     */
+    protected double lookupDistinct(Request request, Group group, Set<TableColumn> columns)
+    {
+        return Double.NaN;
+    }
+
+
+    /**
      * True if the column selects the groups, so that a value bound to it is accounted for by the group itself.
      *
      * @param column the column
@@ -126,11 +144,13 @@ public abstract class TableStatisticsBase implements TableStatistics
 
     /**
      * Estimated number of distinct combinations of the values of the columns among the rows satisfying the disjunct:
-     * the most distinct values any of the columns has, as a combination has at least as many values as each of its
-     * columns, and the columns holding one term together, like the parts of an IRI, mostly have one of them determine
-     * the others. A constant and a column the disjunct binds to a value have one value, a column with statistics the
-     * skew-corrected number of its distinct values (see {@link ColumnStatistics#joinDistinct}) and a column nothing is
-     * known about, like an expression, a distinct value in every row, all of them capped by the rows.
+     * the combinations of the columns the disjunct does not bind to values where the statistics keep them for those
+     * columns together (see {@link #lookupDistinct}), and at least the most distinct values any of the columns has, as
+     * a combination has at least as many values as each of its columns; without the statistics of the columns together
+     * that is all, as the columns holding one term together, like the parts of an IRI, mostly have one of them
+     * determine the others. A constant and a column the disjunct binds to a value have one value, a column with
+     * statistics the skew-corrected number of its distinct values (see {@link ColumnStatistics#joinDistinct}) and a
+     * column nothing is known about, like an expression, a distinct value in every row, all of them capped by the rows.
      *
      * @param request the current request
      * @param columns the columns
@@ -143,6 +163,7 @@ public abstract class TableStatisticsBase implements TableStatistics
     {
         Map<TableColumn, Column> values = getValues(condition);
         Group group = lookupGroup(request, condition);
+        Set<TableColumn> free = new HashSet<>();
         double distinct = 1;
 
         for(Column column : columns)
@@ -150,10 +171,23 @@ public abstract class TableStatisticsBase implements TableStatistics
             if(column instanceof ConstantColumn || column instanceof TableColumn bound && values.containsKey(bound))
                 continue;
 
-            ColumnStatistics statistics = column instanceof TableColumn tableColumn && group != null ?
-                    group.columns().get(tableColumn.getName()) : null;
+            ColumnStatistics statistics = null;
+
+            if(column instanceof TableColumn tableColumn)
+            {
+                free.add(tableColumn);
+                statistics = group != null ? group.columns().get(tableColumn.getName()) : null;
+            }
 
             distinct = Math.max(distinct, statistics != null ? Math.min(statistics.joinDistinct(), rows) : rows);
+        }
+
+        if(free.size() > 1 && group != null)
+        {
+            double combinations = lookupDistinct(request, group, free);
+
+            if(!Double.isNaN(combinations))
+                distinct = Math.max(distinct, Math.min(combinations, rows));
         }
 
         return distinct;

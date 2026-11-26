@@ -1,9 +1,21 @@
 package cz.iocb.sparql.engine.database;
 
+import static java.util.stream.Collectors.toSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.request.Request;
 
 
@@ -11,11 +23,25 @@ import cz.iocb.sparql.engine.request.Request;
 /**
  * Statistics of a database table as the planner keeps them in the catalog: the row count of {@code pg_class} and, per
  * column, the number of distinct values, the fraction of null values and the most common values with their frequencies
- * of {@code pg_stats}. They are read on first use through the connection of the request and kept for the life of the
- * object, the frequency of a value being looked up when it is first asked for.
+ * of {@code pg_stats}, and the numbers of the distinct combinations of the values of several columns that the extended
+ * statistics of the table keep ({@code CREATE STATISTICS} of the kind {@code ndistinct}), read from
+ * {@code pg_stats_ext} or through the function the configuration names (see
+ * {@link SparqlDatabaseConfiguration#setExtendedStatisticsFunction}). They are read on first use through the connection
+ * of the request and kept for the life of the object, the frequency of a value being looked up when it is first asked
+ * for.
  */
 public final class CatalogStatistics extends TableStatisticsBase
 {
+    /**
+     * Logger of the lookups of the statistics.
+     */
+    private static final Logger logger = LoggerFactory.getLogger(CatalogStatistics.class);
+
+    /**
+     * Reader of the JSON forms of the extended statistics.
+     */
+    private static final ObjectMapper mapper = new ObjectMapper();
+
     /**
      * The table.
      */
@@ -30,6 +56,12 @@ public final class CatalogStatistics extends TableStatisticsBase
      * Frequencies of the values asked for, by column name and SQL expression of the value.
      */
     private final Map<String, Double> frequencies = new ConcurrentHashMap<>();
+
+    /**
+     * Numbers of the distinct combinations of the values of several columns that the extended statistics of the table
+     * keep, by the set of the names of the columns, once read.
+     */
+    private volatile Map<Set<String>, Double> combinations;
 
 
     /**
@@ -67,6 +99,26 @@ public final class CatalogStatistics extends TableStatisticsBase
     protected double lookupFrequency(Request request, Group group, TableColumn column, Column value)
     {
         return frequencies.computeIfAbsent(column.getName() + "\0" + value, _ -> readFrequency(request, column, value));
+    }
+
+
+    @Override
+    protected double lookupDistinct(Request request, Group group, Set<TableColumn> columns)
+    {
+        Map<Set<String>, Double> result = combinations;
+
+        if(result == null)
+        {
+            synchronized(this)
+            {
+                if(combinations == null)
+                    combinations = readCombinations(request);
+
+                result = combinations;
+            }
+        }
+
+        return result.getOrDefault(columns.stream().map(TableColumn::getName).collect(toSet()), Double.NaN);
     }
 
 
@@ -146,11 +198,153 @@ public final class CatalogStatistics extends TableStatisticsBase
         {
             // a request out of time or cancelled has not looked the value up, and the frequency, which the statistics
             // keep for the following requests, must not be taken for the value not being among the most common ones
-            if(request.isCanceled()
-                    || e.getCause() instanceof SQLException cause && "57014".equals(cause.getSQLState()))
+            if(isUnanswered(request, e))
                 throw e;
 
             return Double.NaN;
         }
+    }
+
+
+    /**
+     * Reads the numbers of the distinct combinations of the values of several columns that the extended statistics of
+     * the table keep, with the names of the columns of the table by their numbers, by which the statistics name them:
+     * from the view {@code pg_stats_ext}, which shows them to the owner of the table only, or through the function the
+     * configuration names for a role that does not own it (see
+     * {@link SparqlDatabaseConfiguration#setExtendedStatisticsFunction}). A failing lookup counts as no statistics, but
+     * for the lookup of a request that is out of time or cancelled, which is no answer at all.
+     *
+     * @param request the current request
+     * @return numbers of the distinct combinations of the values of several columns by the set of the names of the
+     *         columns
+     * @throws SQLRuntimeException if the request is out of time (SQL state 57014) or cancelled
+     */
+    private Map<Set<String>, Double> readCombinations(Request request)
+    {
+        Function function = request.getConfiguration().getExtendedStatisticsFunction();
+
+        String source = function != null ? "SELECT * FROM " + function + "(n.nspname, c.relname)" :
+                "SELECT e.n_distinct::text FROM pg_stats_ext e WHERE e.schemaname = n.nspname "
+                        + "AND e.tablename = c.relname";
+
+        String sql = "SELECT d.n_distinct, (SELECT json_object_agg(a.attnum, a.attname) FROM pg_attribute a "
+                + "WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped)::text "
+                + "FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace CROSS JOIN LATERAL (" + source
+                + ") AS d(n_distinct) WHERE n.nspname = " + literal(table.getSchema()) + " AND c.relname = "
+                + literal(table.getName());
+
+        try
+        {
+            return query(request, sql, result -> {
+                Map<Set<String>, Double> combinations = new HashMap<>();
+
+                while(result.next())
+                    addCombinations(combinations, result.getString(1), result.getString(2));
+
+                return combinations;
+            });
+        }
+        catch(SQLRuntimeException e)
+        {
+            // as for a frequency, the statistics keep what they have read for the following requests
+            if(isUnanswered(request, e))
+                throw e;
+
+            logger.warn("cannot read the extended statistics of {}", table, e);
+
+            return Map.of();
+        }
+    }
+
+
+    /**
+     * Adds the numbers of the distinct combinations that the text form of an {@code n_distinct} of extended statistics
+     * gives, in either of its forms: a JSON object whose keys list the numbers of the columns of a combination, like
+     * <code>{"1, 2": 400}</code> (PostgreSQL 18 and older), or a JSON array of objects holding the numbers of the
+     * columns in {@code attributes} and the number of the combinations in {@code ndistinct} (PostgreSQL 19). A
+     * combination holding an expression, which the statistics number by a negative number, is left out.
+     *
+     * @param combinations the numbers of the distinct combinations by the set of the names of the columns
+     * @param text the text form of the {@code n_distinct}, or null
+     * @param names the names of the columns of the table by their numbers, as a JSON object, or null
+     * @throws SQLException if the text cannot be parsed
+     */
+    private static void addCombinations(Map<Set<String>, Double> combinations, String text, String names)
+            throws SQLException
+    {
+        if(text == null || names == null)
+            return;
+
+        try
+        {
+            JsonNode columns = mapper.readTree(names);
+            JsonNode root = mapper.readTree(text);
+
+            if(root.isObject())
+            {
+                for(Entry<String, JsonNode> item : root.properties())
+                    addCombination(combinations, columns, List.of(item.getKey().split(",")), item.getValue());
+            }
+            else
+            {
+                for(JsonNode item : root)
+                {
+                    List<String> attributes = new ArrayList<>();
+
+                    for(JsonNode attribute : item.path("attributes"))
+                        attributes.add(attribute.asText());
+
+                    addCombination(combinations, columns, attributes, item.path("ndistinct"));
+                }
+            }
+        }
+        catch(JsonProcessingException e)
+        {
+            throw new SQLException("cannot parse the extended statistics", e);
+        }
+    }
+
+
+    /**
+     * Adds the number of the distinct combinations of the values of the columns of the given numbers, unless a number
+     * is none of a column of the table, like the negative number of an expression.
+     *
+     * @param combinations the numbers of the distinct combinations by the set of the names of the columns
+     * @param names the names of the columns of the table by their numbers
+     * @param attributes the numbers of the columns
+     * @param count the number of the distinct combinations
+     */
+    private static void addCombination(Map<Set<String>, Double> combinations, JsonNode names, List<String> attributes,
+            JsonNode count)
+    {
+        Set<String> columns = new HashSet<>();
+
+        for(String attribute : attributes)
+        {
+            JsonNode name = names.get(attribute.trim());
+
+            if(name == null || !name.isTextual())
+                return;
+
+            columns.add(name.asText());
+        }
+
+        if(columns.size() > 1 && count.isNumber())
+            combinations.put(columns, count.asDouble());
+    }
+
+
+    /**
+     * True if a lookup has failed because the request is out of time (SQL state 57014) or cancelled, which is no answer
+     * about the statistics at all.
+     *
+     * @param request the current request
+     * @param exception the failure of the lookup
+     * @return true if the lookup has failed because the request is out of time or cancelled, false otherwise
+     */
+    private static boolean isUnanswered(Request request, SQLRuntimeException exception)
+    {
+        return request.isCanceled()
+                || exception.getCause() instanceof SQLException cause && "57014".equals(cause.getSQLState());
     }
 }
