@@ -336,6 +336,10 @@ public final class SqlExists extends SqlExpressionIntercode
             if(!variables.contains(binding.getVariable()))
                 continue;
 
+            // a value of a class without columns would be taken for no value
+            assert !binding.getMappings().containsValue(null): "a class of " + binding.getVariable()
+                    + " without columns: " + binding.getClasses();
+
             VariableBinding addressed = new VariableBinding(binding.getVariable(), binding.canBeNull());
 
             for(Entry<ResourceClass, List<Column>> entry : binding.getMappings().entrySet())

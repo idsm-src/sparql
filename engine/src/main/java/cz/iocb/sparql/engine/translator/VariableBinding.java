@@ -486,6 +486,9 @@ public class VariableBinding
      */
     public SqlCode getIsNull(Table table)
     {
+        // a value of a class without columns would be taken for no value
+        assert !mappings.containsValue(null): "a class of " + variable + " without columns: " + mappings.keySet();
+
         return and(mappings.entrySet().stream().filter(e -> e.getValue() != null)
                 .map(e -> getIsNull(e.getKey(), e.getValue(), table)));
     }
@@ -511,6 +514,9 @@ public class VariableBinding
      */
     public SqlCode getIsNotNull(Table table)
     {
+        // a value of a class without columns would be taken for no value
+        assert !mappings.containsValue(null): "a class of " + variable + " without columns: " + mappings.keySet();
+
         return or(mappings.entrySet().stream().filter(e -> e.getValue() != null)
                 .map(e -> getIsNotNull(e.getKey(), e.getValue(), table)));
     }
