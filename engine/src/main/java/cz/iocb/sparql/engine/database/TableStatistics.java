@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.database;
 
+import java.util.Set;
 import cz.iocb.sparql.engine.request.Request;
 
 
@@ -25,15 +26,17 @@ public interface TableStatistics
 
 
     /**
-     * Estimated number of distinct values of the column among the rows satisfying the conditions; at most the estimated
-     * number of the rows, and 1 for a column bound to a value by the conditions.
+     * Estimated number of distinct combinations of the values of the columns among the rows satisfying the conditions,
+     * like the distinct values of a variable held in several columns; at most the estimated number of the rows, and 1
+     * for columns all bound to values by the conditions.
      *
      * @param request the current request, whose database connection may be used for lookups
-     * @param column the column
+     * @param columns the columns
      * @param conditions conditions on the columns of the table
-     * @return estimated number of distinct values of the column among the rows satisfying the conditions
+     * @return estimated number of distinct combinations of the values of the columns among the rows satisfying the
+     *         conditions
      */
-    double estimateDistinct(Request request, Column column, Conditions conditions);
+    double estimateDistinct(Request request, Set<Column> columns, Conditions conditions);
 
 
     /**

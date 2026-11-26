@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import cz.iocb.sparql.engine.request.Request;
 
@@ -14,8 +15,9 @@ import cz.iocb.sparql.engine.request.Request;
  * selectivities of its bound columns (the frequency of a most common value, the average of the remaining values
  * otherwise, which share the rows that are not null, the planner's default without statistics) and by the null
  * fractions, the columns required not to be null being null together; the disjuncts add up; the distinct values of a
- * bound column are one, of a free column the skew-corrected count capped by the rows; a group column is accounted for
- * by its group; the effective number of distinct values follows from the frequencies among the rows that are not null.
+ * bound column are one, of a free column the skew-corrected count capped by the rows, of several columns those of the
+ * column that has the most of them; a group column is accounted for by its group; the effective number of distinct
+ * values follows from the frequencies among the rows that are not null.
  */
 public class TableStatisticsTest
 {
@@ -247,8 +249,8 @@ public class TableStatisticsTest
     @Test
     public void distinctOfABoundColumn()
     {
-        assertEquals(1, new TestStatistics(false).estimateDistinct(null, s, conditions(equal(s, one))));
-        assertEquals(1, new TestStatistics(true).estimateDistinct(null, key, conditions(equal(key, a))));
+        assertEquals(1, new TestStatistics(false).estimateDistinct(null, Set.of(s), conditions(equal(s, one))));
+        assertEquals(1, new TestStatistics(true).estimateDistinct(null, Set.of(key), conditions(equal(key, a))));
     }
 
 
@@ -259,8 +261,8 @@ public class TableStatisticsTest
         double effective = 1 / (0.04 + 0.8 * 0.8 / 99);
 
         assertEquals(Math.sqrt(100 * effective),
-                new TestStatistics(false).estimateDistinct(null, s, new Conditions(true)), 1e-9);
-        assertEquals(10, new TestStatistics(false).estimateDistinct(null, o, new Conditions(true)), 1e-9);
+                new TestStatistics(false).estimateDistinct(null, Set.of(s), new Conditions(true)), 1e-9);
+        assertEquals(10, new TestStatistics(false).estimateDistinct(null, Set.of(o), new Conditions(true)), 1e-9);
     }
 
 
@@ -268,8 +270,8 @@ public class TableStatisticsTest
     public void distinctIsCappedByTheRows()
     {
         // the 8.08 rows estimated for the value 2 of s cannot hold the 10 distinct values of o
-        assertEquals(1000 * 0.8 / 99, new TestStatistics(false).estimateDistinct(null, o, conditions(equal(s, two))),
-                1e-9);
+        assertEquals(1000 * 0.8 / 99,
+                new TestStatistics(false).estimateDistinct(null, Set.of(o), conditions(equal(s, two))), 1e-9);
     }
 
 
@@ -278,14 +280,34 @@ public class TableStatisticsTest
     {
         TableColumn u = new TableColumn("u", INT4);
 
-        assertEquals(200, new TestStatistics(false).estimateDistinct(null, u, conditions(equal(s, one))), 1e-9);
+        assertEquals(200, new TestStatistics(false).estimateDistinct(null, Set.of(u), conditions(equal(s, one))), 1e-9);
     }
 
 
     @Test
     public void distinctOfAConstant()
     {
-        assertEquals(1, new TestStatistics(false).estimateDistinct(null, one, new Conditions(true)));
+        assertEquals(1, new TestStatistics(false).estimateDistinct(null, Set.of(one), new Conditions(true)));
+    }
+
+
+    @Test
+    public void distinctOfSeveralColumns()
+    {
+        double effective = 1 / (0.04 + 0.8 * 0.8 / 99);
+        TableColumn u = new TableColumn("u", INT4);
+
+        // the values of the column that has the most of them
+        assertEquals(Math.sqrt(100 * effective),
+                new TestStatistics(false).estimateDistinct(null, Set.of(s, o), new Conditions(true)), 1e-9);
+
+        // a bound column and a constant have one value
+        assertEquals(10, new TestStatistics(false).estimateDistinct(null, Set.of(s, o, one), conditions(equal(s, one))),
+                1e-9);
+
+        // a column nothing is known about has a value of its own in every row
+        assertEquals(200, new TestStatistics(false).estimateDistinct(null, Set.of(o, u), conditions(equal(s, one))),
+                1e-9);
     }
 
 

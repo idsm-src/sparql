@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.request.Request.ResultReader;
@@ -18,8 +19,9 @@ import cz.iocb.sparql.engine.request.Request.ResultReader;
  * remaining values, which share the rows holding neither a most common value nor a null) and by the fraction of null or
  * not-null values of every column tested for them; the rows of a disjunction are the sum over its disjuncts. Unlike the
  * planner, which takes all those conditions for independent, the columns a disjunct requires not to be null are taken
- * to be null together (see {@link #estimateRows(Request, Condition)}). Subclasses supply the groups and the
- * frequencies.
+ * to be null together (see {@link #estimateRows(Request, Condition)}). The distinct values of several columns are those
+ * of the column that has the most of them (see {@link #estimateDistinct(Request, Set, Condition, double)}). Subclasses
+ * supply the groups and the frequencies.
  */
 public abstract class TableStatisticsBase implements TableStatistics
 {
@@ -103,7 +105,7 @@ public abstract class TableStatisticsBase implements TableStatistics
 
 
     @Override
-    public double estimateDistinct(Request request, Column column, Conditions conditions)
+    public double estimateDistinct(Request request, Set<Column> columns, Conditions conditions)
     {
         double total = 0;
 
@@ -114,37 +116,47 @@ public abstract class TableStatisticsBase implements TableStatistics
 
             double rows = estimateRows(request, condition);
 
-            if(rows <= 0)
-                continue;
-
-            double distinct = rows;
-
-            if(column instanceof ConstantColumn)
-            {
-                distinct = 1;
-            }
-            else if(column instanceof TableColumn tableColumn)
-            {
-                Map<TableColumn, Column> values = getValues(condition);
-
-                if(values.containsKey(tableColumn))
-                {
-                    distinct = 1;
-                }
-                else
-                {
-                    Group group = lookupGroup(request, condition);
-                    ColumnStatistics statistics = group != null ? group.columns().get(tableColumn.getName()) : null;
-
-                    if(statistics != null)
-                        distinct = Math.min(statistics.joinDistinct(), rows);
-                }
-            }
-
-            total += distinct;
+            if(rows > 0)
+                total += estimateDistinct(request, columns, condition, rows);
         }
 
         return total;
+    }
+
+
+    /**
+     * Estimated number of distinct combinations of the values of the columns among the rows satisfying the disjunct:
+     * the most distinct values any of the columns has, as a combination has at least as many values as each of its
+     * columns, and the columns holding one term together, like the parts of an IRI, mostly have one of them determine
+     * the others. A constant and a column the disjunct binds to a value have one value, a column with statistics the
+     * skew-corrected number of its distinct values (see {@link ColumnStatistics#joinDistinct}) and a column nothing is
+     * known about, like an expression, a distinct value in every row, all of them capped by the rows.
+     *
+     * @param request the current request
+     * @param columns the columns
+     * @param condition the disjunct
+     * @param rows estimated number of rows satisfying the disjunct
+     * @return estimated number of distinct combinations of the values of the columns among the rows satisfying the
+     *         disjunct
+     */
+    private double estimateDistinct(Request request, Set<Column> columns, Condition condition, double rows)
+    {
+        Map<TableColumn, Column> values = getValues(condition);
+        Group group = lookupGroup(request, condition);
+        double distinct = 1;
+
+        for(Column column : columns)
+        {
+            if(column instanceof ConstantColumn || column instanceof TableColumn bound && values.containsKey(bound))
+                continue;
+
+            ColumnStatistics statistics = column instanceof TableColumn tableColumn && group != null ?
+                    group.columns().get(tableColumn.getName()) : null;
+
+            distinct = Math.max(distinct, statistics != null ? Math.min(statistics.joinDistinct(), rows) : rows);
+        }
+
+        return distinct;
     }
 
 

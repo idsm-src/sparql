@@ -11,6 +11,7 @@ import static org.hamcrest.Matchers.lessThan;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Set;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -169,17 +170,17 @@ public class CatalogStatisticsTest
 
         try(Request request = new Engine(config).getRequest())
         {
-            assertThat(statistics.estimateDistinct(request, o, new Conditions(true)), closeTo(10, 0.5));
-            assertThat(statistics.estimateDistinct(request, p, new Conditions(true)), closeTo(2, 0.5));
-            assertThat(statistics.estimateDistinct(request, p, equal(p, "a")), closeTo(1, 0));
+            assertThat(statistics.estimateDistinct(request, Set.of(o), new Conditions(true)), closeTo(10, 0.5));
+            assertThat(statistics.estimateDistinct(request, Set.of(p), new Conditions(true)), closeTo(2, 0.5));
+            assertThat(statistics.estimateDistinct(request, Set.of(p), equal(p, "a")), closeTo(1, 0));
 
             // 501 distinct values of s, half of the rows sharing one of them, corrected for the skew
-            double distinct = statistics.estimateDistinct(request, s, new Conditions(true));
+            double distinct = statistics.estimateDistinct(request, Set.of(s), new Conditions(true));
             assertThat(distinct, greaterThan(40.0));
             assertThat(distinct, lessThan(501.0));
 
             // capped by the rows
-            assertThat(statistics.estimateDistinct(request, s, equal(o, "3")), lessThan(101.0));
+            assertThat(statistics.estimateDistinct(request, Set.of(s), equal(o, "3")), lessThan(101.0));
         }
     }
 
@@ -217,7 +218,7 @@ public class CatalogStatisticsTest
             // 201 distinct values, half of the 400 rows that are not null sharing one of them: their effective number
             // is about 4 (the null rows taken for rows of the other values would make it 23), and the number corrected
             // for the skew is the geometric mean of the two
-            assertThat(statistics.estimateDistinct(request, code, new Conditions(true)),
+            assertThat(statistics.estimateDistinct(request, Set.of(code), new Conditions(true)),
                     closeTo(Math.sqrt(201 * 4), 3));
         }
     }
@@ -269,14 +270,14 @@ public class CatalogStatisticsTest
             assertThat(statistics.estimateRows(request, equal(p, "b", o, "3")), closeTo(10, 1e-9));
 
             // distinct values within the group, corrected for the skew and capped by the rows
-            assertThat(statistics.estimateDistinct(request, o, equal(p, "b")), closeTo(10, 1e-9));
-            assertThat(statistics.estimateDistinct(request, s, equal(p, "b", o, "3")), closeTo(10, 1e-9));
-            assertThat(statistics.estimateDistinct(request, p, equal(p, "b")), closeTo(1, 0));
+            assertThat(statistics.estimateDistinct(request, Set.of(o), equal(p, "b")), closeTo(10, 1e-9));
+            assertThat(statistics.estimateDistinct(request, Set.of(s), equal(p, "b", o, "3")), closeTo(10, 1e-9));
+            assertThat(statistics.estimateDistinct(request, Set.of(p), equal(p, "b")), closeTo(1, 0));
 
             // without the group column the catalog answers
             assertThat(statistics.estimateRows(request, new Conditions(true)), closeTo(1000, 1));
             assertThat(statistics.estimateNullFraction(request, s), closeTo(0, 0));
-            assertThat(statistics.estimateDistinct(request, p, new Conditions(true)), closeTo(2, 0.5));
+            assertThat(statistics.estimateDistinct(request, Set.of(p), new Conditions(true)), closeTo(2, 0.5));
         }
     }
 

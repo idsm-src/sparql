@@ -2236,9 +2236,12 @@ final class JoinOptimizer
 
     /**
      * Estimated number of distinct values of the variable in the solutions of the node, at most the estimated number of
-     * the solutions: 1 for a variable the node binds to a constant or does not bind, from the statistics of its table
-     * for a table access, the fewest among the children binding it for a join, the sum over the branches for a union,
-     * and the count in the child binding it for the other nodes; the number of solutions when nothing better is known.
+     * the solutions: 1 for a variable the node binds to a constant or does not bind, for a table access the number of
+     * its rows when the columns of the variable hold a key of its table (see {@link SqlTableAccess#holdsKey}) and the
+     * distinct combinations of the values of all those columns by the statistics of its table otherwise (see
+     * {@link TableStatistics#estimateDistinct}), the fewest among the children binding it for a join, the sum over the
+     * branches for a union, and the count in the child binding it for the other nodes; the number of solutions when
+     * nothing better is known.
      *
      * @param request the current request
      * @param node the node
@@ -2263,11 +2266,14 @@ final class JoinOptimizer
             if(access.getTable() == null || columns.isEmpty())
                 return 1;
 
-            Column column = columns.stream().sorted().findFirst().get();
-            TableStatistics statistics = request.getConfiguration().getTableStatistics(access.getTable());
+            // a variable whose columns hold a key of the table has a value of its own in every row
+            if(!access.holdsKey(request, List.of(variable)))
+            {
+                TableStatistics statistics = request.getConfiguration().getTableStatistics(access.getTable());
 
-            distinct = statistics.estimateDistinct(request, column,
-                    access.getConstantConditions(request.getConfiguration()));
+                distinct = statistics.estimateDistinct(request, columns,
+                        access.getConstantConditions(request.getConfiguration()));
+            }
         }
         else if(node instanceof SqlJoin join)
         {

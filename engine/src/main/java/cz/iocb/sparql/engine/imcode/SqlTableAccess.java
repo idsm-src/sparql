@@ -780,17 +780,31 @@ public final class SqlTableAccess extends SqlIntercode
     @Override
     public boolean isDistinct(Request request, Collection<Variable> selected)
     {
-        if(table == null)
-            return true;
-
-        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
-        Set<Column> columns = getCoveredVariableColumns(selected);
-
-        if(schema.getCompatibleKey(table, getKnownNotNull(schema, columns)) != null)
+        if(table == null || holdsKey(request, selected))
             return true;
 
         // the access deduplicates its rows itself, unless the duplicates do not matter to its parent
-        return isDeduplicating() && columns.containsAll(distinctColumns);
+        return isDeduplicating() && getCoveredVariableColumns(selected).containsAll(distinctColumns);
+    }
+
+
+    /**
+     * True if the access reads a table and the columns of the selected variables, together with the columns its
+     * conditions bind to constants, hold a unique key of the table that is not null in its rows, so that no two of its
+     * rows give the variables the same values, whether it deduplicates its rows or not.
+     *
+     * @param request the current request
+     * @param selected the selected variables
+     * @return true if the columns of the selected variables hold a unique key of the table, false otherwise
+     */
+    boolean holdsKey(Request request, Collection<Variable> selected)
+    {
+        if(table == null)
+            return false;
+
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+
+        return schema.getCompatibleKey(table, getKnownNotNull(schema, getCoveredVariableColumns(selected))) != null;
     }
 
 
