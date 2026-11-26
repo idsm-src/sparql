@@ -2028,7 +2028,11 @@ public final class SqlJoin extends SqlIntercode
 
     /**
      * Alternatives of joined components of a join of the children (cartesian combination of the children's
-     * alternatives), dropping unjoinable ones.
+     * alternatives), dropping unjoinable ones. The combinations are built child by child and checked in the context of
+     * the whole join (see {@link #getJoinedClasses}): the components of the first children were restricted against the
+     * children coming later too, so a component may lack the columns of a class that a later child excludes. Such a
+     * class meets no class the variable takes in the whole join, and as a solution of a complete combination binds the
+     * variable to a value of one of those classes, no combination the check drops completes into one with a solution.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param childs the child nodes
@@ -2037,6 +2041,9 @@ public final class SqlJoin extends SqlIntercode
      */
     private static List<List<SqlIntercode>> expandJoin(ClassRelations relations, List<SqlIntercode> childs)
     {
+        Map<Variable, Set<ResourceClass>> context = getJoinedClasses(relations,
+                childs.stream().map(c -> c.getVariableBindings()).toList());
+
         List<List<SqlIntercode>> result = List.of(List.of());
 
         for(SqlIntercode child : childs)
@@ -2057,7 +2064,7 @@ public final class SqlJoin extends SqlIntercode
                     merged.addAll(e);
                     merged.addAll(r);
 
-                    if(isJoinable(relations, merged))
+                    if(areJoinable(relations, merged.stream().map(c -> c.getVariableBindings()).toList(), context))
                         subresult.add(merged);
                 }
             }

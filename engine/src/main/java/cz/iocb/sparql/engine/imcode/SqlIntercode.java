@@ -2781,10 +2781,7 @@ public abstract class SqlIntercode extends SqlBaseClass
 
     /**
      * False if a variable is always bound in several of the joined parts with disjoint classes or different constants,
-     * so the join of the parts is empty. The classes compared are those the variable takes in the join of all the parts
-     * (see {@link #joinResourceClasses}), so a class that one of the parts excludes is never compared between the
-     * others, which may lack its columns when they were restricted against that part (see
-     * {@link VariableBindings#restrict}).
+     * so the join of the parts is empty (see {@link #areJoinable(ClassRelations, List, Map)}).
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param parts bindings of the joined parts
@@ -2793,6 +2790,29 @@ public abstract class SqlIntercode extends SqlBaseClass
      */
     protected static boolean areJoinable(ClassRelations relations, List<VariableBindings> parts)
     {
+        return areJoinable(relations, parts, Map.of());
+    }
+
+
+    /**
+     * False if a variable is always bound in several of the joined parts with disjoint classes or different constants,
+     * so the join of the parts is empty, or is bound so in no class meeting a class the variable takes in a join the
+     * parts belong to (see {@link #getJoinedClasses}), so the join of the parts with the rest of that join is empty.
+     * The classes compared are those the variable takes in the join of the parts (see {@link #joinResourceClasses})
+     * that meet a class of the whole join: a class that one of the parts, or the rest of the whole join, excludes is
+     * never compared, as the others may lack its columns when they were restricted against it (see
+     * {@link VariableBindings#restrict}).
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param parts bindings of the joined parts
+     * @param context classes per variable in the whole join the parts belong to (see {@link #getJoinedClasses}); a
+     *            variable without an entry is compared in all its classes
+     * @return false if a variable is always bound in several parts with disjoint classes or different constants, or in
+     *         no class meeting the whole join, true otherwise
+     */
+    protected static boolean areJoinable(ClassRelations relations, List<VariableBindings> parts,
+            Map<Variable, Set<ResourceClass>> context)
+    {
         for(Variable variable : parts.stream().flatMap(v -> v.getVariables().stream()).collect(toSet()))
         {
             List<VariableBinding> uvars = parts.stream().map(v -> v.get(variable))
@@ -2800,7 +2820,10 @@ public abstract class SqlIntercode extends SqlBaseClass
 
             if(uvars.size() > 1)
             {
-                Set<ResourceClass> resClasses = joinResourceClasses(relations, uvars);
+                Set<ResourceClass> joined = context.get(variable);
+                Set<ResourceClass> resClasses = joinResourceClasses(relations, uvars).stream()
+                        .filter(r -> joined == null || !ResourceClass.areDisjunct(relations, r, joined))
+                        .collect(toSet());
 
                 if(resClasses.isEmpty())
                     return false;
@@ -2816,9 +2839,9 @@ public abstract class SqlIntercode extends SqlBaseClass
 
                         List<Column> cols = binding.getMapping(resClass);
 
-                        // a part restricted in a join that was flattened into this one, or expanded with it, lacks the
-                        // columns of a class another part of that join excludes (see getJoinedClasses), which some of
-                        // the parts (see SqlJoin.expandJoin) may hold without the excluding one
+                        // a part restricted against the members of another join lacks the columns of a class one of
+                        // them excludes, which only parts checked without that member and without the context of that
+                        // join (see SqlJoin.expandJoin) may hold
                         if(cols == null)
                             continue;
 
