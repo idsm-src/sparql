@@ -2137,13 +2137,14 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * CREATE FUNCTION stats.ndistinct(schema_name name, table_name name) RETURNS SETOF text
      * LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, pg_temp
      * AS $$ SELECT n_distinct::text FROM pg_stats_ext
-     *     WHERE schemaname = schema_name AND tablename = table_name
+     *     WHERE schemaname = schema_name AND tablename = table_name AND n_distinct IS NOT NULL
      *     AND has_table_privilege(session_user, format('%I.%I', schema_name, table_name), 'SELECT') $$;
      * REVOKE EXECUTE ON FUNCTION stats.ndistinct(name, name) FROM PUBLIC;
      * GRANT EXECUTE ON FUNCTION stats.ndistinct(name, name) TO reader;
      * </pre>
      *
-     * which gives no more than the numbers, of the tables the role logged in to the database may read. Without a
+     * which gives no more than the numbers, of the tables the role logged in to the database may read; the statements
+     * of {@link ExtendedStatistics} make the function together with the statistics the configuration needs. Without a
      * function the engine reads the view itself, which serves a role owning the tables. The statistics of a table are
      * kept by the configuration once they have been read, so the function is to be set before the configuration serves
      * requests.
