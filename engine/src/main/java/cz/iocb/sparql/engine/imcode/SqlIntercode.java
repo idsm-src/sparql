@@ -2839,11 +2839,10 @@ public abstract class SqlIntercode extends SqlBaseClass
 
                         List<Column> cols = binding.getMapping(resClass);
 
-                        // a part restricted against the members of another join lacks the columns of a class one of
-                        // them excludes, which only parts checked without that member and without the context of that
-                        // join (see SqlJoin.expandJoin) may hold
-                        if(cols == null)
-                            continue;
+                        // a part lacks the columns of a class another part holds only when the members of a join it was
+                        // restricted against exclude the class, and the parts are checked together with them or in the
+                        // context of their join (see SqlJoin.expandJoin), which such a class does not meet
+                        assert cols != null;
 
                         for(int j = 0; j < resClass.getColumnCount(); j++)
                             if(cols.get(j) instanceof ConstantColumn c && !consts.computeIfAbsent(j, _ -> c).equals(c))
