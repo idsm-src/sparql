@@ -42,7 +42,6 @@ import cz.iocb.sparql.engine.mapping.extension.ResultDefinition;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBinding;
-import cz.iocb.sparql.engine.translator.VariableBindingPair;
 import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
@@ -551,14 +550,14 @@ public final class SqlProcedureCall extends SqlIntercode
 
         addNodeBindings(relations, callBindings, procedure, optParameters, optParameterNode, optResultNode);
 
-        for(SqlIntercode r : getJoinList(optChild))
-        {
-            List<VariableBindingPair> pairs = VariableBindingPair.getPairs(relations, callBindings,
-                    r.getVariableBindings());
+        // the call is checked together with all the components of the child, as a component may lack the columns of a
+        // class that one of its siblings excludes (see areJoinable)
+        List<VariableBindings> parts = new ArrayList<>();
+        parts.add(callBindings);
+        getJoinList(optChild).forEach(c -> parts.add(c.getVariableBindings()));
 
-            if(pairs.stream().anyMatch(p -> !p.isJoinable()))
-                return SqlNoSolution.get();
-        }
+        if(!areJoinable(relations, parts))
+            return SqlNoSolution.get();
 
 
         // the classes the call binds the results in narrow to the classes the parent accepts

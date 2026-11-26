@@ -2766,7 +2766,7 @@ public abstract class SqlIntercode extends SqlBaseClass
 
     /**
      * False if a variable is always bound in several children with disjoint classes or different constants, so the join
-     * is empty.
+     * is empty (see {@link #areJoinable}).
      *
      * @param relations declarations which unrelated user IRI classes may overlap
      * @param childs the child nodes
@@ -2775,11 +2775,27 @@ public abstract class SqlIntercode extends SqlBaseClass
      */
     protected static boolean isJoinable(ClassRelations relations, List<SqlIntercode> childs)
     {
-        List<VariableBindings> allVars = childs.stream().map(c -> c.getVariableBindings()).toList();
+        return areJoinable(relations, childs.stream().map(c -> c.getVariableBindings()).toList());
+    }
 
-        for(Variable variable : allVars.stream().flatMap(v -> v.getVariables().stream()).collect(toSet()))
+
+    /**
+     * False if a variable is always bound in several of the joined parts with disjoint classes or different constants,
+     * so the join of the parts is empty. The classes compared are those the variable takes in the join of all the parts
+     * (see {@link #joinResourceClasses}), so a class that one of the parts excludes is never compared between the
+     * others, which may lack its columns when they were restricted against that part (see
+     * {@link VariableBindings#restrict}).
+     *
+     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param parts bindings of the joined parts
+     * @return false if a variable is always bound in several parts with disjoint classes or different constants, so the
+     *         join of the parts is empty, true otherwise
+     */
+    protected static boolean areJoinable(ClassRelations relations, List<VariableBindings> parts)
+    {
+        for(Variable variable : parts.stream().flatMap(v -> v.getVariables().stream()).collect(toSet()))
         {
-            List<VariableBinding> uvars = allVars.stream().map(v -> v.get(variable))
+            List<VariableBinding> uvars = parts.stream().map(v -> v.get(variable))
                     .filter(v -> v != null && !v.canBeNull()).toList();
 
             if(uvars.size() > 1)
@@ -2800,9 +2816,9 @@ public abstract class SqlIntercode extends SqlBaseClass
 
                         List<Column> cols = binding.getMapping(resClass);
 
-                        // a child restricted in a join that was flattened into this one, or expanded with it, lacks the
-                        // columns of a class another child of that join excludes (see getJoinedClasses), which a part
-                        // of the children (see SqlJoin.expandJoin) may hold without the excluding child
+                        // a part restricted in a join that was flattened into this one, or expanded with it, lacks the
+                        // columns of a class another part of that join excludes (see getJoinedClasses), which some of
+                        // the parts (see SqlJoin.expandJoin) may hold without the excluding one
                         if(cols == null)
                             continue;
 
@@ -2819,30 +2835,19 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
     /**
-     * False if some shared variable can never match between a join component of the left and a join component of the
-     * right subtree (see {@link VariableBindingPair#isJoinable}).
+     * False if the components the two subtrees join (see {@link #getJoinList}) cannot be joined all together (see
+     * {@link #areJoinable}). The components of both subtrees are checked together, not in pairs of a component of each:
+     * a component restricted against its siblings in a join of one subtree lacks the columns of a class one of the
+     * siblings excludes, which a pair of it with a component of the other subtree would compare without the sibling.
      *
      * @param relations declarations which unrelated user IRI classes may overlap
-     * @param left bindings of the left side
-     * @param right bindings of the right side
-     * @return false if some shared variable can never match between a join component of the left and a join component
-     *         of the right subtree (see {@link VariableBindingPair#isJoinable}), true otherwise
+     * @param left the left side
+     * @param right the right side
+     * @return false if the components of the two subtrees cannot be joined all together, true otherwise
      */
     protected static boolean isJoinable(ClassRelations relations, SqlIntercode left, SqlIntercode right)
     {
-        for(SqlIntercode l : getJoinList(left))
-        {
-            for(SqlIntercode r : getJoinList(right))
-            {
-                List<VariableBindingPair> pairs = VariableBindingPair.getPairs(relations, l.getVariableBindings(),
-                        r.getVariableBindings());
-
-                if(pairs.stream().anyMatch(p -> !p.isJoinable()))
-                    return false;
-            }
-        }
-
-        return true;
+        return isJoinable(relations, Stream.concat(getJoinList(left).stream(), getJoinList(right).stream()).toList());
     }
 
 

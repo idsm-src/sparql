@@ -214,10 +214,11 @@ public class VariableBindingPair
                     List<Column> leftCols = leftVariableBinding.getMapping(pairedClass.getLeftClass());
                     List<Column> rightCols = rightVariableBinding.getMapping(pairedClass.getLeftClass());
 
-                    /* NOTE: Consider the situation "(X join Y) left join Z". In both X and Z, the variable V may have
-                     * resource class R. In Y, however, the variable V cannot have resource class R, and is therefore
-                     * eliminated from both X and Z. During optimization, however, isJoinable may be called with
-                     * parameters X and Z.
+                    /* NOTE: The sides are bindings of nodes optimised against each other, which hold the classes they
+                     * share with columns, except in the trials of SqlIntercode.addAcceptedClasses: the pattern of an
+                     * EXISTS is compared there with a solution binding a variable to a class that the current solution
+                     * the pattern was optimised for does not take, and the pattern holds the class without columns. No
+                     * current solution binds the variable to a value of the class, so the pair is not joinable.
                      */
                     if(leftCols == null || rightCols == null)
                         continue;
