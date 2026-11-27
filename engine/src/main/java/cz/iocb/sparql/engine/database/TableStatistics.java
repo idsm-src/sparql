@@ -10,8 +10,10 @@ import cz.iocb.sparql.engine.request.Request;
  * (see {@link cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration#getTableStatistics}) because the estimates of
  * the database planner are not enough where the table holds data of many kinds at once, such as all the triples of a
  * dataset: the planner estimates the selectivity of every column independently of the others, while the statistics of
- * the engine may be kept per value of a column (see {@link GroupedStatistics}). The estimates are consulted when the
- * engine chooses the order and the methods of the joins it generates.
+ * the engine may be kept per value of a column (see {@link GroupedStatistics}). The statistics are only read, from the
+ * catalog of the database or from tables kept for the engine, and never counted from the rows of the table, so the
+ * statistics the catalog does not keep are computed together with the data and stored in such tables. The estimates are
+ * consulted when the engine chooses the order and the methods of the joins it generates.
  */
 public interface TableStatistics
 {

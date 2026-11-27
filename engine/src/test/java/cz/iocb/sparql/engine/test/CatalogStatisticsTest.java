@@ -37,14 +37,14 @@ import cz.iocb.sparql.testing.Database;
  * Statistics read from the database: the catalog statistics of an analysed table give its rows, the frequency of a most
  * common value, the average frequency of the other values and the distinct values of its columns, also where a column
  * holds nulls or booleans, the columns required not to be null being null together; the grouped statistics read the
- * side tables for a bound group column and fall back to the catalog otherwise; the configuration serves the registered
- * statistics and the catalog statistics of other tables.
+ * side tables for a bound group column, never counting the rows of the table, and fall back to the catalog otherwise;
+ * the configuration serves the registered statistics and the catalog statistics of other tables.
  */
 public class CatalogStatisticsTest
 {
     /**
      * The table of 1000 rows: {@code p} holds 'a' in 900 rows and 'b' in 100, {@code s} is 0 in 500 rows and distinct
-     * otherwise, {@code o} ranges over 10 values.
+     * otherwise, {@code o} ranges over 10 values; indexed by {@code p} and {@code s}.
      */
     private static final DatabaseTable table = new DatabaseTable("statistics_test", "triples");
 
@@ -54,7 +54,8 @@ public class CatalogStatisticsTest
     private static final DatabaseTable statisticsTable = new DatabaseTable("statistics_test", "triples_statistics");
 
     /**
-     * The most common values of the table per value of {@code p}.
+     * The values of the table kept per value of {@code p}: those of {@code s} held by more than one row, and all those
+     * of {@code o} in the rows of 'a'.
      */
     private static final DatabaseTable valuesTable = new DatabaseTable("statistics_test", "triples_values");
 
@@ -81,8 +82,8 @@ public class CatalogStatisticsTest
 
 
     /**
-     * Creates the {@code statistics_test} schema: the tables, analysed, and the side tables of the first one computed
-     * by SQL.
+     * Creates the {@code statistics_test} schema: the tables, indexed and analysed, and the side tables of the first
+     * one computed by SQL.
      */
     @BeforeAll
     static void init() throws SQLException
@@ -96,6 +97,7 @@ public class CatalogStatisticsTest
                     + "o integer not null)");
             statement.execute("insert into statistics_test.triples select case when i <= 900 then 'a' else 'b' end, "
                     + "case when i % 2 = 0 then 0 else i end, i % 10 from generate_series(1, 1000) as i");
+            statement.execute("create index on statistics_test.triples (p, s)");
             statement.execute("analyze statistics_test.triples");
             statement.execute("create table statistics_test.entities (flag boolean, code integer)");
             statement.execute("""
@@ -114,6 +116,9 @@ public class CatalogStatisticsTest
                     create table statistics_test.triples_values as select p as key_value, 's' as \
                     column_name, s::text as value, count(*) as row_count from statistics_test.triples group by p, \
                     s having count(*) > 1""");
+            statement.execute("""
+                    insert into statistics_test.triples_values select p, 'o', o::text, count(*) \
+                    from statistics_test.triples where p = 'a' group by p, o""");
         }
 
         config = new SparqlDatabaseConfiguration(null, connectionPool, new DatabaseSchema(connectionPool), true);
@@ -278,6 +283,26 @@ public class CatalogStatisticsTest
             assertThat(statistics.estimateRows(request, new Conditions(true)), closeTo(1000, 1));
             assertThat(statistics.estimateNullFraction(request, s), closeTo(0, 0));
             assertThat(statistics.estimateDistinct(request, Set.of(p), new Conditions(true)), closeTo(2, 0.5));
+        }
+    }
+
+
+    @Test
+    public void groupedStatisticsFromTheirTablesAlone() throws SQLException
+    {
+        TableStatistics statistics = config.getTableStatistics(table);
+
+        try(Request request = new Engine(config).getRequest())
+        {
+            // a value the side tables do not keep is an average one of the values they leave out, although the index
+            // of the table could count its rows: no row of 'b' holds 7, whereas the 50 rows of 'b' that do not hold 0
+            // hold 50 values
+            assertThat(statistics.estimateRows(request, equal(p, "b", s, "7")), closeTo(1, 1e-9));
+
+            // the side tables keep every value of o in the rows of 'a': a value of them by its rows, any other value by
+            // none
+            assertThat(statistics.estimateRows(request, equal(p, "a", o, "3")), closeTo(90, 1e-9));
+            assertThat(statistics.estimateRows(request, equal(p, "a", o, "11")), closeTo(0, 0));
         }
     }
 

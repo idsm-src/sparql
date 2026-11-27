@@ -16,20 +16,18 @@ import cz.iocb.sparql.engine.request.Request;
  * {@code distinct_count float8} and {@code effective_count float8} (the distinct and the effective distinct values of
  * the column in the group, see {@link ColumnStatistics#effectiveDistinct}); the optional table of the most common
  * values holds a row per group, column and value: {@code key_value}, {@code column_name text}, {@code value text} (the
- * text form of the value) and {@code row_count bigint}. A value absent from the most common ones is counted through an
- * index of the table when there is one (see {@link DatabaseSchema#canLookUp}). An access that does not bind the group
- * column to a value is estimated from the catalog statistics of the table (see {@link CatalogStatistics}), which alone
- * give the distinct combinations of the values of several columns, of the table as a whole. The side tables are read
- * and the counts made through the connection of the request as the groups and the values are first asked for, and the
- * results are kept for the life of the object.
+ * text form of the value) and {@code row_count bigint}. The statistics come from these tables alone, the rows of the
+ * table itself are never counted: a value the table of the most common values does not keep is taken for an average one
+ * of the values left out (see {@link TableStatisticsBase#selectivity}), as the database planner takes a value missing
+ * from its own list, so whoever computes the side tables chooses the values estimated exactly, and where the table
+ * keeps every value of a column in a group, a value it does not keep has no rows there. An access that does not bind
+ * the group column to a value is estimated from the catalog statistics of the table (see {@link CatalogStatistics}),
+ * which alone give the distinct combinations of the values of several columns, of the table as a whole. The side tables
+ * are read through the connection of the request as the groups and the values are first asked for, and the results are
+ * kept for the life of the object.
  */
 public final class GroupedStatistics extends TableStatisticsBase
 {
-    /**
-     * The table.
-     */
-    private final DatabaseTable table;
-
     /**
      * The group column.
      */
@@ -73,7 +71,6 @@ public final class GroupedStatistics extends TableStatisticsBase
     public GroupedStatistics(DatabaseTable table, TableColumn key, DatabaseTable statisticsTable,
             DatabaseTable valuesTable)
     {
-        this.table = table;
         this.key = key;
         this.statisticsTable = statisticsTable;
         this.valuesTable = valuesTable;
@@ -106,14 +103,11 @@ public final class GroupedStatistics extends TableStatisticsBase
         if(group.key() == null)
             return catalog.lookupFrequency(request, group, column, value);
 
-        return frequencies.computeIfAbsent(group.key() + "\0" + column.getName() + "\0" + value, _ -> {
-            double frequency = valuesTable != null ? readFrequency(request, group, column, value) : Double.NaN;
+        if(valuesTable == null)
+            return Double.NaN;
 
-            if(Double.isNaN(frequency) && group.rows() > 0 && canCount(request, column))
-                frequency = count(request, group, column, value) / group.rows();
-
-            return frequency;
-        });
+        return frequencies.computeIfAbsent(group.key() + "\0" + column.getName() + "\0" + value,
+                _ -> readFrequency(request, group, column, value));
     }
 
 
@@ -122,43 +116,6 @@ public final class GroupedStatistics extends TableStatisticsBase
     {
         // the side tables keep no combinations of columns, and those of the catalog are of the whole table
         return group.key() == null ? catalog.lookupDistinct(request, group, columns) : Double.NaN;
-    }
-
-
-    /**
-     * True if the rows of the group with a given value of the column can be counted through an index of the table (see
-     * {@link DatabaseSchema#canLookUp}), so that a value absent from the most common ones is counted exactly instead of
-     * being taken for an average one; the count of a value less common than the thousand kept is small.
-     *
-     * @param request the current request
-     * @param column the column
-     * @return true if the rows of the group with a given value of the column can be counted through an index
-     */
-    private boolean canCount(Request request, TableColumn column)
-    {
-        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
-
-        return schema != null && schema.canLookUp(table, column, Set.of(key));
-    }
-
-
-    /**
-     * Counts the rows of the group with the value of the column.
-     *
-     * @param request the current request
-     * @param group the group
-     * @param column the column
-     * @param value SQL expression of the value
-     * @return number of rows of the group with the value of the column
-     */
-    private double count(Request request, Group group, TableColumn column, Column value)
-    {
-        Column groupKey = new ExpressionColumn(new SqlCode(group.key()), key.getType());
-
-        String sql = "SELECT count(*) FROM " + table + " WHERE " + key.getType().equal(key, groupKey).getText()
-                + " AND " + column.getType().equal(column, value).getText();
-
-        return query(request, sql, result -> result.next() ? result.getDouble(1) : 0);
     }
 
 
