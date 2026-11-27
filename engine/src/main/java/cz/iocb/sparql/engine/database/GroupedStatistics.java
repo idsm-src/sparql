@@ -24,7 +24,7 @@ import cz.iocb.sparql.engine.request.Request;
  * the group column to a value is estimated from the catalog statistics of the table (see {@link CatalogStatistics}),
  * which alone give the distinct combinations of the values of several columns, of the table as a whole. The side tables
  * are read through the connection of the request as the groups and the values are first asked for, and the results are
- * kept for the life of the object.
+ * kept for the life of the object in caches of a bounded size (see {@link TableStatisticsBase#cached}).
  */
 public final class GroupedStatistics extends TableStatisticsBase
 {
@@ -49,13 +49,14 @@ public final class GroupedStatistics extends TableStatisticsBase
     private final CatalogStatistics catalog;
 
     /**
-     * Statistics of the groups asked for, by SQL expression of the group value.
+     * Statistics of the groups asked for, by SQL expression of the group value; a cache of a bounded size (see
+     * {@link TableStatisticsBase#cached}).
      */
     private final Map<String, Group> groups = new ConcurrentHashMap<>();
 
     /**
      * Frequencies of the values asked for, by SQL expression of the group value, column name and SQL expression of the
-     * value.
+     * value; a cache of a bounded size (see {@link TableStatisticsBase#cached}).
      */
     private final Map<String, Double> frequencies = new ConcurrentHashMap<>();
 
@@ -93,7 +94,7 @@ public final class GroupedStatistics extends TableStatisticsBase
         if(value == null)
             return catalog.lookupGroup(request, condition);
 
-        return groups.computeIfAbsent(value.toString(), _ -> readGroup(request, value));
+        return cached(groups, value.toString(), _ -> readGroup(request, value));
     }
 
 
@@ -106,7 +107,7 @@ public final class GroupedStatistics extends TableStatisticsBase
         if(valuesTable == null)
             return Double.NaN;
 
-        return frequencies.computeIfAbsent(group.key() + "\0" + column.getName() + "\0" + value,
+        return cached(frequencies, group.key() + "\0" + column.getName() + "\0" + value,
                 _ -> readFrequency(request, group, column, value));
     }
 

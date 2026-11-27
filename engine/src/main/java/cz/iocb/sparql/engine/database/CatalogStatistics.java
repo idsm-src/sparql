@@ -28,7 +28,7 @@ import cz.iocb.sparql.engine.request.Request;
  * {@code pg_stats_ext} or through the function the configuration names (see
  * {@link SparqlDatabaseConfiguration#setExtendedStatisticsFunction}). They are read on first use through the connection
  * of the request and kept for the life of the object, the frequency of a value being looked up when it is first asked
- * for.
+ * for and kept with those of other values in a cache of a bounded size (see {@link TableStatisticsBase#cached}).
  */
 public final class CatalogStatistics extends TableStatisticsBase
 {
@@ -53,7 +53,8 @@ public final class CatalogStatistics extends TableStatisticsBase
     private volatile Group group;
 
     /**
-     * Frequencies of the values asked for, by column name and SQL expression of the value.
+     * Frequencies of the values asked for, by column name and SQL expression of the value; a cache of a bounded size
+     * (see {@link TableStatisticsBase#cached}).
      */
     private final Map<String, Double> frequencies = new ConcurrentHashMap<>();
 
@@ -98,7 +99,7 @@ public final class CatalogStatistics extends TableStatisticsBase
     @Override
     protected double lookupFrequency(Request request, Group group, TableColumn column, Column value)
     {
-        return frequencies.computeIfAbsent(column.getName() + "\0" + value, _ -> readFrequency(request, column, value));
+        return cached(frequencies, column.getName() + "\0" + value, _ -> readFrequency(request, column, value));
     }
 
 

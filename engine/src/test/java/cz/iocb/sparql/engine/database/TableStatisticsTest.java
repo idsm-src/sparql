@@ -2,9 +2,13 @@ package cz.iocb.sparql.engine.database;
 
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
+import static cz.iocb.sparql.engine.database.TableStatisticsBase.CACHE_LIMIT;
+import static cz.iocb.sparql.engine.database.TableStatisticsBase.cached;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import cz.iocb.sparql.engine.request.Request;
 
@@ -18,7 +22,7 @@ import cz.iocb.sparql.engine.request.Request;
  * bound column are one, of a free column the skew-corrected count capped by the rows, of several columns the
  * combinations kept for the free ones together, else those of the column that has the most of them; a group column is
  * accounted for by its group; the effective number of distinct values follows from the frequencies among the rows that
- * are not null.
+ * are not null; a cache of the statistics keeps a bounded number of values.
  */
 public class TableStatisticsTest
 {
@@ -361,5 +365,29 @@ public class TableStatisticsTest
 
         // a column of nulls alone
         assertEquals(1, ColumnStatistics.of(1000, 0, 1, 0, 0, 0).effectiveDistinct(), 1e-9);
+    }
+
+
+    @Test
+    public void cacheOfABoundedSize()
+    {
+        Map<String, Integer> cache = new ConcurrentHashMap<>();
+        AtomicInteger reads = new AtomicInteger();
+
+        // up to the limit, every value is read once and kept
+        for(int i = 0; i < CACHE_LIMIT; i++)
+            cached(cache, "value" + i, _ -> reads.incrementAndGet());
+
+        assertEquals(CACHE_LIMIT, cache.size());
+        assertEquals(1, cached(cache, "value0", _ -> reads.incrementAndGet()));
+        assertEquals(CACHE_LIMIT, reads.get());
+
+        // another value empties the full cache first
+        assertEquals(CACHE_LIMIT + 1, cached(cache, "other", _ -> reads.incrementAndGet()));
+        assertEquals(1, cache.size());
+
+        // and the values are read anew
+        assertEquals(CACHE_LIMIT + 2, cached(cache, "value0", _ -> reads.incrementAndGet()));
+        assertEquals(2, cache.size());
     }
 }

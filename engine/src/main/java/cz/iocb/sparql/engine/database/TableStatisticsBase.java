@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.function.Function;
 import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.request.Request.ResultReader;
@@ -23,7 +24,7 @@ import cz.iocb.sparql.engine.request.Request.ResultReader;
  * to be null together (see {@link #estimateRows(Request, Condition)}). The distinct values of several columns are the
  * combinations the statistics keep for the columns together, or those of the column that has the most of them (see
  * {@link #estimateDistinct(Request, Set, Condition, double)}). Subclasses supply the groups, the frequencies and the
- * combinations.
+ * combinations, and keep what they read in caches of a bounded size (see {@link #cached}).
  */
 public abstract class TableStatisticsBase implements TableStatistics
 {
@@ -36,6 +37,14 @@ public abstract class TableStatisticsBase implements TableStatistics
      * Rows of a group when nothing is known about it.
      */
     protected static final double DEFAULT_ROWS = 1000;
+
+    /**
+     * Most values a cache of the statistics keeps (see {@link #cached}): far more than the values the queries of a
+     * deployment keep asking about, so that only a stream of ever new constants fills a cache, which is then emptied
+     * instead of growing for the life of the statistics; a frequency takes up some 140 to 280 bytes of a cache, the
+     * statistics of a group more.
+     */
+    protected static final int CACHE_LIMIT = 100_000;
 
 
     /**
@@ -330,6 +339,26 @@ public abstract class TableStatisticsBase implements TableStatistics
             values.putIfAbsent(column, comparison.getRight());
         else if(comparison.getRight() instanceof TableColumn column && !(comparison.getLeft() instanceof TableColumn))
             values.putIfAbsent(column, comparison.getLeft());
+    }
+
+
+    /**
+     * The value the cache keeps for the key, read and kept when the cache does not hold it yet; a cache holding
+     * {@link #CACHE_LIMIT} values already is emptied first, so that the values asked for over the life of the
+     * statistics do not take up ever more memory, a value asked for again being read anew once.
+     *
+     * @param <V> type of the values
+     * @param cache the cache, a concurrent map
+     * @param key the key
+     * @param reader reader of the value of a key
+     * @return the value of the key
+     */
+    protected static <V> V cached(Map<String, V> cache, String key, Function<String, V> reader)
+    {
+        if(cache.size() >= CACHE_LIMIT && !cache.containsKey(key))
+            cache.clear();
+
+        return cache.computeIfAbsent(key, reader);
     }
 
 
