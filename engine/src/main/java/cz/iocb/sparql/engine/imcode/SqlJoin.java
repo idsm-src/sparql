@@ -49,10 +49,11 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * variable with another child being turned into one first, see {@link SqlLeftJoin#toUnion}), seeds the walks of
  * property paths with the siblings that bind their start (see {@link SqlRecursive#seed}; a walk binding the start
  * without being distinct over it is shared, so that its distinct values seed the other walk, see {@link SqlShared}),
- * evaluates nondeterministic children last, and evaluates the SERVICE calls that have no context of their own (see
- * {@link SqlServiceStub#isEvaluatedByJoin}) for the solutions of their siblings, deciding by row estimates which of the
- * shared variables the calls are asked about: a call keeps the variables whose distinct combinations in the solutions
- * of the siblings are estimated to fit into the context limit of its endpoint (see
+ * tests the start of a walk against a sibling binding it without being distinct over it (see
+ * {@link SqlRecursive#testStart}), evaluates nondeterministic children last, and evaluates the SERVICE calls that have
+ * no context of their own (see {@link SqlServiceStub#isEvaluatedByJoin}) for the solutions of their siblings, deciding
+ * by row estimates which of the shared variables the calls are asked about: a call keeps the variables whose distinct
+ * combinations in the solutions of the siblings are estimated to fit into the context limit of its endpoint (see
  * {@link SqlServiceStub#getServiceSettings}), leaving out the variables of the most distinct values first.
  */
 public final class SqlJoin extends SqlIntercode
@@ -281,6 +282,7 @@ public final class SqlJoin extends SqlIntercode
             newChilds = expandLeadingOptionals(request, scope, newChilds, evalServices);
             newChilds = seedWalks(request, scope, newChilds, newRestrictions);
             newChilds = shareSeeds(request, scope, newChilds, evalServices);
+            newChilds = testWalkStarts(request, scope, newChilds, newRestrictions);
 
             if(!Objects.equals(new Multiset<>(newChilds), new Multiset<>(optChilds)))
                 optChilds = newChilds;
@@ -1873,6 +1875,84 @@ public final class SqlJoin extends SqlIntercode
                     return result;
                 }
             }
+        }
+
+        return childs;
+    }
+
+
+    /**
+     * Tests the start of a walk between two variables against a sibling that binds the start variable always but cannot
+     * seed the walk, not being distinct over it (see {@link SqlRecursive#testStart}): the walk then starts only from
+     * the nodes the sibling binds the variable to, of whose paths alone the join keeps any, and the sibling keeps its
+     * place, so its solutions are not multiplied by the recursion. A sibling binding the end variable so turns the walk
+     * to start from it, when the walk may be turned (see {@link SqlRecursive#canTestEnd}). The siblings considered are
+     * deterministic, hold no SERVICE call and are no walks, whose values seed another walk instead (see
+     * {@link #shareSeeds}), and an end that siblings seed directly is left to them (see {@link #seedWalks}); of the
+     * tests the one expected to spare the walk the most is taken, and only when it is expected to pay (see
+     * {@link SqlRecursive#getStartTestGain}). One walk is tested per call; the optimisation loop comes back for the
+     * others.
+     *
+     * @param request the current request
+     * @param scope the scope of the join
+     * @param childs the child nodes
+     * @param restrictions what the parent needs of the variables
+     * @return the children, with the first walk whose start pays to be tested replaced by its tested form
+     */
+    private static List<SqlIntercode> testWalkStarts(Request request, Scope scope, List<SqlIntercode> childs,
+            Restrictions restrictions)
+    {
+        for(int i = 0; i < childs.size(); i++)
+        {
+            if(!(childs.get(i) instanceof SqlRecursive walk) || !walk.canTestStart())
+                continue;
+
+            Variable beginVar = walk.beginVar;
+            Variable endVar = walk.endBinding.getVariable();
+
+            // the tested walk exposes what the parent and the remaining siblings need of it
+            Restrictions walkRestrictions = getRestrictions(request.getConfiguration(), walk, childs, restrictions);
+
+            SqlRecursive best = null;
+            double bestGain = 0;
+
+            for(Variable variable : walk.canTestEnd(walkRestrictions) ? List.of(beginVar, endVar) : List.of(beginVar))
+            {
+                Variable other = variable.equals(beginVar) ? endVar : beginVar;
+
+                if(!selectSeeds(request, childs, i, variable, other, walk.graphVar).isEmpty())
+                    continue;
+
+                for(int j = 0; j < childs.size(); j++)
+                {
+                    SqlIntercode child = childs.get(j);
+                    VariableBinding binding = child.getVariable(variable);
+
+                    if(j == i || binding == null || binding.canBeNull() || child instanceof SqlRecursive
+                            || !child.isDeterministic() || child.hasServiceSubpattern())
+                        continue;
+
+                    if(!(walk.testStart(request, scope, child, variable.equals(endVar),
+                            walkRestrictions) instanceof SqlRecursive candidate))
+                        continue;
+
+                    double gain = candidate.getStartTestGain(request);
+
+                    if(gain > bestGain)
+                    {
+                        best = candidate;
+                        bestGain = gain;
+                    }
+                }
+            }
+
+            if(best == null)
+                continue;
+
+            List<SqlIntercode> result = new ArrayList<>(childs);
+            result.set(i, best);
+
+            return result;
         }
 
         return childs;

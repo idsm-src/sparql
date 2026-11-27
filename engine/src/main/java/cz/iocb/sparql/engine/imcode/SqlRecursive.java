@@ -24,6 +24,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.LateralTable;
 import cz.iocb.sparql.engine.database.SqlBuilder;
 import cz.iocb.sparql.engine.database.SqlCode;
 import cz.iocb.sparql.engine.database.SqlType;
@@ -63,7 +64,9 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * {@link #start}): the recursion then takes only the initial solutions that start in the value, unless siblings
  * expected to be fewer seed the walk from its other end. The optimisation restricts the initial solutions of a walk to
  * the classes of the start the parent accepts, and the nodes above then rely on the classes the walk binds its
- * variables in, so whatever becomes of the walk keeps them (see {@link #turn}, {@link #delivered}).
+ * variables in, so whatever becomes of the walk keeps them (see {@link #turn}, {@link #delivered}). A sibling that
+ * binds the start always without being distinct over it cannot seed the walk, but the walk then starts only from the
+ * nodes the sibling binds the start to (see {@link #startTest}).
  */
 public final class SqlRecursive extends SqlIntercode
 {
@@ -102,6 +105,11 @@ public final class SqlRecursive extends SqlIntercode
      * Alias of the recursion of a walk evaluated for every start by itself, joined laterally with the start.
      */
     private static final AliasTable pathsTable = new AliasTable("paths");
+
+    /**
+     * Alias of the sibling the starts of a walk are tested against (see {@link #startTest}).
+     */
+    private static final AliasTable siblingTable = new AliasTable("sibling");
 
     /**
      * Solutions starting the recursion.
@@ -217,6 +225,19 @@ public final class SqlRecursive extends SqlIntercode
      */
     private final Set<ResourceClass> delivered;
 
+    /**
+     * The test of the start against a sibling of the walk in a join that binds the start variable always without being
+     * distinct over it, so that it cannot seed the walk (see {@link #seed}): the walk starts only from the nodes the
+     * sibling binds the variable to, of whose paths alone the join keeps any, and the sibling keeps its place in the
+     * join (see {@link #testStart}). The recursion of a walk evaluated for every start by itself is then joined only
+     * with the starts the sibling binds, so the walk keeps being evaluated so (see {@link #isWalkedPerStart}), and the
+     * recursion of a walk evaluated as a whole takes only the initial solutions starting in such a node (see
+     * {@link #translateStartTest}). The test holds only for the solutions of the walk that the join compares with the
+     * sibling, so it is given up wherever the walk stops starting from the variable: when the walk is turned or walked
+     * without its start (see {@link #optimize}). Null when the start is not tested.
+     */
+    private final StartTest startTest;
+
 
     /**
      * The parts a walk turned the other way round differs in (see {@link #turn}).
@@ -226,6 +247,19 @@ public final class SqlRecursive extends SqlIntercode
      *            when the turned walk reaches nodes of these classes only
      */
     private record Turned(SqlIntercode init, Set<ResourceClass> delivered)
+    {
+    }
+
+
+    /**
+     * The test of the start of a walk against a sibling (see {@link #startTest}).
+     *
+     * @param sibling the solutions of the sibling, which bind the start variable always, optimised for it alone
+     * @param table alias of the solutions the test is evaluated for, fixed when the test is made and kept by every
+     *            rebuilt walk: the sibling evaluated for every solution refers to the solution through it, across the
+     *            boundaries of nested subqueries, so it has to be unique (see {@link Request#createLateralTable})
+     */
+    private record StartTest(SqlIntercode sibling, LateralTable table)
     {
     }
 
@@ -250,15 +284,18 @@ public final class SqlRecursive extends SqlIntercode
      * @param seeded whether the initial solutions are seeds taken from the siblings
      * @param start values the walk starts from, by the variables of the initial solutions
      * @param delivered classes of the end variable the walk delivers its solutions in, or null
+     * @param startTest the test of the start against a sibling, or null
      */
     protected SqlRecursive(VariableBindings bindings, SqlIntercode init, SqlIntercode next, VariableBinding endBinding,
             Variable joinVar, Variable beginVar, List<Column> iv, List<Column> ev, Variable graphVar,
             SqlIntercode reverseNext, Variable reverseJoinVar, SqlIntercode reverseInit,
             Set<ResourceClass> segmentClasses, VariableBindings carried, boolean seeded,
-            Map<Variable, SqlExpressionIntercode> start, Set<ResourceClass> delivered)
+            Map<Variable, SqlExpressionIntercode> start, Set<ResourceClass> delivered, StartTest startTest)
     {
-        super(bindings, init.isDeterministic() && next.isDeterministic()
-                && start.values().stream().allMatch(SqlExpressionIntercode::isDeterministic));
+        super(bindings,
+                init.isDeterministic() && next.isDeterministic()
+                        && start.values().stream().allMatch(SqlExpressionIntercode::isDeterministic)
+                        && (startTest == null || startTest.sibling().isDeterministic()));
         this.init = init;
         this.next = next;
         this.endBinding = endBinding;
@@ -275,6 +312,7 @@ public final class SqlRecursive extends SqlIntercode
         this.seeded = seeded;
         this.start = start;
         this.delivered = delivered;
+        this.startTest = startTest;
     }
 
 
@@ -296,7 +334,7 @@ public final class SqlRecursive extends SqlIntercode
             Variable joinVar, Variable endVar, Variable graphVar)
     {
         return create(request, init, next, beginVar, joinVar, endVar, graphVar, null, null, null, null, null, false,
-                Map.of(), null);
+                Map.of(), null, null);
     }
 
 
@@ -325,7 +363,7 @@ public final class SqlRecursive extends SqlIntercode
             Map<Variable, SqlExpressionIntercode> start)
     {
         return create(request, init, next, beginVar, joinVar, endVar, graphVar, null, reverseNext, reverseJoinVar,
-                reverseNext != null ? init : null, null, false, start, null);
+                reverseNext != null ? init : null, null, false, start, null, null);
     }
 
 
@@ -352,6 +390,8 @@ public final class SqlRecursive extends SqlIntercode
      * @param start values the walk starts from, by the variables of the initial solutions (see {@link #start})
      * @param delivered classes the walk delivers its end in: of the classes its nodes take, those that are subclasses
      *            of the given ones (see {@link #delivered}); null to deliver every node
+     * @param startTest the test of the start against a sibling (see {@link #startTest}), or null; a walk without a
+     *            start variable takes none
      * @return recursion exposing only what the parent needs; the carried variables get fresh output columns; no
      *         solution when the initial solutions do not bind the end variable, or when no node is delivered; null when
      *         the nodes take a class that overlaps a class to deliver without being its subclass, as the nodes of that
@@ -360,7 +400,7 @@ public final class SqlRecursive extends SqlIntercode
     protected static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, Variable beginVar,
             Variable joinVar, Variable endVar, Variable graphVar, Restrictions restrictions, SqlIntercode reverseNext,
             Variable reverseJoinVar, SqlIntercode reverseInit, Set<ResourceClass> segmentClasses, boolean seeded,
-            Map<Variable, SqlExpressionIntercode> start, Set<ResourceClass> delivered)
+            Map<Variable, SqlExpressionIntercode> start, Set<ResourceClass> delivered, StartTest startTest)
     {
         // initial solutions that do not bind the end variable have no solution, so no path starts
         if(init.getVariableBindings().get(endVar) == null)
@@ -446,7 +486,7 @@ public final class SqlRecursive extends SqlIntercode
 
         return new SqlRecursive(bindings.restrict(relations, restrictions), init, next, endBinding, joinVar, beginVar,
                 innerColumns, outerColumns, graphVar, reverseNext, reverseJoinVar, reverseInit, segmentClasses, carried,
-                seeded, start, endClasses);
+                seeded, start, endClasses, beginVar != null ? startTest : null);
     }
 
 
@@ -485,7 +525,8 @@ public final class SqlRecursive extends SqlIntercode
      * {@link #turn}), starting from the initial solutions it was created with and delivering its new end in the classes
      * it started in. The seeded walk is not turned any more, because the carried variables belong to its start, and it
      * starts from the seeds alone: the values the walk would start from otherwise (see {@link #start}) are given up,
-     * the pattern the walk lies in comparing its solutions with the current solution.
+     * the pattern the walk lies in comparing its solutions with the current solution. The test of the start against a
+     * sibling (see {@link #startTest}) is kept, unless the walk is turned, as its start then becomes the end.
      *
      * @param request the current request
      * @param scope the scope of the walk
@@ -519,10 +560,10 @@ public final class SqlRecursive extends SqlIntercode
 
         if(fromEnd)
             return create(request, seeded, reverseNext, startVar, reverseJoinVar, stopVar, graphVar, seedRestrictions,
-                    null, null, null, null, true, Map.of(), turned.delivered());
+                    null, null, null, null, true, Map.of(), turned.delivered(), null);
 
         return create(request, seeded, next, startVar, joinVar, stopVar, graphVar, seedRestrictions, null, null, null,
-                null, true, Map.of(), delivered);
+                null, true, Map.of(), delivered, startTest);
     }
 
 
@@ -540,6 +581,252 @@ public final class SqlRecursive extends SqlIntercode
     protected boolean canSeedFromEnd(Request request, Scope scope, List<SqlIntercode> seeds, Restrictions restrictions)
     {
         return canTurn(restrictions) && turn(request, scope, seeds) != null;
+    }
+
+
+    /**
+     * True if the start of the walk may be tested against a sibling (see {@link #startTest}): the walk lies between two
+     * variables, its start is not tested yet, and it does not start from the values of expressions, which give a single
+     * node.
+     *
+     * @return true if the start of the walk may be tested against a sibling, false otherwise
+     */
+    protected boolean canTestStart()
+    {
+        return beginVar != null && startTest == null && start.isEmpty();
+    }
+
+
+    /**
+     * True if the walk may be turned to start from its end, tested against a sibling (see {@link #testStart}): its
+     * start may be tested, the walk may be turned (see {@link #canTurn}), and the parent restricts its start neither to
+     * a constant term nor to the terms it accepts, which restrict the start more than a sibling does, the walk being
+     * turned back by them otherwise (see {@link #startsBetterFromEnd}).
+     *
+     * @param restrictions what the parent and the siblings of the walk need of its variables
+     * @return true if the walk may be turned to start from its end tested against a sibling, false otherwise
+     */
+    protected boolean canTestEnd(Restrictions restrictions)
+    {
+        return canTestStart() && canTurn(restrictions) && !isConstant(restrictions.getAcceptedValue(beginVar))
+                && restrictions.getAcceptedTerms(beginVar) == null;
+    }
+
+
+    /**
+     * The walk whose start is tested against a sibling (see {@link #startTest}), or, when the sibling binds the end
+     * variable, the walk turned to start from it (see {@link #turn(Request, Scope)}) and tested so; the turned walk is
+     * not turned any more, which would give the test up. The sibling is optimised for the start alone (see
+     * {@link #optimizeStartTest}).
+     *
+     * @param request the current request
+     * @param scope the scope of the walk
+     * @param sibling the sibling, which binds the variable always
+     * @param fromEnd true when the sibling binds the end variable, so that the walk is turned; only when the walk may
+     *            be turned so (see {@link #canTestEnd})
+     * @param restrictions what the parent and the siblings of the walk need of its variables
+     * @return the walk whose start is tested against the sibling; null when the walk cannot be turned, when the test
+     *         could not be hashed (see {@link #optimizeStartTest}), or when the walk could not tell the nodes it
+     *         delivers apart any more (see {@link #create})
+     */
+    protected SqlIntercode testStart(Request request, Scope scope, SqlIntercode sibling, boolean fromEnd,
+            Restrictions restrictions)
+    {
+        Variable endVar = endBinding.getVariable();
+        Turned turned = fromEnd ? turn(request, scope) : null;
+
+        if(fromEnd && turned == null)
+            return null;
+
+        StartTest test = optimizeStartTest(request, scope, fromEnd ? turned.init() : init, fromEnd ? endVar : beginVar,
+                new StartTest(sibling, request.createLateralTable()), false);
+
+        if(test == null)
+            return null;
+
+        if(!fromEnd)
+            return create(request, init, next, beginVar, joinVar, endVar, graphVar, restrictions, reverseNext,
+                    reverseJoinVar, reverseInit, segmentClasses, seeded, start, delivered, test);
+
+        return create(request, turned.init(), reverseNext, endVar, reverseJoinVar, beginVar, graphVar, restrictions,
+                null, null, null, null, seeded, Map.of(), turned.delivered(), test);
+    }
+
+
+    /**
+     * The test of the start against the sibling optimised for the initial solutions (see {@link #startTest}): the
+     * sibling optimised for the start variable alone, the duplicates not mattering to the test, and presenting the
+     * variable in the classes the initial solutions hold it in (see {@link Restrictions#getJoinClasses}), so that the
+     * test compares a single pair of classes, which the database can hash or look up; a union of the classes of a walk
+     * is split into segments of a class each, each of which optimises the test for its own class (see
+     * {@link #optimize}). Null when the test still compares several classes of either side, or the sibling may leave
+     * the variable unbound: the database could only compare the starts with the sibling pairwise.
+     *
+     * @param request the current request
+     * @param scope the scope of the walk
+     * @param solutions the initial solutions the walk starts from
+     * @param variable the start variable
+     * @param test the test of the start
+     * @param evalServices whether SERVICE stubs are evaluated
+     * @return the test optimised for the initial solutions; the test itself when nothing has changed; null when the
+     *         test could not be hashed
+     */
+    private static StartTest optimizeStartTest(Request request, Scope scope, SqlIntercode solutions, Variable variable,
+            StartTest test, boolean evalServices)
+    {
+        VariableBindings start = new VariableBindings();
+        VariableBinding binding = solutions.getVariable(variable);
+
+        if(binding == null)
+            return null;
+
+        start.add(binding);
+
+        Restrictions restrictions = new Restrictions(Set.of(variable));
+        restrictions.addJoinClasses(variable, binding.getClasses());
+
+        SqlIntercode sibling = test.sibling().optimize(request, scope, restrictions, true, evalServices);
+
+        if(!JoinOptimizer.isHashable(start, sibling.getVariableBindings()))
+            return null;
+
+        return sibling.equals(test.sibling()) ? test : new StartTest(sibling, test.table());
+    }
+
+
+    /**
+     * Estimated cost the test of the start against the sibling spares the walk (see {@link #startTest}), less the cost
+     * of the test itself; positive when the test is expected to pay. Every start the sibling does not bind spares at
+     * least a lookup of its initial solutions and a lookup of the step from each of them, the starts the sibling binds
+     * being taken to lie among those of the walk, whereas the test costs a probe of the sibling for every solution it
+     * is evaluated for, or a pass over the sibling (see {@link #getStartTestCost}). A path mostly leads far beyond its
+     * first step, so the walk is mostly spared much more.
+     *
+     * @param request the current request
+     * @return estimated cost the test spares the walk, less the cost of the test
+     */
+    protected double getStartTestGain(Request request)
+    {
+        double starts = Math.max(JoinOptimizer.estimateDistinct(request, init, beginVar), 1);
+        double passed = Math.min(JoinOptimizer.estimateDistinct(request, startTest.sibling(), beginVar), starts);
+        double spared = (1 - passed / starts) * (starts + JoinOptimizer.estimateRows(request, init))
+                * JoinOptimizer.LOOKUP_COST;
+
+        return spared - getStartTestCost(request, getTestedSolutions(request));
+    }
+
+
+    /**
+     * Estimated number of the solutions the start is tested for (see {@link #startTest}): the distinct starts of a walk
+     * evaluated for every start by itself (see {@link #isWalkedPerStart}), the initial solutions of a walk evaluated as
+     * a whole.
+     *
+     * @param request the current request
+     * @return estimated number of the solutions the start is tested for
+     */
+    private double getTestedSolutions(Request request)
+    {
+        return isWalkedPerStart(request) ? JoinOptimizer.estimateDistinct(request, init, beginVar) :
+                JoinOptimizer.estimateRows(request, init);
+    }
+
+
+    /**
+     * Estimated cost of the test of the start against the sibling for the given number of solutions (see
+     * {@link #startTest}): a probe of the sibling for every solution, which an index of every table the sibling reads
+     * serves and which stops at the first solution of the sibling found (see {@link #isProbed}), or a pass over the
+     * sibling whose distinct solutions the database hashes, whichever costs less.
+     *
+     * @param request the current request
+     * @param solutions estimated number of the solutions the start is tested for
+     * @return estimated cost of the test
+     */
+    private double getStartTestCost(Request request, double solutions)
+    {
+        double hashed = getStartTestHashCost(request, solutions);
+
+        return canProbeSibling(request) ? Math.min(hashed, solutions * JoinOptimizer.LOOKUP_COST) : hashed;
+    }
+
+
+    /**
+     * Estimated cost of the test of the start against the sibling hashed (see {@link #startTest}): a pass over the
+     * sibling, the hashing of its distinct solutions, and a probe of the hash table for every solution tested.
+     *
+     * @param request the current request
+     * @param solutions estimated number of the solutions the start is tested for
+     * @return estimated cost of the hashed test
+     */
+    private double getStartTestHashCost(Request request, double solutions)
+    {
+        SqlIntercode sibling = startTest.sibling();
+
+        return JoinOptimizer.estimateRows(request, sibling)
+                + JoinOptimizer.HASH_COST * JoinOptimizer.estimateDistinct(request, sibling, beginVar) + solutions;
+    }
+
+
+    /**
+     * True if the sibling the start is tested against (see {@link #startTest}) can be probed for a start: evaluated for
+     * the start, it is restricted to the solutions compatible with it (see {@link JoinOptimizer#estimateForRow}), and
+     * every table it reads can be looked up by an index for the value of the start (see {@link #canLookUpEvery}), so
+     * that the database finds the first solution of a probe at once.
+     *
+     * @param request the current request
+     * @return true if the sibling can be probed for a start, false otherwise
+     */
+    private boolean canProbeSibling(Request request)
+    {
+        JoinOptimizer.Outer outer = getStartTestRows();
+
+        return !outer.bindings().getVariables().isEmpty()
+                && canLookUpEvery(request, startTest.sibling(), beginVar, null)
+                && JoinOptimizer.estimateForRow(request, startTest.sibling(), outer).restricted();
+    }
+
+
+    /**
+     * True if the sibling the start is tested against (see {@link #startTest}) is probed for every solution tested,
+     * which costs less than hashing it (see {@link #getStartTestCost}).
+     *
+     * @param request the current request
+     * @param solutions estimated number of the solutions the start is tested for
+     * @return true if the sibling is probed for every solution, false when it is hashed
+     */
+    private boolean isProbed(Request request, double solutions)
+    {
+        return canProbeSibling(request)
+                && solutions * JoinOptimizer.LOOKUP_COST < getStartTestHashCost(request, solutions);
+    }
+
+
+    /**
+     * The solutions the start is tested for (see {@link #startTest}), as the sibling evaluated for every one of them
+     * sees them: their binding of the start variable, addressed through the alias of the test.
+     *
+     * @return the solutions the start is tested for
+     */
+    private JoinOptimizer.Outer getStartTestRows()
+    {
+        return JoinOptimizer.Outer.of(getStartBinding(), startTest.sibling().getVariableBindings(), startTest.table());
+    }
+
+
+    /**
+     * The binding of the start variable in the initial solutions, which the solutions the start is tested for (see
+     * {@link #startTest}) hold.
+     *
+     * @return the binding of the start variable in the initial solutions, empty when they do not bind it
+     */
+    private VariableBindings getStartBinding()
+    {
+        VariableBindings bindings = new VariableBindings();
+        VariableBinding binding = init.getVariable(beginVar);
+
+        if(binding != null)
+            bindings.add(binding);
+
+        return bindings;
     }
 
 
@@ -905,9 +1192,9 @@ public final class SqlRecursive extends SqlIntercode
      */
     protected boolean matchesEverySolutionOf(SqlIntercode node)
     {
-        // a walk starting from the values of expressions has no path from the other nodes, and a walk that does not
-        // deliver every node leaves out the zero-length paths of the others
-        if(beginVar == null || !start.isEmpty() || delivered != null)
+        // a walk starting from the values of expressions or from the starts a sibling binds has no path from the other
+        // nodes, and a walk that does not deliver every node leaves out the zero-length paths of the others
+        if(beginVar == null || !start.isEmpty() || startTest != null || delivered != null)
             return false;
 
         Variable endVar = endBinding.getVariable();
@@ -981,6 +1268,8 @@ public final class SqlRecursive extends SqlIntercode
      * starting anywhere, of which the parent keeps the same ones. The parent does not restrict the end alone when the
      * initial solutions have been restricted to some classes of the start already (see {@link #startsInEveryClass}):
      * having seen the bindings of the walk, it accepts the start in any class, because nothing is left for it to drop.
+     * A walk whose start is tested against a sibling (see {@link #startTest}) starts from fewer nodes than the classes
+     * of the end tell, so only a constant term or the terms accepted of the end turn it.
      *
      * @param restrictions what the parent needs of the variables
      * @return true if the walk should start from its end variable, false otherwise
@@ -1000,6 +1289,9 @@ public final class SqlRecursive extends SqlIntercode
 
         if(restrictions.getAcceptedTerms(endBinding.getVariable()) != null)
             return true;
+
+        if(startTest != null)
+            return false;
 
         Set<ResourceClass> end = restrictions.getAcceptedClasses(endBinding.getVariable());
         Set<ResourceClass> begin = restrictions.getAcceptedClasses(beginVar);
@@ -1112,14 +1404,16 @@ public final class SqlRecursive extends SqlIntercode
     /**
      * True if the walk starts from all the initial solutions it was created with, as far as the nodes above can tell:
      * it is a walk between two variables that is not seeded (it may be turned), it is no segment, it starts from no
-     * values of expressions, and its initial solutions have lost no class of the start (see
-     * {@link #startsInEveryClass}). Only then a node ends a path of the walk iff it ends an initial solution.
+     * values of expressions and its start is tested against no sibling, and its initial solutions have lost no class of
+     * the start (see {@link #startsInEveryClass}). Only then a node ends a path of the walk iff it ends an initial
+     * solution.
      *
      * @return true if the walk starts from all the initial solutions it was created with, false otherwise
      */
     private boolean startsAnywhere()
     {
-        return reverseNext != null && segmentClasses == null && start.isEmpty() && startsInEveryClass();
+        return reverseNext != null && segmentClasses == null && start.isEmpty() && startTest == null
+                && startsInEveryClass();
     }
 
 
@@ -1189,11 +1483,12 @@ public final class SqlRecursive extends SqlIntercode
             }
 
             // a walk that does not start anywhere has to be walked, but without the start the parent does not need:
-            // the recursion then enumerates the nodes the walk reaches, not the pairs of a start and a node
+            // the recursion then enumerates the nodes the walk reaches, not the pairs of a start and a node; a test of
+            // the start against a sibling, which the parent then does not compare with the walk, is given up
             if(beginVar != null && start.isEmpty() && !restrictions.containsVar(beginVar))
             {
                 SqlIntercode walk = create(request, init, next, null, joinVar, endVar, graphVar, restrictions, null,
-                        null, null, null, seeded, Map.of(), delivered);
+                        null, null, null, seeded, Map.of(), delivered, null);
 
                 if(walk != null)
                     return walk.optimize(request, scope, restrictions, true, evalServices);
@@ -1204,15 +1499,16 @@ public final class SqlRecursive extends SqlIntercode
 
         // a walk between two variables starts from the end the parent restricts more: the same step walked the other
         // way round, with the end variable for the start and the start variable for the end, from the initial solutions
-        // the walk was created with, as the restrictions of the start no longer apply to them (see turn); a walk
-        // starting from the values of expressions starts from a single node already
+        // the walk was created with, as the restrictions of the start no longer apply to them (see turn), nor does a
+        // test of the start against a sibling; a walk starting from the values of expressions starts from a single node
+        // already
         if(start.isEmpty() && canTurn(restrictions) && startsBetterFromEnd(restrictions))
         {
             Turned turned = turn(request, scope);
 
             SqlIntercode walk = turned == null ? null :
                     create(request, turned.init(), reverseNext, endVar, reverseJoinVar, beginVar, graphVar,
-                            restrictions, next, joinVar, reverseInit, null, seeded, Map.of(), turned.delivered());
+                            restrictions, next, joinVar, reverseInit, null, seeded, Map.of(), turned.delivered(), null);
 
             if(walk != null)
                 return walk.optimize(request, scope, restrictions, reduced, evalServices);
@@ -1305,11 +1601,14 @@ public final class SqlRecursive extends SqlIntercode
                 List<SqlIntercode> childs = new ArrayList<>();
 
                 // a segment keeps the initial solutions of the whole walk for turning, and the classes it restricts the
-                // start to, which it may be turned only when the parent accepts alone (see canTurn)
+                // start to, which it may be turned only when the parent accepts alone (see canTurn), and the test of
+                // the start, which it optimises for its own class (see optimizeStartTest)
                 for(SqlIntercode child : segs)
                     childs.add(create(request, child, nextOpt, beginVar, joinVar, endBinding.getVariable(), graphVar,
                             restrictions, reverseNext, reverseJoinVar, reverseInit,
-                            Set.copyOf(child.getVariable(beginVar).getClasses()), seeded, optStart, delivered));
+                            Set.copyOf(child.getVariable(beginVar).getClasses()), seeded, optStart, delivered,
+                            startTest == null ? null :
+                                    optimizeStartTest(request, scope, child, beginVar, startTest, evalServices)));
 
                 // the segments are walks, which care about the multiplicities as much as their parent does
                 if(!childs.contains(null))
@@ -1381,11 +1680,17 @@ public final class SqlRecursive extends SqlIntercode
         }
 
 
-        if(initOpt == init && nextOpt == next && optStart == start && restrictions.isOptimized(relations, bindings))
+        // the sibling the start is tested against is optimised again for the initial solutions as they are now
+        StartTest optTest = startTest == null ? null :
+                optimizeStartTest(request, scope, initOpt, beginVar, startTest, evalServices);
+
+        if(initOpt == init && nextOpt == next && optStart == start && optTest == startTest
+                && restrictions.isOptimized(relations, bindings))
             return this;
 
         SqlIntercode walk = create(request, initOpt, nextOpt, beginVar, joinVar, endBinding.getVariable(), graphVar,
-                restrictions, reverseNext, reverseJoinVar, reverseInit, segmentClasses, seeded, optStart, delivered);
+                restrictions, reverseNext, reverseJoinVar, reverseInit, segmentClasses, seeded, optStart, delivered,
+                optTest);
 
         // the walk that could not tell the nodes it delivers apart any more stays as it is
         return walk != null ? walk : this;
@@ -1492,16 +1797,17 @@ public final class SqlRecursive extends SqlIntercode
      * can be looked up by an index of each table (see {@link #canLookUp}).
      *
      * @param request the current request
-     * @param node the initial solutions or the step
+     * @param node the initial solutions, the step, or the sibling the start is tested against
      * @param variable the variable whose value the rows are looked up by
+     * @param graphVar the graph variable the walk carries, whose columns count as bound, or null
      * @return true if the rows of the node with a given value of the variable can be looked up by an index
      */
-    private boolean canLookUpEvery(Request request, SqlIntercode node, Variable variable)
+    private static boolean canLookUpEvery(Request request, SqlIntercode node, Variable variable, Variable graphVar)
     {
         if(node instanceof SqlUnion union)
-            return union.getChilds().stream().allMatch(branch -> canLookUp(request, branch, variable));
+            return union.getChilds().stream().allMatch(branch -> canLookUp(request, branch, variable, graphVar));
 
-        return canLookUp(request, node, variable);
+        return canLookUp(request, node, variable, graphVar);
     }
 
 
@@ -1511,12 +1817,13 @@ public final class SqlRecursive extends SqlIntercode
      * {@link DatabaseSchema#canLookUp}).
      *
      * @param request the current request
-     * @param branch a branch of the initial solutions or of the step
-     * @param variable the variable whose value the rows are looked up by: the start variable of the initial solutions,
-     *            or the variable of the step bound to the node it departs from
+     * @param branch a branch of the initial solutions, of the step, or of the sibling the start is tested against
+     * @param variable the variable whose value the rows are looked up by: the start variable of the initial solutions
+     *            and of the sibling, or the variable of the step bound to the node it departs from
+     * @param graphVar the graph variable the walk carries, whose columns count as bound, or null
      * @return true if the rows of the branch with a given value of the variable can be looked up by an index
      */
-    private boolean canLookUp(Request request, SqlIntercode branch, Variable variable)
+    private static boolean canLookUp(Request request, SqlIntercode branch, Variable variable, Variable graphVar)
     {
         DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
 
@@ -1581,7 +1888,7 @@ public final class SqlRecursive extends SqlIntercode
                 return false;
         }
 
-        return canLookUpEvery(request, init, beginVar) && canLookUpEvery(request, next, joinVar);
+        return canLookUpEvery(request, init, beginVar, graphVar) && canLookUpEvery(request, next, joinVar, graphVar);
     }
 
 
@@ -1638,11 +1945,81 @@ public final class SqlRecursive extends SqlIntercode
 
 
     /**
+     * SQL code of the solutions whose start passes the test against the sibling (see {@link #startTest}): the
+     * solutions, under the alias of the test, for which a compatible solution of the sibling exists. With the join
+     * optimizer on, the sibling is probed for every solution when that costs less than hashing it (see
+     * {@link #isProbed}): it is then restricted to its solutions compatible with the solution (see
+     * {@link SqlIntercode#translateForRow}), which the database looks up by an index and stops at the first of;
+     * otherwise its solutions are deduplicated (see {@link SqlDistinct#deduplicate}), so that the database evaluates
+     * the sibling once and hashes it. Without the optimizer the database chooses either way itself.
+     *
+     * @param request the current request
+     * @param scope the scope of the walk
+     * @param code SQL code of the solutions: the initial solutions, or the distinct starts
+     * @param columns columns of the solutions the code exposes, which the code returned keeps
+     * @param solutions estimated number of the solutions
+     * @return SQL code of the solutions whose start passes the test
+     */
+    private SqlCode translateStartTest(Request request, Scope scope, SqlCode code, Collection<Column> columns,
+            double solutions)
+    {
+        ClassRelations relations = request.getConfiguration();
+        SqlIntercode sibling = startTest.sibling();
+        boolean optimizer = request.getConfiguration().isJoinOptimizerEnabled();
+
+        SqlCode tested;
+
+        if(optimizer && isProbed(request, solutions))
+        {
+            tested = sibling.translateForRow(request, scope, getStartTestRows());
+        }
+        else
+        {
+            tested = sibling.translate(request, scope);
+
+            if(optimizer && tested.getOuterTables().isEmpty())
+                tested = SqlDistinct.deduplicate(request, sibling, tested);
+        }
+
+        SqlBuilder builder = new SqlBuilder();
+
+        builder.append("SELECT ");
+
+        if(!columns.isEmpty())
+            builder.append(columns.stream().collect(SqlCode.joining(", ")));
+        else
+            builder.append("1");
+
+        builder.append(" FROM (");
+        builder.append(code);
+        builder.append(") AS ");
+        builder.appendAlias(startTest.table());
+        builder.append(" WHERE EXISTS (SELECT 1 FROM (");
+        builder.append(tested);
+        builder.append(") AS ");
+        builder.append(siblingTable);
+
+        SqlCode condition = generateJoinCondition(relations, getStartBinding(), sibling.getVariableBindings(),
+                startTest.table(), siblingTable);
+
+        if(condition != null)
+        {
+            builder.append(" WHERE ");
+            builder.append(condition);
+        }
+
+        builder.append(")");
+
+        return builder.toCode();
+    }
+
+
+    /**
      * The walk evaluated as a whole, from all its initial solutions, or for every start by itself (see
      * {@link #isWalkedPerStart}): the distinct starts of the initial solutions (the carried columns, with the grouping
-     * keys of the values that are equal without being the same terms, see {@link SqlType#getGroupingKey}) joined
-     * laterally with the recursion whose initial solutions are restricted to the start (see
-     * {@link #getStartRestriction}).
+     * keys of the values that are equal without being the same terms, see {@link SqlType#getGroupingKey}), of which
+     * only those whose start passes the test against a sibling are kept (see {@link #startTest}), joined laterally with
+     * the recursion whose initial solutions are restricted to the start (see {@link #getStartRestriction}).
      */
     @Override
     public SqlCode translate(Request request, Scope scope)
@@ -1664,22 +2041,28 @@ public final class SqlRecursive extends SqlIntercode
         else
             builder.append("1");
 
-        builder.append(" FROM (SELECT DISTINCT ");
-        builder.append(iv.stream().collect(SqlCode.joining(", ")));
+        SqlBuilder starts = new SqlBuilder();
+
+        starts.append("SELECT DISTINCT ");
+        starts.append(iv.stream().collect(SqlCode.joining(", ")));
 
         for(Column column : iv)
         {
             if(column.getType().hasGroupingKey())
             {
-                builder.append(", ");
-                builder.append(column.getType().getGroupingKey(column));
+                starts.append(", ");
+                starts.append(column.getType().getGroupingKey(column));
             }
         }
 
+        starts.append(" FROM (");
+        starts.append(init.translate(request, scope));
+        starts.append(") AS ");
+        starts.append(initTable);
+
         builder.append(" FROM (");
-        builder.append(init.translate(request, scope));
-        builder.append(") AS ");
-        builder.append(initTable);
+        builder.append(startTest == null ? starts.toCode() : translateStartTest(request, scope, starts.toCode(), iv,
+                JoinOptimizer.estimateDistinct(request, init, beginVar)));
         builder.append(") AS ");
         builder.append(startsTable);
         builder.append(" CROSS JOIN LATERAL (");
@@ -1825,8 +2208,12 @@ public final class SqlRecursive extends SqlIntercode
         if(!hasInitSelect)
             builder.append("1");
 
+        // a walk evaluated as a whole takes only the initial solutions whose start passes the test against a sibling;
+        // the starts of a walk evaluated for every start by itself have passed it already
         builder.append(" FROM (");
-        builder.append(init.translate(request, scope));
+        builder.append(perStart || startTest == null ? init.translate(request, scope) :
+                translateStartTest(request, scope, init.translate(request, scope),
+                        init.getVariableBindings().getNonConstantColumns(), JoinOptimizer.estimateRows(request, init)));
         builder.append(") AS ");
         builder.append(initTable);
 
@@ -1861,7 +2248,7 @@ public final class SqlRecursive extends SqlIntercode
         VariableBinding carriedGraph = graphVar != null ? carried.get(graphVar) : null;
         boolean lateral = next instanceof SqlUnion union
                 && (endBinding.getClasses().size() > 1 || (carriedGraph != null && carriedGraph.getClasses().size() > 1
-                        && union.getChilds().stream().allMatch(b -> canLookUp(request, b, joinVar))));
+                        && union.getChilds().stream().allMatch(b -> canLookUp(request, b, joinVar, graphVar))));
         AliasTable left = lateral ? walkTable : leftTable;
         AliasTable right = lateral ? stepTable : rightTable;
 
@@ -2191,7 +2578,8 @@ public final class SqlRecursive extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return init.hasServiceSubpattern() || next.hasServiceSubpattern()
-                || start.values().stream().anyMatch(SqlExpressionIntercode::hasServiceSubpattern);
+                || start.values().stream().anyMatch(SqlExpressionIntercode::hasServiceSubpattern)
+                || startTest != null && startTest.sibling().hasServiceSubpattern();
     }
 
 
@@ -2232,6 +2620,15 @@ public final class SqlRecursive extends SqlIntercode
             builder.append(endBinding.getVariable());
             builder.append(" as ");
             builder.append(String.join(", ", delivered.stream().map(ResourceClass::toString).sorted().toList()));
+        }
+
+        if(startTest != null)
+        {
+            indentInfo(builder, indent, true);
+            builder.append("from ");
+            builder.append(beginVar);
+            builder.append(" in ");
+            startTest.sibling().generateExplanation(builder, getIndent(indent, false) + "  ");
         }
 
         indentChild(builder, indent, false);
@@ -2290,6 +2687,9 @@ public final class SqlRecursive extends SqlIntercode
         if(!Objects.equals(delivered, imcode.delivered))
             return false;
 
+        if(!Objects.equals(startTest, imcode.startTest))
+            return false;
+
         return true;
     }
 
@@ -2297,7 +2697,10 @@ public final class SqlRecursive extends SqlIntercode
     @Override
     protected int getHashCode()
     {
-        return Objects.hash(graphVar, beginVar, joinVar, endBinding, init, next, reverseNext, reverseJoinVar,
+        int hash = Objects.hash(graphVar, beginVar, joinVar, endBinding, init, next, reverseNext, reverseJoinVar,
                 reverseInit, segmentClasses, start, delivered);
+
+        // a walk without a test is hashed by its other parts alone
+        return startTest == null ? hash : 31 * hash + startTest.hashCode();
     }
 }
