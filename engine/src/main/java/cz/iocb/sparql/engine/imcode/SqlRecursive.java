@@ -1945,6 +1945,49 @@ public final class SqlRecursive extends SqlIntercode
 
 
     /**
+     * True if the step, a table access looked up for every row of the recursion, is looked up by a nested loop that
+     * keeps the rows found for every node it is looked up for (Memoize, see
+     * {@link cz.iocb.sparql.engine.database.PlanAdvice#MEMOIZED_LOOKUP}): plan advice makes the planner look the step
+     * up (see {@link Request#isAdvised}), outside a pattern of an expression, where the lookups of a join stay fenced
+     * as well (see {@link SqlJoin}), the step can be looked up in place (see
+     * {@link SqlTableAccess#canBeLookedUpInPlace}) by the row of the recursion alone, and the walk departs from several
+     * starts. The recursion holds a node apart for every start reaching it, in its rows or in the recursion of each
+     * start of a walk evaluated for every start by itself (see {@link #isWalkedPerStart}), so a node reached from
+     * several starts is looked up for each of them, and the rows found for it serve them all. A step that refers to the
+     * start as well (the graph of a walk evaluated for every start by itself) is looked up by the values of two
+     * sources, which stays fenced, and the database would drop the rows kept whenever the start changes. How many
+     * starts reach a node no statistics tell, so the step is memoized wherever as many starts as the lookups of a value
+     * have to repeat for the rows to be kept (see {@link JoinOptimizer#MEMOIZE_RATIO}) may reach one: the walk of the
+     * nextProt terms related to each other took 7.5 minutes instead of 17.3, whereas a node reached from a single start
+     * costs about half a lookup more.
+     *
+     * @param request the current request
+     * @param scope the scope of the walk
+     * @param access the step
+     * @param byRow SQL condition restricting the step to the node, and the carried graph, of a row of the recursion, or
+     *            null
+     * @param byStart SQL condition restricting the step to the start the recursion is joined with, or null
+     * @return true if the step is looked up by a memoized nested loop, false otherwise
+     */
+    private boolean isStepMemoized(Request request, Scope scope, SqlTableAccess access, SqlCode byRow, SqlCode byStart)
+    {
+        if(!request.isAdvised() || scope.isWithinExpression() || !access.canBeLookedUpInPlace())
+            return false;
+
+        if(byRow == null || byStart != null || beginVar == null || carried.get(beginVar) == null)
+            return false;
+
+        double starts = JoinOptimizer.estimateDistinct(request, init, beginVar);
+
+        // the test against a sibling keeps only the starts the sibling binds
+        if(startTest != null)
+            starts = Math.min(starts, JoinOptimizer.estimateDistinct(request, startTest.sibling(), beginVar));
+
+        return starts >= JoinOptimizer.MEMOIZE_RATIO;
+    }
+
+
+    /**
      * SQL code of the solutions whose start passes the test against the sibling (see {@link #startTest}): the
      * solutions, under the alias of the test, for which a compatible solution of the sibling exists. With the join
      * optimizer on, the sibling is probed for every solution when that costs less than hashing it (see
@@ -2330,8 +2373,9 @@ public final class SqlRecursive extends SqlIntercode
             // up laterally through an index of the table for every row of the recursion instead of being hashed whole
             // in every round (see JoinOptimizer); the node reached is converted to the class of the columns of the
             // step, so that the index serves the lookup also when the path leads through nodes of another class
-            SqlCode lookup = and(access.getLookupCondition(relations, tmp, left, Map.of()),
-                    access.getLookupCondition(relations, starting, startsTable, Map.of()));
+            SqlCode byRow = access.getLookupCondition(relations, tmp, left, Map.of());
+            SqlCode byStart = access.getLookupCondition(relations, starting, startsTable, Map.of());
+            SqlCode lookup = and(byRow, byStart);
             SqlCode condition = and(lookup, getNoLoopCondition(request, access.getInternalVariableBinding(joinVar),
                     access.getInternalVariableBinding(endVar), null));
 
@@ -2339,8 +2383,15 @@ public final class SqlRecursive extends SqlIntercode
             strict.addAll(access.getLookupComparedColumns(relations, starting));
 
             builder.append(" CROSS JOIN LATERAL (");
-            builder.append(access.translateLateral(request, condition != null ? condition : SqlCode.TRUE,
-                    lookup != null ? strict : Set.of()));
+
+            // where plan advice makes the planner look the step up, the step of a walk from several starts is a plain
+            // join, which the advice makes a nested loop keeping the rows found for every node (see isStepMemoized)
+            if(isStepMemoized(request, scope, access, byRow, byStart))
+                builder.append(access.translateInPlace(request, condition, strict, true));
+            else
+                builder.append(access.translateLateral(request, condition != null ? condition : SqlCode.TRUE,
+                        lookup != null ? strict : Set.of()));
+
             builder.append(") AS ");
             builder.append(right);
         }

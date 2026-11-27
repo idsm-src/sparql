@@ -52,8 +52,10 @@ import cz.iocb.sparql.testing.Database;
  * them to repeat; the joins the optimizer hashes are hashed, and every item of the advice is followed. A statement read
  * by fetches is advised as well, and so is one whose rows the database copies to the client, which the database
  * evaluates as advised, and the right side of an OPTIONAL looked up for every solution; a lookup by the values of two
- * children stays fenced, and so does a lookup in the pattern of an expression. The advice of a statement does not hold
- * for the next statement of the request. The solutions are those of the joins left to the planner.
+ * children stays fenced, and so does a lookup in the pattern of an expression. The step of a walk from every node is
+ * looked up by a memoized nested loop, whereas that of a walk from a single node stays fenced. The advice of a
+ * statement does not hold for the next statement of the request. The solutions are those of the joins left to the
+ * planner.
  */
 public class PlanAdviceLookupTest
 {
@@ -614,6 +616,55 @@ public class PlanAdviceLookupTest
         assertFollowed(plan);
         assertThat(plan, containsString("Memoize"));
         assertThat(plan, containsString("on items " + PlanAdvice.MEMOIZED_LOOKUP));
+    }
+
+
+    @Test
+    public void memoizedWalkStep() throws Exception
+    {
+        String query = "SELECT (COUNT(*) AS ?c) WHERE { ?x ex:link+ ?y }";
+
+        // the walk from every node looks the links of a node up for every start reaching it, so the rows found are
+        // kept for the other starts
+        String sql = check(query, 0);
+        assertThat(sql, containsString("WITH RECURSIVE "));
+        assertThat(sql, containsString(" AS " + PlanAdvice.MEMOIZED_LOOKUP + " WHERE "));
+
+        String plan = explain(sql);
+        assertFollowed(plan);
+        assertThat(plan, containsString("Memoize"));
+        assertThat(plan, containsString("on links " + PlanAdvice.MEMOIZED_LOOKUP));
+    }
+
+
+    @Test
+    public void walkStepFromOneStartFenced() throws Exception
+    {
+        String query = "SELECT ?y WHERE { <http://example.org/n/3> ex:link+ ?y }";
+
+        // the walk from a single node looks every node up once, so its step stays fenced, and the statement is not
+        // planned for advice
+        List<List<RdfTerm>> expected = expected(query);
+
+        try(Request request = new Engine(advised).getRequest())
+        {
+            int before = queries.size();
+
+            try(Result result = request.execute(prefix + query))
+            {
+                List<List<RdfTerm>> actual = read(result);
+
+                assertThat(actual, containsInAnyOrder(expected.toArray()));
+                assertThat(actual, hasSize(greaterThan(1)));
+            }
+
+            String sql = queries.getLast();
+            assertThat(sql, containsString("WITH RECURSIVE "));
+            assertThat(sql, containsString(" OFFSET 0) AS "));
+            assertThat(sql, not(containsString(" AS " + PlanAdvice.MEMOIZED_LOOKUP + " ")));
+            assertThat(queries.subList(before, queries.size()).stream().anyMatch(q -> q.startsWith("EXPLAIN")),
+                    is(false));
+        }
     }
 
 
