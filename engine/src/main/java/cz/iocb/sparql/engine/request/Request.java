@@ -25,7 +25,9 @@ import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.LateralTable;
 import cz.iocb.sparql.engine.database.PlanAdvice;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
+import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.SqlCode;
+import cz.iocb.sparql.engine.database.TableStatistics;
 import cz.iocb.sparql.engine.error.MessageCategory;
 import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
@@ -331,6 +333,12 @@ public class Request implements AutoCloseable
      * {@link #getNodeTerms}).
      */
     private final Map<Variable, NodeTerm> nodeTerms = new HashMap<>();
+
+    /**
+     * Statistics of the tables the request has taken, by table, kept for the rest of the request (see
+     * {@link #getTableStatistics}).
+     */
+    private final Map<SourceTable, TableStatistics> tableStatistics = new HashMap<>();
 
     /**
      * Start of the execution in {@link System#nanoTime} units.
@@ -1446,6 +1454,34 @@ public class Request implements AutoCloseable
     public Map<Variable, NodeTerm> getNodeTerms()
     {
         return nodeTerms;
+    }
+
+
+    /**
+     * Statistics of a table the mappings read, as the configuration has them when the request first takes them (see
+     * {@link SparqlDatabaseConfiguration#getTableStatistics}), kept for the rest of the request, so that its estimates
+     * do not change while the configuration renews the statistics. Before the first statistics it takes, the request
+     * has the configuration check whether the statistics are to be renewed (see
+     * {@link SparqlDatabaseConfiguration#checkTableStatistics}).
+     *
+     * @param table the table
+     * @return statistics of the table
+     * @throws SQLRuntimeException if the check of the statistics finds the request out of time or cancelled
+     */
+    public TableStatistics getTableStatistics(SourceTable table)
+    {
+        TableStatistics statistics = tableStatistics.get(table);
+
+        if(statistics == null)
+        {
+            if(tableStatistics.isEmpty())
+                config.checkTableStatistics(this);
+
+            statistics = config.getTableStatistics(table);
+            tableStatistics.put(table, statistics);
+        }
+
+        return statistics;
     }
 
 

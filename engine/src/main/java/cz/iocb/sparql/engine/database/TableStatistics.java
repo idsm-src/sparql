@@ -12,8 +12,10 @@ import cz.iocb.sparql.engine.request.Request;
  * dataset: the planner estimates the selectivity of every column independently of the others, while the statistics of
  * the engine may be kept per value of a column (see {@link GroupedStatistics}). The statistics are only read, from the
  * catalog of the database or from tables kept for the engine, and never counted from the rows of the table, so the
- * statistics the catalog does not keep are computed together with the data and stored in such tables. The estimates are
- * consulted when the engine chooses the order and the methods of the joins it generates.
+ * statistics the catalog does not keep are computed together with the data and stored in such tables. The configuration
+ * renews the statistics once the tables they are read from change (see {@link #getSources}), whereas a request keeps
+ * the statistics it has begun with (see {@link Request#getTableStatistics}). The estimates are consulted when the
+ * engine chooses the order and the methods of the joins it generates.
  */
 public interface TableStatistics
 {
@@ -50,4 +52,43 @@ public interface TableStatistics
      * @return estimated fraction of the rows of the table whose value of the column is null
      */
     double estimateNullFraction(Request request, Column column);
+
+
+    /**
+     * The tables the statistics are read from, whose changes make them stale: the table itself, whose statistics in the
+     * catalog they read, and the tables kept for the engine; none by default, as statistics reading nothing never grow
+     * stale. The configuration checks the tables now and then and renews the statistics once they have changed (see
+     * {@link cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration#checkTableStatistics}).
+     *
+     * @return the tables the statistics are read from
+     */
+    default Set<DatabaseTable> getSources()
+    {
+        return Set.of();
+    }
+
+
+    /**
+     * Statistics of the same table that read everything anew, which the configuration takes in place of these once the
+     * tables they are read from have changed or a lookup of theirs has failed (see {@link #isComplete}); these
+     * statistics themselves by default.
+     *
+     * @return statistics of the same table that read everything anew
+     */
+    default TableStatistics renew()
+    {
+        return this;
+    }
+
+
+    /**
+     * False if a lookup of the statistics has failed, so that they lack what it would have read until the configuration
+     * renews them, whether the tables they are read from change or not (see {@link #renew}); true by default.
+     *
+     * @return false if a lookup of the statistics has failed, true otherwise
+     */
+    default boolean isComplete()
+    {
+        return true;
+    }
 }

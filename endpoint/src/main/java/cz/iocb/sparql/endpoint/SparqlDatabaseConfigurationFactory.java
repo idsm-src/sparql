@@ -3,6 +3,7 @@ package cz.iocb.sparql.endpoint;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.Hashtable;
 import javax.naming.Context;
 import javax.naming.InitialContext;
@@ -26,7 +27,9 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
  * {@code advice} turns it on with its joins kept by plan advice (see
  * {@link SparqlDatabaseConfiguration#setPlanAdvice}). The optional {@code statistics-function} address names the
  * function through which the engine reads the extended statistics of the tables, its schema and its name joined by a
- * dot (see {@link SparqlDatabaseConfiguration#setExtendedStatisticsFunction}).
+ * dot (see {@link SparqlDatabaseConfiguration#setExtendedStatisticsFunction}), and the optional
+ * {@code statistics-check-interval} address gives the least number of seconds between two checks of whether the
+ * statistics of the tables are to be renewed (see {@link SparqlDatabaseConfiguration#setStatisticsCheckInterval}).
  */
 public class SparqlDatabaseConfigurationFactory implements ObjectFactory
 {
@@ -50,6 +53,7 @@ public class SparqlDatabaseConfigurationFactory implements ObjectFactory
         RefAddr service = ref.get("service");
         RefAddr optimizer = ref.get("join-optimizer");
         RefAddr statistics = ref.get("statistics-function");
+        RefAddr interval = ref.get("statistics-check-interval");
 
         if(datasource == null)
             return null;
@@ -74,6 +78,9 @@ public class SparqlDatabaseConfigurationFactory implements ObjectFactory
 
             if(statistics != null)
                 setExtendedStatisticsFunction((SparqlDatabaseConfiguration) config, (String) statistics.getContent());
+
+            if(interval != null)
+                setStatisticsCheckInterval((SparqlDatabaseConfiguration) config, (String) interval.getContent());
 
             return config;
         }
@@ -122,5 +129,22 @@ public class SparqlDatabaseConfigurationFactory implements ObjectFactory
             throw new IllegalArgumentException("unknown statistics-function value: " + value);
 
         config.setExtendedStatisticsFunction(value.substring(0, dot), value.substring(dot + 1));
+    }
+
+
+    /**
+     * Sets the least time between two checks of whether the statistics of the tables are to be renewed as the
+     * {@code statistics-check-interval} address of the reference says.
+     *
+     * @param config the configuration
+     * @param value the content of the address: a number of seconds, an integer that is not negative
+     * @throws IllegalArgumentException if the value is no such number
+     */
+    private static void setStatisticsCheckInterval(SparqlDatabaseConfiguration config, String value)
+    {
+        if(!value.matches("[0-9]{1,18}"))
+            throw new IllegalArgumentException("unknown statistics-check-interval value: " + value);
+
+        config.setStatisticsCheckInterval(Duration.ofSeconds(Long.parseLong(value)));
     }
 }

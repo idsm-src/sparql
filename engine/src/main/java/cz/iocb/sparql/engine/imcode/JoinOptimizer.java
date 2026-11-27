@@ -2100,7 +2100,7 @@ final class JoinOptimizer
             if(access.getTable() == null)
                 return 1;
 
-            TableStatistics statistics = request.getConfiguration().getTableStatistics(access.getTable());
+            TableStatistics statistics = request.getTableStatistics(access.getTable());
 
             return Math.max(statistics.estimateRows(request, access.getConstantConditions(request.getConfiguration())),
                     0);
@@ -2269,7 +2269,7 @@ final class JoinOptimizer
             // a variable whose columns hold a key of the table has a value of its own in every row
             if(!access.holdsKey(request, List.of(variable)))
             {
-                TableStatistics statistics = request.getConfiguration().getTableStatistics(access.getTable());
+                TableStatistics statistics = request.getTableStatistics(access.getTable());
 
                 distinct = statistics.estimateDistinct(request, columns,
                         access.getConstantConditions(request.getConfiguration()));
@@ -2916,7 +2916,7 @@ final class JoinOptimizer
         if(columns.size() != 1 || !(columns.iterator().next() instanceof TableColumn column))
             return 1;
 
-        TableStatistics statistics = request.getConfiguration().getTableStatistics(access.getTable());
+        TableStatistics statistics = request.getTableStatistics(access.getTable());
         double present = 1 - statistics.estimateNullFraction(request, column);
 
         return present > 0 ? present : 1;

@@ -42,6 +42,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -54,7 +55,10 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import javax.sql.DataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import cz.iocb.sparql.engine.common.IriResolver;
 import cz.iocb.sparql.engine.database.CatalogStatistics;
 import cz.iocb.sparql.engine.database.Column;
@@ -107,6 +111,7 @@ import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.IriCache;
+import cz.iocb.sparql.engine.request.Request;
 import info.adams.ryu.RyuDouble;
 import info.adams.ryu.RyuFloat;
 
@@ -120,6 +125,11 @@ import info.adams.ryu.RyuFloat;
  */
 public class SparqlDatabaseConfiguration implements ClassRelations
 {
+    /**
+     * Logger of the checks of the statistics of the tables.
+     */
+    private static final Logger logger = LoggerFactory.getLogger(SparqlDatabaseConfiguration.class);
+
     /**
      * Namespace of the terms of the SPARQL service description.
      */
@@ -223,9 +233,33 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
     /**
      * Statistics of the tables the mappings read, by table: those registered by the deployment and those read from the
-     * catalog on first use (see {@link #getTableStatistics}).
+     * catalog on first use (see {@link #getTableStatistics}), renewed once the tables they are read from change (see
+     * {@link #checkTableStatistics}).
      */
     protected final Map<SourceTable, TableStatistics> tableStatistics = new ConcurrentHashMap<>();
+
+    /**
+     * The states of the tables the statistics of a table are read from at the last renewal of the statistics, by the
+     * table of the statistics; missing for statistics not renewed yet (see {@link #checkTableStatistics}).
+     */
+    private final Map<SourceTable, Map<DatabaseTable, String>> statisticsSources = new ConcurrentHashMap<>();
+
+    /**
+     * The least time between two checks of the tables the statistics are read from (see
+     * {@link #setStatisticsCheckInterval}).
+     */
+    private volatile Duration statisticsCheckInterval = Duration.ofMinutes(1);
+
+    /**
+     * The time from which the next check of the tables the statistics are read from is due, in {@link System#nanoTime}
+     * units.
+     */
+    private volatile long nextStatisticsCheck = System.nanoTime();
+
+    /**
+     * Lock held by the request checking the tables the statistics are read from (see {@link #checkTableStatistics}).
+     */
+    private final ReentrantLock statisticsCheck = new ReentrantLock();
 
     /**
      * Function through which the extended statistics of the tables are read, or null (see
@@ -2106,13 +2140,15 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     public void addTableStatistics(SourceTable table, TableStatistics statistics)
     {
         tableStatistics.put(table, statistics);
+        statisticsSources.remove(table);
     }
 
 
     /**
      * Statistics of a table the mappings read: those registered for it, else the statistics of the catalog for a
      * database table (see {@link CatalogStatistics}) and the defaults of the planner for any other table (see
-     * {@link DefaultStatistics}), kept from then on.
+     * {@link DefaultStatistics}), kept from then on until they are renewed (see {@link #checkTableStatistics}). A
+     * request takes them through {@link Request#getTableStatistics}, which keeps them for the rest of the request.
      *
      * @param table the table
      * @return statistics of the table
@@ -2121,6 +2157,132 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     {
         return tableStatistics.computeIfAbsent(table, t -> t instanceof DatabaseTable databaseTable ?
                 new CatalogStatistics(databaseTable) : new DefaultStatistics());
+    }
+
+
+    /**
+     * Sets the least time between two checks of whether the statistics of the tables are to be renewed (see
+     * {@link #checkTableStatistics}); a minute by default, while zero has every request that asks for statistics check
+     * them.
+     *
+     * @param interval the least time between two checks
+     * @throws IllegalArgumentException if the interval is negative
+     */
+    public void setStatisticsCheckInterval(Duration interval)
+    {
+        if(interval.isNegative())
+            throw new IllegalArgumentException("negative interval of the checks of the statistics: " + interval);
+
+        statisticsCheckInterval = interval;
+    }
+
+
+    /**
+     * Checks whether the statistics of the tables are to be renewed, at most once per the interval set by
+     * {@link #setStatisticsCheckInterval}: the tables the statistics are read from (see
+     * {@link TableStatistics#getSources}) are compared with their states at the last renewal of the statistics, and the
+     * statistics a table of which has changed since, those a lookup of which has failed (see
+     * {@link TableStatistics#isComplete}) and those not renewed yet, which may have been read at any time, are replaced
+     * by statistics reading everything anew (see {@link TableStatistics#renew}). The state of a table is its identity,
+     * its file, which another one replaces on {@code TRUNCATE}, its row estimate and pages in the catalog, which the
+     * analyses and the vacuums update, the numbers of its analyses and of the rows written to it, and its extended
+     * statistics, all read by one lookup through the connection of the request (see {@link Request#lookup}); a server
+     * in recovery, which counts neither the analyses nor the writes of its primary server, tells them only by the row
+     * estimate and the pages, once a table has been analysed or vacuumed. A request finding another one checking goes
+     * on without waiting, and a check that fails keeps the statistics until the next one. A request asks for the check
+     * at the first statistics it takes (see {@link Request#getTableStatistics}).
+     *
+     * @param request the request asking for statistics
+     * @throws SQLRuntimeException if the request is out of time (SQL state 57014) or cancelled
+     */
+    public void checkTableStatistics(Request request)
+    {
+        if(System.nanoTime() - nextStatisticsCheck < 0 || !statisticsCheck.tryLock())
+            return;
+
+        try
+        {
+            long now = System.nanoTime();
+
+            if(now - nextStatisticsCheck < 0)
+                return;
+
+            nextStatisticsCheck = now + statisticsCheckInterval.toNanos();
+
+            Map<SourceTable, TableStatistics> current = Map.copyOf(tableStatistics);
+            Set<DatabaseTable> sources = new HashSet<>();
+
+            for(TableStatistics statistics : current.values())
+                sources.addAll(statistics.getSources());
+
+            if(sources.isEmpty())
+                return;
+
+            Map<DatabaseTable, String> states = readStates(request, List.copyOf(sources));
+
+            for(Entry<SourceTable, TableStatistics> entry : current.entrySet())
+            {
+                TableStatistics statistics = entry.getValue();
+                Map<DatabaseTable, String> state = new HashMap<>();
+
+                for(DatabaseTable source : statistics.getSources())
+                    state.put(source, states.get(source));
+
+                if(state.isEmpty() || state.equals(statisticsSources.get(entry.getKey())) && statistics.isComplete())
+                    continue;
+
+                if(tableStatistics.replace(entry.getKey(), statistics, statistics.renew()))
+                    statisticsSources.put(entry.getKey(), state);
+            }
+        }
+        catch(SQLException e)
+        {
+            if(request.isCanceled() || "57014".equals(e.getSQLState()))
+                throw new SQLRuntimeException(e);
+
+            logger.warn("cannot check the tables the statistics are read from", e);
+        }
+        finally
+        {
+            statisticsCheck.unlock();
+        }
+    }
+
+
+    /**
+     * Reads the states of the tables by one lookup through the connection of the request: for each table, a text made
+     * of its identity, its file, its row estimate and pages in the catalog, the numbers of its analyses and of the rows
+     * written to it, and the identities of its extended statistics; an empty text for a table that does not exist.
+     *
+     * @param request the request
+     * @param tables the tables
+     * @return the states of the tables
+     * @throws SQLException when the lookup fails
+     */
+    private static Map<DatabaseTable, String> readStates(Request request, List<DatabaseTable> tables)
+            throws SQLException
+    {
+        String schemas = String.join(", ", tables.stream().map(table -> ValueColumn.quote(table.getSchema())).toList());
+        String names = String.join(", ", tables.stream().map(table -> ValueColumn.quote(table.getName())).toList());
+
+        String sql = """
+                SELECT concat_ws(' ', c.oid, c.relfilenode, c.reltuples, c.relpages, \
+                pg_stat_get_analyze_count(c.oid) + pg_stat_get_autoanalyze_count(c.oid), \
+                pg_stat_get_tuples_inserted(c.oid) + pg_stat_get_tuples_updated(c.oid) \
+                + pg_stat_get_tuples_deleted(c.oid), \
+                (SELECT array_agg(e.oid ORDER BY e.oid) FROM pg_statistic_ext e WHERE e.stxrelid = c.oid)) \
+                FROM unnest(ARRAY[%s]::text[], ARRAY[%s]::text[]) WITH ORDINALITY AS t(schema_name, table_name, n) \
+                LEFT JOIN (pg_class c JOIN pg_namespace s ON s.oid = c.relnamespace) \
+                ON s.nspname = t.schema_name AND c.relname = t.table_name ORDER BY t.n""".formatted(schemas, names);
+
+        return request.lookup(List.of(sql), result -> {
+            Map<DatabaseTable, String> states = new HashMap<>();
+
+            for(DatabaseTable table : tables)
+                states.put(table, result.next() ? result.getString(1) : "");
+
+            return states;
+        }).get(0);
     }
 
 

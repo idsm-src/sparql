@@ -28,7 +28,9 @@ import cz.iocb.sparql.engine.request.Request;
  * {@code pg_stats_ext} or through the function the configuration names (see
  * {@link SparqlDatabaseConfiguration#setExtendedStatisticsFunction}). They are read on first use through the connection
  * of the request and kept for the life of the object, the frequency of a value being looked up when it is first asked
- * for and kept with those of other values in a cache of a bounded size (see {@link TableStatisticsBase#cached}).
+ * for and kept with those of other values in a cache of a bounded size (see {@link TableStatisticsBase#cached}). The
+ * configuration replaces the object by a new one once the table changes or a lookup fails (see {@link #getSources} and
+ * {@link #isComplete}).
  */
 public final class CatalogStatistics extends TableStatisticsBase
 {
@@ -63,6 +65,11 @@ public final class CatalogStatistics extends TableStatisticsBase
      * keep, by the set of the names of the columns, once read.
      */
     private volatile Map<Set<String>, Double> combinations;
+
+    /**
+     * Whether no lookup of the statistics has failed (see {@link #isComplete}).
+     */
+    private volatile boolean complete = true;
 
 
     /**
@@ -123,6 +130,27 @@ public final class CatalogStatistics extends TableStatisticsBase
     }
 
 
+    @Override
+    public Set<DatabaseTable> getSources()
+    {
+        return Set.of(table);
+    }
+
+
+    @Override
+    public CatalogStatistics renew()
+    {
+        return new CatalogStatistics(table);
+    }
+
+
+    @Override
+    public boolean isComplete()
+    {
+        return complete;
+    }
+
+
     /**
      * Reads the statistics of the table from the catalog; the row count is unknown when the table has not been
      * analysed.
@@ -169,8 +197,9 @@ public final class CatalogStatistics extends TableStatisticsBase
      * whose text form the input of the type does not take back cannot fail the lookup). The catalog gives the list as
      * an array, whose text holds such forms, and the value is written the same way, as the element of an array, because
      * a cast to text gives another form for some types: a boolean is cast to {@code true} and written as {@code t}. A
-     * failing lookup counts as the value not being among the most common ones, but for the lookup of a request that is
-     * out of time or cancelled, which is no answer at all.
+     * failing lookup counts as the value not being among the most common ones until the statistics are renewed (see
+     * {@link #isComplete}), but for the lookup of a request that is out of time or cancelled, which is no answer at
+     * all.
      *
      * @param request the current request
      * @param column the column
@@ -202,6 +231,8 @@ public final class CatalogStatistics extends TableStatisticsBase
             if(isUnanswered(request, e))
                 throw e;
 
+            complete = false;
+
             return Double.NaN;
         }
     }
@@ -212,8 +243,9 @@ public final class CatalogStatistics extends TableStatisticsBase
      * the table keep, with the names of the columns of the table by their numbers, by which the statistics name them:
      * from the view {@code pg_stats_ext}, which shows them to the owner of the table only, or through the function the
      * configuration names for a role that does not own it (see
-     * {@link SparqlDatabaseConfiguration#setExtendedStatisticsFunction}). A failing lookup counts as no statistics, but
-     * for the lookup of a request that is out of time or cancelled, which is no answer at all.
+     * {@link SparqlDatabaseConfiguration#setExtendedStatisticsFunction}). A failing lookup counts as no statistics
+     * until the statistics are renewed (see {@link #isComplete}), but for the lookup of a request that is out of time
+     * or cancelled, which is no answer at all.
      *
      * @param request the current request
      * @return numbers of the distinct combinations of the values of several columns by the set of the names of the
@@ -251,6 +283,7 @@ public final class CatalogStatistics extends TableStatisticsBase
             if(isUnanswered(request, e))
                 throw e;
 
+            complete = false;
             logger.warn("cannot read the extended statistics of {}", table, e);
 
             return Map.of();
