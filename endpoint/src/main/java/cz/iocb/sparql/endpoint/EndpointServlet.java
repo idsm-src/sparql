@@ -63,7 +63,9 @@ import cz.iocb.sparql.engine.translator.ServiceException;
  * Turtle, TriG, N-Triples and N-Quads, and by the {@code version} parameter of their media types. A GET without a query
  * serves the page with the SPARQL editor to browsers and the service description otherwise; {@code ?info} returns a
  * JSON summary of prefixes, properties and classes. Init parameters: {@code resource} (JNDI name of the configuration),
- * {@code fetch-size}, {@code timeout} and {@code max-timeout} (seconds), {@code sql-query-size-limit}.
+ * {@code fetch-size}, {@code timeout} and {@code max-timeout} (seconds), {@code sql-query-size-limit}. The outcome of a
+ * query is kept in attributes of the request ({@link #QUERY_ATTRIBUTE}, {@link #ERROR_ATTRIBUTE} and
+ * {@link #STATUS_ATTRIBUTE}), so that a filter or the access log of the container can log it.
  */
 public class EndpointServlet extends HttpServlet
 {
@@ -344,7 +346,26 @@ public class EndpointServlet extends HttpServlet
      * Status logged for a request whose client has closed the connection before the response has been written, as nginx
      * logs it.
      */
-    private static final int CLIENT_CLOSED_REQUEST = 499;
+    public static final int CLIENT_CLOSED_REQUEST = 499;
+
+    /**
+     * Name of the request attribute holding the text of the query the request evaluates (the query of the service
+     * description for a GET without a query).
+     */
+    public static final String QUERY_ATTRIBUTE = "cz.iocb.sparql.endpoint.query";
+
+    /**
+     * Name of the request attribute holding the exception the evaluation of the query has ended by, unless the client
+     * has closed the connection.
+     */
+    public static final String ERROR_ATTRIBUTE = "cz.iocb.sparql.endpoint.error";
+
+    /**
+     * Name of the request attribute holding the status the request is logged with (an {@link Integer}): the status of
+     * the response, but {@link #CLIENT_CLOSED_REQUEST} for a client that has closed the connection, and the status of
+     * the error for a query that has failed after the response was committed, which the response cannot take any more.
+     */
+    public static final String STATUS_ATTRIBUTE = "cz.iocb.sparql.endpoint.status";
 
     /**
      * Logger of request processing.
@@ -708,7 +729,9 @@ public class EndpointServlet extends HttpServlet
      * Prepares and runs the query with the protocol dataset parameters and writes the result in the negotiated format;
      * errors are reported by HTTP status codes. The request of a client that closes the connection is cancelled (see
      * {@link ClientWatch}), or its result is written no further (see {@link ClientCheck}), and the request is logged
-     * with the status {@link #CLIENT_CLOSED_REQUEST}.
+     * with the status {@link #CLIENT_CLOSED_REQUEST}. The query, the exception the query has ended by and the status
+     * the request is logged with are kept in the attributes {@link #QUERY_ATTRIBUTE}, {@link #ERROR_ATTRIBUTE} and
+     * {@link #STATUS_ATTRIBUTE} of the request.
      *
      * @param req the HTTP request
      * @param res the HTTP response
@@ -726,9 +749,13 @@ public class EndpointServlet extends HttpServlet
         // whether the client has closed the connection before the response has been written
         boolean aborted = false;
 
+        // the status of the error the query has ended by, which the response does not take once it has been committed
+        int failure = 0;
+
         try
         {
             MDC.put("request", getRequestString(req));
+            req.setAttribute(QUERY_ATTRIBUTE, query);
 
             if(query == null || versions != null && versions.length > 1)
             {
@@ -900,6 +927,8 @@ public class EndpointServlet extends HttpServlet
         }
         catch(TranslateExceptions e)
         {
+            req.setAttribute(ERROR_ATTRIBUTE, e);
+
             try
             {
                 res.resetBuffer();
@@ -908,7 +937,8 @@ public class EndpointServlet extends HttpServlet
             {
             }
 
-            res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            failure = HttpServletResponse.SC_BAD_REQUEST;
+            res.setStatus(failure);
             res.setContentType("text/plain");
 
             PrintWriter out = res.getWriter();
@@ -919,6 +949,8 @@ public class EndpointServlet extends HttpServlet
         }
         catch(LimitExceedException e)
         {
+            req.setAttribute(ERROR_ATTRIBUTE, e);
+
             try
             {
                 res.resetBuffer();
@@ -927,7 +959,8 @@ public class EndpointServlet extends HttpServlet
             {
             }
 
-            res.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+            failure = HttpServletResponse.SC_SERVICE_UNAVAILABLE;
+            res.setStatus(failure);
             res.setContentType("text/plain");
 
             PrintWriter out = res.getWriter();
@@ -936,6 +969,8 @@ public class EndpointServlet extends HttpServlet
         }
         catch(ServiceException e)
         {
+            req.setAttribute(ERROR_ATTRIBUTE, e);
+
             try
             {
                 res.resetBuffer();
@@ -944,12 +979,15 @@ public class EndpointServlet extends HttpServlet
             {
             }
 
-            res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            failure = HttpServletResponse.SC_BAD_REQUEST;
+            res.setStatus(failure);
             res.setContentType("text/plain");
             res.getWriter().println("error: " + e.getMessage());
         }
         catch(SQLException e)
         {
+            req.setAttribute(ERROR_ATTRIBUTE, e);
+
             try
             {
                 res.resetBuffer();
@@ -960,19 +998,23 @@ public class EndpointServlet extends HttpServlet
 
             if(e.getErrorCode() == 0 && "57014".equals(e.getSQLState()))
             {
-                res.setStatus(HttpServletResponse.SC_REQUEST_TIMEOUT);
+                failure = HttpServletResponse.SC_REQUEST_TIMEOUT;
+                res.setStatus(failure);
                 res.setContentType("text/plain");
                 res.getWriter().println("request timeout");
             }
             else
             {
-                res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                failure = HttpServletResponse.SC_BAD_REQUEST;
+                res.setStatus(failure);
                 res.setContentType("text/plain");
                 res.getWriter().println("error: " + e.getClass().getCanonicalName() + ": " + e.getMessage());
             }
         }
         catch(Throwable e)
         {
+            req.setAttribute(ERROR_ATTRIBUTE, e);
+
             System.err.println("EndpointServlet: log begin");
 
             if(defaultGraphs != null)
@@ -995,13 +1037,16 @@ public class EndpointServlet extends HttpServlet
             {
             }
 
-            res.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            failure = HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
+            res.setStatus(failure);
             res.setContentType("text/plain");
             res.getWriter().println("error: " + e.getClass().getCanonicalName() + ": " + e.getMessage());
         }
         finally
         {
-            int status = aborted ? CLIENT_CLOSED_REQUEST : res.getStatus();
+            int status = aborted ? CLIENT_CLOSED_REQUEST : failure != 0 ? failure : res.getStatus();
+
+            req.setAttribute(STATUS_ATTRIBUTE, status);
 
             switch(status)
             {
