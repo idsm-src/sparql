@@ -49,11 +49,12 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 public final class SqlAggregation extends SqlIntercode
 {
     /**
-     * How many times more solutions a join has to be estimated to have than its children together for its solutions to
-     * be counted by the counts of its children (see {@link #countJoin}). The children are then each read and grouped
-     * once, whereas the join hands every solution it makes to the count: with five workers, the join took 46 ns for a
-     * solution it made and the counted children 89 ns for a solution they grouped, so the counts pay from about twice
-     * as many solutions, and the margin covers an estimate that is off by half.
+     * How many times more solutions a join has to be estimated to have than its counted children together with the join
+     * of their counts for its solutions to be counted by the counts of its children (see {@link #countJoin}). The
+     * counted children are then each read and grouped once and their counts are joined with the other children, whereas
+     * the join hands every solution it makes to the count: with five workers, the join took 46 ns for a solution it
+     * made and the counted children 89 ns for a solution they grouped, so the counts pay from about twice as many
+     * solutions, and the margin covers an estimate that is off by half.
      */
     private static final double COUNTED_JOIN_RATIO = 4;
 
@@ -354,14 +355,19 @@ public final class SqlAggregation extends SqlIntercode
      * each other, whether two solutions are compatible depends only on the values they give the variables their
      * children share (unbound ones included), and the solutions of a group agree on the grouping variables, so the
      * number of the solutions of a group is the sum, over the compatible combinations of those values, of the products
-     * of the numbers of the solutions of each child giving them. Every child is therefore counted grouped by its
-     * variables that another child binds as well and by the grouping variables it binds, the counted children are
-     * joined, and the products of their counts are summed per group: the join of 28 and 20 million solutions sharing
-     * 41544 values of a variable, which has 4.09e10 solutions, was counted in 0.71 s instead of 311 s. The aggregates
-     * have to count the solutions (COUNT(*)), and the join has to be made of deterministic children holding no SERVICE
-     * call, each of which binds a variable it is grouped by, as a child counted without grouping makes a group of no
-     * solutions, and it has to be estimated to have {@link #COUNTED_JOIN_RATIO} times more solutions than its children
-     * together.
+     * of the numbers of the solutions of each child giving them. A child is therefore counted grouped by its variables
+     * that another child binds as well and by the grouping variables it binds, the counted children are joined with the
+     * others, and the products of their counts are summed per group: the join of 28 and 20 million solutions sharing
+     * 41544 values of a variable, which has 4.09e10 solutions, was counted in 0.71 s instead of 311 s. Only a child
+     * whose solutions the grouping is estimated to reduce is counted, because the children bind only what the join
+     * needs of them, the variables they share and the grouping variables, so a child may be grouped by all it binds,
+     * which leaves solutions without duplicates as they are (the triples of a property joined with the classes of their
+     * subjects and of their objects and counted per pair of the classes); any other child is joined as it is, each of
+     * its solutions counting once. The aggregates have to count the solutions (COUNT(*)), the join has to be made of
+     * deterministic children holding no SERVICE call, each binding a variable to group it by, as a child counted
+     * without grouping makes a group of no solutions, some child has to be counted, and the join has to be estimated to
+     * have {@link #COUNTED_JOIN_RATIO} times more solutions than the counted children together with the join of their
+     * counts.
      *
      * @param request the current request
      * @param aggregations aggregate expression of each result variable
@@ -381,24 +387,18 @@ public final class SqlAggregation extends SqlIntercode
             return null;
 
         List<SqlIntercode> childs = join.getChilds();
+        List<SqlIntercode> joinedChilds = new ArrayList<>();
+        List<Variable> counts = new ArrayList<>();
 
-        // the counted children are each read and grouped once, whereas the join hands every solution it makes to the
-        // count, so the counts pay only where the join multiplies the solutions of its children
-        double read = 0;
-
-        for(SqlIntercode c : childs)
-            read += JoinOptimizer.estimateRows(request, c);
-
-        if(JoinOptimizer.estimateRows(request, join) < COUNTED_JOIN_RATIO * Math.max(read, 1))
-            return null;
-
-        List<SqlIntercode> countedChilds = new ArrayList<>();
+        // the solutions the counted children are grouped from
+        double grouped = 0;
 
         for(int i = 0; i < childs.size(); i++)
         {
+            SqlIntercode member = childs.get(i);
             Set<Variable> keys = new LinkedHashSet<>();
 
-            for(Variable variable : childs.get(i).getVariableBindings().getVariables())
+            for(Variable variable : member.getVariableBindings().getVariables())
             {
                 if(groupVariables.contains(variable))
                     keys.add(variable);
@@ -411,18 +411,46 @@ public final class SqlAggregation extends SqlIntercode
             if(keys.isEmpty())
                 return null;
 
-            countedChilds.add(aggregate(request, keys,
-                    Map.of(getCountVariable(i), SqlBuiltinCall.create(request, "card", false, List.of())),
-                    childs.get(i)));
+            Variable count = getCountVariable(i);
+            SqlIntercode counted = aggregate(request, keys,
+                    Map.of(count, SqlBuiltinCall.create(request, "card", false, List.of())), member);
+            double rows = JoinOptimizer.estimateRows(request, member);
+
+            // a child that the grouping is not estimated to reduce is joined as it is, each solution counting once
+            if(JoinOptimizer.estimateRows(request, counted) < rows)
+            {
+                joinedChilds.add(counted);
+                counts.add(count);
+                grouped += rows;
+            }
+            else
+            {
+                joinedChilds.add(member);
+            }
         }
 
-        SqlIntercode joined = SqlJoin.join(request, countedChilds);
+        if(counts.isEmpty())
+            return null;
+
+        // the counted children are each read and grouped once and their counts joined with the other children, whereas
+        // the join hands every solution it makes to the count, so the counts pay only where the join multiplies the
+        // solutions of the counted children; the join of the counts is planned only where they may pay
+        double solutions = JoinOptimizer.estimateRows(request, join);
+
+        if(solutions < COUNTED_JOIN_RATIO * Math.max(grouped, 1))
+            return null;
+
+        SqlIntercode joined = SqlJoin.join(request, joinedChilds);
+
+        if(solutions < COUNTED_JOIN_RATIO * Math.max(grouped + JoinOptimizer.estimateRows(request, joined), 1))
+            return null;
+
         SqlExpressionIntercode product = null;
 
-        for(int i = 0; i < countedChilds.size(); i++)
+        for(Variable count : counts)
         {
-            SqlExpressionIntercode count = SqlVariable.create(relations, joined.getVariable(getCountVariable(i)));
-            product = product == null ? count : SqlBinaryArithmetic.create(relations, MULTIPLY, product, count);
+            SqlExpressionIntercode value = SqlVariable.create(relations, joined.getVariable(count));
+            product = product == null ? value : SqlBinaryArithmetic.create(relations, MULTIPLY, product, value);
         }
 
         Variable productVariable = new Variable("@product");

@@ -4,15 +4,16 @@ import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
-import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.is;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.MatchResult;
+import java.util.regex.Pattern;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -39,8 +40,9 @@ import cz.iocb.sparql.testing.Database;
 /**
  * Counts of the solutions of joins that multiply the solutions of their children, which are counted by the counts of
  * the children grouped by the variables they share and by the grouping variables: without grouping and per group, with
- * three children, with no solution, and with a shared variable a child may leave unbound. A join that does not multiply
- * the solutions of its children and a count of distinct values are counted as they are.
+ * three children, with no solution, and with a shared variable a child may leave unbound. A child that the grouping
+ * does not reduce is joined as it is; a join that does not multiply the solutions of its children, a join none of whose
+ * children the grouping reduces and a count of distinct values are counted as they are.
  */
 public class CountedJoinTest
 {
@@ -50,9 +52,9 @@ public class CountedJoinTest
     private static final String prefix = "PREFIX ex: <http://example.org/> ";
 
     /**
-     * The SQL of the count of the second child of a join counted by the counts of its children.
+     * The column of the count of a child of a join counted by the counts of its children.
      */
-    private static final String counted = "\"@count1#";
+    private static final Pattern counted = Pattern.compile("\"@count[0-9]+#");
 
     /**
      * Configuration mapping the test tables.
@@ -213,18 +215,18 @@ public class CountedJoinTest
 
 
     /**
-     * Checks that the query is counted by the counts of the children of its join, or as it is, under both
-     * configurations.
+     * Checks that the query is counted by the counts of the number of the children of its join, or as it is when the
+     * number is zero, under both configurations.
      *
      * @param query the query, without the prefix declarations
-     * @param byChildren whether the join is counted by the counts of its children
+     * @param children the number of the children of the join counted by their counts
      * @throws Exception on errors
      */
-    private static void assertCounted(String query, boolean byChildren) throws Exception
+    private static void assertCounted(String query, int children) throws Exception
     {
         for(SparqlDatabaseConfiguration configuration : List.of(config, optimized))
-            assertThat(translate(configuration, query),
-                    byChildren ? containsString(counted) : not(containsString(counted)));
+            assertThat(counted.matcher(translate(configuration, query)).results().map(MatchResult::group).distinct()
+                    .count(), is((long) children));
     }
 
 
@@ -270,7 +272,7 @@ public class CountedJoinTest
         String query = "SELECT (COUNT(*) AS ?c) WHERE { ?s ex:p ?o1 . ?s ex:q ?o2 }";
 
         // the subjects a/1 to a/5 have 40 objects of ex:p and 30 of ex:q each
-        assertCounted(query, true);
+        assertCounted(query, 2);
         assertThat(execute(query), containsInAnyOrder(row(integer(6000))));
     }
 
@@ -280,13 +282,14 @@ public class CountedJoinTest
     {
         String query = "SELECT ?o (COUNT(*) AS ?c) WHERE { ?s ex:p ?o . ?s ex:q ?o2 } GROUP BY ?o";
 
-        // every object of ex:p is the object of the five subjects with 30 objects of ex:q each
+        // every object of ex:p is the object of the five subjects with 30 objects of ex:q each; ex:p is grouped by both
+        // its variables, which leaves its solutions as they are, so only ex:q is counted
         List<List<RdfTerm>> expected = new ArrayList<>();
 
         for(int o = 1; o <= 40; o++)
             expected.add(row(a(o), integer(150)));
 
-        assertCounted(query, true);
+        assertCounted(query, 1);
         assertThat(execute(query), containsInAnyOrder(expected.toArray()));
     }
 
@@ -302,7 +305,7 @@ public class CountedJoinTest
         for(int s = 1; s <= 5; s++)
             expected.add(row(a(s), integer(1200)));
 
-        assertCounted(query, true);
+        assertCounted(query, 2);
         assertThat(execute(query), containsInAnyOrder(expected.toArray()));
     }
 
@@ -312,7 +315,7 @@ public class CountedJoinTest
     {
         String query = "SELECT (COUNT(*) AS ?c) WHERE { ?s ex:p ?o1 . ?s ex:q ?o2 . ?s ex:t ?o3 }";
 
-        assertCounted(query, true);
+        assertCounted(query, 3);
         assertThat(execute(query), containsInAnyOrder(row(integer(18000))));
     }
 
@@ -324,9 +327,9 @@ public class CountedJoinTest
         String grouped = "SELECT ?o1 (COUNT(*) AS ?c) WHERE { ?s ex:p ?o1 . ?s ex:z ?o2 } GROUP BY ?o1";
 
         // the subject a/100 of ex:z has no object of ex:p: the count is zero, and no group is made
-        assertCounted(query, true);
+        assertCounted(query, 2);
         assertThat(execute(query), containsInAnyOrder(row(integer(0))));
-        assertCounted(grouped, true);
+        assertCounted(grouped, 1);
         assertThat(execute(grouped), empty());
     }
 
@@ -338,7 +341,7 @@ public class CountedJoinTest
 
         // the 11 solutions whose object a/1 or a/2 relates to a/1 by ex:w join the 50 objects of a/1 by ex:v, and the
         // other 190 solutions, which leave ?x unbound, join all 60 solutions of ex:v
-        assertCounted(query, true);
+        assertCounted(query, 2);
         assertThat(execute(query), containsInAnyOrder(row(integer(11 * 50 + 190 * 60))));
     }
 
@@ -349,7 +352,7 @@ public class CountedJoinTest
         String query = "SELECT (COUNT(*) AS ?c) WHERE { ?s ex:p ?o1 . ?s ex:r ?o2 }";
 
         // every subject has a single object of ex:r, so the join has as many solutions as ex:p
-        assertCounted(query, false);
+        assertCounted(query, 0);
         assertThat(execute(query), containsInAnyOrder(row(integer(201))));
     }
 
@@ -359,7 +362,25 @@ public class CountedJoinTest
     {
         String query = "SELECT (COUNT(DISTINCT ?o1) AS ?c) WHERE { ?s ex:p ?o1 . ?s ex:q ?o2 }";
 
-        assertCounted(query, false);
+        assertCounted(query, 0);
         assertThat(execute(query), containsInAnyOrder(row(integer(40))));
+    }
+
+
+    @Test
+    public void childrenNotReduced() throws Exception
+    {
+        String query = "SELECT ?o1 ?o2 (COUNT(*) AS ?c) WHERE { ?s ex:p ?o1 . ?s ex:q ?o2 } GROUP BY ?o1 ?o2";
+
+        // both children would be grouped by both their variables, which leaves their solutions as they are, so the join
+        // is counted as it is, although it multiplies them; every pair of objects has the five subjects a/1 to a/5
+        List<List<RdfTerm>> expected = new ArrayList<>();
+
+        for(int o1 = 1; o1 <= 40; o1++)
+            for(int o2 = 1; o2 <= 30; o2++)
+                expected.add(row(a(o1), a(o2), integer(5)));
+
+        assertCounted(query, 0);
+        assertThat(execute(query), containsInAnyOrder(expected.toArray()));
     }
 }
