@@ -685,40 +685,40 @@ public class EndpointServlet extends HttpServlet
         String maxrows = req.getParameter("maxrows");
 
         if(maxrows != null)
-            builder.append((hasParam++ == 0 ? "&" : "?") + "maxrows=" + URLEncoder.encode(maxrows, UTF_8));
+            builder.append((hasParam++ == 0 ? "?" : "&") + "maxrows=" + URLEncoder.encode(maxrows, UTF_8));
 
 
         String timeout = req.getParameter("timeout");
 
         if(timeout != null)
-            builder.append((hasParam++ == 0 ? "&" : "?") + "timeout=" + URLEncoder.encode(timeout, UTF_8));
+            builder.append((hasParam++ == 0 ? "?" : "&") + "timeout=" + URLEncoder.encode(timeout, UTF_8));
 
 
         String[] versions = req.getParameterValues("version");
 
         if(versions != null)
             for(String v : versions)
-                builder.append((hasParam++ == 0 ? "&" : "?") + "version=" + URLEncoder.encode(v, UTF_8));
+                builder.append((hasParam++ == 0 ? "?" : "&") + "version=" + URLEncoder.encode(v, UTF_8));
 
 
         String[] defaultGraphUris = req.getParameterValues("default-graph-uri");
 
         if(defaultGraphUris != null)
             for(String v : defaultGraphUris)
-                builder.append((hasParam++ == 0 ? "&" : "?") + "default-graph-uri=" + URLEncoder.encode(v, UTF_8));
+                builder.append((hasParam++ == 0 ? "?" : "&") + "default-graph-uri=" + URLEncoder.encode(v, UTF_8));
 
 
         String[] namedGraphUris = req.getParameterValues("named-graph-uri");
 
         if(namedGraphUris != null)
             for(String v : namedGraphUris)
-                builder.append((hasParam++ == 0 ? "&" : "?") + "named-graph-uri=" + URLEncoder.encode(v, UTF_8));
+                builder.append((hasParam++ == 0 ? "?" : "&") + "named-graph-uri=" + URLEncoder.encode(v, UTF_8));
 
 
         String query = req.getParameter("query");
 
         if(query != null)
-            builder.append((hasParam++ == 0 ? "&" : "?") + "query=" + URLEncoder.encode(query, UTF_8));
+            builder.append((hasParam++ == 0 ? "?" : "&") + "query=" + URLEncoder.encode(query, UTF_8));
 
 
         return builder.toString();
