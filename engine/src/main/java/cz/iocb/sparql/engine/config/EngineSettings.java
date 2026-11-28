@@ -127,9 +127,9 @@ public final class EngineSettings implements Cloneable
      * {@link cz.iocb.sparql.engine.imcode.JoinOptimizer#planExhaustively}); the tree of a join of more children is
      * built greedily (see {@link cz.iocb.sparql.engine.imcode.JoinOptimizer#planGreedily}), once the children that the
      * others determine have been left out (see {@link cz.iocb.sparql.engine.imcode.JoinOptimizer#getDetermined}).
-     * Trying the trees of n children takes time growing as 3 to the power of n and keeps the sizes of the joins of all
-     * the 2 to the power of n subsets of the children, which are numbered by the bits of an {@code int}, so the limit
-     * is at most 30.
+     * Trying the trees of n children takes time growing as 3 to the power of n and keeps the sizes and the best trees
+     * of the joins of all the 2 to the power of n subsets of the children in arrays, which an {@code int} indexes, so
+     * the limit is at most 30.
      */
     private int exhaustiveJoinLimit = 15;
 
