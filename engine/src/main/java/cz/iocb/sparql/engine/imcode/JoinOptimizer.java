@@ -84,9 +84,18 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * children so restricted, and a node that cannot be restricted costs its whole evaluation. The test of a pattern for
  * the solutions of another node (the pattern of an EXISTS, the right side of a MINUS) is chosen the same way (see
  * {@link #planTest}).
+ *
+ * The children of a join and its subsets are numbered by the bits of a {@code long}, so a join of more children than
+ * {@link #CHILD_LIMIT} is left to the planner of the database (see {@link #leaveToPlanner}).
  */
 final class JoinOptimizer
 {
+    /**
+     * Largest number of children of a join whose tree the optimizer chooses: the subsets of the children are kept as
+     * the bits of a {@code long}.
+     */
+    static final int CHILD_LIMIT = Long.SIZE;
+
     /**
      * A node of the join tree.
      */
@@ -130,7 +139,8 @@ final class JoinOptimizer
     /**
      * The join tree chosen for the children with the estimated number of rows of its result.
      *
-     * @param root the root of the tree
+     * @param root the root of the tree, or null for a join left to the planner of the database (see
+     *            {@link #leaveToPlanner})
      * @param first the child whose scan a tree chosen for the first solutions of the join starts with (see
      *            {@link #planFirstRows}), so that only a part of its rows is read; -1 when there is none
      * @param rows estimated number of rows of the result
@@ -143,7 +153,7 @@ final class JoinOptimizer
      *            {@link EngineSettings#memoizeRatio()}), as a bit per child
      */
     record Plan(Node root, int first, double rows, double cost, boolean restricted, List<Equality> equalities,
-            int memoized)
+            long memoized)
     {
     }
 
@@ -346,7 +356,7 @@ final class JoinOptimizer
      * @param mask the children of the tree, as a bit per child
      * @param cost cost of the tree
      */
-    private record Cost(int mask, double cost)
+    private record Cost(long mask, double cost)
     {
     }
 
@@ -360,7 +370,7 @@ final class JoinOptimizer
      * @param hashable whether the equality of the variable can be hashed: every child binding it binds it always and in
      *            a single class
      */
-    private record Shared(Variable variable, int mask, double[] distinct, boolean hashable)
+    private record Shared(Variable variable, long mask, double[] distinct, boolean hashable)
     {
     }
 
@@ -371,7 +381,7 @@ final class JoinOptimizer
      * @param mask the two children the join takes the variables of the condition from
      * @param selectivity estimated fraction of the solutions of a join of those children that the condition keeps
      */
-    private record Filter(int mask, double selectivity)
+    private record Filter(long mask, double selectivity)
     {
     }
 
@@ -469,6 +479,9 @@ final class JoinOptimizer
     {
         int n = childs.size();
 
+        if(n > CHILD_LIMIT)
+            return leaveToPlanner(request, childs, outer);
+
         Map<SqlExpressionIntercode, Set<Variable>> filters = getFilters(request.getConfiguration(), conditions);
 
         // the conditions each child decides by one variable, taken together, so that the bounds of a range are
@@ -553,6 +566,67 @@ final class JoinOptimizer
         return new Plan(plan.root(), plan.first(),
                 plan(request, childs, Filtering.none(n), outer, Double.POSITIVE_INFINITY).rows(), plan.cost(),
                 plan.restricted(), plan.equalities(), plan.memoized());
+    }
+
+
+    /**
+     * The plan of a join of more children than the optimizer chooses the tree of (see {@link #CHILD_LIMIT}): the join
+     * is left to the planner of the database, as without the optimizer, so the plan has no tree. Its rows are estimated
+     * as those of the join of all the children (see {@link Sizes#compute}), without the filters above, and it costs a
+     * pass over every child and the rows of the join.
+     *
+     * @param request the current request
+     * @param childs the children
+     * @param outer the rows the join is evaluated for one by one, or null when it is evaluated once
+     * @return the plan of the join without a tree
+     */
+    private static Plan leaveToPlanner(Request request, List<SqlIntercode> childs, Outer outer)
+    {
+        // the logarithm of the size, as the product of the rows of so many children may overflow
+        double size = 0;
+        double cost = 0;
+        boolean restricted = false;
+
+        double[] rows = new double[childs.size()];
+        Map<Variable, List<Integer>> bindings = new HashMap<>();
+
+        for(int i = 0; i < childs.size(); i++)
+        {
+            SqlIntercode child = childs.get(i);
+            Evaluation evaluation = outer == null ? null : estimateForRow(request, child, outer);
+
+            rows[i] = Math.max(evaluation == null ? estimateRows(request, child) : evaluation.rows(), 1);
+            size += Math.log(rows[i]);
+            cost += rows[i] + (evaluation == null ? 0 : evaluation.cost());
+            restricted |= evaluation != null && evaluation.restricted();
+
+            for(Variable variable : child.getVariableBindings().getVariables())
+                bindings.computeIfAbsent(variable, _ -> new ArrayList<>()).add(i);
+        }
+
+        // the values of a shared variable are taken to be among those of the child having the fewest of them
+        for(Map.Entry<Variable, List<Integer>> entry : bindings.entrySet())
+        {
+            if(entry.getValue().size() < 2)
+                continue;
+
+            double smallest = Double.POSITIVE_INFINITY;
+
+            for(int i : entry.getValue())
+            {
+                double distinct = Math.max(Math.min(estimateDistinct(request, childs.get(i), entry.getKey()), rows[i]),
+                        1);
+
+                size -= Math.log(distinct);
+                smallest = Math.min(smallest, distinct);
+            }
+
+            size += Math.log(smallest);
+        }
+
+        double result = Math.max(Math.exp(size), 1);
+
+        return new Plan(null, -1, result, cost + result, restricted, List.of(), 0);
     }
 
 
@@ -706,19 +780,19 @@ final class JoinOptimizer
         }
 
 
-        Map<Variable, Integer> masks = new HashMap<>();
+        Map<Variable, Long> masks = new HashMap<>();
 
         for(int i = 0; i < n; i++)
             for(Variable variable : childs.get(i).getVariableBindings().getVariables())
-                masks.merge(variable, 1 << i, (a, b) -> a | b);
+                masks.merge(variable, 1L << i, (a, b) -> a | b);
 
         List<Shared> shared = new ArrayList<>();
 
-        for(Map.Entry<Variable, Integer> entry : masks.entrySet())
+        for(Map.Entry<Variable, Long> entry : masks.entrySet())
         {
-            int mask = entry.getValue();
+            long mask = entry.getValue();
 
-            if(Integer.bitCount(mask) < 2)
+            if(Long.bitCount(mask) < 2)
                 continue;
 
             double[] distinct = new double[n];
@@ -726,7 +800,7 @@ final class JoinOptimizer
 
             for(int i = 0; i < n; i++)
             {
-                if((mask >> i & 1) == 0)
+                if((mask >> i & 1L) == 0)
                     continue;
 
                 SqlIntercode child = childs.get(i);
@@ -743,40 +817,40 @@ final class JoinOptimizer
 
 
         // the children adjacent to each child through a shared variable, and through a hashable one
-        int[] adjacent = new int[n];
-        int[] hashableAdjacent = new int[n];
+        long[] adjacent = new long[n];
+        long[] hashableAdjacent = new long[n];
 
         for(Shared s : shared)
         {
             for(int i = 0; i < n; i++)
             {
-                if((s.mask() >> i & 1) == 0)
+                if((s.mask() >> i & 1L) == 0)
                     continue;
 
-                adjacent[i] |= s.mask() & ~(1 << i);
+                adjacent[i] |= s.mask() & ~(1L << i);
 
                 if(s.hashable())
-                    hashableAdjacent[i] |= s.mask() & ~(1 << i);
+                    hashableAdjacent[i] |= s.mask() & ~(1L << i);
             }
         }
 
         // the children whose rows can be the outer rows of an index lookup into each child: those whose values of a
         // variable are compared with the column of the child as the column is
-        int[] lookupable = new int[n];
+        long[] lookupable = new long[n];
 
         for(int j = 0; j < n; j++)
         {
             for(Shared s : shared)
             {
-                if((s.mask() >> j & 1) == 0 || !s.hashable() || !canLookUp(request, childs.get(j), s.variable()))
+                if((s.mask() >> j & 1L) == 0 || !s.hashable() || !canLookUp(request, childs.get(j), s.variable()))
                     continue;
 
                 SqlTableAccess access = (SqlTableAccess) childs.get(j);
 
                 for(int i = 0; i < n; i++)
-                    if(i != j && (s.mask() >> i & 1) != 0
+                    if(i != j && (s.mask() >> i & 1L) != 0
                             && access.isLookedUpBy(request.getConfiguration(), childs.get(i).getVariable(s.variable())))
-                        lookupable[j] |= 1 << i;
+                        lookupable[j] |= 1L << i;
             }
         }
 
@@ -792,12 +866,12 @@ final class JoinOptimizer
                 int child = ends[e];
                 int other = ends[1 - e];
 
-                adjacent[child] |= 1 << other;
-                hashableAdjacent[child] |= 1 << other;
+                adjacent[child] |= 1L << other;
+                hashableAdjacent[child] |= 1L << other;
 
                 if(canLookUp(request, childs.get(child), variables[e]) && ((SqlTableAccess) childs.get(child))
                         .isLookedUpBy(request.getConfiguration(), equality.getRenamed(childs, other)))
-                    lookupable[child] |= 1 << other;
+                    lookupable[child] |= 1L << other;
             }
         }
 
@@ -806,7 +880,7 @@ final class JoinOptimizer
 
         for(List<Variable> equated : filtering.equated())
             filters.add(new Filter(
-                    1 << getDecidingChild(childs, equated.get(0)) | 1 << getDecidingChild(childs, equated.get(1)),
+                    1L << getDecidingChild(childs, equated.get(0)) | 1L << getDecidingChild(childs, equated.get(1)),
                     equalitySelectivity(request, childs, rows, filtering.values(), equated)));
 
         boolean exhaustive = n <= settings.exhaustiveJoinLimit();
@@ -814,19 +888,19 @@ final class JoinOptimizer
 
         // the trees of a join of too many children cannot all be tried, so the children that the others determine are
         // left out of the search and joined to the tree chosen for the others
-        int determined = exhaustive ? 0 : getDetermined(request, childs, filtering, shared, filters, lookupable);
+        long determined = exhaustive ? 0 : getDetermined(request, childs, filtering, shared, filters, lookupable);
 
         Node root;
         int first = -1;
 
         if(determined != 0)
         {
-            int[] members = IntStream.range(0, n).filter(i -> (determined >> i & 1) == 0).toArray();
+            int[] members = IntStream.range(0, n).filter(i -> (determined >> i & 1L) == 0).toArray();
 
             root = plan(settings, members, rows, dropped, adjacent, hashableAdjacent, lookupable, shared, filters);
 
             for(int i = 0; i < n; i++)
-                if((determined >> i & 1) != 0)
+                if((determined >> i & 1L) != 0)
                     root = attach(settings, root, i, adjacent[i], hashableAdjacent, lookupable, sizes, dropped);
         }
         else if(exhaustive)
@@ -834,7 +908,7 @@ final class JoinOptimizer
             Node[] trees = planExhaustively(settings, n, rows, dropped, adjacent, hashableAdjacent, lookupable, sizes);
 
             // the part of the solutions of the join that its parent reads
-            double fraction = needed / sizes.get((1 << n) - 1);
+            double fraction = needed / sizes.get(full(n));
 
             if(outer == null && fraction < 1)
             {
@@ -865,9 +939,8 @@ final class JoinOptimizer
             root = planGreedily(settings, n, dropped, adjacent, hashableAdjacent, lookupable, sizes);
         }
 
-        return new Plan(root, first, sizes.get((1 << n) - 1),
-                cost(settings, root, costs, hashableAdjacent, sizes).cost(), restricted, filtering.equalities(),
-                getMemoized(settings, root, shared, sizes));
+        return new Plan(root, first, sizes.get(full(n)), cost(settings, root, costs, hashableAdjacent, sizes).cost(),
+                restricted, filtering.equalities(), getMemoized(settings, root, shared, sizes));
     }
 
 
@@ -883,7 +956,7 @@ final class JoinOptimizer
      * @param sizes the sizes of the joins of the subsets of the children
      * @return the children looked up for rows repeating their values, as a bit per child
      */
-    private static int getMemoized(EngineSettings settings, Node node, List<Shared> shared, Sizes sizes)
+    private static long getMemoized(EngineSettings settings, Node node, List<Shared> shared, Sizes sizes)
     {
         return switch(node)
         {
@@ -892,27 +965,27 @@ final class JoinOptimizer
                     | getMemoized(settings, join.right(), shared, sizes);
             case Lookup lookup ->
             {
-                int outer = collect(lookup.outer(), new ArrayList<>());
+                long outer = collect(lookup.outer(), new ArrayList<>());
                 double values = 1;
 
                 for(Shared variable : shared)
                 {
-                    int binding = variable.mask() & outer;
+                    long binding = variable.mask() & outer;
 
-                    if((variable.mask() >> lookup.child() & 1) == 0 || binding == 0)
+                    if((variable.mask() >> lookup.child() & 1L) == 0 || binding == 0)
                         continue;
 
                     double fewest = Double.POSITIVE_INFINITY;
 
                     for(int i = 0; i < variable.distinct().length; i++)
-                        if((binding >> i & 1) != 0)
+                        if((binding >> i & 1L) != 0)
                             fewest = Math.min(fewest, variable.distinct()[i]);
 
                     values *= Math.max(fewest, 1);
                 }
 
                 yield getMemoized(settings, lookup.outer(), shared, sizes)
-                        | (isMemoized(settings, sizes.get(outer), values) ? 1 << lookup.child() : 0);
+                        | (isMemoized(settings, sizes.get(outer), values) ? 1L << lookup.child() : 0);
             }
         };
     }
@@ -972,14 +1045,14 @@ final class JoinOptimizer
      * @param lookupable the children whose rows can be the outer rows of an index lookup into each child
      * @return the children that the other children determine, as a bit per child
      */
-    private static int getDetermined(Request request, List<SqlIntercode> childs, Filtering filtering,
-            List<Shared> shared, List<Filter> filters, int[] lookupable)
+    private static long getDetermined(Request request, List<SqlIntercode> childs, Filtering filtering,
+            List<Shared> shared, List<Filter> filters, long[] lookupable)
     {
-        int determined = 0;
+        long determined = 0;
 
         for(int i = 0; i < childs.size(); i++)
         {
-            int child = 1 << i;
+            long child = 1L << i;
 
             List<Shared> variables = shared.stream().filter(s -> (s.mask() & child) != 0).toList();
 
@@ -988,7 +1061,7 @@ final class JoinOptimizer
                 continue;
 
             Shared variable = variables.get(0);
-            int others = variable.mask() & ~child;
+            long others = variable.mask() & ~child;
 
             if(!variable.hashable() || (others & ~lookupable[i]) != 0 || (others & ~determined) == 0)
                 continue;
@@ -999,7 +1072,7 @@ final class JoinOptimizer
             double values = variable.distinct()[i];
 
             if(IntStream.range(0, childs.size())
-                    .anyMatch(j -> (others >> j & 1) != 0 && variable.distinct()[j] > values))
+                    .anyMatch(j -> (others >> j & 1L) != 0 && variable.distinct()[j] > values))
                 continue;
 
             determined |= child;
@@ -1025,16 +1098,16 @@ final class JoinOptimizer
      * @param filters the conditions of the filters above the join that require variables of two children to be equal
      * @return the join tree of the members
      */
-    private static Node plan(EngineSettings settings, int[] members, double[] rows, double[] dropped, int[] adjacent,
-            int[] hashableAdjacent, int[] lookupable, List<Shared> shared, List<Filter> filters)
+    private static Node plan(EngineSettings settings, int[] members, double[] rows, double[] dropped, long[] adjacent,
+            long[] hashableAdjacent, long[] lookupable, List<Shared> shared, List<Filter> filters)
     {
         int n = members.length;
 
         double[] memberRows = new double[n];
         double[] memberDropped = new double[n];
-        int[] memberAdjacent = new int[n];
-        int[] memberHashableAdjacent = new int[n];
-        int[] memberLookupable = new int[n];
+        long[] memberAdjacent = new long[n];
+        long[] memberHashableAdjacent = new long[n];
+        long[] memberLookupable = new long[n];
 
         for(int i = 0; i < n; i++)
         {
@@ -1049,7 +1122,7 @@ final class JoinOptimizer
                 Arrays.stream(members).mapToDouble(m -> s.distinct()[m]).toArray(), s.hashable())).toList();
 
         List<Filter> memberFilters = filters.stream().map(f -> new Filter(renumber(f.mask(), members), f.selectivity()))
-                .filter(f -> Integer.bitCount(f.mask()) == 2).toList();
+                .filter(f -> Long.bitCount(f.mask()) == 2).toList();
 
         boolean exhaustive = n <= settings.exhaustiveJoinLimit();
         Sizes sizes = new Sizes(n, memberRows, memberShared, memberFilters, exhaustive);
@@ -1065,19 +1138,31 @@ final class JoinOptimizer
 
 
     /**
+     * All the children of a join, as a bit per child.
+     *
+     * @param n number of children, at most {@link #CHILD_LIMIT}
+     * @return all the children of the join, as a bit per child
+     */
+    private static long full(int n)
+    {
+        return n == Long.SIZE ? -1L : (1L << n) - 1;
+    }
+
+
+    /**
      * The members of a subset of the children of a join as a subset of the members numbered anew.
      *
      * @param mask the subset, as a bit per child of the join
      * @param members the members, by their indexes in the join
      * @return the members of the subset, as a bit per member
      */
-    private static int renumber(int mask, int[] members)
+    private static long renumber(long mask, int[] members)
     {
-        int renumbered = 0;
+        long renumbered = 0;
 
         for(int i = 0; i < members.length; i++)
-            if((mask >> members[i] & 1) != 0)
-                renumbered |= 1 << i;
+            if((mask >> members[i] & 1L) != 0)
+                renumbered |= 1L << i;
 
         return renumbered;
     }
@@ -1107,7 +1192,7 @@ final class JoinOptimizer
      * @param node the subtree
      * @param mask the children of the subtree, as a bit per child
      */
-    private record Subtree(Node node, int mask)
+    private record Subtree(Node node, long mask)
     {
     }
 
@@ -1129,8 +1214,8 @@ final class JoinOptimizer
      * @param dropped the rows a scan of each child reads beyond the rows the child gives the joins
      * @return the tree with the child joined
      */
-    private static Node attach(EngineSettings settings, Node tree, int child, int adjacent, int[] hashableAdjacent,
-            int[] lookupable, Sizes sizes, double[] dropped)
+    private static Node attach(EngineSettings settings, Node tree, int child, long adjacent, long[] hashableAdjacent,
+            long[] lookupable, Sizes sizes, double[] dropped)
     {
         List<Subtree> subtrees = new ArrayList<>();
         collect(tree, subtrees);
@@ -1145,7 +1230,7 @@ final class JoinOptimizer
             if((subtree.mask() & adjacent) == 0)
                 continue;
 
-            Map.Entry<Double, Node> candidate = join(settings, subtree.mask(), 1 << child, subtree.node(),
+            Map.Entry<Double, Node> candidate = join(settings, subtree.mask(), 1L << child, subtree.node(),
                     new Leaf(child), hashableAdjacent, lookupable, sizes, dropped);
 
             if(candidate.getKey() <= bestCost)
@@ -1167,12 +1252,12 @@ final class JoinOptimizer
      * @param subtrees the list the subtrees are added to
      * @return the children of the tree, as a bit per child
      */
-    private static int collect(Node node, List<Subtree> subtrees)
+    private static long collect(Node node, List<Subtree> subtrees)
     {
-        int mask = switch(node)
+        long mask = switch(node)
         {
-            case Leaf leaf -> 1 << leaf.child();
-            case Lookup lookup -> collect(lookup.outer(), subtrees) | 1 << lookup.child();
+            case Leaf leaf -> 1L << leaf.child();
+            case Lookup lookup -> collect(lookup.outer(), subtrees) | 1L << lookup.child();
             case HashJoin join -> collect(join.left(), subtrees) | collect(join.right(), subtrees);
         };
 
@@ -1364,7 +1449,7 @@ final class JoinOptimizer
         /**
          * The sizes computed, by the subset, otherwise.
          */
-        private final Map<Integer, Double> map;
+        private final Map<Long, Double> map;
 
         /**
          * Estimated numbers of distinct values of every shared variable in the join of every subset of the children, by
@@ -1375,7 +1460,7 @@ final class JoinOptimizer
         /**
          * The children binding every shared variable, as a bit per child, once computed (see {@link #getMatched}).
          */
-        private int[] masks = null;
+        private long[] masks = null;
 
         /**
          * The shared variables that the children of every subset bind, as a bit per variable for the first
@@ -1415,14 +1500,17 @@ final class JoinOptimizer
          * @param mask the subset
          * @return estimated size of the join of the subset of the children
          */
-        double get(int mask)
+        double get(long mask)
         {
             if(array != null)
             {
-                if(Double.isNaN(array[mask]))
-                    array[mask] = compute(mask);
+                // the subsets of the children kept in the array are few enough for an int to number them
+                int index = (int) mask;
 
-                return array[mask];
+                if(Double.isNaN(array[index]))
+                    array[index] = compute(mask);
+
+                return array[index];
             }
 
             return map.computeIfAbsent(mask, this::compute);
@@ -1446,7 +1534,7 @@ final class JoinOptimizer
             if(values == null)
             {
                 values = new double[shared.size()][1 << n];
-                masks = new int[shared.size()];
+                masks = new long[shared.size()];
 
                 for(int v = 0; v < values.length; v++)
                 {
@@ -1503,12 +1591,12 @@ final class JoinOptimizer
          * @param mask the subset
          * @return estimated size of the join of the subset of the children
          */
-        private double compute(int mask)
+        private double compute(long mask)
         {
             double size = 1;
 
             for(int i = 0; i < n; i++)
-                if((mask >> i & 1) != 0)
+                if((mask >> i & 1L) != 0)
                     size *= rows[i];
 
             for(Shared s : shared)
@@ -1518,7 +1606,7 @@ final class JoinOptimizer
 
                 for(int i = 0; i < n; i++)
                 {
-                    if(((mask & s.mask()) >> i & 1) == 0)
+                    if(((mask & s.mask()) >> i & 1L) == 0)
                         continue;
 
                     double distinct = s.distinct()[i];
@@ -1567,15 +1655,15 @@ final class JoinOptimizer
      * @param dropped the rows a scan of each child reads beyond the rows the child gives the joins
      * @return the cost and the node
      */
-    private static Map.Entry<Double, Node> join(EngineSettings settings, int left, int right, Node leftTree,
-            Node rightTree, int[] hashableAdjacent, int[] lookupable, Sizes sizes, double[] dropped)
+    private static Map.Entry<Double, Node> join(EngineSettings settings, long left, long right, Node leftTree,
+            Node rightTree, long[] hashableAdjacent, long[] lookupable, Sizes sizes, double[] dropped)
     {
         double cost = hashCost(settings, left, right, hashableAdjacent, sizes);
         Node node = new HashJoin(leftTree, rightTree);
 
         if((right & right - 1) == 0)
         {
-            int child = Integer.numberOfTrailingZeros(right);
+            int child = Long.numberOfTrailingZeros(right);
 
             if((lookupable[child] & left) != 0)
             {
@@ -1604,7 +1692,7 @@ final class JoinOptimizer
      * @param sizes the sizes of the joins
      * @return the cost of the join
      */
-    private static double hashCost(EngineSettings settings, int left, int right, int[] hashableAdjacent, Sizes sizes)
+    private static double hashCost(EngineSettings settings, long left, long right, long[] hashableAdjacent, Sizes sizes)
     {
         return hashCost(settings, isHashable(left, right, hashableAdjacent), sizes.get(left), sizes.get(right),
                 sizes.get(left | right));
@@ -1619,10 +1707,10 @@ final class JoinOptimizer
      * @param hashableAdjacent the children adjacent to each child through a hashable variable
      * @return true if a child of the left subset is adjacent to a child of the right one through a hashable variable
      */
-    private static boolean isHashable(int left, int right, int[] hashableAdjacent)
+    private static boolean isHashable(long left, long right, long[] hashableAdjacent)
     {
         for(int i = 0; i < hashableAdjacent.length; i++)
-            if((left >> i & 1) != 0 && (hashableAdjacent[i] & right) != 0)
+            if((left >> i & 1L) != 0 && (hashableAdjacent[i] & right) != 0)
                 return true;
 
         return false;
@@ -1683,7 +1771,7 @@ final class JoinOptimizer
      * @param sizes the sizes of the joins
      * @return the cost of the join
      */
-    private static double lookupCost(EngineSettings settings, int left, int right, Sizes sizes)
+    private static double lookupCost(EngineSettings settings, long left, long right, Sizes sizes)
     {
         return sizes.get(left) * settings.lookupCost() + settings.lookupRowCost() * sizes.get(left | right);
     }
@@ -1700,15 +1788,15 @@ final class JoinOptimizer
      * @param sizes the sizes of the joins
      * @return the children of the tree with its cost
      */
-    private static Cost cost(EngineSettings settings, Node node, double[] costs, int[] hashableAdjacent, Sizes sizes)
+    private static Cost cost(EngineSettings settings, Node node, double[] costs, long[] hashableAdjacent, Sizes sizes)
     {
         if(node instanceof Leaf leaf)
-            return new Cost(1 << leaf.child(), costs[leaf.child()]);
+            return new Cost(1L << leaf.child(), costs[leaf.child()]);
 
         if(node instanceof Lookup lookup)
         {
             Cost outer = cost(settings, lookup.outer(), costs, hashableAdjacent, sizes);
-            int child = 1 << lookup.child();
+            long child = 1L << lookup.child();
 
             return new Cost(outer.mask() | child, outer.cost() + lookupCost(settings, outer.mask(), child, sizes));
         }
@@ -1741,7 +1829,7 @@ final class JoinOptimizer
      *         of all the children
      */
     private static Node[] planExhaustively(EngineSettings settings, int n, double[] rows, double[] dropped,
-            int[] adjacent, int[] hashableAdjacent, int[] lookupable, Sizes sizes)
+            long[] adjacent, long[] hashableAdjacent, long[] lookupable, Sizes sizes)
     {
         int full = (1 << n) - 1;
 
@@ -1807,20 +1895,21 @@ final class JoinOptimizer
 
 
     /**
-     * The children adjacent to the children of every subset of the children through a shared variable.
+     * The children adjacent to the children of every subset of the children through a shared variable; only for the
+     * children few enough for an int to number all their subsets.
      *
      * @param n number of children
      * @param adjacent the children adjacent to each child through a shared variable
      * @return the children adjacent to a child of each subset, by the subset as a bit per child
      */
-    private static int[] getNeighbours(int n, int[] adjacent)
+    private static int[] getNeighbours(int n, long[] adjacent)
     {
         int[] neighbours = new int[1 << n];
 
         for(int mask = 1; mask < neighbours.length; mask++)
         {
             int lowest = mask & -mask;
-            neighbours[mask] = neighbours[mask ^ lowest] | adjacent[Integer.numberOfTrailingZeros(lowest)];
+            neighbours[mask] = neighbours[mask ^ lowest] | (int) adjacent[Integer.numberOfTrailingZeros(lowest)];
         }
 
         return neighbours;
@@ -1857,7 +1946,7 @@ final class JoinOptimizer
      * @return the join tree
      */
     private static Node planFirstRows(EngineSettings settings, int n, double[] rows, double[] dropped,
-            boolean[] streamed, int[] adjacent, int[] hashableAdjacent, int[] lookupable, Sizes sizes, Node[] whole,
+            boolean[] streamed, long[] adjacent, long[] hashableAdjacent, long[] lookupable, Sizes sizes, Node[] whole,
             double fraction)
     {
         int full = (1 << n) - 1;
@@ -1985,10 +2074,10 @@ final class JoinOptimizer
      * @param sizes the sizes of the joins
      * @return the join tree
      */
-    private static Node planGreedily(EngineSettings settings, int n, double[] dropped, int[] adjacent,
-            int[] hashableAdjacent, int[] lookupable, Sizes sizes)
+    private static Node planGreedily(EngineSettings settings, int n, double[] dropped, long[] adjacent,
+            long[] hashableAdjacent, long[] lookupable, Sizes sizes)
     {
-        int full = (1 << n) - 1;
+        long full = full(n);
 
         double bestCost = Double.POSITIVE_INFINITY;
         Node bestTree = null;
@@ -1996,13 +2085,13 @@ final class JoinOptimizer
         for(int start = 0; start < n; start++)
         {
             Node tree = new Leaf(start);
-            int mask = 1 << start;
-            int neighbours = adjacent[start];
+            long mask = 1L << start;
+            long neighbours = adjacent[start];
             double cost = dropped[start];
 
             while(mask != full)
             {
-                int candidates = (neighbours & ~mask) != 0 ? neighbours & ~mask : full & ~mask;
+                long candidates = (neighbours & ~mask) != 0 ? neighbours & ~mask : full & ~mask;
 
                 double stepCost = Double.POSITIVE_INFINITY;
                 Node stepTree = null;
@@ -2010,10 +2099,10 @@ final class JoinOptimizer
 
                 for(int i = 0; i < n; i++)
                 {
-                    if((candidates >> i & 1) == 0)
+                    if((candidates >> i & 1L) == 0)
                         continue;
 
-                    Map.Entry<Double, Node> candidate = join(settings, mask, 1 << i, tree, new Leaf(i),
+                    Map.Entry<Double, Node> candidate = join(settings, mask, 1L << i, tree, new Leaf(i),
                             hashableAdjacent, lookupable, sizes, dropped);
 
                     if(candidate.getKey() + dropped[i] < stepCost)
@@ -2026,7 +2115,7 @@ final class JoinOptimizer
 
                 cost += stepCost;
                 tree = stepTree;
-                mask |= 1 << stepChild;
+                mask |= 1L << stepChild;
                 neighbours |= adjacent[stepChild];
             }
 

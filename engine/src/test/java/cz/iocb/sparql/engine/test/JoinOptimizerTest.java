@@ -9,6 +9,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -346,6 +347,25 @@ public class JoinOptimizerTest
         String query = "SELECT ?x ?y ?z WHERE { ?x ex:tag ?t . ?x ex:link ?y . ?y ex:link ?z }";
         config.setEngineSettings(EngineSettings.DEFAULT.withExhaustiveJoinLimit(1));
         assertThat(execute(config, query), containsInAnyOrder(execute(plain, query).toArray()));
+    }
+
+
+    @Test
+    public void joinsOfManyChildren() throws Exception
+    {
+        // forty accesses of the few, joined on their subject, are more children than the bits of an int number
+        String forty = "SELECT * WHERE { "
+                + IntStream.range(0, 40).mapToObj(i -> "?x ex:tag ?t" + i + " .").collect(joining(" ")) + " }";
+
+        assertThat(explain(forty), containsString("join ("));
+        assertThat(check(forty), hasSize(5));
+
+        // and seventy are more than the bits of a long number, so the join is left to the planner
+        String seventy = "SELECT * WHERE { "
+                + IntStream.range(0, 70).mapToObj(i -> "?x ex:tag ?t" + i + " .").collect(joining(" ")) + " }";
+
+        assertThat(explain(seventy), not(containsString("join (")));
+        assertThat(check(seventy), hasSize(5));
     }
 
 

@@ -1245,7 +1245,9 @@ public final class SqlJoin extends SqlIntercode
 
         builder.append(" FROM ");
 
-        if(request.getConfiguration().isJoinOptimizerEnabled() && childs.size() > 1)
+        // a join of more children than the optimizer chooses the tree of is left to the planner (see JoinOptimizer)
+        if(request.getConfiguration().isJoinOptimizerEnabled() && childs.size() > 1
+                && getPlan(request, outer).root() != null)
         {
             Map<Variable, Set<ResourceClass>> joined = getJoinedClasses(relations,
                     childs.stream().map(c -> c.getVariableBindings()).toList());
@@ -1335,7 +1337,7 @@ public final class SqlJoin extends SqlIntercode
      * @param builder the SQL code being built
      * @return the children of the tree, as a bit per child
      */
-    private int translateTree(Request request, Scope scope, JoinOptimizer.Node node, JoinOptimizer.Plan plan,
+    private long translateTree(Request request, Scope scope, JoinOptimizer.Node node, JoinOptimizer.Plan plan,
             Map<Variable, Set<ResourceClass>> joined, JoinOptimizer.Outer outer, Map<Integer, Set<Variable>> replaced,
             SqlBuilder builder)
     {
@@ -1353,12 +1355,12 @@ public final class SqlJoin extends SqlIntercode
             builder.append(") AS ");
             builder.append(tables.get(leaf.child()));
 
-            return 1 << leaf.child();
+            return 1L << leaf.child();
         }
 
         if(node instanceof JoinOptimizer.Lookup lookup)
         {
-            int outerChilds = translateTree(request, scope, lookup.outer(), plan, joined, outer, replaced, builder);
+            long outerChilds = translateTree(request, scope, lookup.outer(), plan, joined, outer, replaced, builder);
             SqlTableAccess access = (SqlTableAccess) childs.get(lookup.child());
 
             // the values the access is looked up by: those of the children of the outer tree, those an outer child
@@ -1367,7 +1369,7 @@ public final class SqlJoin extends SqlIntercode
             List<LookupSource> sources = new ArrayList<>();
 
             for(int i = 0; i < childs.size(); i++)
-                if((outerChilds >> i & 1) != 0)
+                if((outerChilds >> i & 1L) != 0)
                     sources.add(new LookupSource(i, childs.get(i).getVariableBindings(), tables.get(i), joined));
 
             for(JoinOptimizer.Equality equality : equalities)
@@ -1375,7 +1377,7 @@ public final class SqlJoin extends SqlIntercode
                 int other = equality.left() == lookup.child() ? equality.right() :
                         equality.right() == lookup.child() ? equality.left() : -1;
 
-                if(other == -1 || (outerChilds >> other & 1) == 0)
+                if(other == -1 || (outerChilds >> other & 1L) == 0)
                     continue;
 
                 VariableBindings value = new VariableBindings();
@@ -1439,31 +1441,31 @@ public final class SqlJoin extends SqlIntercode
             builder.append(" CROSS JOIN LATERAL (");
             builder.append(inPlace ?
                     access.translateInPlace(request, condition, compared,
-                            (plan.memoized() >> lookup.child() & 1) != 0) :
+                            (plan.memoized() >> lookup.child() & 1L) != 0) :
                     access.translateLateral(request, condition, compared));
             builder.append(") AS ");
             builder.append(tables.get(lookup.child()));
 
-            return outerChilds | 1 << lookup.child();
+            return outerChilds | 1L << lookup.child();
         }
 
         JoinOptimizer.HashJoin join = (JoinOptimizer.HashJoin) node;
 
-        int left = translateTree(request, scope, join.left(), plan, joined, outer, replaced, builder);
+        long left = translateTree(request, scope, join.left(), plan, joined, outer, replaced, builder);
 
         SqlBuilder rightBuilder = new SqlBuilder();
-        int right = translateTree(request, scope, join.right(), plan, joined, outer, replaced, rightBuilder);
+        long right = translateTree(request, scope, join.right(), plan, joined, outer, replaced, rightBuilder);
 
         List<SqlCode> conditions = new ArrayList<>();
 
         for(int i = 0; i < childs.size(); i++)
         {
-            if((left >> i & 1) == 0)
+            if((left >> i & 1L) == 0)
                 continue;
 
             for(int j = 0; j < childs.size(); j++)
             {
-                if((right >> j & 1) == 0)
+                if((right >> j & 1L) == 0)
                     continue;
 
                 SqlCode condition = generateJoinCondition(relations,
@@ -1479,7 +1481,7 @@ public final class SqlJoin extends SqlIntercode
         // the equalities of the filters above whose children the join brings together
         for(JoinOptimizer.Equality equality : equalities)
         {
-            int ends = 1 << equality.left() | 1 << equality.right();
+            long ends = 1L << equality.left() | 1L << equality.right();
 
             if((left & ends) == 0 || (right & ends) == 0)
                 continue;
@@ -2292,7 +2294,7 @@ public final class SqlJoin extends SqlIntercode
         builder.append("join");
 
         // the tree chosen by the optimizer, when the join has been translated with it
-        if(plan != null)
+        if(plan != null && plan.root() != null)
             builder.append(" ").append(JoinOptimizer.describe(plan.root()));
 
         for(int i = 0; i < childs.size(); i++)
