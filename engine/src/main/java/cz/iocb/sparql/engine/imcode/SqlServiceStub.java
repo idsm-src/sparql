@@ -45,6 +45,7 @@ import javax.xml.parsers.SAXParserFactory;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
+import cz.iocb.sparql.engine.config.EngineSettings;
 import cz.iocb.sparql.engine.config.ServiceSettings;
 import cz.iocb.sparql.engine.config.ServiceSettings.ContextOverflow;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
@@ -625,29 +626,19 @@ public final class SqlServiceStub extends SqlIntercode
 
     /**
      * Answer of an endpoint, received by a virtual thread of its own, so that the thread evaluating the request never
-     * blocks on the communication: it waits for the parts of the answer, checking every {@link #CHECK_INTERVAL} at the
-     * latest that the time limit of the request has not elapsed and that the request has not been cancelled (see
-     * {@link Request#cancel}), and once it gives the answer up, it interrupts the receiving thread, which ends a
-     * blocking operation of a virtual thread on a socket by closing the socket. So an endpoint that does not answer, or
-     * sends its answer slowly, holds the request neither beyond its time limit nor once the request is cancelled,
-     * whether the call is connecting, sending the query, waiting for the response or reading it (a single read of a
-     * connection is bounded only by its read timeout, the time remaining when the connection was opened, which an
-     * endpoint sending its answer slowly never reaches). The receiving thread hands the answer over in parts through a
-     * bounded queue, so it reads ahead only a few parts.
+     * blocks on the communication: it waits for the parts of the answer, checking at the interval the settings of the
+     * engine give (see {@link EngineSettings#serviceCheckInterval()}) at the latest that the time limit of the request
+     * has not elapsed and that the request has not been cancelled (see {@link Request#cancel}), and once it gives the
+     * answer up, it interrupts the receiving thread, which ends a blocking operation of a virtual thread on a socket by
+     * closing the socket. So an endpoint that does not answer, or sends its answer slowly, holds the request neither
+     * beyond its time limit nor once the request is cancelled, whether the call is connecting, sending the query,
+     * waiting for the response or reading it (a single read of a connection is bounded only by its read timeout, the
+     * time remaining when the connection was opened, which an endpoint sending its answer slowly never reaches). The
+     * receiving thread hands the answer over in parts through a bounded queue, so it reads ahead only a few parts (see
+     * {@link EngineSettings#servicePartSize()} and {@link EngineSettings#serviceReadAhead()}).
      */
     private static final class Answer extends InputStream
     {
-        /**
-         * Longest time in milliseconds the request waits for a part of the answer before it checks its time limit and
-         * its cancellation again.
-         */
-        private static final long CHECK_INTERVAL = 100;
-
-        /**
-         * Largest part of the answer handed over at once, in bytes.
-         */
-        private static final int PART_SIZE = 65536;
-
         /**
          * Element of the queue telling that the endpoint has accepted the request.
          */
@@ -667,7 +658,7 @@ public final class SqlServiceStub extends SqlIntercode
          * What the receiving thread has received and the request has not taken yet: {@link #ACCEPTED}, the parts of the
          * answer as byte arrays and {@link #END}, or the {@link Throwable} that has ended the communication.
          */
-        private final BlockingQueue<Object> received = new ArrayBlockingQueue<>(16);
+        private final BlockingQueue<Object> received;
 
         /**
          * The thread receiving the answer.
@@ -707,6 +698,7 @@ public final class SqlServiceStub extends SqlIntercode
         Answer(Request request, String endpoint, String query, int redirectLimit)
         {
             this.request = request;
+            this.received = new ArrayBlockingQueue<>(request.getEngineSettings().serviceReadAhead());
             this.receiver = Thread.ofVirtual().start(() -> receive(endpoint, query, redirectLimit));
         }
 
@@ -754,7 +746,7 @@ public final class SqlServiceStub extends SqlIntercode
 
                 try(InputStream input = connection.getInputStream())
                 {
-                    byte[] buffer = new byte[PART_SIZE];
+                    byte[] buffer = new byte[request.getEngineSettings().servicePartSize()];
 
                     for(int length; (length = input.read(buffer)) >= 0;)
                         if(length > 0)
@@ -913,7 +905,8 @@ public final class SqlServiceStub extends SqlIntercode
                     if(request.isCanceled())
                         throw new InterruptedIOException("query was canceled");
 
-                    Object element = received.poll(CHECK_INTERVAL, TimeUnit.MILLISECONDS);
+                    Object element = received.poll(request.getEngineSettings().serviceCheckInterval().toNanos(),
+                            TimeUnit.NANOSECONDS);
 
                     if(element != null)
                         return element;
@@ -1393,8 +1386,8 @@ public final class SqlServiceStub extends SqlIntercode
             String statement = SqlSelect.translateStatement(request, code);
             boolean overflow = false;
 
-            try(Result result = new Result(ResultType.SELECT, query.getResultDescription(),
-                    request.getStatement().executeQuery(statement), request.getBegin(), request.getTimeout()))
+            try(Result result = new Result(request, ResultType.SELECT, query.getResultDescription(),
+                    request.getStatement().executeQuery(statement)))
             {
                 varIndexes = result.getVariableIndexes();
 

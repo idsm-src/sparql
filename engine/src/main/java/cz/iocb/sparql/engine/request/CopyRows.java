@@ -17,6 +17,7 @@ import org.postgresql.PGConnection;
 import org.postgresql.copy.CopyOut;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import cz.iocb.sparql.engine.config.EngineSettings;
 import cz.iocb.sparql.engine.database.SqlType;
 
 
@@ -47,12 +48,6 @@ final class CopyRows implements ResultRows
      * Logger of the copies.
      */
     private static final Logger logger = LoggerFactory.getLogger(CopyRows.class);
-
-    /**
-     * Time in nanoseconds for which rows closed before their end read the rows the database has sent already, about
-     * what a cancellation of the copy takes, as it opens a connection of its own (see {@link #close}).
-     */
-    private static final long DRAIN_TIME = 2_000_000;
 
     /**
      * The request whose statement is copied.
@@ -348,11 +343,12 @@ final class CopyRows implements ResultRows
 
     /**
      * {@inheritDoc} The rows of a copy whose end has not been read are read and dropped as far as the database has sent
-     * them, without waiting for more, though for {@link #DRAIN_TIME} at most, as the database may go on sending them as
-     * they are read. A copy that has not ended with them is cancelled, and the rows the database sends before it takes
-     * the cancellation are dropped as well, as is the error ending the copy; the transaction that an error has aborted
-     * is rolled back to the savepoint made before the statement. So a copy whose end has come with the rows read, like
-     * the copy of a few rows read in part, ends without the cancellation and without rolling back.
+     * them, without waiting for more, though for the time the settings of the engine give at most (see
+     * {@link EngineSettings#copyDrainTime()}), as the database may go on sending them as they are read. A copy that has
+     * not ended with them is cancelled, and the rows the database sends before it takes the cancellation are dropped as
+     * well, as is the error ending the copy; the transaction that an error has aborted is rolled back to the savepoint
+     * made before the statement. So a copy whose end has come with the rows read, like the copy of a few rows read in
+     * part, ends without the cancellation and without rolling back.
      */
     @Override
     public void close() throws SQLException
@@ -366,9 +362,10 @@ final class CopyRows implements ResultRows
 
         try
         {
-            long deadline = System.nanoTime() + DRAIN_TIME;
+            long begin = System.nanoTime();
+            long drain = request.getEngineSettings().copyDrainTime().toNanos();
 
-            while(System.nanoTime() < deadline && copy.readFromCopy(false) != null)
+            while(System.nanoTime() - begin < drain && copy.readFromCopy(false) != null)
                 dropped++;
 
             if(copy.isActive())

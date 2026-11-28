@@ -708,10 +708,10 @@ public class Request implements AutoCloseable
                     advise(code);
 
                 if(copied)
-                    return new Result(type, imcode.getResultDescription(), copy(code), fetchSize, begin, timeout);
+                    return new Result(this, type, imcode.getResultDescription(), copy(code), fetchSize);
 
-                return new Result(type, imcode.getResultDescription(), getStatement(fetchSize).executeQuery(code),
-                        begin, timeout);
+                return new Result(this, type, imcode.getResultDescription(),
+                        getStatement(fetchSize).executeQuery(code));
             }
             catch(SQLRuntimeException e)
             {
@@ -920,9 +920,10 @@ public class Request implements AutoCloseable
     /**
      * Cancels the copy of the rows of the statement of the request (see {@link #copying}). A cancellation that comes
      * before the statement of the copy reaches the database has no effect, and the driver tells that the database has
-     * started the copy only when the database sends the first rows, so the cancellation is sent again every 100
-     * milliseconds by a thread of its own until then, unless the copy has ended; once the database has started the
-     * copy, the rows end at their next row, or close, as the request has been cancelled (see {@link CopyRows#next}).
+     * started the copy only when the database sends the first rows, so the cancellation is sent again by a thread of
+     * its own at the interval the settings of the engine give (see {@link EngineSettings#copyCancelInterval()}) until
+     * then, unless the copy has ended; once the database has started the copy, the rows end at their next row, or
+     * close, as the request has been cancelled (see {@link CopyRows#next}).
      *
      * @param rows the rows of the copy
      * @throws SQLException when the cancellation cannot be sent
@@ -939,7 +940,7 @@ public class Request implements AutoCloseable
             {
                 while(true)
                 {
-                    Thread.sleep(100);
+                    Thread.sleep(engineSettings.copyCancelInterval());
 
                     synchronized(this)
                     {

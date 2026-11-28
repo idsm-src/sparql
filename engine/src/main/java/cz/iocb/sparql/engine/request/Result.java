@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import cz.iocb.sparql.engine.config.EngineSettings;
 import cz.iocb.sparql.engine.mapping.classes.BooleanBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.BooleanClass;
 import cz.iocb.sparql.engine.mapping.classes.ByteBaseClass;
@@ -203,43 +204,44 @@ public class Result implements AutoCloseable
 
 
     /**
-     * Creates the cursor over the result set described by the given result classes.
+     * Creates the cursor over the result set described by the given result classes, read within the time limit of the
+     * request (see {@link Request#getTimeout}).
      *
+     * @param request the request whose statement the result set belongs to
      * @param type form of the query
      * @param description result classes of each projected variable
      * @param rs the JDBC result set
-     * @param begin start of the execution in {@link System#nanoTime} units
-     * @param timeout time limit in nanoseconds, 0 for none
      * @throws SQLException on database errors
      */
-    public Result(ResultType type, Map<Variable, List<ResourceClass>> description, ResultSet rs, long begin,
-            long timeout) throws SQLException
+    public Result(Request request, ResultType type, Map<Variable, List<ResourceClass>> description, ResultSet rs)
+            throws SQLException
     {
-        this(type, description, new ResultSetRows(rs), rs.getFetchSize(), begin, timeout);
+        this(request, type, description, new ResultSetRows(rs), rs.getFetchSize());
     }
 
 
     /**
-     * Creates the cursor over the rows described by the given result classes.
+     * Creates the cursor over the rows described by the given result classes, read within the time limit of the request
+     * (see {@link Request#getTimeout}), which is checked once for a part of the rows read at once at least (see
+     * {@link EngineSettings#resultCheckRows()}).
      *
+     * @param request the request whose statement the rows belong to
      * @param type form of the query
      * @param description result classes of each projected variable
      * @param rows the rows
      * @param fetchSize number of rows read at once, 0 for all
-     * @param begin start of the execution in {@link System#nanoTime} units
-     * @param timeout time limit in nanoseconds, 0 for none
      */
-    Result(ResultType type, Map<Variable, List<ResourceClass>> description, ResultRows rows, int fetchSize, long begin,
-            long timeout)
+    Result(Request request, ResultType type, Map<Variable, List<ResourceClass>> description, ResultRows rows,
+            int fetchSize)
     {
         this.rows = rows;
         this.description = description;
         this.rowData = new RdfTerm[description.size()];
 
         this.type = type;
-        this.begin = begin;
-        this.timeout = timeout;
-        this.checkSize = Math.max(100, fetchSize);
+        this.begin = request.getBegin();
+        this.timeout = request.getTimeout();
+        this.checkSize = Math.max(request.getEngineSettings().resultCheckRows(), fetchSize);
 
         for(Variable var : description.keySet())
         {

@@ -21,6 +21,7 @@ import java.net.URLDecoder;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -552,6 +553,23 @@ public class ServiceSettingsTest
 
         engine.getConfig().setEngineSettings(settings.withServiceTableRows(2).withServiceBatchSize(1));
         assertThat(translate(engine, query), containsString("tmp_table_"));
+        assertThat(execute(engine, query), containsInAnyOrder(row(a, integer("1")), row(b, integer("2")),
+                row(iri("c"), integer("3")), row(d, decimal("1.5"))));
+    }
+
+
+    @Test
+    @DisplayName("an answer is received whole in parts of the size and the number the engine settings say")
+    void receivedParts() throws Exception
+    {
+        String query = "SELECT ?s ?o WHERE { " + service() + "}";
+        Engine engine = engine(ServiceSettings.DEFAULT);
+        EngineSettings settings = engine.getConfig().getEngineSettings();
+
+        // parts of a single byte, one read ahead, waited for a millisecond between the checks of the request
+        engine.getConfig().setEngineSettings(
+                settings.withServicePartSize(1).withServiceReadAhead(1).withServiceCheckInterval(Duration.ofMillis(1)));
+
         assertThat(execute(engine, query), containsInAnyOrder(row(a, integer("1")), row(b, integer("2")),
                 row(iri("c"), integer("3")), row(d, decimal("1.5"))));
     }

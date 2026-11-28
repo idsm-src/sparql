@@ -11,13 +11,13 @@ import cz.iocb.sparql.engine.database.Function;
  * {@link SparqlDatabaseConfiguration#getEngineSettings}): whether the engine chooses the joins and how the planner
  * keeps them, the costs and the margins by which the join optimizer chooses the joins, the estimates it takes where
  * nothing is known, the limits beyond which the translation leaves a transformation of the intermediate code out, how
- * the statistics of the tables are read, kept and renewed, and how the SERVICE calls are ordered and their solutions
- * stored. A request keeps the settings it has begun with (see
- * {@link cz.iocb.sparql.engine.request.Request#getEngineSettings}). The settings are immutable: the {@code with}
- * methods derive changed copies, checking the values given. The default of a setting, which {@link #DEFAULT} holds, is
- * the initial value of its field, whose description tells why the value is what it is where there is a reason for it.
- * Each setting has a name, the name of its accessor written in lower case with its words joined by hyphens, like
- * {@code lookup-cost}.
+ * the statistics of the tables are read, kept and renewed, how the SERVICE calls are ordered, how their answers are
+ * received and their solutions stored, and how the rows of a result are read. A request keeps the settings it has begun
+ * with (see {@link cz.iocb.sparql.engine.request.Request#getEngineSettings}). The settings are immutable: the
+ * {@code with} methods derive changed copies, checking the values given. The default of a setting, which
+ * {@link #DEFAULT} holds, is the initial value of its field, whose description tells why the value is what it is where
+ * there is a reason for it. Each setting has a name, the name of its accessor written in lower case with its words
+ * joined by hyphens, like {@code lookup-cost}.
  */
 public final class EngineSettings implements Cloneable
 {
@@ -269,6 +269,46 @@ public final class EngineSettings implements Cloneable
      * {@link #serviceTableRows} of them, as the solutions are kept until it is known whether they are stored.
      */
     private int serviceBatchSize = 1000;
+
+    /**
+     * Longest time a request waits for a part of the answer of an endpoint before it checks again that its time limit
+     * has not elapsed and that it has not been cancelled (see {@link cz.iocb.sparql.engine.imcode.SqlServiceStub}).
+     */
+    private Duration serviceCheckInterval = Duration.ofMillis(100);
+
+    /**
+     * Largest part of the answer of an endpoint, in bytes, that the thread receiving the answer hands over to the
+     * request at once (see {@link cz.iocb.sparql.engine.imcode.SqlServiceStub}).
+     */
+    private int servicePartSize = 65536;
+
+    /**
+     * Number of the parts of the answer of an endpoint that the thread receiving the answer reads ahead of the request
+     * at most: it hands them over through a bounded queue, so that it reads ahead only a few parts (see
+     * {@link cz.iocb.sparql.engine.imcode.SqlServiceStub}).
+     */
+    private int serviceReadAhead = 16;
+
+    /**
+     * Time for which the rows of a copy closed before their end read the rows the database has sent already, about what
+     * a cancellation of the copy takes, as it opens a connection of its own (see
+     * {@link cz.iocb.sparql.engine.request.CopyRows#close}).
+     */
+    private Duration copyDrainTime = Duration.ofMillis(2);
+
+    /**
+     * Time after which the cancellation of a copy is sent again until the database has started the copy: a cancellation
+     * that comes before the statement of the copy reaches the database has no effect, and the driver tells that the
+     * database has started the copy only when the database sends the first rows (see
+     * {@link cz.iocb.sparql.engine.request.Request#cancel}).
+     */
+    private Duration copyCancelInterval = Duration.ofMillis(100);
+
+    /**
+     * Number of the rows a result reads between two checks of the time limit of its request; a result read in parts
+     * checks the time limit once for a part at least (see {@link cz.iocb.sparql.engine.request.Result#next}).
+     */
+    private int resultCheckRows = 100;
 
 
     /**
@@ -835,7 +875,8 @@ public final class EngineSettings implements Cloneable
     public EngineSettings withStatisticsCheckInterval(Duration statisticsCheckInterval)
     {
         EngineSettings copy = copy();
-        copy.statisticsCheckInterval = checkDuration("statistics-check-interval", statisticsCheckInterval);
+        copy.statisticsCheckInterval = checkDuration("statistics-check-interval", statisticsCheckInterval,
+                Duration.ZERO);
         return copy;
     }
 
@@ -949,6 +990,172 @@ public final class EngineSettings implements Cloneable
 
 
     /**
+     * Longest time a request waits for a part of the answer of an endpoint before it checks its time limit and its
+     * cancellation again (the setting {@code service-check-interval}).
+     *
+     * @return longest time a request waits for a part of the answer of an endpoint between two checks
+     */
+    public Duration serviceCheckInterval()
+    {
+        return serviceCheckInterval;
+    }
+
+
+    /**
+     * Copy with the given longest time a request waits for a part of the answer of an endpoint between two checks.
+     *
+     * @param serviceCheckInterval longest time a request waits for a part of the answer of an endpoint between two
+     *            checks
+     * @return copy with the given time
+     * @throws NullPointerException if the time is null
+     * @throws IllegalArgumentException if the time is not positive or longer than a {@code long} number of nanoseconds
+     */
+    public EngineSettings withServiceCheckInterval(Duration serviceCheckInterval)
+    {
+        EngineSettings copy = copy();
+        copy.serviceCheckInterval = checkDuration("service-check-interval", serviceCheckInterval, Duration.ofNanos(1));
+        return copy;
+    }
+
+
+    /**
+     * Largest part of the answer of an endpoint, in bytes, handed over to the request at once (the setting
+     * {@code service-part-size}).
+     *
+     * @return largest part of the answer of an endpoint handed over at once
+     */
+    public int servicePartSize()
+    {
+        return servicePartSize;
+    }
+
+
+    /**
+     * Copy with the given largest part of the answer of an endpoint, in bytes, handed over to the request at once.
+     *
+     * @param servicePartSize largest part of the answer of an endpoint handed over at once
+     * @return copy with the given size
+     * @throws IllegalArgumentException if the size is not positive
+     */
+    public EngineSettings withServicePartSize(int servicePartSize)
+    {
+        EngineSettings copy = copy();
+        copy.servicePartSize = checkRange("service-part-size", servicePartSize, 1, Integer.MAX_VALUE);
+        return copy;
+    }
+
+
+    /**
+     * Number of the parts of the answer of an endpoint read ahead of the request at most (the setting
+     * {@code service-read-ahead}).
+     *
+     * @return number of the parts of the answer of an endpoint read ahead at most
+     */
+    public int serviceReadAhead()
+    {
+        return serviceReadAhead;
+    }
+
+
+    /**
+     * Copy with the given number of the parts of the answer of an endpoint read ahead of the request at most.
+     *
+     * @param serviceReadAhead number of the parts of the answer of an endpoint read ahead at most
+     * @return copy with the given number
+     * @throws IllegalArgumentException if the number is not positive
+     */
+    public EngineSettings withServiceReadAhead(int serviceReadAhead)
+    {
+        EngineSettings copy = copy();
+        copy.serviceReadAhead = checkRange("service-read-ahead", serviceReadAhead, 1, Integer.MAX_VALUE);
+        return copy;
+    }
+
+
+    /**
+     * Time for which the rows of a copy closed before their end read the rows the database has sent already (the
+     * setting {@code copy-drain-time}).
+     *
+     * @return time for which the rows of a copy closed before their end are read
+     */
+    public Duration copyDrainTime()
+    {
+        return copyDrainTime;
+    }
+
+
+    /**
+     * Copy with the given time for which the rows of a copy closed before their end read the rows sent already.
+     *
+     * @param copyDrainTime time for which the rows of a copy closed before their end are read
+     * @return copy with the given time
+     * @throws NullPointerException if the time is null
+     * @throws IllegalArgumentException if the time is negative or longer than a {@code long} number of nanoseconds
+     */
+    public EngineSettings withCopyDrainTime(Duration copyDrainTime)
+    {
+        EngineSettings copy = copy();
+        copy.copyDrainTime = checkDuration("copy-drain-time", copyDrainTime, Duration.ZERO);
+        return copy;
+    }
+
+
+    /**
+     * Time after which the cancellation of a copy is sent again until the database has started the copy (the setting
+     * {@code copy-cancel-interval}).
+     *
+     * @return time after which the cancellation of a copy is sent again
+     */
+    public Duration copyCancelInterval()
+    {
+        return copyCancelInterval;
+    }
+
+
+    /**
+     * Copy with the given time after which the cancellation of a copy is sent again until the copy has started.
+     *
+     * @param copyCancelInterval time after which the cancellation of a copy is sent again
+     * @return copy with the given time
+     * @throws NullPointerException if the time is null
+     * @throws IllegalArgumentException if the time is not positive or longer than a {@code long} number of nanoseconds
+     */
+    public EngineSettings withCopyCancelInterval(Duration copyCancelInterval)
+    {
+        EngineSettings copy = copy();
+        copy.copyCancelInterval = checkDuration("copy-cancel-interval", copyCancelInterval, Duration.ofNanos(1));
+        return copy;
+    }
+
+
+    /**
+     * Number of the rows a result reads between two checks of the time limit of its request (the setting
+     * {@code result-check-rows}).
+     *
+     * @return number of the rows read between two checks of the time limit
+     */
+    public int resultCheckRows()
+    {
+        return resultCheckRows;
+    }
+
+
+    /**
+     * Copy with the given number of the rows a result reads between two checks of the time limit of its request.
+     *
+     * @param resultCheckRows number of the rows read between two checks of the time limit
+     * @return copy with the given number
+     * @throws IllegalArgumentException if the number is not positive
+     */
+    public EngineSettings withResultCheckRows(int resultCheckRows)
+    {
+        EngineSettings copy = copy();
+        copy.resultCheckRows = checkRange("result-check-rows", resultCheckRows, 1, Integer.MAX_VALUE);
+        return copy;
+    }
+
+
+    /**
      * Copy of the settings, which a {@code with} method changes before it hands it out.
      *
      * @return copy of the settings
@@ -1001,22 +1208,23 @@ public final class EngineSettings implements Cloneable
 
 
     /**
-     * Checks that the value of a setting is a time that is not negative and fits into a {@code long} number of
-     * nanoseconds.
+     * Checks that the value of a setting is a time that is not less than the given one and fits into a {@code long}
+     * number of nanoseconds.
      *
      * @param name name of the setting
      * @param value the value
+     * @param least the least time allowed
      * @return the value
      * @throws NullPointerException if the value is null
-     * @throws IllegalArgumentException if the value is negative or too long
+     * @throws IllegalArgumentException if the value is less than the least time or too long
      */
-    private static Duration checkDuration(String name, Duration value)
+    private static Duration checkDuration(String name, Duration value, Duration least)
     {
         Objects.requireNonNull(value, name);
 
-        if(value.isNegative() || value.compareTo(Duration.ofNanos(Long.MAX_VALUE)) > 0)
+        if(value.compareTo(least) < 0 || value.compareTo(Duration.ofNanos(Long.MAX_VALUE)) > 0)
             throw new IllegalArgumentException(
-                    name + " has to be a time from zero to " + Long.MAX_VALUE + " ns: " + value);
+                    name + " has to be a time from " + least.toNanos() + " to " + Long.MAX_VALUE + " ns: " + value);
 
         return value;
     }

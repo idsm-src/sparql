@@ -90,7 +90,21 @@ public class EngineSettingsTest
             new Setting("service-table-rows", s -> s.withServiceTableRows(0), EngineSettings::serviceTableRows, 0,
                     s -> s.withServiceTableRows(-1)),
             new Setting("service-batch-size", s -> s.withServiceBatchSize(10), EngineSettings::serviceBatchSize, 10,
-                    s -> s.withServiceBatchSize(0)));
+                    s -> s.withServiceBatchSize(0)),
+            new Setting("service-check-interval", s -> s.withServiceCheckInterval(Duration.ofMillis(10)),
+                    EngineSettings::serviceCheckInterval, Duration.ofMillis(10),
+                    s -> s.withServiceCheckInterval(Duration.ZERO)),
+            new Setting("service-part-size", s -> s.withServicePartSize(1024), EngineSettings::servicePartSize, 1024,
+                    s -> s.withServicePartSize(0)),
+            new Setting("service-read-ahead", s -> s.withServiceReadAhead(4), EngineSettings::serviceReadAhead, 4,
+                    s -> s.withServiceReadAhead(0)),
+            new Setting("copy-drain-time", s -> s.withCopyDrainTime(Duration.ZERO), EngineSettings::copyDrainTime,
+                    Duration.ZERO, s -> s.withCopyDrainTime(Duration.ofMillis(-1))),
+            new Setting("copy-cancel-interval", s -> s.withCopyCancelInterval(Duration.ofMillis(10)),
+                    EngineSettings::copyCancelInterval, Duration.ofMillis(10),
+                    s -> s.withCopyCancelInterval(Duration.ZERO)),
+            new Setting("result-check-rows", s -> s.withResultCheckRows(10), EngineSettings::resultCheckRows, 10,
+                    s -> s.withResultCheckRows(0)));
 
 
     /**
@@ -136,6 +150,12 @@ public class EngineSettingsTest
         assertFalse(settings.serviceReorder());
         assertEquals(1000, settings.serviceTableRows());
         assertEquals(1000, settings.serviceBatchSize());
+        assertEquals(Duration.ofMillis(100), settings.serviceCheckInterval());
+        assertEquals(65536, settings.servicePartSize());
+        assertEquals(16, settings.serviceReadAhead());
+        assertEquals(Duration.ofMillis(2), settings.copyDrainTime());
+        assertEquals(Duration.ofMillis(100), settings.copyCancelInterval());
+        assertEquals(100, settings.resultCheckRows());
     }
 
 
@@ -183,6 +203,9 @@ public class EngineSettingsTest
 
         assertThrows(NullPointerException.class, () -> EngineSettings.DEFAULT.withJoinOptimizer(null));
         assertThrows(NullPointerException.class, () -> EngineSettings.DEFAULT.withStatisticsCheckInterval(null));
+        assertThrows(NullPointerException.class, () -> EngineSettings.DEFAULT.withServiceCheckInterval(null));
+        assertThrows(NullPointerException.class, () -> EngineSettings.DEFAULT.withCopyDrainTime(null));
+        assertThrows(NullPointerException.class, () -> EngineSettings.DEFAULT.withCopyCancelInterval(null));
 
         // the times of the checks of the statistics
         assertEquals(Duration.ZERO,
