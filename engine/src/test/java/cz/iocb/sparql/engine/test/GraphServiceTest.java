@@ -36,6 +36,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
 import cz.iocb.sparql.engine.config.ServiceSettings;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
@@ -345,7 +346,8 @@ public class GraphServiceTest
                 config.createIriMapping("ex:ep"), config.createIriMapping(BuiltinClasses.iri, "e"));
 
         config.setServiceSettings(settings);
-        config.setJoinOptimizer(joinOptimizer);
+        config.setEngineSettings(config.getEngineSettings()
+                .withJoinOptimizer(joinOptimizer ? JoinOptimizerMode.SETTINGS : JoinOptimizerMode.OFF));
 
         return config;
     }

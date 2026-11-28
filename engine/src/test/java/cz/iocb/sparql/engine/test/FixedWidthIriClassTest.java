@@ -21,6 +21,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -175,7 +176,8 @@ public class FixedWidthIriClassTest
                     configuration.createLiteralMapping(xsdInt, "v"));
         }
 
-        configuration.setJoinOptimizer(joinOptimizer);
+        configuration.setEngineSettings(configuration.getEngineSettings()
+                .withJoinOptimizer(joinOptimizer ? JoinOptimizerMode.SETTINGS : JoinOptimizerMode.OFF));
 
         return configuration;
     }

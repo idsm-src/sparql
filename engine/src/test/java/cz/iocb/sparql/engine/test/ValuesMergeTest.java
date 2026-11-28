@@ -470,7 +470,8 @@ public class ValuesMergeTest
         String key = "SELECT ?r ?s WHERE { VALUES ?r { " + refs(1, 5) + " } VALUES ?s { " + items(1, 5)
                 + " } ?r ex:ref ?s . ?s a ex:Item }";
 
-        config.setEngineSettings(EngineSettings.DEFAULT.withDisjunctLimit(20));
+        EngineSettings settings = config.getEngineSettings();
+        config.setEngineSettings(settings.withDisjunctLimit(20));
 
         try
         {
@@ -489,7 +490,7 @@ public class ValuesMergeTest
         }
         finally
         {
-            config.setEngineSettings(EngineSettings.DEFAULT);
+            config.setEngineSettings(settings);
         }
     }
 }

@@ -54,11 +54,10 @@ import cz.iocb.sparql.engine.rdf.Iri;
  * needed otherwise, make the missing ones in the schema of their table (named after the table and the columns, as the
  * database names a statistics object made without a name), analyse the tables whose needed statistics have not been
  * computed yet, and, when the configuration names the function through which the engine reads the statistics (see
- * {@link SparqlDatabaseConfiguration#setExtendedStatisticsFunction}), create or replace that function, in an existing
- * schema, and grant it to the given roles. They are to be run by the owner of the tables: only the owner may create
- * their statistics, and the function, declared {@code SECURITY DEFINER}, sees the statistics of the tables its owner
- * owns. The database computes the statistics anew whenever it analyses a table, so the statements need not be run when
- * only the data change.
+ * {@link EngineSettings#statisticsFunction()}), create or replace that function, in an existing schema, and grant it to
+ * the given roles. They are to be run by the owner of the tables: only the owner may create their statistics, and the
+ * function, declared {@code SECURITY DEFINER}, sees the statistics of the tables its owner owns. The database computes
+ * the statistics anew whenever it analyses a table, so the statements need not be run when only the data change.
  */
 public final class ExtendedStatistics
 {
@@ -225,7 +224,7 @@ public final class ExtendedStatistics
      *
      * @param config the configuration
      * @param readers the roles the function through which the engine reads the statistics is to be granted to, if the
-     *            configuration names one (see {@link SparqlDatabaseConfiguration#setExtendedStatisticsFunction})
+     *            configuration names one (see {@link EngineSettings#statisticsFunction()})
      */
     public ExtendedStatistics(SparqlDatabaseConfiguration config, List<String> readers)
     {
@@ -292,7 +291,7 @@ public final class ExtendedStatistics
         this.configuration = config.getClass().getName();
         this.tables = List.copyOf(mapped);
         this.definitions = List.copyOf(definitions);
-        this.function = config.getExtendedStatisticsFunction();
+        this.function = config.getEngineSettings().statisticsFunction();
         this.readers = List.copyOf(readers);
     }
 
@@ -502,7 +501,8 @@ public final class ExtendedStatistics
                 .newInstance(service, source, new DatabaseSchema(source));
 
         if(function != null)
-            config.setExtendedStatisticsFunction(function.substring(0, dot), function.substring(dot + 1));
+            config.setEngineSettings(config.getEngineSettings()
+                    .withStatisticsFunction(new Function(function.substring(0, dot), function.substring(dot + 1))));
 
         ExtendedStatistics statistics = new ExtendedStatistics(config, readers);
 

@@ -13,8 +13,11 @@ import javax.naming.RefAddr;
 import javax.naming.Reference;
 import javax.naming.spi.ObjectFactory;
 import javax.sql.DataSource;
+import cz.iocb.sparql.engine.config.EngineSettings;
+import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.Function;
 
 
 
@@ -24,12 +27,11 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
  * looked up by the {@code datasource} address and the optional {@code service} IRI address of the reference. The
  * optional {@code join-optimizer} address overrides what the configuration says about the join optimizer of the engine:
  * {@code off} turns it off, {@code settings} turns it on with its joins kept by the settings of the planner, and
- * {@code advice} turns it on with its joins kept by plan advice (see
- * {@link SparqlDatabaseConfiguration#setPlanAdvice}). The optional {@code statistics-function} address names the
- * function through which the engine reads the extended statistics of the tables, its schema and its name joined by a
- * dot (see {@link SparqlDatabaseConfiguration#setExtendedStatisticsFunction}), and the optional
- * {@code statistics-check-interval} address gives the least number of seconds between two checks of whether the
- * statistics of the tables are to be renewed (see {@link SparqlDatabaseConfiguration#setStatisticsCheckInterval}).
+ * {@code advice} turns it on with its joins kept by plan advice (see {@link EngineSettings#joinOptimizer()}). The
+ * optional {@code statistics-function} address names the function through which the engine reads the extended
+ * statistics of the tables, its schema and its name joined by a dot (see {@link EngineSettings#statisticsFunction()}),
+ * and the optional {@code statistics-check-interval} address gives the least number of seconds between two checks of
+ * whether the statistics of the tables are to be renewed (see {@link EngineSettings#statisticsCheckInterval()}).
  */
 public class SparqlDatabaseConfigurationFactory implements ObjectFactory
 {
@@ -100,16 +102,15 @@ public class SparqlDatabaseConfigurationFactory implements ObjectFactory
      */
     private static void setJoinOptimizer(SparqlDatabaseConfiguration config, String value)
     {
-        switch(value)
+        JoinOptimizerMode mode = switch(value)
         {
-            case "off" -> config.setJoinOptimizer(false);
-            case "settings", "advice" ->
-            {
-                config.setJoinOptimizer(true);
-                config.setPlanAdvice(value.equals("advice"));
-            }
+            case "off" -> JoinOptimizerMode.OFF;
+            case "settings" -> JoinOptimizerMode.SETTINGS;
+            case "advice" -> JoinOptimizerMode.ADVICE;
             default -> throw new IllegalArgumentException("unknown join-optimizer value: " + value);
-        }
+        };
+
+        config.setEngineSettings(config.getEngineSettings().withJoinOptimizer(mode));
     }
 
 
@@ -128,7 +129,8 @@ public class SparqlDatabaseConfigurationFactory implements ObjectFactory
         if(dot <= 0 || dot == value.length() - 1)
             throw new IllegalArgumentException("unknown statistics-function value: " + value);
 
-        config.setExtendedStatisticsFunction(value.substring(0, dot), value.substring(dot + 1));
+        config.setEngineSettings(config.getEngineSettings()
+                .withStatisticsFunction(new Function(value.substring(0, dot), value.substring(dot + 1))));
     }
 
 
@@ -145,6 +147,7 @@ public class SparqlDatabaseConfigurationFactory implements ObjectFactory
         if(!value.matches("[0-9]{1,18}"))
             throw new IllegalArgumentException("unknown statistics-check-interval value: " + value);
 
-        config.setStatisticsCheckInterval(Duration.ofSeconds(Long.parseLong(value)));
+        config.setEngineSettings(
+                config.getEngineSettings().withStatisticsCheckInterval(Duration.ofSeconds(Long.parseLong(value))));
     }
 }

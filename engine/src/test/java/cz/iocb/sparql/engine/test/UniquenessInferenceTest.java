@@ -22,6 +22,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -101,7 +102,8 @@ public class UniquenessInferenceTest
         for(boolean optimizer : new boolean[] { false, true })
         {
             SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool, schema, true);
-            config.setJoinOptimizer(optimizer);
+            config.setEngineSettings(config.getEngineSettings()
+                    .withJoinOptimizer(optimizer ? JoinOptimizerMode.SETTINGS : JoinOptimizerMode.OFF));
 
             config.addPrefix("ex", "http://example.org/");
             config.addIriClass(new IntegerUserIriClass("protein", INT4, "http://example.org/protein/"));

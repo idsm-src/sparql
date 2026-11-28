@@ -16,6 +16,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -113,7 +114,8 @@ public class CountDistinctSolutionsTest
                 configuration.createIriMapping("item", "o"));
         configuration.addQuadMapping(num, null, subject, configuration.createIriMapping("ex:num"),
                 configuration.createLiteralMapping(xsdDouble, "d"));
-        configuration.setJoinOptimizer(joinOptimizer);
+        configuration.setEngineSettings(configuration.getEngineSettings()
+                .withJoinOptimizer(joinOptimizer ? JoinOptimizerMode.SETTINGS : JoinOptimizerMode.OFF));
 
         return configuration;
     }

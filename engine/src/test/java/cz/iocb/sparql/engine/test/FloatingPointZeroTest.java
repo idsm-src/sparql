@@ -21,6 +21,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
@@ -150,7 +151,8 @@ public class FloatingPointZeroTest
                 configuration.createLiteralMapping(xsdDouble, "d"));
         configuration.addQuadMapping(multi, null, owner, configuration.createIriMapping("ex:u"),
                 configuration.createLiteralMapping(xsdDouble, "d"), new Conditions(true), true);
-        configuration.setJoinOptimizer(joinOptimizer);
+        configuration.setEngineSettings(configuration.getEngineSettings()
+                .withJoinOptimizer(joinOptimizer ? JoinOptimizerMode.SETTINGS : JoinOptimizerMode.OFF));
 
         return configuration;
     }

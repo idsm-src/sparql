@@ -2254,7 +2254,7 @@ public final class SqlTableAccess extends SqlIntercode
      */
     private Conditions restrictToAcceptedTerms(Request request, Restrictions restrictions)
     {
-        if(table == null || !request.getConfiguration().isJoinOptimizerEnabled())
+        if(table == null || !request.getEngineSettings().isJoinOptimizerEnabled())
             return conditions;
 
         Conditions result = conditions;

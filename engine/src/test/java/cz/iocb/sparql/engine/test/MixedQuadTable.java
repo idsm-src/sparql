@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.jena.graph.Node;
+import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -172,7 +173,7 @@ public final class MixedQuadTable
             config.addDictionaryTable(resourceTable);
             config.addProbedTable(resourceQuadTable);
             config.addProbedTable(valueQuadTable);
-            config.setJoinOptimizer(true);
+            config.setEngineSettings(config.getEngineSettings().withJoinOptimizer(JoinOptimizerMode.SETTINGS));
         }
     }
 

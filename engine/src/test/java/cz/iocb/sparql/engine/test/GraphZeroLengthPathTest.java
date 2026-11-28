@@ -14,6 +14,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -116,10 +117,11 @@ public class GraphZeroLengthPathTest
 
         config = configuration(connectionPool, schema, false);
         optimized = configuration(connectionPool, schema, false);
-        optimized.setJoinOptimizer(true);
+        optimized.setEngineSettings(optimized.getEngineSettings().withJoinOptimizer(JoinOptimizerMode.SETTINGS));
         unclassified = configuration(connectionPool, schema, true);
         unclassifiedOptimized = configuration(connectionPool, schema, true);
-        unclassifiedOptimized.setJoinOptimizer(true);
+        unclassifiedOptimized.setEngineSettings(
+                unclassifiedOptimized.getEngineSettings().withJoinOptimizer(JoinOptimizerMode.SETTINGS));
     }
 
 

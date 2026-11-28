@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -96,7 +97,7 @@ public class LookupTest
         config.addQuadMapping(links, null, config.createIriMapping("node", "src"), config.createIriMapping("ex:link"),
                 config.createIriMapping("node", "dst"));
 
-        config.setJoinOptimizer(true);
+        config.setEngineSettings(config.getEngineSettings().withJoinOptimizer(JoinOptimizerMode.SETTINGS));
     }
 
 

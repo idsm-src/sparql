@@ -409,13 +409,14 @@ public class Request implements AutoCloseable
 
 
     /**
-     * Creates a request without service reordering.
+     * Creates a request evaluating the SERVICE calls independently of their context as the settings of the engine say
+     * (see {@link EngineSettings#serviceReorder()}).
      *
      * @param config the endpoint configuration
      */
     public Request(SparqlDatabaseConfiguration config)
     {
-        this(config, false);
+        this(config, config.getEngineSettings().serviceReorder());
     }
 
 
@@ -627,7 +628,7 @@ public class Request implements AutoCloseable
             // evaluates one read by fetches without them, and when the session allows them; the joins the optimizer
             // has chosen are then written so that the workers can evaluate them (see SqlJoin.translateTree), as they
             // are anyway when plan advice makes the planner keep them
-            parallel = config.isJoinOptimizerEnabled() && !isAdvised() && !fetched && allowsParallelWorkers();
+            parallel = engineSettings.isJoinOptimizerEnabled() && !isAdvised() && !fetched && allowsParallelWorkers();
 
             TranslateVisitor translateVisitor = new TranslateVisitor(this);
             SqlSelect imcode = translateVisitor.translate(syntaxTree, newOffset, newLimit, order);
@@ -693,7 +694,7 @@ public class Request implements AutoCloseable
                 // the joins are written in the order and with the methods the engine has chosen: the planner must keep
                 // the order of the explicit joins and hash them (a merge join would sort the values, which is slow for
                 // boxes), the index lookups being forced by lateral subqueries (see JoinOptimizer)
-                if(config.isJoinOptimizerEnabled())
+                if(engineSettings.isJoinOptimizerEnabled())
                     settings.addAll(
                             List.of("join_collapse_limit = 1", "enable_nestloop = off", "enable_mergejoin = off"));
 
@@ -1837,15 +1838,15 @@ public class Request implements AutoCloseable
 
     /**
      * True if plan advice makes the planner keep the joins the join optimizer chooses (see
-     * {@link SparqlDatabaseConfiguration#setPlanAdvice}): the lookups the optimizer has chosen are then written as
-     * plain joins of the statement (see {@link cz.iocb.sparql.engine.imcode.SqlTableAccess}), which the advice makes
-     * the planner evaluate by nested loops.
+     * {@link EngineSettings.JoinOptimizerMode#ADVICE}): the lookups the optimizer has chosen are then written as plain
+     * joins of the statement (see {@link cz.iocb.sparql.engine.imcode.SqlTableAccess}), which the advice makes the
+     * planner evaluate by nested loops.
      *
      * @return true if plan advice makes the planner keep the joins, false otherwise
      */
     public boolean isAdvised()
     {
-        return config.isJoinOptimizerEnabled() && config.isPlanAdviceEnabled();
+        return engineSettings.isPlanAdviceEnabled();
     }
 
 

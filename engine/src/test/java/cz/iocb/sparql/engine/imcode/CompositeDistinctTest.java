@@ -16,9 +16,11 @@ import org.apache.tomcat.jdbc.pool.PoolProperties;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
+import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.classes.GenericUserIriClass;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -163,10 +165,12 @@ public class CompositeDistinctTest
         reader = configure(readerPool, schema);
 
         readerWithFunction = configure(readerPool, schema);
-        readerWithFunction.setExtendedStatisticsFunction("composite_distinct_test", "ndistinct");
+        readerWithFunction.setEngineSettings(readerWithFunction.getEngineSettings()
+                .withStatisticsFunction(new Function("composite_distinct_test", "ndistinct")));
 
         fixed = configure(pool, schema);
-        fixed.setExtendedStatisticsFunction("composite_distinct_test", "fixed_ndistinct");
+        fixed.setEngineSettings(fixed.getEngineSettings()
+                .withStatisticsFunction(new Function("composite_distinct_test", "fixed_ndistinct")));
     }
 
 
@@ -203,7 +207,7 @@ public class CompositeDistinctTest
         config.addQuadMapping(scores, graph, config.createIriMapping("item", "kind", "serial"),
                 config.createIriMapping("ex:score"), config.createLiteralMapping(xsdInt, "score"));
 
-        config.setJoinOptimizer(true);
+        config.setEngineSettings(config.getEngineSettings().withJoinOptimizer(JoinOptimizerMode.SETTINGS));
 
         return config;
     }

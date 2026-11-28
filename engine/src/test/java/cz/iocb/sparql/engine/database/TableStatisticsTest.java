@@ -11,7 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import cz.iocb.sparql.engine.config.EngineSettings;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.request.Request;
 
@@ -172,7 +171,7 @@ public class TableStatisticsTest
     public void defaultsOfTheSettings() throws SQLException
     {
         SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, null, null, false);
-        config.setEngineSettings(EngineSettings.DEFAULT.withDefaultRows(500).withEqualitySelectivity(0.01));
+        config.setEngineSettings(config.getEngineSettings().withDefaultRows(500).withEqualitySelectivity(0.01));
 
         try(Request changed = new Request(config))
         {
@@ -432,7 +431,7 @@ public class TableStatisticsTest
     public void cacheLimitOfTheSettings() throws SQLException
     {
         SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, null, null, false);
-        config.setEngineSettings(EngineSettings.DEFAULT.withStatisticsCacheLimit(3));
+        config.setEngineSettings(config.getEngineSettings().withStatisticsCacheLimit(3));
 
         try(Request changed = new Request(config))
         {

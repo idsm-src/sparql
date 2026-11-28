@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.jena.graph.Node;
+import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -123,7 +124,7 @@ public final class NumberedQuadTable
         if(variant == Variant.DICTIONARY)
         {
             config.addDictionaryTable(termTable);
-            config.setJoinOptimizer(true);
+            config.setEngineSettings(config.getEngineSettings().withJoinOptimizer(JoinOptimizerMode.SETTINGS));
         }
     }
 

@@ -14,6 +14,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.CatalogStatistics;
 import cz.iocb.sparql.engine.database.Condition;
@@ -82,7 +83,7 @@ public class RequestTimeoutTest
         config.addIriClass(new IntegerUserIriClass("item", INT4, "http://example.org/item/"));
         config.addQuadMapping(table, null, config.createIriMapping("item", "s"), config.createIriMapping("ex:v"),
                 config.createLiteralMapping(xsdString, "v"));
-        config.setJoinOptimizer(true);
+        config.setEngineSettings(config.getEngineSettings().withJoinOptimizer(JoinOptimizerMode.SETTINGS));
     }
 
 

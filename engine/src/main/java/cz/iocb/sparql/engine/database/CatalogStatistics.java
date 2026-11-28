@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
+import cz.iocb.sparql.engine.config.EngineSettings;
 import cz.iocb.sparql.engine.request.Request;
 
 
@@ -26,10 +26,10 @@ import cz.iocb.sparql.engine.request.Request;
  * of {@code pg_stats}, and the numbers of the distinct combinations of the values of several columns that the extended
  * statistics of the table keep ({@code CREATE STATISTICS} of the kind {@code ndistinct}), read from
  * {@code pg_stats_ext} or through the function the configuration names (see
- * {@link SparqlDatabaseConfiguration#setExtendedStatisticsFunction}). They are read on first use through the connection
- * of the request and kept for the life of the object, the frequency of a value being looked up when it is first asked
- * for and kept with those of other values in a cache of a bounded size (see {@link TableStatisticsBase#cached}). The
- * configuration replaces the object by a new one once the table changes or a lookup fails (see {@link #getSources} and
+ * {@link EngineSettings#statisticsFunction()}). They are read on first use through the connection of the request and
+ * kept for the life of the object, the frequency of a value being looked up when it is first asked for and kept with
+ * those of other values in a cache of a bounded size (see {@link TableStatisticsBase#cached}). The configuration
+ * replaces the object by a new one once the table changes or a lookup fails (see {@link #getSources} and
  * {@link #isComplete}).
  */
 public final class CatalogStatistics extends TableStatisticsBase
@@ -243,10 +243,9 @@ public final class CatalogStatistics extends TableStatisticsBase
      * Reads the numbers of the distinct combinations of the values of several columns that the extended statistics of
      * the table keep, with the names of the columns of the table by their numbers, by which the statistics name them:
      * from the view {@code pg_stats_ext}, which shows them to the owner of the table only, or through the function the
-     * configuration names for a role that does not own it (see
-     * {@link SparqlDatabaseConfiguration#setExtendedStatisticsFunction}). A failing lookup counts as no statistics
-     * until the statistics are renewed (see {@link #isComplete}), but for the lookup of a request that is out of time
-     * or cancelled, which is no answer at all.
+     * configuration names for a role that does not own it (see {@link EngineSettings#statisticsFunction()}). A failing
+     * lookup counts as no statistics until the statistics are renewed (see {@link #isComplete}), but for the lookup of
+     * a request that is out of time or cancelled, which is no answer at all.
      *
      * @param request the current request
      * @return numbers of the distinct combinations of the values of several columns by the set of the names of the
@@ -255,7 +254,7 @@ public final class CatalogStatistics extends TableStatisticsBase
      */
     private Map<Set<String>, Double> readCombinations(Request request)
     {
-        Function function = request.getConfiguration().getExtendedStatisticsFunction();
+        Function function = request.getEngineSettings().statisticsFunction();
 
         String source = function != null ? "SELECT * FROM " + function + "(n.nspname, c.relname)" :
                 "SELECT e.n_distinct::text FROM pg_stats_ext e WHERE e.schemaname = n.nspname "

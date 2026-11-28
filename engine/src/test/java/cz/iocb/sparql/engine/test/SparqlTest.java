@@ -83,6 +83,7 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -260,7 +261,8 @@ public class SparqlTest
                     schema);
 
             for(SparqlDatabaseConfiguration config : List.of(stringConfig, integerConfig, combinedConfig))
-                config.setJoinOptimizer(joins == Joins.OPTIMIZER);
+                config.setEngineSettings(config.getEngineSettings().withJoinOptimizer(
+                        (joins == Joins.OPTIMIZER) ? JoinOptimizerMode.SETTINGS : JoinOptimizerMode.OFF));
 
             stringEngines.put(joins, new Engine(stringConfig));
             integerEngines.put(joins, new Engine(integerConfig));
@@ -459,7 +461,7 @@ public class SparqlTest
         config.addQuadMapping(quadTable, null, subject, predicate, object,
                 config.createIsNullCondition(quadTable, "g"));
         config.addQuadMapping(quadTable, graph, subject, predicate, object);
-        config.setJoinOptimizer(true);
+        config.setEngineSettings(config.getEngineSettings().withJoinOptimizer(JoinOptimizerMode.SETTINGS));
 
         Engine engine = new Engine(config);
 

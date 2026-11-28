@@ -28,6 +28,7 @@ import org.postgresql.PGConnection;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.copy.CopyOut;
 import org.postgresql.core.BaseConnection;
+import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -129,10 +130,10 @@ public class ParallelLookupTest
         DatabaseSchema schema = new DatabaseSchema(connectionPool);
 
         optimized = configure(record(DataSource.class, connectionPool, true), schema);
-        optimized.setJoinOptimizer(true);
+        optimized.setEngineSettings(optimized.getEngineSettings().withJoinOptimizer(JoinOptimizerMode.SETTINGS));
 
         fetching = configure(record(DataSource.class, connectionPool, false), schema);
-        fetching.setJoinOptimizer(true);
+        fetching.setEngineSettings(fetching.getEngineSettings().withJoinOptimizer(JoinOptimizerMode.SETTINGS));
 
         plain = configure(connectionPool, schema);
     }

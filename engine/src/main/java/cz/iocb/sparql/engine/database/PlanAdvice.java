@@ -12,8 +12,8 @@ import java.util.Set;
 /**
  * Plan advice of the module {@code pg_plan_advice} of PostgreSQL 19 and later, by which the planner is made to look up
  * the table accesses the join optimizer of the engine looks up for every row of the other side of their joins (see
- * {@link cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration#setPlanAdvice}). The engine writes such an access as
- * a plain join of the statement under the alias {@link #LOOKUP} or {@link #MEMOIZED_LOOKUP}, and the advice makes the
+ * {@link cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode#ADVICE}). The engine writes such an access as a
+ * plain join of the statement under the alias {@link #LOOKUP} or {@link #MEMOIZED_LOOKUP}, and the advice makes the
  * planner join it by a nested loop with the access on the inner side, which keeps the rows found for the values looked
  * up (Memoize) for the latter. So a lookup is a join of the statement itself, which the database can hand to parallel
  * workers, whereas a lateral subquery fenced by {@code OFFSET 0}, which the settings of the optimizer alone need for a

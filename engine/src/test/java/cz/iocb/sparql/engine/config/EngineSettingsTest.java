@@ -1,17 +1,21 @@
 package cz.iocb.sparql.engine.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.Test;
+import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
 import cz.iocb.sparql.engine.request.Request;
 
 
@@ -25,7 +29,8 @@ import cz.iocb.sparql.engine.request.Request;
 public class EngineSettingsTest
 {
     /**
-     * A setting: its name, a change of it, its value, the value the change gives it and a change it refuses.
+     * A setting: its name, a change of it, its value, the value the change gives it and a change it refuses, if there
+     * is one.
      */
     private record Setting(String name, UnaryOperator<EngineSettings> change, Function<EngineSettings, Object> value,
             Object changed, UnaryOperator<EngineSettings> invalid)
@@ -37,6 +42,8 @@ public class EngineSettingsTest
      * The settings.
      */
     private static final List<Setting> settings = List.of(
+            new Setting("join-optimizer", s -> s.withJoinOptimizer(JoinOptimizerMode.ADVICE),
+                    EngineSettings::joinOptimizer, JoinOptimizerMode.ADVICE, null),
             new Setting("lookup-cost", s -> s.withLookupCost(4), EngineSettings::lookupCost, 4.0,
                     s -> s.withLookupCost(0)),
             new Setting("lookup-row-cost", s -> s.withLookupRowCost(1), EngineSettings::lookupRowCost, 1.0,
@@ -71,8 +78,15 @@ public class EngineSettingsTest
                     EngineSettings::tripleTermClassLimit, 1, s -> s.withTripleTermClassLimit(0)),
             new Setting("exists-round-limit", s -> s.withExistsRoundLimit(2), EngineSettings::existsRoundLimit, 2,
                     s -> s.withExistsRoundLimit(0)),
+            new Setting("statistics-function",
+                    s -> s.withStatisticsFunction(new cz.iocb.sparql.engine.database.Function("s", "f")),
+                    EngineSettings::statisticsFunction, new cz.iocb.sparql.engine.database.Function("s", "f"), null),
+            new Setting("statistics-check-interval", s -> s.withStatisticsCheckInterval(Duration.ofSeconds(5)),
+                    EngineSettings::statisticsCheckInterval, Duration.ofSeconds(5),
+                    s -> s.withStatisticsCheckInterval(Duration.ofSeconds(-1))),
             new Setting("statistics-cache-limit", s -> s.withStatisticsCacheLimit(10),
                     EngineSettings::statisticsCacheLimit, 10, s -> s.withStatisticsCacheLimit(0)),
+            new Setting("service-reorder", s -> s.withServiceReorder(true), EngineSettings::serviceReorder, true, null),
             new Setting("service-table-rows", s -> s.withServiceTableRows(0), EngineSettings::serviceTableRows, 0,
                     s -> s.withServiceTableRows(-1)),
             new Setting("service-batch-size", s -> s.withServiceBatchSize(10), EngineSettings::serviceBatchSize, 10,
@@ -82,13 +96,14 @@ public class EngineSettingsTest
     /**
      * The accessors of the settings.
      *
-     * @return the public methods of the settings that take no parameter and give a setting
+     * @return the public methods of the settings that take no parameter and give a setting, not one derived from them
      */
     private static List<Method> getAccessors()
     {
         return Arrays.stream(EngineSettings.class.getDeclaredMethods())
                 .filter(m -> Modifier.isPublic(m.getModifiers()) && !Modifier.isStatic(m.getModifiers()))
-                .filter(m -> m.getParameterCount() == 0 && m.getReturnType() != EngineSettings.class).toList();
+                .filter(m -> m.getParameterCount() == 0 && m.getReturnType() != EngineSettings.class)
+                .filter(m -> !m.getName().startsWith("is")).toList();
     }
 
 
@@ -97,6 +112,7 @@ public class EngineSettingsTest
     {
         EngineSettings settings = EngineSettings.DEFAULT;
 
+        assertEquals(JoinOptimizerMode.OFF, settings.joinOptimizer());
         assertEquals(8, settings.lookupCost());
         assertEquals(2, settings.lookupRowCost());
         assertEquals(2.5, settings.hashCost());
@@ -114,7 +130,10 @@ public class EngineSettingsTest
         assertEquals(256, settings.boxComparisonLimit());
         assertEquals(256, settings.tripleTermClassLimit());
         assertEquals(8, settings.existsRoundLimit());
+        assertNull(settings.statisticsFunction());
+        assertEquals(Duration.ofMinutes(1), settings.statisticsCheckInterval());
         assertEquals(100_000, settings.statisticsCacheLimit());
+        assertFalse(settings.serviceReorder());
         assertEquals(1000, settings.serviceTableRows());
         assertEquals(1000, settings.serviceBatchSize());
     }
@@ -153,16 +172,44 @@ public class EngineSettingsTest
     {
         for(Setting setting : settings)
         {
+            if(setting.invalid() == null)
+                continue;
+
             IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                     () -> setting.invalid().apply(EngineSettings.DEFAULT), setting.name());
 
             assertTrue(e.getMessage().startsWith(setting.name() + " "), e.getMessage());
         }
 
+        assertThrows(NullPointerException.class, () -> EngineSettings.DEFAULT.withJoinOptimizer(null));
+        assertThrows(NullPointerException.class, () -> EngineSettings.DEFAULT.withStatisticsCheckInterval(null));
+
+        // the times of the checks of the statistics
+        assertEquals(Duration.ZERO,
+                EngineSettings.DEFAULT.withStatisticsCheckInterval(Duration.ZERO).statisticsCheckInterval());
+        assertThrows(IllegalArgumentException.class,
+                () -> EngineSettings.DEFAULT.withStatisticsCheckInterval(Duration.ofDays(365 * 300)));
+
         // the limits of the join trees tried
         assertEquals(1, EngineSettings.DEFAULT.withExhaustiveJoinLimit(1).exhaustiveJoinLimit());
         assertEquals(30, EngineSettings.DEFAULT.withExhaustiveJoinLimit(30).exhaustiveJoinLimit());
         assertThrows(IllegalArgumentException.class, () -> EngineSettings.DEFAULT.withExhaustiveJoinLimit(0));
+    }
+
+
+    @Test
+    public void joinOptimizer()
+    {
+        assertFalse(EngineSettings.DEFAULT.isJoinOptimizerEnabled());
+        assertFalse(EngineSettings.DEFAULT.isPlanAdviceEnabled());
+
+        EngineSettings settings = EngineSettings.DEFAULT.withJoinOptimizer(JoinOptimizerMode.SETTINGS);
+        assertTrue(settings.isJoinOptimizerEnabled());
+        assertFalse(settings.isPlanAdviceEnabled());
+
+        EngineSettings advice = EngineSettings.DEFAULT.withJoinOptimizer(JoinOptimizerMode.ADVICE);
+        assertTrue(advice.isJoinOptimizerEnabled());
+        assertTrue(advice.isPlanAdviceEnabled());
     }
 
 
@@ -185,6 +232,15 @@ public class EngineSettingsTest
             config.setEngineSettings(EngineSettings.DEFAULT);
 
             assertSame(changed, request.getEngineSettings());
+        }
+
+        // and evaluates the SERVICE calls independently of their context as the settings say, unless told otherwise
+        config.setEngineSettings(EngineSettings.DEFAULT.withServiceReorder(true));
+
+        try(Request request = new Request(config); Request told = new Request(config, false))
+        {
+            assertTrue(request.isServiceReorderEnabled());
+            assertFalse(told.isServiceReorderEnabled());
         }
     }
 }

@@ -30,6 +30,8 @@ import org.postgresql.PGConnection;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.copy.CopyOut;
 import org.postgresql.core.BaseConnection;
+import cz.iocb.sparql.engine.config.EngineSettings;
+import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -44,7 +46,7 @@ import cz.iocb.sparql.testing.Database;
 
 
 /**
- * The lookups of the join optimizer made by plan advice (see {@link SparqlDatabaseConfiguration#setPlanAdvice}), which
+ * The lookups of the join optimizer made by plan advice (see {@link EngineSettings.JoinOptimizerMode#ADVICE}), which
  * needs the module {@code pg_plan_advice} of PostgreSQL 19 loaded in the sessions of the test database; the tests are
  * skipped otherwise. A lookup is a plain join of the statement, without the fence of {@code OFFSET 0} and compared by
  * plain equalities, and its table is read under an alias by which the advice makes the planner look it up by a nested
@@ -166,12 +168,10 @@ public class PlanAdviceLookupTest
         DatabaseSchema schema = new DatabaseSchema(connectionPool);
 
         advised = configure(record(DataSource.class, connectionPool, true), schema);
-        advised.setJoinOptimizer(true);
-        advised.setPlanAdvice(true);
+        advised.setEngineSettings(advised.getEngineSettings().withJoinOptimizer(JoinOptimizerMode.ADVICE));
 
         fetching = configure(record(DataSource.class, connectionPool, false), schema);
-        fetching.setJoinOptimizer(true);
-        fetching.setPlanAdvice(true);
+        fetching.setEngineSettings(fetching.getEngineSettings().withJoinOptimizer(JoinOptimizerMode.ADVICE));
 
         plain = configure(connectionPool, schema);
     }

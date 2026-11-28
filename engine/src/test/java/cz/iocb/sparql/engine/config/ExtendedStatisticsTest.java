@@ -31,6 +31,7 @@ import cz.iocb.sparql.engine.config.ExtendedStatistics.Definition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
+import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping.JoinColumns;
@@ -133,7 +134,8 @@ public class ExtendedStatisticsTest
             addQuadMapping(named, graph, createIriMapping("item", "kind", "serial"), createIriMapping("ex:named"),
                     createLiteralMapping(xsdString, "name"));
 
-            setExtendedStatisticsFunction(ExtendedStatisticsTest.schema, "ndistinct");
+            setEngineSettings(getEngineSettings()
+                    .withStatisticsFunction(new Function(ExtendedStatisticsTest.schema, "ndistinct")));
         }
     }
 

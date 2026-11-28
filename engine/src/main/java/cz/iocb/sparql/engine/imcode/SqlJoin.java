@@ -1246,7 +1246,7 @@ public final class SqlJoin extends SqlIntercode
         builder.append(" FROM ");
 
         // a join of more children than the optimizer chooses the tree of is left to the planner (see JoinOptimizer)
-        if(request.getConfiguration().isJoinOptimizerEnabled() && childs.size() > 1
+        if(request.getEngineSettings().isJoinOptimizerEnabled() && childs.size() > 1
                 && getPlan(request, outer).root() != null)
         {
             Map<Variable, Set<ResourceClass>> joined = getJoinedClasses(relations,

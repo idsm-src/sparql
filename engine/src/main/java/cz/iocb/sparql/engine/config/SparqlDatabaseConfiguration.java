@@ -42,7 +42,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -68,7 +67,6 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.DefaultStatistics;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
-import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.SourceTable;
@@ -245,12 +243,6 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     private final Map<SourceTable, Map<DatabaseTable, String>> statisticsSources = new ConcurrentHashMap<>();
 
     /**
-     * The least time between two checks of the tables the statistics are read from (see
-     * {@link #setStatisticsCheckInterval}).
-     */
-    private volatile Duration statisticsCheckInterval = Duration.ofMinutes(1);
-
-    /**
      * The time from which the next check of the tables the statistics are read from is due, in {@link System#nanoTime}
      * units.
      */
@@ -262,12 +254,6 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     private final ReentrantLock statisticsCheck = new ReentrantLock();
 
     /**
-     * Function through which the extended statistics of the tables are read, or null (see
-     * {@link #setExtendedStatisticsFunction}).
-     */
-    protected Function extendedStatisticsFunction = null;
-
-    /**
      * Tables whose rows the translation of a query may read (see {@link #addDictionaryTable}).
      */
     protected final Set<SourceTable> dictionaryTables = new HashSet<>();
@@ -276,17 +262,6 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * Tables whose accesses the translation of a query asks for a row (see {@link #addProbedTable}).
      */
     protected final Set<SourceTable> probedTables = new HashSet<>();
-
-    /**
-     * Whether the engine chooses the order and the methods of the joins it generates (see {@link #setJoinOptimizer}).
-     */
-    protected boolean joinOptimizer = false;
-
-    /**
-     * Whether the planner is made to keep the joins the join optimizer chooses by plan advice (see
-     * {@link #setPlanAdvice}).
-     */
-    protected boolean planAdvice = false;
 
     /**
      * Settings of the engine for the requests of this configuration (see {@link #setEngineSettings}).
@@ -2190,25 +2165,8 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
-     * Sets the least time between two checks of whether the statistics of the tables are to be renewed (see
-     * {@link #checkTableStatistics}); a minute by default, while zero has every request that asks for statistics check
-     * them.
-     *
-     * @param interval the least time between two checks
-     * @throws IllegalArgumentException if the interval is negative
-     */
-    public void setStatisticsCheckInterval(Duration interval)
-    {
-        if(interval.isNegative())
-            throw new IllegalArgumentException("negative interval of the checks of the statistics: " + interval);
-
-        statisticsCheckInterval = interval;
-    }
-
-
-    /**
-     * Checks whether the statistics of the tables are to be renewed, at most once per the interval set by
-     * {@link #setStatisticsCheckInterval}: the tables the statistics are read from (see
+     * Checks whether the statistics of the tables are to be renewed, at most once per the interval the settings of the
+     * engine give (see {@link EngineSettings#statisticsCheckInterval()}): the tables the statistics are read from (see
      * {@link TableStatistics#getSources}) are compared with their states at the last renewal of the statistics, and the
      * statistics a table of which has changed since, those a lookup of which has failed (see
      * {@link TableStatistics#isComplete}) and those not renewed yet, which may have been read at any time, are replaced
@@ -2236,7 +2194,7 @@ public class SparqlDatabaseConfiguration implements ClassRelations
             if(now - nextStatisticsCheck < 0)
                 return;
 
-            nextStatisticsCheck = now + statisticsCheckInterval.toNanos();
+            nextStatisticsCheck = now + request.getEngineSettings().statisticsCheckInterval().toNanos();
 
             Map<SourceTable, TableStatistics> current = Map.copyOf(tableStatistics);
             Set<DatabaseTable> sources = new HashSet<>();
@@ -2316,52 +2274,6 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
-     * Sets the function through which the engine reads the numbers of the distinct combinations of the values of
-     * several columns that the extended statistics of the database keep for a table ({@code CREATE STATISTICS} of the
-     * kind {@code ndistinct}), like those of the columns of an IRI made of several parts (see
-     * {@link CatalogStatistics}). The database shows them in the view {@code pg_stats_ext} to the owner of the table
-     * only, so a role that may only read the tables needs a function declared {@code SECURITY DEFINER} by their owner:
-     * it takes the schema and the name of a table (both of the type {@code name}) and returns the text forms of the
-     * {@code n_distinct} of the extended statistics of the table ({@code SETOF text}), like
-     *
-     * <pre>
-     * CREATE FUNCTION stats.ndistinct(schema_name name, table_name name) RETURNS SETOF text
-     * LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, pg_temp
-     * AS $$ SELECT n_distinct::text FROM pg_stats_ext
-     *     WHERE schemaname = schema_name AND tablename = table_name AND n_distinct IS NOT NULL
-     *     AND has_table_privilege(session_user, format('%I.%I', schema_name, table_name), 'SELECT') $$;
-     * REVOKE EXECUTE ON FUNCTION stats.ndistinct(name, name) FROM PUBLIC;
-     * GRANT EXECUTE ON FUNCTION stats.ndistinct(name, name) TO reader;
-     * </pre>
-     *
-     * which gives no more than the numbers, of the tables the role logged in to the database may read; the statements
-     * of {@link ExtendedStatistics} make the function together with the statistics the configuration needs. Without a
-     * function the engine reads the view itself, which serves a role owning the tables. The statistics of a table are
-     * kept by the configuration once they have been read, so the function is to be set before the configuration serves
-     * requests.
-     *
-     * @param schema the schema of the function
-     * @param name the name of the function
-     */
-    public void setExtendedStatisticsFunction(String schema, String name)
-    {
-        extendedStatisticsFunction = new Function(schema, name);
-    }
-
-
-    /**
-     * The function through which the engine reads the extended statistics of the tables (see
-     * {@link #setExtendedStatisticsFunction}), or null when it reads the view {@code pg_stats_ext} itself.
-     *
-     * @return the function through which the engine reads the extended statistics of the tables, or null
-     */
-    public Function getExtendedStatisticsFunction()
-    {
-        return extendedStatisticsFunction;
-    }
-
-
-    /**
      * Declares a dictionary table: a table whose rows give the values of one of its keys for those of another one, like
      * a table of the terms of a dataset with their numbers, and are neither changed nor removed while the configuration
      * serves requests. The translation of a query then reads the row that constants select by a key of the table and
@@ -2422,67 +2334,6 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     public boolean isProbedTable(SourceTable table)
     {
         return probedTables.contains(table);
-    }
-
-
-    /**
-     * Turns the join optimizer of the engine on or off: when on, the engine chooses the order and the methods of the
-     * joins it generates from the statistics of the tables (see {@link #getTableStatistics}) and makes the planner keep
-     * them, instead of leaving them to the planner (see {@link cz.iocb.sparql.engine.imcode.JoinOptimizer}). Off by
-     * default.
-     *
-     * @param enabled whether the join optimizer is on
-     */
-    public void setJoinOptimizer(boolean enabled)
-    {
-        joinOptimizer = enabled;
-    }
-
-
-    /**
-     * True if the engine chooses the order and the methods of the joins it generates (see {@link #setJoinOptimizer}).
-     *
-     * @return true if the engine chooses the order and the methods of the joins it generates, false otherwise
-     */
-    public boolean isJoinOptimizerEnabled()
-    {
-        return joinOptimizer;
-    }
-
-
-    /**
-     * Chooses how the planner is made to keep the joins the join optimizer chooses (see {@link #setJoinOptimizer}).
-     * Without plan advice, the default, the statement runs under settings that make the planner keep the order of the
-     * joins as written and hash every join it can, and an index lookup is written as a lateral subquery fenced by
-     * {@code OFFSET 0}, which the database evaluates in the process reading the outer rows, or, where the database may
-     * evaluate the statement by parallel workers, merged into the join and compared by conditions it cannot hash (see
-     * {@link cz.iocb.sparql.engine.request.Request#isParallel}). With plan advice, the lookups are plain joins of the
-     * statement, which the database can hand to the workers and cache by the values they are looked up by (Memoize),
-     * and the advice of the module {@code pg_plan_advice} makes the planner look them up by nested loops (see
-     * {@link cz.iocb.sparql.engine.database.PlanAdvice}); a statement with a lookup is planned once more for it, for
-     * the planner to tell the identifiers of its relations, and once again when a lookup is memoized. The module comes
-     * with PostgreSQL 19 and later and has to be loaded in the sessions of the data source, by
-     * {@code session_preload_libraries} or {@code shared_preload_libraries}, as only a superuser may load it in a
-     * session. The tables looked up are given aliases of their own, so the expressions of the mappings must not qualify
-     * the columns by the names of their tables.
-     *
-     * @param enabled whether the planner is made to keep the joins by plan advice
-     */
-    public void setPlanAdvice(boolean enabled)
-    {
-        planAdvice = enabled;
-    }
-
-
-    /**
-     * True if the planner is made to keep the joins the join optimizer chooses by plan advice (see
-     * {@link #setPlanAdvice}).
-     *
-     * @return true if the planner is made to keep the joins by plan advice, false otherwise
-     */
-    public boolean isPlanAdviceEnabled()
-    {
-        return planAdvice;
     }
 
 

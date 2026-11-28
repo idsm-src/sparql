@@ -544,7 +544,7 @@ public final class SqlFilter extends SqlIntercode
     {
         ClassRelations relations = request.getConfiguration();
 
-        if(!request.getConfiguration().isJoinOptimizerEnabled()
+        if(!request.getEngineSettings().isJoinOptimizerEnabled()
                 || conditions.stream().noneMatch(c -> c instanceof SqlExists))
             return translateConditions(request);
 

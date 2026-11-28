@@ -486,7 +486,7 @@ public final class SqlMinus extends SqlIntercode
             builder.append("1");
 
         // the solutions of the left side the right side is evaluated for one by one, when the optimizer chooses so
-        JoinOptimizer.Outer solutions = request.getConfiguration().isJoinOptimizerEnabled() ?
+        JoinOptimizer.Outer solutions = request.getEngineSettings().isJoinOptimizerEnabled() ?
                 getPlan(request, outer, scope.getLeftInputTable()).outer() : null;
 
         Table table = solutions != null ? solutions.table() : leftTable;
@@ -533,7 +533,7 @@ public final class SqlMinus extends SqlIntercode
     {
         SqlCode code = right.translate(request, scope);
 
-        if(!request.getConfiguration().isJoinOptimizerEnabled() || !code.getOuterTables().isEmpty())
+        if(!request.getEngineSettings().isJoinOptimizerEnabled() || !code.getOuterTables().isEmpty())
             return code;
 
         return SqlDistinct.deduplicate(request, right, code);

@@ -545,10 +545,12 @@ public class ServiceSettingsTest
         // four solutions stay inline data by default, and also when a batch is smaller than the solutions kept so
         assertThat(translate(engine, query), not(containsString("tmp_table_")));
 
-        engine.getConfig().setEngineSettings(EngineSettings.DEFAULT.withServiceTableRows(5).withServiceBatchSize(1));
+        EngineSettings settings = engine.getConfig().getEngineSettings();
+
+        engine.getConfig().setEngineSettings(settings.withServiceTableRows(5).withServiceBatchSize(1));
         assertThat(translate(engine, query), not(containsString("tmp_table_")));
 
-        engine.getConfig().setEngineSettings(EngineSettings.DEFAULT.withServiceTableRows(2).withServiceBatchSize(1));
+        engine.getConfig().setEngineSettings(settings.withServiceTableRows(2).withServiceBatchSize(1));
         assertThat(translate(engine, query), containsString("tmp_table_"));
         assertThat(execute(engine, query), containsInAnyOrder(row(a, integer("1")), row(b, integer("2")),
                 row(iri("c"), integer("3")), row(d, decimal("1.5"))));

@@ -14,7 +14,6 @@ import java.util.Set;
 import java.util.function.ToDoubleFunction;
 import java.util.stream.IntStream;
 import cz.iocb.sparql.engine.config.EngineSettings;
-import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
@@ -50,31 +49,30 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 /**
  * Chooses the tree and the methods of the joins of the children of a {@link SqlJoin} from the statistics the engine
  * keeps of the tables (see {@link TableStatistics}), for the planner of the database to keep them (see
- * {@link SparqlDatabaseConfiguration#setJoinOptimizer}): the planner estimates every join of a table holding many kinds
- * of rows at once, such as a table of all the triples of a dataset, at one row, and then nests the joins in a wrong
- * order. The size of a join of some of the children is estimated independently of the order: the product of the sizes
- * of the children, divided for every variable they share by the distinct values of the variable in each of them but the
- * one with the fewest, so that the children sharing a variable are joined on it like a key. A join of two sides costs
- * the hashing of the smaller side and the probing of the other, or the pairwise comparison of the sides when no
- * equality can be hashed (a variable that may be unbound, or bound in several classes, on a side compares by a
- * disjunction); a child that is a table access looked up by an index of a variable the other side binds may be joined
- * by an index nested loop instead, costing a lookup per outer row. The tree that minimises the sum of the costs and of
- * the sizes of the intermediate results is found by dynamic programming over the connected subsets of the children, up
- * to a number of them the settings of the engine give (see {@link EngineSettings#exhaustiveJoinLimit()}). Of more
- * children, those that the others determine, like a dictionary giving the terms of the numbers the others hold, are
- * left out of the search and joined to the tree chosen for the others (see {@link #getDetermined}), which is built
- * greedily when the others are still too many. The costs are in units of one row scanned or hashed, and the settings of
- * the engine give them too (see {@link EngineSettings#lookupCost()} and the costs next to it). A filter above the join
- * counts as well (see {@link SqlIntercode.Restrictions#getFilterConditions}), because the database evaluates a
- * condition as soon as the variables deciding it are bound: a condition that one variable decides alone reduces the
- * child the join takes the variable from (the rows it drops are read all the same when the child is scanned, unless an
- * index serves the condition, so they are the cost of the scan, which a lookup of the child spares; see
- * {@link #isServedByIndex}), and a condition requiring two variables taken from two children to be equal reduces every
- * join that holds both children, as a variable shared by them would; where it holds only for the same term, the
- * children are joined on it like on such a variable, by hashing or by an index lookup (see {@link Equality}). A join
- * whose parent reads only its first solutions, like a slice in no order, is planned for them (see
- * {@link #planFirstRows}): the database stops once the parent has its rows, which a tree of lookups reaches after a few
- * rows, whereas a hash join reads a side whole first.
+ * {@link EngineSettings#joinOptimizer()}): the planner estimates every join of a table holding many kinds of rows at
+ * once, such as a table of all the triples of a dataset, at one row, and then nests the joins in a wrong order. The
+ * size of a join of some of the children is estimated independently of the order: the product of the sizes of the
+ * children, divided for every variable they share by the distinct values of the variable in each of them but the one
+ * with the fewest, so that the children sharing a variable are joined on it like a key. A join of two sides costs the
+ * hashing of the smaller side and the probing of the other, or the pairwise comparison of the sides when no equality
+ * can be hashed (a variable that may be unbound, or bound in several classes, on a side compares by a disjunction); a
+ * child that is a table access looked up by an index of a variable the other side binds may be joined by an index
+ * nested loop instead, costing a lookup per outer row. The tree that minimises the sum of the costs and of the sizes of
+ * the intermediate results is found by dynamic programming over the connected subsets of the children, up to a number
+ * of them the settings of the engine give (see {@link EngineSettings#exhaustiveJoinLimit()}). Of more children, those
+ * that the others determine, like a dictionary giving the terms of the numbers the others hold, are left out of the
+ * search and joined to the tree chosen for the others (see {@link #getDetermined}), which is built greedily when the
+ * others are still too many. The costs are in units of one row scanned or hashed, and the settings of the engine give
+ * them too (see {@link EngineSettings#lookupCost()} and the costs next to it). A filter above the join counts as well
+ * (see {@link SqlIntercode.Restrictions#getFilterConditions}), because the database evaluates a condition as soon as
+ * the variables deciding it are bound: a condition that one variable decides alone reduces the child the join takes the
+ * variable from (the rows it drops are read all the same when the child is scanned, unless an index serves the
+ * condition, so they are the cost of the scan, which a lookup of the child spares; see {@link #isServedByIndex}), and a
+ * condition requiring two variables taken from two children to be equal reduces every join that holds both children, as
+ * a variable shared by them would; where it holds only for the same term, the children are joined on it like on such a
+ * variable, by hashing or by an index lookup (see {@link Equality}). A join whose parent reads only its first
+ * solutions, like a slice in no order, is planned for them (see {@link #planFirstRows}): the database stops once the
+ * parent has its rows, which a tree of lookups reaches after a few rows, whereas a hash join reads a side whole first.
  *
  * The sides of an OPTIONAL keep their order, so only the method of their join is chosen (see {@link #planLeftJoin}):
  * the right side is evaluated once and the sides are hashed, or the right side is evaluated for every solution of the

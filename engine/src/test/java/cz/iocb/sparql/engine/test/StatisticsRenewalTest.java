@@ -18,6 +18,7 @@ import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
+import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.database.GroupedStatistics;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.TableStatistics;
@@ -104,7 +105,7 @@ public class StatisticsRenewalTest
         DataSource pool = Database.getPool();
         DatabaseSchema schema = new DatabaseSchema(pool);
         SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, pool, schema, true);
-        config.setStatisticsCheckInterval(interval);
+        config.setEngineSettings(config.getEngineSettings().withStatisticsCheckInterval(interval));
 
         return config;
     }
@@ -258,7 +259,8 @@ public class StatisticsRenewalTest
 
         // the function reading the extended statistics does not exist yet
         SparqlDatabaseConfiguration config = configure(Duration.ZERO);
-        config.setExtendedStatisticsFunction("statistics_renewal_test", "ndistinct");
+        config.setEngineSettings(config.getEngineSettings()
+                .withStatisticsFunction(new Function("statistics_renewal_test", "ndistinct")));
         statistics(config, table);
         statistics(config, table);
 

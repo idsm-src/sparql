@@ -790,7 +790,8 @@ public class EndpointServlet extends HttpServlet
             boolean includeWarnings = warnings != null ? Boolean.parseBoolean(warnings) : false;
 
             String reorder = req.getParameter("service-reorder");
-            boolean serviceReorder = reorder != null ? Boolean.parseBoolean(reorder) : false;
+            boolean serviceReorder = reorder != null ? Boolean.parseBoolean(reorder) :
+                    sparqlConfig.getEngineSettings().serviceReorder();
 
 
             int limit = -1;

@@ -41,13 +41,14 @@ public class Engine
 
 
     /**
-     * Creates a request without service reordering.
+     * Creates a request evaluating the SERVICE calls independently of their context as the settings of the engine say
+     * (see {@link cz.iocb.sparql.engine.config.EngineSettings#serviceReorder()}).
      *
      * @return the new request
      */
     public Request getRequest()
     {
-        return new Request(config, false);
+        return new Request(config);
     }
 
 

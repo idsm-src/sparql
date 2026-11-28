@@ -1,13 +1,18 @@
 package cz.iocb.sparql.engine.config;
 
+import java.time.Duration;
+import java.util.Objects;
+import cz.iocb.sparql.engine.database.Function;
+
 
 
 /**
  * Settings of the engine for the requests of a configuration (see
- * {@link SparqlDatabaseConfiguration#getEngineSettings}): the costs and the margins by which the join optimizer chooses
- * the joins, the estimates it takes where nothing is known, the limits beyond which the translation leaves a
- * transformation of the intermediate code out, the caches of the statistics of the tables, and the storage of the
- * solutions of SERVICE calls. A request keeps the settings it has begun with (see
+ * {@link SparqlDatabaseConfiguration#getEngineSettings}): whether the engine chooses the joins and how the planner
+ * keeps them, the costs and the margins by which the join optimizer chooses the joins, the estimates it takes where
+ * nothing is known, the limits beyond which the translation leaves a transformation of the intermediate code out, how
+ * the statistics of the tables are read, kept and renewed, and how the SERVICE calls are ordered and their solutions
+ * stored. A request keeps the settings it has begun with (see
  * {@link cz.iocb.sparql.engine.request.Request#getEngineSettings}). The settings are immutable: the {@code with}
  * methods derive changed copies, checking the values given. The default of a setting, which {@link #DEFAULT} holds, is
  * the initial value of its field, whose description tells why the value is what it is where there is a reason for it.
@@ -17,9 +22,54 @@ package cz.iocb.sparql.engine.config;
 public final class EngineSettings implements Cloneable
 {
     /**
+     * Who chooses the order and the methods of the joins the engine generates, and how the planner of the database is
+     * made to keep them.
+     */
+    public enum JoinOptimizerMode
+    {
+        /**
+         * The planner chooses the joins.
+         */
+        OFF,
+
+        /**
+         * The engine chooses the joins (see {@link cz.iocb.sparql.engine.imcode.JoinOptimizer}), and the statement runs
+         * under settings that make the planner keep the order of the joins as written and hash every join it can; an
+         * index lookup is written as a lateral subquery fenced by {@code OFFSET 0}, which the database evaluates in the
+         * process reading the outer rows, or, where the database may evaluate the statement by parallel workers, merged
+         * into the join and compared by conditions it cannot hash (see
+         * {@link cz.iocb.sparql.engine.request.Request#isParallel}).
+         */
+        SETTINGS,
+
+        /**
+         * The engine chooses the joins, and plan advice makes the planner keep them: the lookups are plain joins of the
+         * statement, which the database can hand to the workers and cache by the values they are looked up by
+         * (Memoize), and the advice of the module {@code pg_plan_advice} makes the planner look them up by nested loops
+         * (see {@link cz.iocb.sparql.engine.database.PlanAdvice}); a statement with a lookup is planned once more for
+         * it, for the planner to tell the identifiers of its relations, and once again when a lookup is memoized. The
+         * module comes with PostgreSQL 19 and later and has to be loaded in the sessions of the data source, by
+         * {@code session_preload_libraries} or {@code shared_preload_libraries}, as only a superuser may load it in a
+         * session. The tables looked up are given aliases of their own, so the expressions of the mappings must not
+         * qualify the columns by the names of their tables.
+         */
+        ADVICE
+    }
+
+
+    /**
      * The default settings.
      */
     public static final EngineSettings DEFAULT = new EngineSettings();
+
+    /**
+     * Who chooses the order and the methods of the joins the engine generates: when the engine does, it chooses them
+     * from the statistics of the tables (see {@link SparqlDatabaseConfiguration#getTableStatistics}) and makes the
+     * planner keep them, as the planner estimates every join of a table holding many kinds of rows, such as a table of
+     * all the triples of a dataset, at one row and nests the joins in a wrong order then; the planner chooses them by
+     * default.
+     */
+    private JoinOptimizerMode joinOptimizer = JoinOptimizerMode.OFF;
 
     /**
      * Cost of the lookup of the rows matching one outer row by an index, in units of one row scanned or hashed, like
@@ -155,6 +205,40 @@ public final class EngineSettings implements Cloneable
     private int existsRoundLimit = 8;
 
     /**
+     * The function through which the engine reads the numbers of the distinct combinations of the values of several
+     * columns that the extended statistics of the database keep for a table ({@code CREATE STATISTICS} of the kind
+     * {@code ndistinct}), like those of the columns of an IRI made of several parts (see
+     * {@link cz.iocb.sparql.engine.database.CatalogStatistics}), or null, the default, when the engine reads the view
+     * {@code pg_stats_ext} itself, which serves a role owning the tables. The database shows the view to the owner of
+     * the table only, so a role that may only read the tables needs a function declared {@code SECURITY DEFINER} by
+     * their owner: it takes the schema and the name of a table (both of the type {@code name}) and returns the text
+     * forms of the {@code n_distinct} of the extended statistics of the table ({@code SETOF text}), like
+     *
+     * <pre>
+     * CREATE FUNCTION stats.ndistinct(schema_name name, table_name name) RETURNS SETOF text
+     * LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, pg_temp
+     * AS $$ SELECT n_distinct::text FROM pg_stats_ext
+     *     WHERE schemaname = schema_name AND tablename = table_name AND n_distinct IS NOT NULL
+     *     AND has_table_privilege(session_user, format('%I.%I', schema_name, table_name), 'SELECT') $$;
+     * REVOKE EXECUTE ON FUNCTION stats.ndistinct(name, name) FROM PUBLIC;
+     * GRANT EXECUTE ON FUNCTION stats.ndistinct(name, name) TO reader;
+     * </pre>
+     *
+     * which gives no more than the numbers, of the tables the role logged in to the database may read; the statements
+     * of {@link ExtendedStatistics} make the function together with the statistics the configuration needs. The
+     * statistics of a table are kept by the configuration once they have been read, so the function is to be set before
+     * the configuration serves requests.
+     */
+    private Function statisticsFunction = null;
+
+    /**
+     * The least time between two checks of whether the statistics of the tables are to be renewed (see
+     * {@link SparqlDatabaseConfiguration#checkTableStatistics}); zero has every request that asks for statistics check
+     * them.
+     */
+    private Duration statisticsCheckInterval = Duration.ofMinutes(1);
+
+    /**
      * Most values a cache of the statistics of a table keeps (see
      * {@link cz.iocb.sparql.engine.database.TableStatisticsBase}): far more than the values the queries of a deployment
      * keep asking about, so that only a stream of ever new constants fills a cache, which is then emptied instead of
@@ -162,6 +246,15 @@ public final class EngineSettings implements Cloneable
      * a group more.
      */
     private int statisticsCacheLimit = 100_000;
+
+    /**
+     * Whether a request evaluates the SERVICE calls independently of their context and joins them afterwards, each
+     * asked about as many of its shared variables as the context limit of its endpoint takes by the estimates (see
+     * {@link cz.iocb.sparql.engine.request.Request#isServiceReorderEnabled}), when the request is not told otherwise
+     * (see {@link cz.iocb.sparql.engine.request.Engine#getRequest(boolean)}), like by the parameter
+     * {@code service-reorder} of a request of the endpoint; not by default.
+     */
+    private boolean serviceReorder = false;
 
     /**
      * Number of the solutions of a SERVICE call from which they are stored in a temporary table, which the query reads
@@ -183,6 +276,54 @@ public final class EngineSettings implements Cloneable
      */
     private EngineSettings()
     {
+    }
+
+
+    /**
+     * Who chooses the order and the methods of the joins the engine generates (the setting {@code join-optimizer}).
+     *
+     * @return who chooses the joins and how the planner keeps them
+     */
+    public JoinOptimizerMode joinOptimizer()
+    {
+        return joinOptimizer;
+    }
+
+
+    /**
+     * Copy with the given chooser of the order and the methods of the joins the engine generates.
+     *
+     * @param joinOptimizer who chooses the joins and how the planner keeps them
+     * @return copy with the given chooser of the joins
+     * @throws NullPointerException if the chooser is null
+     */
+    public EngineSettings withJoinOptimizer(JoinOptimizerMode joinOptimizer)
+    {
+        EngineSettings copy = copy();
+        copy.joinOptimizer = Objects.requireNonNull(joinOptimizer, "join-optimizer");
+        return copy;
+    }
+
+
+    /**
+     * True if the engine chooses the order and the methods of the joins it generates (see {@link #joinOptimizer}).
+     *
+     * @return true if the engine chooses the joins, false if the planner does
+     */
+    public boolean isJoinOptimizerEnabled()
+    {
+        return joinOptimizer != JoinOptimizerMode.OFF;
+    }
+
+
+    /**
+     * True if plan advice makes the planner keep the joins the engine chooses (see {@link JoinOptimizerMode#ADVICE}).
+     *
+     * @return true if plan advice makes the planner keep the joins, false otherwise
+     */
+    public boolean isPlanAdviceEnabled()
+    {
+        return joinOptimizer == JoinOptimizerMode.ADVICE;
     }
 
 
@@ -646,6 +787,60 @@ public final class EngineSettings implements Cloneable
 
 
     /**
+     * The function through which the engine reads the extended statistics of the tables (the setting
+     * {@code statistics-function}), or null when it reads the view {@code pg_stats_ext} itself.
+     *
+     * @return the function through which the engine reads the extended statistics of the tables, or null
+     */
+    public Function statisticsFunction()
+    {
+        return statisticsFunction;
+    }
+
+
+    /**
+     * Copy with the given function through which the engine reads the extended statistics of the tables.
+     *
+     * @param statisticsFunction the function, or null when the engine reads the view {@code pg_stats_ext} itself
+     * @return copy with the given function
+     */
+    public EngineSettings withStatisticsFunction(Function statisticsFunction)
+    {
+        EngineSettings copy = copy();
+        copy.statisticsFunction = statisticsFunction;
+        return copy;
+    }
+
+
+    /**
+     * The least time between two checks of whether the statistics of the tables are to be renewed (the setting
+     * {@code statistics-check-interval}).
+     *
+     * @return the least time between two checks of the statistics
+     */
+    public Duration statisticsCheckInterval()
+    {
+        return statisticsCheckInterval;
+    }
+
+
+    /**
+     * Copy with the given least time between two checks of whether the statistics of the tables are to be renewed.
+     *
+     * @param statisticsCheckInterval the least time between two checks of the statistics
+     * @return copy with the given time
+     * @throws NullPointerException if the time is null
+     * @throws IllegalArgumentException if the time is negative or longer than a {@code long} number of nanoseconds
+     */
+    public EngineSettings withStatisticsCheckInterval(Duration statisticsCheckInterval)
+    {
+        EngineSettings copy = copy();
+        copy.statisticsCheckInterval = checkDuration("statistics-check-interval", statisticsCheckInterval);
+        return copy;
+    }
+
+
+    /**
      * Most values a cache of the statistics of a table keeps (the setting {@code statistics-cache-limit}).
      *
      * @return most values a cache of the statistics of a table keeps
@@ -667,6 +862,32 @@ public final class EngineSettings implements Cloneable
     {
         EngineSettings copy = copy();
         copy.statisticsCacheLimit = checkRange("statistics-cache-limit", statisticsCacheLimit, 1, Integer.MAX_VALUE);
+        return copy;
+    }
+
+
+    /**
+     * Whether a request evaluates the SERVICE calls independently of their context when it is not told otherwise (the
+     * setting {@code service-reorder}).
+     *
+     * @return whether a request evaluates the SERVICE calls independently of their context by default
+     */
+    public boolean serviceReorder()
+    {
+        return serviceReorder;
+    }
+
+
+    /**
+     * Copy with the given default of the evaluation of the SERVICE calls independently of their context.
+     *
+     * @param serviceReorder whether a request evaluates the SERVICE calls independently of their context by default
+     * @return copy with the given default
+     */
+    public EngineSettings withServiceReorder(boolean serviceReorder)
+    {
+        EngineSettings copy = copy();
+        copy.serviceReorder = serviceReorder;
         return copy;
     }
 
@@ -774,6 +995,28 @@ public final class EngineSettings implements Cloneable
     {
         if(!(value > 0 && value <= 1))
             throw new IllegalArgumentException(name + " has to be a number greater than 0 and at most 1: " + value);
+
+        return value;
+    }
+
+
+    /**
+     * Checks that the value of a setting is a time that is not negative and fits into a {@code long} number of
+     * nanoseconds.
+     *
+     * @param name name of the setting
+     * @param value the value
+     * @return the value
+     * @throws NullPointerException if the value is null
+     * @throws IllegalArgumentException if the value is negative or too long
+     */
+    private static Duration checkDuration(String name, Duration value)
+    {
+        Objects.requireNonNull(value, name);
+
+        if(value.isNegative() || value.compareTo(Duration.ofNanos(Long.MAX_VALUE)) > 0)
+            throw new IllegalArgumentException(
+                    name + " has to be a time from zero to " + Long.MAX_VALUE + " ns: " + value);
 
         return value;
     }

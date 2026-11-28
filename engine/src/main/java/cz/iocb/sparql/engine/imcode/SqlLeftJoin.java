@@ -1184,7 +1184,7 @@ public final class SqlLeftJoin extends SqlIntercode
         ClassRelations relations = request.getConfiguration();
 
         // the method the optimizer chooses for the join
-        JoinOptimizer.LeftJoinPlan plan = request.getConfiguration().isJoinOptimizerEnabled() ?
+        JoinOptimizer.LeftJoinPlan plan = request.getEngineSettings().isJoinOptimizerEnabled() ?
                 getPlan(request, outer) : null;
 
         // the solutions binding the variables the left side may leave unbound are joined apart where the optimizer says

@@ -2737,7 +2737,7 @@ public abstract class SqlIntercode extends SqlBaseClass
     protected static void addFilterConditions(Request request, Restrictions restrictions,
             List<SqlExpressionIntercode> conditions, VariableBindings bindings)
     {
-        if(!request.getConfiguration().isJoinOptimizerEnabled())
+        if(!request.getEngineSettings().isJoinOptimizerEnabled())
             return;
 
         ClassRelations relations = request.getConfiguration();

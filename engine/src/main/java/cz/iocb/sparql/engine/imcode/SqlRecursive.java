@@ -2011,7 +2011,7 @@ public final class SqlRecursive extends SqlIntercode
     {
         ClassRelations relations = request.getConfiguration();
         SqlIntercode sibling = startTest.sibling();
-        boolean optimizer = request.getConfiguration().isJoinOptimizerEnabled();
+        boolean optimizer = request.getEngineSettings().isJoinOptimizerEnabled();
 
         SqlCode tested;
 
@@ -2369,7 +2369,7 @@ public final class SqlRecursive extends SqlIntercode
             builder.append(") AS ");
             builder.append(right);
         }
-        else if(request.getConfiguration().isJoinOptimizerEnabled() && next instanceof SqlTableAccess access
+        else if(request.getEngineSettings().isJoinOptimizerEnabled() && next instanceof SqlTableAccess access
                 && access.getTable() != null)
         {
             // with the join optimizer on, the planner is told not to nest loops, so a step reading a table is looked
