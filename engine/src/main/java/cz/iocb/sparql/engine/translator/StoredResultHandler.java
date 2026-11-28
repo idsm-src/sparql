@@ -17,6 +17,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
+import cz.iocb.sparql.engine.config.EngineSettings;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.NullColumn;
@@ -38,7 +39,9 @@ import cz.iocb.sparql.engine.request.Request;
 
 /**
  * Result handler that keeps small results as a VALUES list and stores large ones in a temporary table (created and
- * filled in batches while the solutions arrive), which is then accessed as an ordinary table.
+ * filled in batches while the solutions arrive), which is then accessed as an ordinary table; the settings of the
+ * engine tell from how many solutions a result is stored and how many solutions a batch inserts (see
+ * {@link EngineSettings#serviceTableRows()}, {@link EngineSettings#serviceBatchSize()}).
  */
 public class StoredResultHandler extends ResultHandler
 {
@@ -48,14 +51,15 @@ public class StoredResultHandler extends ResultHandler
     private static AtomicInteger tableIdx = new AtomicInteger(0);
 
     /**
-     * Rows inserted per batch.
+     * Results with fewer rows stay a VALUES list instead of a table.
      */
-    private static int batchSize = 1000;
+    private final int tableRows;
 
     /**
-     * Results with fewer rows stay a VALUES list instead of a table; must not exceed the batch size.
+     * Rows inserted per batch, at least {@link #tableRows}, so that a result that stays a VALUES list is held whole by
+     * the first batch.
      */
-    private static int minTableSize = 1000; // has to be less than or equal to batchSize
+    private final int batchSize;
 
     /**
      * Pending asynchronous work.
@@ -131,6 +135,10 @@ public class StoredResultHandler extends ResultHandler
     public StoredResultHandler(Request request, Scope scope, Restrictions restrictions)
     {
         super(request, scope, restrictions);
+
+        EngineSettings settings = request.getEngineSettings();
+        tableRows = settings.serviceTableRows();
+        batchSize = Math.max(settings.serviceBatchSize(), tableRows);
 
         columns.put(new TableColumn("__", INT4), INT4);
     }
@@ -234,7 +242,7 @@ public class StoredResultHandler extends ResultHandler
             return SqlNoSolution.get();
 
         // a result stored in the table is stored completely before its columns are merged
-        if(rowCount >= minTableSize && batchCount > 0)
+        if(rowCount >= tableRows && batchCount > 0)
             flushValues();
 
         mergeOverlappingClasses();
@@ -261,7 +269,7 @@ public class StoredResultHandler extends ResultHandler
         }
 
 
-        if(rowCount < minTableSize)
+        if(rowCount < tableRows)
         {
             Map<Column, SqlType> sqlTypes = new HashMap<>();
 

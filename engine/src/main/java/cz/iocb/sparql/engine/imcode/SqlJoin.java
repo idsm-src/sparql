@@ -264,8 +264,6 @@ public final class SqlJoin extends SqlIntercode
 
         List<SqlIntercode> optChilds = deterministic;
 
-        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
-
         // the children could swap their presentations of a shared variable in every round
         Settlement settlement = new Settlement();
 
@@ -273,8 +271,8 @@ public final class SqlJoin extends SqlIntercode
         {
             List<SqlIntercode> optimized = optimize(request, scope, optChilds, newRestrictions, reduced, evalServices,
                     settlement.getClasses());
-            List<SqlIntercode> newChilds = reduceDistinctUnion(relations,
-                    reduceJoin(request, optimized, newRestrictions), schema);
+            List<SqlIntercode> newChilds = reduceDistinctUnion(request,
+                    reduceJoin(request, optimized, newRestrictions));
 
             if(reduced)
                 newChilds = reduceSubsumed(newChilds);
@@ -922,11 +920,11 @@ public final class SqlJoin extends SqlIntercode
 
                     if(optChilds.get(j) instanceof SqlTableAccess right)
                     {
-                        merged = SqlTableAccess.tryReduceJoin(relations, schema, left, right, null);
+                        merged = SqlTableAccess.tryReduceJoin(request, left, right, null);
                     }
                     else if(optChilds.get(j) instanceof SqlDistinct d && d.getChild() instanceof SqlTableAccess right)
                     {
-                        merged = tryReduceDistinct(relations, schema, left, right);
+                        merged = tryReduceDistinct(request, left, right);
                     }
 
                     if(Objects.equals(merged, SqlNoSolution.get()))
@@ -955,14 +953,13 @@ public final class SqlJoin extends SqlIntercode
      * children it replaces (see {@link #tryReduceDistinct}), and the scan starts again after every replacement, which
      * changes the children.
      *
-     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param request the current request
      * @param childs the child nodes
-     * @param schema the database schema
      * @return the simplified children
      */
-    private static List<SqlIntercode> reduceDistinctUnion(ClassRelations relations, List<SqlIntercode> childs,
-            DatabaseSchema schema)
+    private static List<SqlIntercode> reduceDistinctUnion(Request request, List<SqlIntercode> childs)
     {
+        ClassRelations relations = request.getConfiguration();
         List<SqlIntercode> newChilds = new ArrayList<>(childs);
 
         loop:
@@ -984,7 +981,7 @@ public final class SqlJoin extends SqlIntercode
                         if(!(d instanceof SqlTableAccess distinctPart))
                             continue;
 
-                        SqlIntercode intercode = tryReduceDistinct(relations, schema, candidate, distinctPart);
+                        SqlIntercode intercode = tryReduceDistinct(request, candidate, distinctPart);
 
                         if(intercode instanceof SqlTableAccess a && a.getConditions().equals(candidate.getConditions())
                                 && a.hasSameValues(candidate))
@@ -1110,15 +1107,16 @@ public final class SqlJoin extends SqlIntercode
      * children of the join may join any of them; the next round of the optimisation restricts it (see
      * {@link #getRestrictions}).
      *
-     * @param relations declarations which unrelated user IRI classes may overlap
-     * @param schema the database schema
+     * @param request the current request
      * @param candidate the access joined with the distinct pattern
      * @param distinct the deduplicated access
      * @return the merged access, or null
      */
-    private static SqlIntercode tryReduceDistinct(ClassRelations relations, DatabaseSchema schema,
-            SqlTableAccess candidate, SqlTableAccess distinct)
+    private static SqlIntercode tryReduceDistinct(Request request, SqlTableAccess candidate, SqlTableAccess distinct)
     {
+        ClassRelations relations = request.getConfiguration();
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+
         if(Objects.equals(distinct.getTable(), candidate.getTable()))
         {
             // the distinct part denotes a set over all the columns it binds
@@ -1127,7 +1125,7 @@ public final class SqlJoin extends SqlIntercode
             if(!SqlTableAccess.canBeJoinedByDistinctColumns(relations, candidate, distinct, distinctColumns))
                 return null;
 
-            return SqlTableAccess.joinByDistinctColumns(relations, candidate, distinct, null);
+            return SqlTableAccess.joinByDistinctColumns(request, candidate, distinct, null);
         }
         else
         {
@@ -1155,7 +1153,7 @@ public final class SqlJoin extends SqlIntercode
             for(Set<ColumnPair> key : keys)
                 if(key.containsAll(columns)
                         && key.stream().allMatch(p -> candidate.isKnownNotNull(schema, p.getRight())))
-                    return SqlTableAccess.joinByForeignKey(relations, distinct, candidate, columns, null);
+                    return SqlTableAccess.joinByForeignKey(request, distinct, candidate, columns, null);
         }
 
         return null;

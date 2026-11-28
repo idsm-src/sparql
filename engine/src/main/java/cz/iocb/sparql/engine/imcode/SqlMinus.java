@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import cz.iocb.sparql.engine.config.EngineSettings;
 import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.SqlBuilder;
@@ -122,15 +123,16 @@ public final class SqlMinus extends SqlIntercode
     /**
      * The number of the solutions of the left side that a difference reads at most for the solutions its parent reads
      * of its own (see {@link Restrictions#getNeededRows}): nothing tells how many solutions the right side removes, so
-     * the difference is taken to keep the default part of them (see {@link JoinOptimizer#DEFAULT_SELECTIVITY}).
+     * the difference is taken to keep the default part of them (see {@link EngineSettings#defaultSelectivity()}).
      *
+     * @param request the current request
      * @param restrictions what the parent needs of the variables, or null
      * @return the number of the solutions of the left side the difference reads at most
      */
-    private static double getLeftRows(Restrictions restrictions)
+    private static double getLeftRows(Request request, Restrictions restrictions)
     {
         return restrictions == null ? Double.POSITIVE_INFINITY :
-                restrictions.getNeededRows() / JoinOptimizer.DEFAULT_SELECTIVITY;
+                restrictions.getNeededRows() / request.getEngineSettings().defaultSelectivity();
     }
 
 
@@ -200,7 +202,7 @@ public final class SqlMinus extends SqlIntercode
             SqlExpressionIntercode solutionBound, Restrictions restrictions)
     {
         return new SqlMinus(left.getVariableBindings().restrict(request.getConfiguration(), restrictions), left, right,
-                graph, solutionBound, getFilterConditions(left, restrictions), getLeftRows(restrictions));
+                graph, solutionBound, getFilterConditions(left, restrictions), getLeftRows(request, restrictions));
     }
 
 
@@ -243,7 +245,7 @@ public final class SqlMinus extends SqlIntercode
         // keeps every solution, matched or not)
         Restrictions leftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
                 optRight.getVariableBindings(), restrictions, false);
-        leftRestrictions.setNeededRows(getLeftRows(restrictions));
+        leftRestrictions.setNeededRows(getLeftRows(request, restrictions));
         Restrictions rightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
                 optLeft.getVariableBindings(), new Restrictions(), true);
 
@@ -295,7 +297,7 @@ public final class SqlMinus extends SqlIntercode
             boolean newLeftReduced = reduced & optRight.isDeterministic;
             Restrictions newLeftRestrictions = getJoinRestrictions(relations, optLeft.getVariableBindings(),
                     Set.of(optRight.getVariableBindings()), restrictions, false, settlement.getClasses());
-            newLeftRestrictions.setNeededRows(getLeftRows(restrictions));
+            newLeftRestrictions.setNeededRows(getLeftRows(request, restrictions));
             Restrictions newRightRestrictions = getJoinRestrictions(relations, optRight.getVariableBindings(),
                     Set.of(optLeft.getVariableBindings()), new Restrictions(), true, settlement.getClasses());
 
@@ -366,7 +368,7 @@ public final class SqlMinus extends SqlIntercode
         if(restrictions.isOptimized(relations, bindings) && optLeft == left && optRight == right
                 && Objects.equals(optSolutionBound, solutionBound)
                 && filterConditions.equals(getFilterConditions(optLeft, restrictions))
-                && leftRows == getLeftRows(restrictions))
+                && leftRows == getLeftRows(request, restrictions))
             return this;
 
         return minus(request, optLeft, optRight, graph, optSolutionBound, restrictions);

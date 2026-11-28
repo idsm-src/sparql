@@ -812,7 +812,7 @@ public final class SqlLeftJoin extends SqlIntercode
                         .filter(b -> !variables.contains(b.getVariable()))
                         .allMatch(b -> !b.canBeNull() && !restrictions.containsVar(b.getVariable()));
 
-                SqlTableAccess moved = bound ? SqlTableAccess.tryTransfer(relations, schema, access, part) : null;
+                SqlTableAccess moved = bound ? SqlTableAccess.tryTransfer(request, access, part) : null;
 
                 if(moved != null)
                 {

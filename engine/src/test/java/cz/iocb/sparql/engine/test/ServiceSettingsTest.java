@@ -37,6 +37,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import cz.iocb.sparql.engine.config.EngineSettings;
 import cz.iocb.sparql.engine.config.ServiceSettings;
 import cz.iocb.sparql.engine.config.ServiceSettings.ContextOverflow;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
@@ -44,6 +45,7 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
+import cz.iocb.sparql.engine.imcode.SqlSelect;
 import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
 import cz.iocb.sparql.engine.rdf.Iri;
@@ -52,8 +54,10 @@ import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.Engine;
 import cz.iocb.sparql.engine.request.LimitExceedException;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.request.Request.PreparedQuery;
 import cz.iocb.sparql.engine.request.Result;
 import cz.iocb.sparql.engine.translator.ServiceException;
+import cz.iocb.sparql.engine.translator.TranslateVisitor;
 import cz.iocb.sparql.testing.Database;
 
 
@@ -406,6 +410,29 @@ public class ServiceSettingsTest
 
 
     /**
+     * SQL the query is translated to by the engine, its SERVICE calls evaluated.
+     *
+     * @param engine the engine
+     * @param query the query, without the prefix declaration
+     * @return SQL the query is translated to
+     * @throws SQLException on database errors
+     * @throws TranslateExceptions if the query has errors
+     * @throws ServiceException if a federated SERVICE call fails
+     */
+    private static String translate(Engine engine, String query)
+            throws SQLException, TranslateExceptions, ServiceException
+    {
+        try(Request request = engine.getRequest())
+        {
+            PreparedQuery prepared = request.prepareQuery(prefix + query, null);
+            SqlSelect imcode = new TranslateVisitor(request).translate(prepared.getSyntaxTree(), null, null, List.of());
+
+            return imcode.optimize(request, false).optimize(request, true).translate(request);
+        }
+    }
+
+
+    /**
      * Row of the terms.
      *
      * @param terms the terms
@@ -505,6 +532,26 @@ public class ServiceSettingsTest
         config.setServiceSettings(own, null);
 
         assertThat(config.getServiceSettings(own), is(defaults));
+    }
+
+
+    @Test
+    @DisplayName("the solutions of a call are stored in a temporary table from as many as the engine settings say")
+    void storedSolutions() throws Exception
+    {
+        String query = "SELECT ?s ?o WHERE { " + service() + "}";
+        Engine engine = engine(ServiceSettings.DEFAULT);
+
+        // four solutions stay inline data by default, and also when a batch is smaller than the solutions kept so
+        assertThat(translate(engine, query), not(containsString("tmp_table_")));
+
+        engine.getConfig().setEngineSettings(EngineSettings.DEFAULT.withServiceTableRows(5).withServiceBatchSize(1));
+        assertThat(translate(engine, query), not(containsString("tmp_table_")));
+
+        engine.getConfig().setEngineSettings(EngineSettings.DEFAULT.withServiceTableRows(2).withServiceBatchSize(1));
+        assertThat(translate(engine, query), containsString("tmp_table_"));
+        assertThat(execute(engine, query), containsInAnyOrder(row(a, integer("1")), row(b, integer("2")),
+                row(iri("c"), integer("3")), row(d, decimal("1.5"))));
     }
 
 

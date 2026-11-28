@@ -15,6 +15,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
+import cz.iocb.sparql.engine.config.EngineSettings;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
@@ -48,16 +49,6 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  */
 public final class SqlAggregation extends SqlIntercode
 {
-    /**
-     * How many times more solutions a join has to be estimated to have than its counted children together with the join
-     * of their counts for its solutions to be counted by the counts of its children (see {@link #countJoin}). The
-     * counted children are then each read and grouped once and their counts are joined with the other children, whereas
-     * the join hands every solution it makes to the count: with five workers, the join took 46 ns for a solution it
-     * made and the counted children 89 ns for a solution they grouped, so the counts pay from about twice as many
-     * solutions, and the margin covers an estimate that is off by half.
-     */
-    private static final double COUNTED_JOIN_RATIO = 4;
-
     /**
      * Solutions being grouped.
      */
@@ -366,8 +357,8 @@ public final class SqlAggregation extends SqlIntercode
      * its solutions counting once. The aggregates have to count the solutions (COUNT(*)), the join has to be made of
      * deterministic children holding no SERVICE call, each binding a variable to group it by, as a child counted
      * without grouping makes a group of no solutions, some child has to be counted, and the join has to be estimated to
-     * have {@link #COUNTED_JOIN_RATIO} times more solutions than the counted children together with the join of their
-     * counts.
+     * have as many times more solutions than the counted children together with the join of their counts as the
+     * settings of the engine say (see {@link EngineSettings#countedJoinRatio()}).
      *
      * @param request the current request
      * @param aggregations aggregate expression of each result variable
@@ -436,13 +427,14 @@ public final class SqlAggregation extends SqlIntercode
         // the join hands every solution it makes to the count, so the counts pay only where the join multiplies the
         // solutions of the counted children; the join of the counts is planned only where they may pay
         double solutions = JoinOptimizer.estimateRows(request, join);
+        double ratio = request.getEngineSettings().countedJoinRatio();
 
-        if(solutions < COUNTED_JOIN_RATIO * Math.max(grouped, 1))
+        if(solutions < ratio * Math.max(grouped, 1))
             return null;
 
         SqlIntercode joined = SqlJoin.join(request, joinedChilds);
 
-        if(solutions < COUNTED_JOIN_RATIO * Math.max(grouped + JoinOptimizer.estimateRows(request, joined), 1))
+        if(solutions < ratio * Math.max(grouped + JoinOptimizer.estimateRows(request, joined), 1))
             return null;
 
         SqlExpressionIntercode product = null;

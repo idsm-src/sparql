@@ -29,6 +29,7 @@ import java.util.stream.IntStream;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import cz.iocb.sparql.engine.config.EngineSettings;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -321,6 +322,30 @@ public class JoinOptimizerTest
         assertThat(sql, not(containsString("\"join_optimizer_test\".\"few\" WHERE ")));
 
         assertThat(check(query), hasSize(50));
+    }
+
+
+    @Test
+    public void costsOfTheSettings() throws Exception
+    {
+        DataSource connectionPool = Database.getPool();
+        SparqlDatabaseConfiguration config = configure(connectionPool, new DatabaseSchema(connectionPool));
+        config.setJoinOptimizer(true);
+
+        // the lookups of the many cost more than hashing them
+        config.setEngineSettings(EngineSettings.DEFAULT.withLookupCost(1e6));
+        assertThat(translate(config, "SELECT ?x ?y WHERE { ?x ex:tag ?t . ?x ex:link ?y }"),
+                not(containsString("LATERAL")));
+
+        // hashing the many costs more than looking them up
+        config.setEngineSettings(EngineSettings.DEFAULT.withHashCost(1e6));
+        assertThat(translate(config, "SELECT ?x ?z WHERE { ?x ex:link ?y . ?y ex:link ?z }"),
+                containsString(" CROSS JOIN LATERAL (SELECT "));
+
+        // the tree of a join of more children than are tried exhaustively is built greedily, the solutions the same
+        String query = "SELECT ?x ?y ?z WHERE { ?x ex:tag ?t . ?x ex:link ?y . ?y ex:link ?z }";
+        config.setEngineSettings(EngineSettings.DEFAULT.withExhaustiveJoinLimit(1));
+        assertThat(execute(config, query), containsInAnyOrder(execute(plain, query).toArray()));
     }
 
 

@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import cz.iocb.sparql.engine.config.EngineSettings;
 import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
@@ -78,11 +79,6 @@ public final class SqlExists extends SqlExpressionIntercode
      */
     private static final Column unevaluated = new ExpressionColumn(new SqlCode("sparql.unevaluated_service()"), BOOL,
             false);
-
-    /**
-     * Upper bound of the rounds in which the pattern is optimised for a current solution (see {@link #optimize}).
-     */
-    private static final int maxRounds = 8;
 
     /**
      * True for NOT EXISTS.
@@ -604,7 +600,9 @@ public final class SqlExists extends SqlExpressionIntercode
      * either, so the table accesses of the pattern take the values into their conditions (see
      * {@link Restrictions#getAcceptedValue}). A pattern that shares no variable with the current solution, like the
      * pattern of an ASK query, is read for its first solution only (see {@link Restrictions#getNeededRows}): the test
-     * then compares nothing, so the database cannot turn it into a join that would read the pattern whole.
+     * then compares nothing, so the database cannot turn it into a join that would read the pattern whole. The pattern
+     * is optimised in as many rounds at most as the settings of the engine allow (see
+     * {@link EngineSettings#existsRoundLimit()}).
      *
      * @param request the current request
      * @param scope the scope of the pattern
@@ -621,7 +619,7 @@ public final class SqlExists extends SqlExpressionIntercode
 
         SqlIntercode optPattern = pattern;
 
-        for(int round = 0; round < maxRounds; round++)
+        for(int round = 0; round < request.getEngineSettings().existsRoundLimit(); round++)
         {
             Restrictions restrictions = solution == null ? new Restrictions() : SqlIntercode.getJoinRestrictions(
                     relations, optPattern.getVariableBindings(), solution, new Restrictions(), true);

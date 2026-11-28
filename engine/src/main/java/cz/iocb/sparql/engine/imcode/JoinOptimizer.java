@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.ToDoubleFunction;
 import java.util.stream.IntStream;
+import cz.iocb.sparql.engine.config.EngineSettings;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
@@ -59,10 +60,11 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * disjunction); a child that is a table access looked up by an index of a variable the other side binds may be joined
  * by an index nested loop instead, costing a lookup per outer row. The tree that minimises the sum of the costs and of
  * the sizes of the intermediate results is found by dynamic programming over the connected subsets of the children, up
- * to {@link #EXHAUSTIVE_LIMIT} of them. Of more children, those that the others determine, like a dictionary giving the
- * terms of the numbers the others hold, are left out of the search and joined to the tree chosen for the others (see
- * {@link #getDetermined}), which is built greedily when the others are still too many. The costs are in units of one
- * row scanned or hashed, calibrated on the NeXtProt queries over a single table of triples. A filter above the join
+ * to a number of them the settings of the engine give (see {@link EngineSettings#exhaustiveJoinLimit()}). Of more
+ * children, those that the others determine, like a dictionary giving the terms of the numbers the others hold, are
+ * left out of the search and joined to the tree chosen for the others (see {@link #getDetermined}), which is built
+ * greedily when the others are still too many. The costs are in units of one row scanned or hashed, and the settings of
+ * the engine give them too (see {@link EngineSettings#lookupCost()} and the costs next to it). A filter above the join
  * counts as well (see {@link SqlIntercode.Restrictions#getFilterConditions}), because the database evaluates a
  * condition as soon as the variables deciding it are bound: a condition that one variable decides alone reduces the
  * child the join takes the variable from (the rows it drops are read all the same when the child is scanned, unless an
@@ -85,72 +87,6 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  */
 final class JoinOptimizer
 {
-    /**
-     * Cost of the lookup of the rows matching one outer row by an index, in units of one row scanned or hashed.
-     */
-    static final double LOOKUP_COST = 8;
-
-    /**
-     * Cost of hashing one row of the smaller side of a hash join; the probe of one row of the other side costs 1.
-     */
-    static final double HASH_COST = 2.5;
-
-    /**
-     * Cost of comparing one pair of rows when the sides have to be compared pairwise.
-     */
-    static final double COMPARISON_COST = 0.3;
-
-    /**
-     * How many times cheaper the lookups of the solutions binding a variable have to be than the pairwise comparison of
-     * the sides for the solutions to be told apart (see {@link #planLeftJoin}): the database scans a table of a few
-     * pages whole instead of using its index, so a lookup in a small table costs what the comparison with its rows
-     * does, and the margin leaves such right sides compared pairwise.
-     */
-    static final double PAIRWISE_MARGIN = 16;
-
-    /**
-     * How many times more the comparisons spared by hashing the solutions of the left side of an OPTIONAL that bind a
-     * variable apart from the others have to cost than the second join it takes (see {@link #planLeftJoin}). The costs
-     * of the two are rough estimates, and the right side is then kept for the joins to read it twice, which they do not
-     * count.
-     */
-    static final double SECOND_JOIN_MARGIN = 2;
-
-    /**
-     * How many times a table access has to be looked up for every combination of the values it is looked up by, on
-     * average, for the database to keep the rows found for the values (Memoize) where plan advice makes it look the
-     * access up (see {@link cz.iocb.sparql.engine.database.PlanAdvice#MEMOIZED_LOOKUP}): a lookup found in the cache
-     * costs a part of an index lookup, one that is not costs about half a lookup more, so the cache pays when about a
-     * third of the lookups find their rows there.
-     */
-    static final double MEMOIZE_RATIO = 2;
-
-    /**
-     * Rows of a child nothing is known about.
-     */
-    static final double DEFAULT_ROWS = 1000;
-
-    /**
-     * Selectivity of an equality in a filter (the default of the planner).
-     */
-    static final double EQUALITY_SELECTIVITY = 0.005;
-
-    /**
-     * Selectivity of an inequality in a filter (the default of the planner).
-     */
-    static final double INEQUALITY_SELECTIVITY = 1.0 / 3;
-
-    /**
-     * Selectivity of a filter condition nothing is known about.
-     */
-    static final double DEFAULT_SELECTIVITY = 0.5;
-
-    /**
-     * Largest number of children whose join trees are enumerated exhaustively.
-     */
-    static final int EXHAUSTIVE_LIMIT = 15;
-
-
     /**
      * A node of the join tree.
      */
@@ -204,7 +140,7 @@ final class JoinOptimizer
      * @param equalities the equalities of the filters above the join that the tree joins the children by, which the
      *            join compares in its own conditions (see {@link Equality})
      * @param memoized the children looked up by the tree for rows repeating the values they are looked up by (see
-     *            {@link #MEMOIZE_RATIO}), as a bit per child
+     *            {@link EngineSettings#memoizeRatio()}), as a bit per child
      */
     record Plan(Node root, int first, double rows, double cost, boolean restricted, List<Equality> equalities,
             int memoized)
@@ -259,7 +195,7 @@ final class JoinOptimizer
      *            database cannot hash, or by plain equalities where plan advice makes the planner look the accesses up
      *            (see {@link Request#isAdvised})
      * @param memoized whether an access written in place for the rows under plan advice is looked up by a nested loop
-     *            that keeps the rows found for the values of a row (see {@link #MEMOIZE_RATIO})
+     *            that keeps the rows found for the values of a row (see {@link EngineSettings#memoizeRatio()})
      */
     record Outer(VariableBindings bindings, Table table, boolean inPlace, boolean memoized)
     {
@@ -744,6 +680,7 @@ final class JoinOptimizer
     private static Plan plan(Request request, List<SqlIntercode> childs, Filtering filtering, Outer outer,
             double needed)
     {
+        EngineSettings settings = request.getEngineSettings();
         int n = childs.size();
 
         double[] rows = new double[n];
@@ -872,12 +809,12 @@ final class JoinOptimizer
                     1 << getDecidingChild(childs, equated.get(0)) | 1 << getDecidingChild(childs, equated.get(1)),
                     equalitySelectivity(request, childs, rows, filtering.values(), equated)));
 
-        Sizes sizes = new Sizes(n, rows, shared, filters);
+        boolean exhaustive = n <= settings.exhaustiveJoinLimit();
+        Sizes sizes = new Sizes(n, rows, shared, filters, exhaustive);
 
         // the trees of a join of too many children cannot all be tried, so the children that the others determine are
         // left out of the search and joined to the tree chosen for the others
-        int determined = n <= EXHAUSTIVE_LIMIT ? 0 :
-                getDetermined(request, childs, filtering, shared, filters, lookupable);
+        int determined = exhaustive ? 0 : getDetermined(request, childs, filtering, shared, filters, lookupable);
 
         Node root;
         int first = -1;
@@ -886,15 +823,15 @@ final class JoinOptimizer
         {
             int[] members = IntStream.range(0, n).filter(i -> (determined >> i & 1) == 0).toArray();
 
-            root = plan(members, rows, dropped, adjacent, hashableAdjacent, lookupable, shared, filters);
+            root = plan(settings, members, rows, dropped, adjacent, hashableAdjacent, lookupable, shared, filters);
 
             for(int i = 0; i < n; i++)
                 if((determined >> i & 1) != 0)
-                    root = attach(root, i, adjacent[i], hashableAdjacent, lookupable, sizes, dropped);
+                    root = attach(settings, root, i, adjacent[i], hashableAdjacent, lookupable, sizes, dropped);
         }
-        else if(n <= EXHAUSTIVE_LIMIT)
+        else if(exhaustive)
         {
-            Node[] trees = planExhaustively(n, rows, dropped, adjacent, hashableAdjacent, lookupable, sizes);
+            Node[] trees = planExhaustively(settings, n, rows, dropped, adjacent, hashableAdjacent, lookupable, sizes);
 
             // the part of the solutions of the join that its parent reads
             double fraction = needed / sizes.get((1 << n) - 1);
@@ -906,8 +843,8 @@ final class JoinOptimizer
                 for(int i = 0; i < n; i++)
                     streamed[i] = childs.get(i) instanceof SqlTableAccess access && !access.isDeduplicating();
 
-                root = planFirstRows(n, rows, dropped, streamed, adjacent, hashableAdjacent, lookupable, sizes, trees,
-                        fraction);
+                root = planFirstRows(settings, n, rows, dropped, streamed, adjacent, hashableAdjacent, lookupable,
+                        sizes, trees, fraction);
 
                 // the child the tree starts with
                 Node start = root;
@@ -925,31 +862,34 @@ final class JoinOptimizer
         }
         else
         {
-            root = planGreedily(n, dropped, adjacent, hashableAdjacent, lookupable, sizes);
+            root = planGreedily(settings, n, dropped, adjacent, hashableAdjacent, lookupable, sizes);
         }
 
-        return new Plan(root, first, sizes.get((1 << n) - 1), cost(root, costs, hashableAdjacent, sizes).cost(),
-                restricted, filtering.equalities(), getMemoized(root, shared, sizes));
+        return new Plan(root, first, sizes.get((1 << n) - 1),
+                cost(settings, root, costs, hashableAdjacent, sizes).cost(), restricted, filtering.equalities(),
+                getMemoized(settings, root, shared, sizes));
     }
 
 
     /**
      * The children that a tree looks up for rows repeating the values they are looked up by (see
-     * {@link #MEMOIZE_RATIO}): the rows of the outer tree of a lookup hold at most as many combinations of the values
-     * of the variables the child shares with them as the product of the fewest distinct values of each variable among
-     * the children of the outer tree binding it.
+     * {@link EngineSettings#memoizeRatio()}): the rows of the outer tree of a lookup hold at most as many combinations
+     * of the values of the variables the child shares with them as the product of the fewest distinct values of each
+     * variable among the children of the outer tree binding it.
      *
+     * @param settings the settings of the engine
      * @param node the tree
      * @param shared the variables shared by several children
      * @param sizes the sizes of the joins of the subsets of the children
      * @return the children looked up for rows repeating their values, as a bit per child
      */
-    private static int getMemoized(Node node, List<Shared> shared, Sizes sizes)
+    private static int getMemoized(EngineSettings settings, Node node, List<Shared> shared, Sizes sizes)
     {
         return switch(node)
         {
             case Leaf _ -> 0;
-            case HashJoin join -> getMemoized(join.left(), shared, sizes) | getMemoized(join.right(), shared, sizes);
+            case HashJoin join -> getMemoized(settings, join.left(), shared, sizes)
+                    | getMemoized(settings, join.right(), shared, sizes);
             case Lookup lookup ->
             {
                 int outer = collect(lookup.outer(), new ArrayList<>());
@@ -971,8 +911,8 @@ final class JoinOptimizer
                     values *= Math.max(fewest, 1);
                 }
 
-                yield getMemoized(lookup.outer(), shared, sizes)
-                        | (isMemoized(sizes.get(outer), values) ? 1 << lookup.child() : 0);
+                yield getMemoized(settings, lookup.outer(), shared, sizes)
+                        | (isMemoized(settings, sizes.get(outer), values) ? 1 << lookup.child() : 0);
             }
         };
     }
@@ -980,22 +920,23 @@ final class JoinOptimizer
 
     /**
      * True if a node looked up for the rows of another one by the given number of combinations of values is looked up
-     * by a nested loop keeping the rows found for each combination (see {@link #MEMOIZE_RATIO}).
+     * by a nested loop keeping the rows found for each combination (see {@link EngineSettings#memoizeRatio()}).
      *
+     * @param settings the settings of the engine
      * @param rows estimated number of rows the node is looked up for
      * @param values estimated number of the combinations of the values the rows hold of the variables the node is
      *            looked up by
      * @return true if the rows found for each combination are worth keeping, false otherwise
      */
-    private static boolean isMemoized(double rows, double values)
+    private static boolean isMemoized(EngineSettings settings, double rows, double values)
     {
-        return values * MEMOIZE_RATIO <= rows;
+        return values * settings.memoizeRatio() <= rows;
     }
 
 
     /**
      * True if a node looked up for the solutions of another one, the outer node, is looked up by a nested loop keeping
-     * the rows found for the values of a solution (see {@link #MEMOIZE_RATIO}).
+     * the rows found for the values of a solution (see {@link EngineSettings#memoizeRatio()}).
      *
      * @param request the current request
      * @param node the outer node
@@ -1011,7 +952,7 @@ final class JoinOptimizer
         for(Variable variable : variables)
             values *= Math.max(estimateDistinct(request, node, variable), 1);
 
-        return isMemoized(rows, values);
+        return isMemoized(request.getEngineSettings(), rows, values);
     }
 
 
@@ -1073,6 +1014,7 @@ final class JoinOptimizer
      * when the children are few enough (see {@link #planExhaustively}), and the tree is built greedily otherwise (see
      * {@link #planGreedily}).
      *
+     * @param settings the settings of the engine
      * @param members the children the tree is made of, by their indexes in increasing order
      * @param rows estimated rows of each child of the join
      * @param dropped the rows a scan of each child of the join reads beyond the rows the child gives the joins
@@ -1083,8 +1025,8 @@ final class JoinOptimizer
      * @param filters the conditions of the filters above the join that require variables of two children to be equal
      * @return the join tree of the members
      */
-    private static Node plan(int[] members, double[] rows, double[] dropped, int[] adjacent, int[] hashableAdjacent,
-            int[] lookupable, List<Shared> shared, List<Filter> filters)
+    private static Node plan(EngineSettings settings, int[] members, double[] rows, double[] dropped, int[] adjacent,
+            int[] hashableAdjacent, int[] lookupable, List<Shared> shared, List<Filter> filters)
     {
         int n = members.length;
 
@@ -1109,12 +1051,14 @@ final class JoinOptimizer
         List<Filter> memberFilters = filters.stream().map(f -> new Filter(renumber(f.mask(), members), f.selectivity()))
                 .filter(f -> Integer.bitCount(f.mask()) == 2).toList();
 
-        Sizes sizes = new Sizes(n, memberRows, memberShared, memberFilters);
+        boolean exhaustive = n <= settings.exhaustiveJoinLimit();
+        Sizes sizes = new Sizes(n, memberRows, memberShared, memberFilters, exhaustive);
 
-        Node root = n <= EXHAUSTIVE_LIMIT ?
-                planExhaustively(n, memberRows, memberDropped, memberAdjacent, memberHashableAdjacent, memberLookupable,
-                        sizes)[(1 << n) - 1] :
-                planGreedily(n, memberDropped, memberAdjacent, memberHashableAdjacent, memberLookupable, sizes);
+        Node root = exhaustive ?
+                planExhaustively(settings, n, memberRows, memberDropped, memberAdjacent, memberHashableAdjacent,
+                        memberLookupable, sizes)[(1 << n) - 1] :
+                planGreedily(settings, n, memberDropped, memberAdjacent, memberHashableAdjacent, memberLookupable,
+                        sizes);
 
         return renumber(root, members);
     }
@@ -1175,6 +1119,7 @@ final class JoinOptimizer
      * its join costs by the rows of the subtree alone. Of the subtrees costing the same the largest one is taken, which
      * keeps the columns of the child out of the joins inside it.
      *
+     * @param settings the settings of the engine
      * @param tree the tree
      * @param child index of the child
      * @param adjacent the children adjacent to the child through a shared variable
@@ -1184,8 +1129,8 @@ final class JoinOptimizer
      * @param dropped the rows a scan of each child reads beyond the rows the child gives the joins
      * @return the tree with the child joined
      */
-    private static Node attach(Node tree, int child, int adjacent, int[] hashableAdjacent, int[] lookupable,
-            Sizes sizes, double[] dropped)
+    private static Node attach(EngineSettings settings, Node tree, int child, int adjacent, int[] hashableAdjacent,
+            int[] lookupable, Sizes sizes, double[] dropped)
     {
         List<Subtree> subtrees = new ArrayList<>();
         collect(tree, subtrees);
@@ -1200,8 +1145,8 @@ final class JoinOptimizer
             if((subtree.mask() & adjacent) == 0)
                 continue;
 
-            Map.Entry<Double, Node> candidate = join(subtree.mask(), 1 << child, subtree.node(), new Leaf(child),
-                    hashableAdjacent, lookupable, sizes, dropped);
+            Map.Entry<Double, Node> candidate = join(settings, subtree.mask(), 1 << child, subtree.node(),
+                    new Leaf(child), hashableAdjacent, lookupable, sizes, dropped);
 
             if(candidate.getKey() <= bestCost)
             {
@@ -1320,8 +1265,7 @@ final class JoinOptimizer
         if(isCounted(request, child, condition))
             return true;
 
-        SqlExpressionIntercode comparison = getComparison(request.getConfiguration(), condition,
-                child.getVariableBindings());
+        SqlExpressionIntercode comparison = getComparison(request, condition, child.getVariableBindings());
 
         if(comparison == null || comparison instanceof SqlLiteral || comparison instanceof SqlNull)
             return false;
@@ -1448,15 +1392,17 @@ final class JoinOptimizer
          * @param shared the shared variables
          * @param filters the conditions of the filters above the join that require variables of two children to be
          *            equal
+         * @param exhaustive whether all the trees of the children are tried, so that the sizes of all their subsets are
+         *            kept in an array
          */
-        Sizes(int n, double[] rows, List<Shared> shared, List<Filter> filters)
+        Sizes(int n, double[] rows, List<Shared> shared, List<Filter> filters, boolean exhaustive)
         {
             this.n = n;
             this.rows = rows;
             this.shared = shared;
             this.filters = filters;
-            this.array = n <= EXHAUSTIVE_LIMIT ? new double[1 << n] : null;
-            this.map = n <= EXHAUSTIVE_LIMIT ? null : new HashMap<>();
+            this.array = exhaustive ? new double[1 << n] : null;
+            this.map = exhaustive ? null : new HashMap<>();
 
             if(array != null)
                 Arrays.fill(array, Double.NaN);
@@ -1610,6 +1556,7 @@ final class JoinOptimizer
      * sides cost on top of that, a single child what its scan does; a child that is looked up is not scanned, so the
      * cost of its lookups is given less the rows that only a scan of it reads.
      *
+     * @param settings the settings of the engine
      * @param left the left subset
      * @param right the right subset
      * @param leftTree the tree of the left subset
@@ -1620,10 +1567,10 @@ final class JoinOptimizer
      * @param dropped the rows a scan of each child reads beyond the rows the child gives the joins
      * @return the cost and the node
      */
-    private static Map.Entry<Double, Node> join(int left, int right, Node leftTree, Node rightTree,
-            int[] hashableAdjacent, int[] lookupable, Sizes sizes, double[] dropped)
+    private static Map.Entry<Double, Node> join(EngineSettings settings, int left, int right, Node leftTree,
+            Node rightTree, int[] hashableAdjacent, int[] lookupable, Sizes sizes, double[] dropped)
     {
-        double cost = hashCost(left, right, hashableAdjacent, sizes);
+        double cost = hashCost(settings, left, right, hashableAdjacent, sizes);
         Node node = new HashJoin(leftTree, rightTree);
 
         if((right & right - 1) == 0)
@@ -1632,7 +1579,7 @@ final class JoinOptimizer
 
             if((lookupable[child] & left) != 0)
             {
-                double lookup = lookupCost(left, right, sizes) - dropped[child];
+                double lookup = lookupCost(settings, left, right, sizes) - dropped[child];
 
                 if(lookup < cost)
                 {
@@ -1650,15 +1597,16 @@ final class JoinOptimizer
      * Cost of joining two subsets of the children by hashing the smaller one and probing it with the other one, or by
      * comparing them pairwise when no equality between them can be hashed.
      *
+     * @param settings the settings of the engine
      * @param left the left subset
      * @param right the right subset
      * @param hashableAdjacent the children adjacent to each child through a hashable variable
      * @param sizes the sizes of the joins
      * @return the cost of the join
      */
-    private static double hashCost(int left, int right, int[] hashableAdjacent, Sizes sizes)
+    private static double hashCost(EngineSettings settings, int left, int right, int[] hashableAdjacent, Sizes sizes)
     {
-        return hashCost(isHashable(left, right, hashableAdjacent), sizes.get(left), sizes.get(right),
+        return hashCost(settings, isHashable(left, right, hashableAdjacent), sizes.get(left), sizes.get(right),
                 sizes.get(left | right));
     }
 
@@ -1685,16 +1633,18 @@ final class JoinOptimizer
      * Cost of joining two sides of the given sizes by hashing the smaller one and probing it with the other one, or by
      * comparing them pairwise when no equality between them can be hashed.
      *
+     * @param settings the settings of the engine
      * @param hashable whether an equality between the sides can be hashed
      * @param leftSize estimated rows of the left side
      * @param rightSize estimated rows of the right side
      * @param size estimated rows of the join
      * @return the cost of the join
      */
-    private static double hashCost(boolean hashable, double leftSize, double rightSize, double size)
+    private static double hashCost(EngineSettings settings, boolean hashable, double leftSize, double rightSize,
+            double size)
     {
-        return hashable ? HASH_COST * Math.min(leftSize, rightSize) + Math.max(leftSize, rightSize) + size :
-                leftSize * rightSize * COMPARISON_COST + size;
+        return hashable ? settings.hashCost() * Math.min(leftSize, rightSize) + Math.max(leftSize, rightSize) + size :
+                leftSize * rightSize * settings.comparisonCost() + size;
     }
 
 
@@ -1703,8 +1653,9 @@ final class JoinOptimizer
      * can be hashed, when the join reads only some of the solutions of its left side: the right side is then the one
      * hashed, whole, whatever its size, and probed with the solutions read, because the left side would be read whole
      * to be hashed. When all the solutions of the left side are read, the smaller side is hashed (see
-     * {@link #hashCost(boolean, double, double, double)}).
+     * {@link #hashCost(EngineSettings, boolean, double, double, double)}).
      *
+     * @param settings the settings of the engine
      * @param hashable whether an equality between the sides can be hashed
      * @param leftRows estimated rows of the left side
      * @param read the rows of the left side that the join reads
@@ -1712,27 +1663,29 @@ final class JoinOptimizer
      * @param fanout estimated rows of the join for a row of the left side
      * @return the cost of the join
      */
-    private static double leftHashCost(boolean hashable, double leftRows, double read, double rightRows, double fanout)
+    private static double leftHashCost(EngineSettings settings, boolean hashable, double leftRows, double read,
+            double rightRows, double fanout)
     {
         if(read >= leftRows)
-            return hashCost(hashable, leftRows, rightRows, leftRows * fanout);
+            return hashCost(settings, hashable, leftRows, rightRows, leftRows * fanout);
 
-        return hashable ? HASH_COST * rightRows + read + read * fanout :
-                read * rightRows * COMPARISON_COST + read * fanout;
+        return hashable ? settings.hashCost() * rightRows + read + read * fanout :
+                read * rightRows * settings.comparisonCost() + read * fanout;
     }
 
 
     /**
      * Cost of joining a subset of the children with a child looked up by an index for every row of the subset.
      *
+     * @param settings the settings of the engine
      * @param left the outer subset
      * @param right the child looked up, as a subset
      * @param sizes the sizes of the joins
      * @return the cost of the join
      */
-    private static double lookupCost(int left, int right, Sizes sizes)
+    private static double lookupCost(EngineSettings settings, int left, int right, Sizes sizes)
     {
-        return sizes.get(left) * LOOKUP_COST + 2 * sizes.get(left | right);
+        return sizes.get(left) * settings.lookupCost() + settings.lookupRowCost() * sizes.get(left | right);
     }
 
 
@@ -1740,32 +1693,33 @@ final class JoinOptimizer
      * Cost of a join tree: the costs of its joins (see {@link #join}) and of the children that are its leaves, whereas
      * a child looked up by an index costs its lookups only.
      *
+     * @param settings the settings of the engine
      * @param node the tree
      * @param costs the cost of each child as a leaf of the tree
      * @param hashableAdjacent the children adjacent to each child through a hashable variable
      * @param sizes the sizes of the joins
      * @return the children of the tree with its cost
      */
-    private static Cost cost(Node node, double[] costs, int[] hashableAdjacent, Sizes sizes)
+    private static Cost cost(EngineSettings settings, Node node, double[] costs, int[] hashableAdjacent, Sizes sizes)
     {
         if(node instanceof Leaf leaf)
             return new Cost(1 << leaf.child(), costs[leaf.child()]);
 
         if(node instanceof Lookup lookup)
         {
-            Cost outer = cost(lookup.outer(), costs, hashableAdjacent, sizes);
+            Cost outer = cost(settings, lookup.outer(), costs, hashableAdjacent, sizes);
             int child = 1 << lookup.child();
 
-            return new Cost(outer.mask() | child, outer.cost() + lookupCost(outer.mask(), child, sizes));
+            return new Cost(outer.mask() | child, outer.cost() + lookupCost(settings, outer.mask(), child, sizes));
         }
 
         HashJoin join = (HashJoin) node;
 
-        Cost left = cost(join.left(), costs, hashableAdjacent, sizes);
-        Cost right = cost(join.right(), costs, hashableAdjacent, sizes);
+        Cost left = cost(settings, join.left(), costs, hashableAdjacent, sizes);
+        Cost right = cost(settings, join.right(), costs, hashableAdjacent, sizes);
 
         return new Cost(left.mask() | right.mask(),
-                left.cost() + right.cost() + hashCost(left.mask(), right.mask(), hashableAdjacent, sizes));
+                left.cost() + right.cost() + hashCost(settings, left.mask(), right.mask(), hashableAdjacent, sizes));
     }
 
 
@@ -1775,6 +1729,7 @@ final class JoinOptimizer
      * (see {@link #join}) and its children: a child costs the rows it gives the joins, which are the same in every
      * tree, and, when it is scanned, the rows it reads beyond them.
      *
+     * @param settings the settings of the engine
      * @param n number of children
      * @param rows estimated rows of each child
      * @param dropped the rows a scan of each child reads beyond the rows the child gives the joins
@@ -1785,8 +1740,8 @@ final class JoinOptimizer
      * @return the join tree of every subset of the children, by the subset as a bit per child; the last one is the tree
      *         of all the children
      */
-    private static Node[] planExhaustively(int n, double[] rows, double[] dropped, int[] adjacent,
-            int[] hashableAdjacent, int[] lookupable, Sizes sizes)
+    private static Node[] planExhaustively(EngineSettings settings, int n, double[] rows, double[] dropped,
+            int[] adjacent, int[] hashableAdjacent, int[] lookupable, Sizes sizes)
     {
         int full = (1 << n) - 1;
 
@@ -1826,8 +1781,8 @@ final class JoinOptimizer
                     if(left < right && (right & right - 1) != 0)
                         continue;
 
-                    Map.Entry<Double, Node> candidate = join(left, right, trees[left], trees[right], hashableAdjacent,
-                            lookupable, sizes, dropped);
+                    Map.Entry<Double, Node> candidate = join(settings, left, right, trees[left], trees[right],
+                            hashableAdjacent, lookupable, sizes, dropped);
 
                     double cost = candidate.getKey() + costs[left] + costs[right];
 
@@ -1888,6 +1843,7 @@ final class JoinOptimizer
      * otherwise those of {@link #planExhaustively}, and for the whole of the solutions the two give trees of the same
      * costs.
      *
+     * @param settings the settings of the engine
      * @param n number of children
      * @param rows estimated rows of each child
      * @param dropped the rows a scan of each child reads beyond the rows the child gives the joins
@@ -1900,8 +1856,9 @@ final class JoinOptimizer
      * @param fraction the part of the solutions of the join that the parent reads
      * @return the join tree
      */
-    private static Node planFirstRows(int n, double[] rows, double[] dropped, boolean[] streamed, int[] adjacent,
-            int[] hashableAdjacent, int[] lookupable, Sizes sizes, Node[] whole, double fraction)
+    private static Node planFirstRows(EngineSettings settings, int n, double[] rows, double[] dropped,
+            boolean[] streamed, int[] adjacent, int[] hashableAdjacent, int[] lookupable, Sizes sizes, Node[] whole,
+            double fraction)
     {
         int full = (1 << n) - 1;
 
@@ -1951,7 +1908,7 @@ final class JoinOptimizer
                         continue;
 
                     if(Double.isNaN(wholeCosts[right]))
-                        wholeCosts[right] = cost(whole[right], scans, hashableAdjacent, sizes).cost();
+                        wholeCosts[right] = cost(settings, whole[right], scans, hashableAdjacent, sizes).cost();
 
                     double leftSize = sizes.get(left);
                     double rightSize = sizes.get(right);
@@ -1963,15 +1920,17 @@ final class JoinOptimizer
                     // the right side is hashed whole and probed, or compared, with the rows read of the left one
                     boolean hashable = (hashableNeighbours[left] & right) != 0;
 
-                    double joinFixed = fixed[left] + wholeCosts[right] + (hashable ? HASH_COST * rightSize : 0);
+                    double joinFixed = fixed[left] + wholeCosts[right]
+                            + (hashable ? settings.hashCost() * rightSize : 0);
                     double joinRead = leftRead + fraction * size
-                            + part * leftSize * (hashable ? 1 : rightSize * COMPARISON_COST);
+                            + part * leftSize * (hashable ? 1 : rightSize * settings.comparisonCost());
 
                     boolean lookup = false;
 
                     if((right & right - 1) == 0 && (lookupable[Integer.numberOfTrailingZeros(right)] & left) != 0)
                     {
-                        double lookupRead = leftRead + part * leftSize * LOOKUP_COST + fraction * 2 * size;
+                        double lookupRead = leftRead + part * leftSize * settings.lookupCost()
+                                + fraction * settings.lookupRowCost() * size;
 
                         if(fixed[left] + lookupRead < joinFixed + joinRead)
                         {
@@ -2017,6 +1976,7 @@ final class JoinOptimizer
      * {@link #planExhaustively}), whereas counted in a step they would keep a child of many rows from being joined
      * early, also where it is looked up for a few rows and so read for those only.
      *
+     * @param settings the settings of the engine
      * @param n number of children
      * @param dropped the rows a scan of each child reads beyond the rows the child gives the joins
      * @param adjacent the children adjacent to each child through a shared variable
@@ -2025,8 +1985,8 @@ final class JoinOptimizer
      * @param sizes the sizes of the joins
      * @return the join tree
      */
-    private static Node planGreedily(int n, double[] dropped, int[] adjacent, int[] hashableAdjacent, int[] lookupable,
-            Sizes sizes)
+    private static Node planGreedily(EngineSettings settings, int n, double[] dropped, int[] adjacent,
+            int[] hashableAdjacent, int[] lookupable, Sizes sizes)
     {
         int full = (1 << n) - 1;
 
@@ -2053,8 +2013,8 @@ final class JoinOptimizer
                     if((candidates >> i & 1) == 0)
                         continue;
 
-                    Map.Entry<Double, Node> candidate = join(mask, 1 << i, tree, new Leaf(i), hashableAdjacent,
-                            lookupable, sizes, dropped);
+                    Map.Entry<Double, Node> candidate = join(settings, mask, 1 << i, tree, new Leaf(i),
+                            hashableAdjacent, lookupable, sizes, dropped);
 
                     if(candidate.getKey() + dropped[i] < stepCost)
                     {
@@ -2086,8 +2046,8 @@ final class JoinOptimizer
      * data by its rows, a join by its plan, a union by the sum of its branches, a filter by the selectivities of its
      * conditions, a distinct by the distinct values of its variables, a grouping by those of its grouping variables, a
      * sub-select by its child and its limit, an OPTIONAL by the fan-out of its right side, a MINUS by its left side, a
-     * lateral join by the product of its sides, and the nodes passing the solutions of a child on by the child;
-     * {@link #DEFAULT_ROWS} for the other nodes.
+     * lateral join by the product of its sides, and the nodes passing the solutions of a child on by the child; the
+     * rows of a node nothing is known about for the other nodes (see {@link EngineSettings#defaultRows()}).
      *
      * @param request the current request
      * @param node the node
@@ -2191,7 +2151,7 @@ final class JoinOptimizer
         if(node instanceof SqlNoSolution)
             return 0;
 
-        return DEFAULT_ROWS;
+        return request.getEngineSettings().defaultRows();
     }
 
 
@@ -2371,7 +2331,10 @@ final class JoinOptimizer
                 lookedUp |= canLookUp(request, access, variable);
             }
 
-            return new Evaluation(compatible, lookedUp ? LOOKUP_COST + 2 * compatible : Math.max(rows, 1),
+            EngineSettings settings = request.getEngineSettings();
+
+            return new Evaluation(compatible,
+                    lookedUp ? settings.lookupCost() + settings.lookupRowCost() * compatible : Math.max(rows, 1),
                     !variables.isEmpty());
         }
 
@@ -2481,17 +2444,17 @@ final class JoinOptimizer
      * twice as much at worst (and the same when the database keeps the result of the subquery for them, see
      * {@link SqlLeftJoin#translate}), whereas the solutions binding the variables may gain orders of magnitude, so the
      * fraction is not guessed. Where the sides are compared pairwise otherwise, the lookups have to be cheaper by a
-     * margin (see {@link #PAIRWISE_MARGIN}), because the database does not look a small table up; where the solutions
-     * binding those variables are hashed otherwise, the lookups compete with the hashing as any lookups do. Sides that
-     * can be hashed as they are compare a solution with every row of the right side agreeing with it in the variables
-     * both sides bind always, so the solutions binding the other variables are told apart there as well, and hashed by
-     * those too, when the comparisons spared cost more than the second join it takes, by a margin (see
-     * {@link #SECOND_JOIN_MARGIN}). The left side gives the join only the solutions that the conditions of the filters
-     * above keep, as far as one of its variables decides them alone (see {@link #getFilters}), because the database
-     * evaluates such a condition on the left side (see {@link #plan(Request, List, Map, Outer, double)}). When the
-     * parent reads only the first solutions of the join, like a slice in no order, the join reads only the solutions of
-     * the left side that give them, each of which gives a solution, so the lookups cost by those, whereas the hashing
-     * reads the right side whole all the same (see {@link #leftHashCost}).
+     * margin (see {@link EngineSettings#pairwiseMargin()}), because the database does not look a small table up; where
+     * the solutions binding those variables are hashed otherwise, the lookups compete with the hashing as any lookups
+     * do. Sides that can be hashed as they are compare a solution with every row of the right side agreeing with it in
+     * the variables both sides bind always, so the solutions binding the other variables are told apart there as well,
+     * and hashed by those too, when the comparisons spared cost more than the second join it takes, by a margin (see
+     * {@link EngineSettings#secondJoinMargin()}). The left side gives the join only the solutions that the conditions
+     * of the filters above keep, as far as one of its variables decides them alone (see {@link #getFilters}), because
+     * the database evaluates such a condition on the left side (see {@link #plan(Request, List, Map, Outer, double)}).
+     * When the parent reads only the first solutions of the join, like a slice in no order, the join reads only the
+     * solutions of the left side that give them, each of which gives a solution, so the lookups cost by those, whereas
+     * the hashing reads the right side whole all the same (see {@link #leftHashCost}).
      *
      * @param request the current request
      * @param left the left side
@@ -2507,6 +2470,7 @@ final class JoinOptimizer
     static LeftJoinPlan planLeftJoin(Request request, SqlIntercode left, SqlIntercode right, Table leftTable,
             Map<Variable, Set<SqlExpressionIntercode>> conditions, Outer outer, double needed)
     {
+        EngineSettings settings = request.getEngineSettings();
         double kept = selectivity(request, left, conditions);
 
         double leftSolutions = outer == null ? estimateRows(request, left) :
@@ -2548,8 +2512,8 @@ final class JoinOptimizer
         // the solutions of the left side the join reads for the solutions its parent reads
         double read = Math.min(Math.max(needed / Math.max(fanout, 1), 1), leftRows);
 
-        double hashed = leftHashCost(hashable || !split.isEmpty(), leftRows, read, rightRows, Math.max(fanout, 1))
-                + estimateRead(request, right);
+        double hashed = leftHashCost(settings, hashable || !split.isEmpty(), leftRows, read, rightRows,
+                Math.max(fanout, 1)) + estimateRead(request, right);
 
         LeftJoinPlan plan = new LeftJoinPlan(null, null, split, rows, hashed);
 
@@ -2579,7 +2543,7 @@ final class JoinOptimizer
             double lookedUp = read * evaluation.cost();
 
             // lookups that only may cost less than a pairwise comparison are not worth the risk of a scan
-            double margin = plan.outer() != null || !split.isEmpty() ? 1 : PAIRWISE_MARGIN;
+            double margin = plan.outer() != null || !split.isEmpty() ? 1 : settings.pairwiseMargin();
 
             if(evaluation.restricted() && lookedUp * margin < plan.cost())
                 plan = new LeftJoinPlan(plan.outer(), bound, Set.of(), rows, lookedUp);
@@ -2591,10 +2555,10 @@ final class JoinOptimizer
         // with the pass over the right side it reads
         if(plan.outer() == null && plan.bound() == null && hashable && !unbound.isEmpty())
         {
-            double spared = (read * Math.max(candidates, 1) - read * Math.max(fanout, 1)) * COMPARISON_COST;
-            double second = leftHashCost(true, leftRows, read, rightRows, 0) + rightRows;
+            double spared = (read * Math.max(candidates, 1) - read * Math.max(fanout, 1)) * settings.comparisonCost();
+            double second = leftHashCost(settings, true, leftRows, read, rightRows, 0) + rightRows;
 
-            if(spared > SECOND_JOIN_MARGIN * second)
+            if(spared > settings.secondJoinMargin() * second)
                 plan = new LeftJoinPlan(null, null, unbound, rows, plan.cost() + second);
         }
 
@@ -2629,8 +2593,8 @@ final class JoinOptimizer
      * restricted to its solutions compatible with it (see {@link #estimateForRow}), which the database then cannot make
      * a join of; the test stops at the first of them, so that costs at most what the pattern costs for one row times
      * the solutions. The costs are those of an OPTIONAL of the same sides (see {@link #planLeftJoin}), and so is the
-     * margin where the sides are compared pairwise otherwise (see {@link #PAIRWISE_MARGIN}). A pattern that is not
-     * deterministic is evaluated once.
+     * margin where the sides are compared pairwise otherwise (see {@link EngineSettings#pairwiseMargin()}). A pattern
+     * that is not deterministic is evaluated once.
      *
      * @param request the current request
      * @param solutions estimated number of the solutions the pattern is tested for
@@ -2642,6 +2606,7 @@ final class JoinOptimizer
     static TestPlan planTest(Request request, double solutions, VariableBindings bindings, Table table,
             SqlIntercode pattern)
     {
+        EngineSettings settings = request.getEngineSettings();
         double rows = Math.max(solutions, 1);
         double patternRows = Math.max(estimateRows(request, pattern), 1);
         boolean hashable = false;
@@ -2649,7 +2614,7 @@ final class JoinOptimizer
         for(VariableBinding binding : bindings.getValues())
             hashable |= isHashable(binding) && isHashable(pattern.getVariable(binding.getVariable()));
 
-        double joined = hashCost(hashable, rows, patternRows, rows) + estimateRead(request, pattern);
+        double joined = hashCost(settings, hashable, rows, patternRows, rows) + estimateRead(request, pattern);
         Outer outer = Outer.of(bindings, pattern.getVariableBindings(), table);
 
         if(!pattern.isDeterministic() || outer.bindings().getVariables().isEmpty())
@@ -2659,7 +2624,7 @@ final class JoinOptimizer
         double evaluated = rows * evaluation.cost();
 
         // a pattern that no solution restricts would be evaluated whole for each of them
-        if(evaluation.restricted() && evaluated * (hashable ? 1 : PAIRWISE_MARGIN) < joined)
+        if(evaluation.restricted() && evaluated * (hashable ? 1 : settings.pairwiseMargin()) < joined)
             return new TestPlan(outer, evaluated);
 
         return new TestPlan(null, joined);
@@ -2672,8 +2637,8 @@ final class JoinOptimizer
      * database when the node is an access to a table (see {@link #estimateComparisons}): the planner knows how the
      * values of a column are distributed, so it tells a range holding a few rows from one holding nearly all of them.
      * The other conditions, and all of them when the planner cannot be asked, are estimated by what they say (see
-     * {@link #selectivity(SqlExpressionIntercode)}). A condition the rows estimated for the node count with already
-     * keeps them all (see {@link #isCounted}).
+     * {@link #selectivity(Request, SqlExpressionIntercode)}). A condition the rows estimated for the node count with
+     * already keeps them all (see {@link #isCounted}).
      *
      * @param request the current request
      * @param node the node
@@ -2695,17 +2660,17 @@ final class JoinOptimizer
                 continue;
 
             SqlExpressionIntercode comparison = !table ? null :
-                    getComparison(request.getConfiguration(), condition, node.getVariableBindings());
+                    getComparison(request, condition, node.getVariableBindings());
 
             // a comparison that the classes of the node decide tells the planner nothing
             if(comparison == null || comparison instanceof SqlLiteral || comparison instanceof SqlNull)
             {
-                others *= selectivity(condition);
+                others *= selectivity(request, condition);
                 continue;
             }
 
             comparisons.add(comparison);
-            compared *= selectivity(condition);
+            compared *= selectivity(request, condition);
         }
 
         if(comparisons.isEmpty())
@@ -2874,7 +2839,7 @@ final class JoinOptimizer
 
         if(condition instanceof SqlInExpression in && in.isNegated())
             return 1 - estimateCondition(request, access,
-                    SqlInExpression.create(request.getConfiguration(), false, in.getLeft(), in.getRights()), planner);
+                    SqlInExpression.create(request, false, in.getLeft(), in.getRights()), planner);
 
         // a part the classes of the variable decide
         if(condition instanceof SqlLiteral || condition instanceof SqlNull)
@@ -2981,32 +2946,34 @@ final class JoinOptimizer
      * logical operators; null for any other condition. The condition is made anew of the variable as the bindings give
      * it, because a condition reads its operands by the classes they had where it was optimised last.
      *
-     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param request the current request
      * @param condition the condition
      * @param bindings the variable bindings
      * @return the condition rebuilt over the bindings when it only compares a variable with constants, or null
      */
-    private static SqlExpressionIntercode getComparison(ClassRelations relations, SqlExpressionIntercode condition,
+    private static SqlExpressionIntercode getComparison(Request request, SqlExpressionIntercode condition,
             VariableBindings bindings)
     {
+        ClassRelations relations = request.getConfiguration();
+
         if(condition instanceof SqlEffectiveBooleanValue value)
         {
-            SqlExpressionIntercode operand = getComparison(relations, value.getOperand(), bindings);
+            SqlExpressionIntercode operand = getComparison(request, value.getOperand(), bindings);
 
             return operand == null ? null : SqlEffectiveBooleanValue.create(relations, operand);
         }
 
         if(condition instanceof SqlUnaryLogical negation)
         {
-            SqlExpressionIntercode operand = getComparison(relations, negation.getOperand(), bindings);
+            SqlExpressionIntercode operand = getComparison(request, negation.getOperand(), bindings);
 
             return operand == null ? null : SqlUnaryLogical.create(relations, operand);
         }
 
         if(condition instanceof SqlBinaryLogical logical)
         {
-            SqlExpressionIntercode left = getComparison(relations, logical.getLeft(), bindings);
-            SqlExpressionIntercode right = getComparison(relations, logical.getRight(), bindings);
+            SqlExpressionIntercode left = getComparison(request, logical.getLeft(), bindings);
+            SqlExpressionIntercode right = getComparison(request, logical.getRight(), bindings);
 
             return left == null || right == null ? null :
                     SqlBinaryLogical.create(relations, logical.getOperator(), left, right);
@@ -3021,7 +2988,7 @@ final class JoinOptimizer
             if(left == null || right == null || left instanceof SqlVariable == right instanceof SqlVariable)
                 return null;
 
-            return SqlBinaryComparison.create(relations, comparison.getOperator(), left, right);
+            return SqlBinaryComparison.create(request, comparison.getOperator(), left, right);
         }
 
         if(condition instanceof SqlInExpression in)
@@ -3034,7 +3001,7 @@ final class JoinOptimizer
             if(!in.getRights().stream().allMatch(r -> r instanceof SqlLiteral || r instanceof SqlIri))
                 return null;
 
-            return SqlInExpression.create(relations, in.isNegated(), left, in.getRights());
+            return SqlInExpression.create(request, in.isNegated(), left, in.getRights());
         }
 
         return null;
@@ -3165,41 +3132,47 @@ final class JoinOptimizer
 
 
     /**
-     * Estimated fraction of the solutions a filter condition keeps, after the defaults of the planner: an equality
-     * keeps {@link #EQUALITY_SELECTIVITY}, an inequality {@link #INEQUALITY_SELECTIVITY}, a conjunction the product and
-     * a disjunction the complement of the product of the complements of the selectivities of its operands, a negation
-     * the complement, a membership test what the disjunction of the equalities with its members does, a test of the
-     * characters of a string what an equality does, and any other condition {@link #DEFAULT_SELECTIVITY}.
+     * Estimated fraction of the solutions a filter condition keeps, after the defaults of the planner, which the
+     * settings of the engine give: an equality keeps the selectivity of an equality (see
+     * {@link EngineSettings#equalitySelectivity()}), an inequality that of an inequality (see
+     * {@link EngineSettings#inequalitySelectivity()}), a conjunction the product and a disjunction the complement of
+     * the product of the complements of the selectivities of its operands, a negation the complement, a membership test
+     * what the disjunction of the equalities with its members does, a test of the characters of a string what an
+     * equality does, and any other condition the selectivity of a condition nothing is known about (see
+     * {@link EngineSettings#defaultSelectivity()}).
      *
+     * @param request the current request
      * @param condition the condition
      * @return estimated fraction of the solutions the condition keeps
      */
-    static double selectivity(SqlExpressionIntercode condition)
+    static double selectivity(Request request, SqlExpressionIntercode condition)
     {
+        EngineSettings settings = request.getEngineSettings();
+
         if(condition instanceof SqlBinaryLogical logical)
         {
-            double left = selectivity(logical.getLeft());
-            double right = selectivity(logical.getRight());
+            double left = selectivity(request, logical.getLeft());
+            double right = selectivity(request, logical.getRight());
 
             return logical.getOperator() == LogicalOperator.AND ? left * right : left + right - left * right;
         }
 
         if(condition instanceof SqlUnaryLogical negation)
-            return 1 - selectivity(negation.getOperand());
+            return 1 - selectivity(request, negation.getOperand());
 
         if(condition instanceof SqlBinaryComparison comparison)
         {
             return switch(comparison.getOperator())
             {
-                case EQUAL -> EQUALITY_SELECTIVITY;
-                case NOT_EQUAL -> 1 - EQUALITY_SELECTIVITY;
-                default -> INEQUALITY_SELECTIVITY;
+                case EQUAL -> settings.equalitySelectivity();
+                case NOT_EQUAL -> 1 - settings.equalitySelectivity();
+                default -> settings.inequalitySelectivity();
             };
         }
 
         if(condition instanceof SqlInExpression in)
         {
-            double others = Math.pow(1 - EQUALITY_SELECTIVITY, in.getRights().size());
+            double others = Math.pow(1 - settings.equalitySelectivity(), in.getRights().size());
 
             return in.isNegated() ? others : 1 - others;
         }
@@ -3208,14 +3181,14 @@ final class JoinOptimizer
         {
             return switch(call.getFunction())
             {
-                case "regex", "contains", "strstarts", "strends", "sameterm" -> EQUALITY_SELECTIVITY;
-                default -> DEFAULT_SELECTIVITY;
+                case "regex", "contains", "strstarts", "strends", "sameterm" -> settings.equalitySelectivity();
+                default -> settings.defaultSelectivity();
             };
         }
 
         if(condition instanceof SqlUnary unary)
-            return selectivity(unary.getOperand());
+            return selectivity(request, unary.getOperand());
 
-        return DEFAULT_SELECTIVITY;
+        return settings.defaultSelectivity();
     }
 }

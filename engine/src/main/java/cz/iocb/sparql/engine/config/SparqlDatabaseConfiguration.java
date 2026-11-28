@@ -289,6 +289,11 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     protected boolean planAdvice = false;
 
     /**
+     * Settings of the engine for the requests of this configuration (see {@link #setEngineSettings}).
+     */
+    private volatile EngineSettings engineSettings = EngineSettings.DEFAULT;
+
+    /**
      * Settings of the calls of the remote SERVICE endpoints that have no settings of their own.
      */
     protected ServiceSettings serviceSettings = ServiceSettings.DEFAULT;
@@ -1297,7 +1302,8 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * Imports another configuration: its datatypes and IRI classes are added, its mappings, procedures and functions
      * become available under its service IRIs (for SERVICE patterns) or, with {@code merge}, its own service is merged
      * into this one together with its prefixes, and the settings of the remote endpoints it knows are adopted for the
-     * endpoints this configuration has no settings of its own for (its defaults are not imported).
+     * endpoints this configuration has no settings of its own for (neither its defaults nor the settings of its engine
+     * are imported).
      *
      * @param other the configuration to import
      * @param merge whether to merge the other service into this one
@@ -1920,6 +1926,29 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     public List<Iri> getServices()
     {
         return services;
+    }
+
+
+    /**
+     * Sets the settings of the engine for the requests of this configuration; initially {@link EngineSettings#DEFAULT}.
+     * A request keeps the settings it has begun with (see {@link Request#getEngineSettings}).
+     *
+     * @param settings the settings
+     */
+    public void setEngineSettings(EngineSettings settings)
+    {
+        engineSettings = Objects.requireNonNull(settings);
+    }
+
+
+    /**
+     * Settings of the engine for the requests of this configuration.
+     *
+     * @return settings of the engine for the requests of this configuration
+     */
+    public EngineSettings getEngineSettings()
+    {
+        return engineSettings;
     }
 
 

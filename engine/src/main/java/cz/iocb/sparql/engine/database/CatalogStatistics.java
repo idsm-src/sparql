@@ -106,7 +106,8 @@ public final class CatalogStatistics extends TableStatisticsBase
     @Override
     protected double lookupFrequency(Request request, Group group, TableColumn column, Column value)
     {
-        return cached(frequencies, column.getName() + "\0" + value, _ -> readFrequency(request, column, value));
+        return cached(request, frequencies, column.getName() + "\0" + value,
+                _ -> readFrequency(request, column, value));
     }
 
 
@@ -186,7 +187,7 @@ public final class CatalogStatistics extends TableStatisticsBase
             if(Double.isNaN(rows))
                 return null;
 
-            return new Group(null, rows < 0 ? DEFAULT_ROWS : Math.max(rows, 1), columns);
+            return new Group(null, rows < 0 ? request.getEngineSettings().defaultRows() : Math.max(rows, 1), columns);
         });
     }
 

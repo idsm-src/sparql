@@ -23,6 +23,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import cz.iocb.sparql.engine.config.EngineSettings;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -455,5 +456,40 @@ public class ValuesMergeTest
 
         assertThat(sql, not(containsString("UNION")));
         assertThat(lists(sql), is(0));
+    }
+
+
+    @Test
+    @DisplayName("the disjuncts the merges may give are limited by the settings of the engine")
+    void disjunctLimitOfTheSettings() throws Exception
+    {
+        String list = "SELECT ?s ?l WHERE { VALUES ?s { " + items(1, 5) + " } VALUES ?l { " + labels(5)
+                + " } ?s ex:label ?l }";
+        String accesses = "SELECT ?s ?l WHERE { VALUES ?s { " + items(1, 5) + " } VALUES ?l { " + labels(5)
+                + " } ?s ex:num ?n . ?s ex:label ?l }";
+        String key = "SELECT ?r ?s WHERE { VALUES ?r { " + refs(1, 5) + " } VALUES ?s { " + items(1, 5)
+                + " } ?r ex:ref ?s . ?s a ex:Item }";
+
+        config.setEngineSettings(EngineSettings.DEFAULT.withDisjunctLimit(20));
+
+        try
+        {
+            // the second list would give the access 25 disjuncts
+            assertThat(execute(list), containsInAnyOrder(rows(1, 5, ValuesMergeTest::label)));
+            assertThat(lists(translate(list)), is(1));
+
+            // the two accesses with a list each stay apart
+            assertThat(execute(accesses), containsInAnyOrder(rows(1, 5, ValuesMergeTest::label)));
+            assertThat(reads(translate(accesses), "item"), is(2));
+
+            // and so do the referenced and the referencing access
+            assertThat(execute(key), containsInAnyOrder(
+                    IntStream.rangeClosed(1, 5).mapToObj(i -> Arrays.asList(ref(i), item(i))).toArray()));
+            assertThat(reads(translate(key), "item"), is(1));
+        }
+        finally
+        {
+            config.setEngineSettings(EngineSettings.DEFAULT);
+        }
     }
 }

@@ -18,6 +18,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import cz.iocb.sparql.engine.config.EngineSettings;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.CommonTable;
@@ -270,6 +271,11 @@ public class Request implements AutoCloseable
     private final SparqlDatabaseConfiguration config;
 
     /**
+     * Settings of the engine the request has begun with (see {@link #getEngineSettings}).
+     */
+    private final EngineSettings engineSettings;
+
+    /**
      * Whether SERVICE calls may be evaluated independently of their context.
      */
     private final boolean serviceReorder;
@@ -397,6 +403,7 @@ public class Request implements AutoCloseable
     public Request(SparqlDatabaseConfiguration config, boolean serviceReorder)
     {
         this.config = config;
+        this.engineSettings = config.getEngineSettings();
         this.serviceReorder = serviceReorder;
     }
 
@@ -1381,6 +1388,19 @@ public class Request implements AutoCloseable
     public SparqlDatabaseConfiguration getConfiguration()
     {
         return config;
+    }
+
+
+    /**
+     * Settings of the engine the request has begun with: those of the configuration when the request was created (see
+     * {@link SparqlDatabaseConfiguration#getEngineSettings}), kept for the whole request, so that its translation is
+     * not made by two settings at once when the configuration is given other ones meanwhile.
+     *
+     * @return settings of the engine the request has begun with
+     */
+    public EngineSettings getEngineSettings()
+    {
+        return engineSettings;
     }
 
 

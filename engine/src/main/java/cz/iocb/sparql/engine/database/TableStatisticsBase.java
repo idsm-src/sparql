@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.function.Function;
+import cz.iocb.sparql.engine.config.EngineSettings;
 import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.request.Request.ResultReader;
@@ -28,24 +29,6 @@ import cz.iocb.sparql.engine.request.Request.ResultReader;
  */
 public abstract class TableStatisticsBase implements TableStatistics
 {
-    /**
-     * Selectivity of a column bound to a value when nothing is known about the column (the default of the planner).
-     */
-    protected static final double DEFAULT_SELECTIVITY = 0.005;
-
-    /**
-     * Rows of a group when nothing is known about it.
-     */
-    protected static final double DEFAULT_ROWS = 1000;
-
-    /**
-     * Most values a cache of the statistics keeps (see {@link #cached}): far more than the values the queries of a
-     * deployment keep asking about, so that only a stream of ever new constants fills a cache, which is then emptied
-     * instead of growing for the life of the statistics; a frequency takes up some 140 to 280 bytes of a cache, the
-     * statistics of a group more.
-     */
-    protected static final int CACHE_LIMIT = 100_000;
-
 
     /**
      * Statistics of a group of rows: their number and the statistics of the columns over them.
@@ -231,7 +214,7 @@ public abstract class TableStatisticsBase implements TableStatistics
         Group group = lookupGroup(request, condition);
         Map<TableColumn, Column> values = getValues(condition);
 
-        double rows = group != null ? group.rows() : DEFAULT_ROWS;
+        double rows = group != null ? group.rows() : request.getEngineSettings().defaultRows();
 
         // the fraction of the rows in which all the columns required not to be null are not null
         double present = 1;
@@ -265,7 +248,9 @@ public abstract class TableStatisticsBase implements TableStatistics
     /**
      * Selectivity of the column bound to the value among the rows of the group: the frequency of the value when it is
      * among the most common ones, and otherwise an equal share of the rows left to the other values, which are the rows
-     * that hold neither a most common value nor a null, as no value is equal to a null.
+     * that hold neither a most common value nor a null, as no value is equal to a null; the selectivity of an equality
+     * nothing is known about when the statistics have nothing about the column (see
+     * {@link EngineSettings#equalitySelectivity()}).
      *
      * @param request the current request
      * @param group the group of rows, or null if nothing is known about it
@@ -278,7 +263,7 @@ public abstract class TableStatisticsBase implements TableStatistics
         ColumnStatistics statistics = group != null ? group.columns().get(column.getName()) : null;
 
         if(statistics == null)
-            return DEFAULT_SELECTIVITY;
+            return request.getEngineSettings().equalitySelectivity();
 
         double frequency = lookupFrequency(request, group, column, value);
 
@@ -343,19 +328,21 @@ public abstract class TableStatisticsBase implements TableStatistics
 
 
     /**
-     * The value the cache keeps for the key, read and kept when the cache does not hold it yet; a cache holding
-     * {@link #CACHE_LIMIT} values already is emptied first, so that the values asked for over the life of the
-     * statistics do not take up ever more memory, a value asked for again being read anew once.
+     * The value the cache keeps for the key, read and kept when the cache does not hold it yet; a cache holding as many
+     * values as the settings of the engine allow (see {@link EngineSettings#statisticsCacheLimit()}) is emptied first,
+     * so that the values asked for over the life of the statistics do not take up ever more memory, a value asked for
+     * again being read anew once.
      *
      * @param <V> type of the values
+     * @param request the current request
      * @param cache the cache, a concurrent map
      * @param key the key
      * @param reader reader of the value of a key
      * @return the value of the key
      */
-    protected static <V> V cached(Map<String, V> cache, String key, Function<String, V> reader)
+    protected static <V> V cached(Request request, Map<String, V> cache, String key, Function<String, V> reader)
     {
-        if(cache.size() >= CACHE_LIMIT && !cache.containsKey(key))
+        if(cache.size() >= request.getEngineSettings().statisticsCacheLimit() && !cache.containsKey(key))
             cache.clear();
 
         return cache.computeIfAbsent(key, reader);

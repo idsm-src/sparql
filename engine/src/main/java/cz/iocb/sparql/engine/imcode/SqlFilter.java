@@ -285,9 +285,9 @@ public final class SqlFilter extends SqlIntercode
     /**
      * The number of the solutions of the child that the filter reads for the solutions its parent reads of its own (see
      * {@link Restrictions#getNeededRows}): as many more as the conditions are estimated to drop (see
-     * {@link JoinOptimizer#selectivity(SqlExpressionIntercode)}). A condition handed down as a filter condition of the
-     * variables deciding it (see {@link #addFilterConditions}) does not count, because the child that orders its joins
-     * with it in mind counts its own solutions without those the condition drops.
+     * {@link JoinOptimizer#selectivity(Request, SqlExpressionIntercode)}). A condition handed down as a filter
+     * condition of the variables deciding it (see {@link #addFilterConditions}) does not count, because the child that
+     * orders its joins with it in mind counts its own solutions without those the condition drops.
      *
      * @param request the current request
      * @param needed the number of the solutions of the filter that its parent reads at most
@@ -307,7 +307,7 @@ public final class SqlFilter extends SqlIntercode
         for(SqlExpressionIntercode conjunct : getConjuncts(conditions))
             if(getDecidingVariables(relations, conjunct).stream()
                     .noneMatch(v -> handed.getFilterConditions(v).contains(conjunct)))
-                needed /= JoinOptimizer.selectivity(conjunct);
+                needed /= JoinOptimizer.selectivity(request, conjunct);
 
         return needed;
     }

@@ -14,6 +14,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.IntPredicate;
+import cz.iocb.sparql.engine.config.EngineSettings;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ColumnPair;
 import cz.iocb.sparql.engine.database.Condition;
@@ -53,20 +54,20 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  * Access to one table, or to constants only when the table is null: the mapped columns are exposed as variables and the
  * rows are restricted by conditions. Joins, left joins and distinct unions of accesses to the same table or along keys
  * are merged into a single access ({@link #tryReduceJoin} and friends), and so is a join with VALUES, unless the merge
- * would give the conditions of the access too many disjuncts (see {@link #disjunctLimit}); a union of two accesses
- * telling their rows apart by the null test of a column is written as a single scan ({@link #translateUnion}).
- * {@code reduced} means the parent does not care about duplicates; {@code distinctColumns} asks for deduplication over
- * those columns (see {@link cz.iocb.sparql.engine.mapping.SingleTableQuadMapping}). Inside a pattern evaluated for a
- * current solution (an EXISTS pattern, or a pattern evaluated per graph, whose current solution gives the graph), an
- * access whose variable the nodes above merge with its value in the current solution takes the value into its own
- * conditions, compared in the class of its columns like a constant (see {@link ValueCondition}); so does an access
- * whose variable a filter above requires to be a constant term, which makes the filter needless (see
- * {@link SqlIntercode#addAcceptedValues}). With the join optimizer on, an access whose variable a filter above accepts
- * only with one of several constant terms takes the terms into its conditions as a disjunction (see
- * {@link #restrictToAcceptedTerms}). An access to a dictionary table whose row constants select by a key reads the row
- * when it is optimised and takes it by the key the access is joined by (see {@link #resolveDictionaryRows}), and an
- * access to a probed table that constants restrict by an index is asked for a row then, giving no solution when it has
- * none (see {@link #probeRows}).
+ * would give the conditions of the access too many disjuncts (see {@link EngineSettings#disjunctLimit()}); a union of
+ * two accesses telling their rows apart by the null test of a column is written as a single scan
+ * ({@link #translateUnion}). {@code reduced} means the parent does not care about duplicates; {@code distinctColumns}
+ * asks for deduplication over those columns (see {@link cz.iocb.sparql.engine.mapping.SingleTableQuadMapping}). Inside
+ * a pattern evaluated for a current solution (an EXISTS pattern, or a pattern evaluated per graph, whose current
+ * solution gives the graph), an access whose variable the nodes above merge with its value in the current solution
+ * takes the value into its own conditions, compared in the class of its columns like a constant (see
+ * {@link ValueCondition}); so does an access whose variable a filter above requires to be a constant term, which makes
+ * the filter needless (see {@link SqlIntercode#addAcceptedValues}). With the join optimizer on, an access whose
+ * variable a filter above accepts only with one of several constant terms takes the terms into its conditions as a
+ * disjunction (see {@link #restrictToAcceptedTerms}). An access to a dictionary table whose row constants select by a
+ * key reads the row when it is optimised and takes it by the key the access is joined by (see
+ * {@link #resolveDictionaryRows}), and an access to a probed table that constants restrict by an index is asked for a
+ * row then, giving no solution when it has none (see {@link #probeRows}).
  */
 public final class SqlTableAccess extends SqlIntercode
 {
@@ -94,17 +95,6 @@ public final class SqlTableAccess extends SqlIntercode
     {
     }
 
-
-    /**
-     * The greatest number of disjuncts the conditions of an access may get by a merge that multiplies them: by taking
-     * in the rows of VALUES, or by the merge with another access to its table or to a table referencing it. The
-     * conditions are kept in disjunctive normal form, so they get a disjunct for every row of the VALUES and every
-     * disjunct they have, or for every pair of the disjuncts of the two accesses that do not contradict each other, and
-     * building them, like every later operation on them, compares every two disjuncts: the time grows with the square
-     * of their number, whereas the database joins the access with a list left in VALUES, or the two accesses left
-     * apart, as fast as it evaluates the disjunction.
-     */
-    private static final int disjunctLimit = 30;
 
     /**
      * Settings of the planner of the database under which a probed table is asked for a row (see {@link #hasRows}): no
@@ -833,18 +823,21 @@ public final class SqlTableAccess extends SqlIntercode
     /**
      * True if the VALUES can be merged into the access: distinct rows, every variable bound also in the access and
      * never null on either side, and few enough rows to keep the conditions of the access small (see
-     * {@link #disjunctLimit}; a single row adds no disjunct, so it is always few enough). The access has to bind a
-     * variable in every class of the VALUES, or, when the VALUES is made of terms (see {@link SqlValues#hasTerms}), in
-     * a single class with columns, to which its terms are converted (see {@link SqlValues#asConditions}).
+     * {@link EngineSettings#disjunctLimit()}; a single row adds no disjunct, so it is always few enough). The access
+     * has to bind a variable in every class of the VALUES, or, when the VALUES is made of terms (see
+     * {@link SqlValues#hasTerms}), in a single class with columns, to which its terms are converted (see
+     * {@link SqlValues#asConditions}).
      *
+     * @param request the current request
      * @param left the left access
      * @param right the VALUES node
      * @return true if the VALUES can be merged into the access, false otherwise
      */
-    private static boolean canBeJoinedWithValues(SqlTableAccess left, SqlValues right)
+    private static boolean canBeJoinedWithValues(Request request, SqlTableAccess left, SqlValues right)
     {
         // asked first, because the test of distinct rows compares every two of them
-        if(right.getSize() > 1 && (long) left.conditions.getConditions().size() * right.getSize() > disjunctLimit)
+        if(right.getSize() > 1 && (long) left.conditions.getConditions().size() * right.getSize() > request
+                .getEngineSettings().disjunctLimit())
             return false;
 
         if(!right.isDistinct())
@@ -1479,17 +1472,17 @@ public final class SqlTableAccess extends SqlIntercode
     /**
      * Merges two accesses to the same table joined on a key into one access.
      *
-     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param request the current request
      * @param left the left access
      * @param right the right access
      * @param restrictions what the parent needs of the variables
      * @return the merged access, no solution when the conditions contradict, or null when the merged conditions would
      *         have too many disjuncts (see {@link #conjoin})
      */
-    static SqlIntercode joinByPrimaryKey(ClassRelations relations, SqlTableAccess left, SqlTableAccess right,
+    static SqlIntercode joinByPrimaryKey(Request request, SqlTableAccess left, SqlTableAccess right,
             Restrictions restrictions)
     {
-        return join(relations, left, right, restrictions, union(left.distinctColumns, right.distinctColumns));
+        return join(request, left, right, restrictions, union(left.distinctColumns, right.distinctColumns));
     }
 
 
@@ -1497,17 +1490,17 @@ public final class SqlTableAccess extends SqlIntercode
      * Merges the distinct access into the other access to the same table, see {@link #canBeJoinedByDistinctColumns}.
      * The result keeps the multiplicities of the other access, including its deduplication request.
      *
-     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param request the current request
      * @param access the other access
      * @param distinct the deduplicated access
      * @param restrictions what the parent needs of the variables
      * @return the merged access, no solution when the conditions contradict, or null when the merged conditions would
      *         have too many disjuncts (see {@link #conjoin})
      */
-    static SqlIntercode joinByDistinctColumns(ClassRelations relations, SqlTableAccess access, SqlTableAccess distinct,
+    static SqlIntercode joinByDistinctColumns(Request request, SqlTableAccess access, SqlTableAccess distinct,
             Restrictions restrictions)
     {
-        return join(relations, access, distinct, restrictions, access.distinctColumns);
+        return join(request, access, distinct, restrictions, access.distinctColumns);
     }
 
 
@@ -1515,7 +1508,7 @@ public final class SqlTableAccess extends SqlIntercode
      * Merges two accesses to the same table: their conditions are conjoined with the equalities of the shared
      * variables; no solution when contradictory, and no merge when the conjunction would have too many disjuncts.
      *
-     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param request the current request
      * @param left the left access
      * @param right the right access
      * @param restrictions what the parent needs of the variables
@@ -1523,9 +1516,11 @@ public final class SqlTableAccess extends SqlIntercode
      * @return the merged access, no solution when the conditions contradict, or null when the merged conditions would
      *         have too many disjuncts (see {@link #conjoin})
      */
-    private static SqlIntercode join(ClassRelations relations, SqlTableAccess left, SqlTableAccess right,
+    private static SqlIntercode join(Request request, SqlTableAccess left, SqlTableAccess right,
             Restrictions restrictions, Set<Column> distinctColumns)
     {
+        ClassRelations relations = request.getConfiguration();
+
         Condition joinCondition = new Condition();
         VariableBindings bindings = new VariableBindings(left.internal);
 
@@ -1558,7 +1553,7 @@ public final class SqlTableAccess extends SqlIntercode
 
         bindings = bindings.restrict(relations, restrictions);
 
-        Conditions conditions = conjoin(left.conditions, right.conditions);
+        Conditions conditions = conjoin(request, left.conditions, right.conditions);
 
         if(conditions == null)
             return null;
@@ -1576,19 +1571,22 @@ public final class SqlTableAccess extends SqlIntercode
     /**
      * Conjunction of the conditions of two accesses that are to be merged into one, or null when the merge is not worth
      * it: when the conjunction takes more conjunctions of their disjuncts (see
-     * {@link Conditions#and(Conditions, Conditions, int)}) than {@link #disjunctLimit} and than either of the
-     * conditions has disjuncts. It happens when the conditions restrict different columns to lists of values (each
-     * access has taken in VALUES of a variable of its own), as then every value combines with every value; the
-     * conditions restricting one column to lists of values give only the values the lists have in common, and a
-     * condition of one disjunct leaves the number of the disjuncts of the other one as it is.
+     * {@link Conditions#and(Conditions, Conditions, int)}) than the settings of the engine allow (see
+     * {@link EngineSettings#disjunctLimit()}) and than either of the conditions has disjuncts. It happens when the
+     * conditions restrict different columns to lists of values (each access has taken in VALUES of a variable of its
+     * own), as then every value combines with every value; the conditions restricting one column to lists of values
+     * give only the values the lists have in common, and a condition of one disjunct leaves the number of the disjuncts
+     * of the other one as it is.
      *
+     * @param request the current request
      * @param left the conditions of one access
      * @param right the conditions of the other access, in terms of the columns of the merged access
      * @return conjunction of the conditions, or null when it would have too many disjuncts
      */
-    private static Conditions conjoin(Conditions left, Conditions right)
+    private static Conditions conjoin(Request request, Conditions left, Conditions right)
     {
-        int limit = Math.max(disjunctLimit, Math.max(left.getConditions().size(), right.getConditions().size()));
+        int limit = Math.max(request.getEngineSettings().disjunctLimit(),
+                Math.max(left.getConditions().size(), right.getConditions().size()));
 
         return Conditions.and(left, right, limit);
     }
@@ -1599,7 +1597,7 @@ public final class SqlTableAccess extends SqlIntercode
      * the bindings and the conditions of the parent and the values its rows are restricted to (see {@link #values}) are
      * moved onto the child columns of the key, which hold the values of the parent columns they reference.
      *
-     * @param relations declarations which unrelated user IRI classes may overlap
+     * @param request the current request
      * @param parent access to the referenced table
      * @param child access to the referencing table
      * @param key the foreign key
@@ -1607,9 +1605,11 @@ public final class SqlTableAccess extends SqlIntercode
      * @return the merged access, no solution when the conditions contradict, or null when the merged conditions would
      *         have too many disjuncts (see {@link #conjoin})
      */
-    static SqlIntercode joinByForeignKey(ClassRelations relations, SqlTableAccess parent, SqlTableAccess child,
+    static SqlIntercode joinByForeignKey(Request request, SqlTableAccess parent, SqlTableAccess child,
             Set<ColumnPair> key, Restrictions restrictions)
     {
+        ClassRelations relations = request.getConfiguration();
+
         // only the parent columns of the key have their values in the child row; a parent column equated with one of
         // them by the parent condition must not be moved onto the same child column, which would turn that equality
         // into a tautology
@@ -1648,7 +1648,7 @@ public final class SqlTableAccess extends SqlIntercode
 
         bindings = bindings.restrict(relations, restrictions);
 
-        Conditions conditions = conjoin(child.conditions, remap(map, parent.conditions));
+        Conditions conditions = conjoin(request, child.conditions, remap(map, parent.conditions));
 
         if(conditions == null)
             return null;
@@ -1759,7 +1759,7 @@ public final class SqlTableAccess extends SqlIntercode
     public static SqlIntercode tryReduceJoinWithValues(Request request, SqlTableAccess left, SqlValues right,
             Restrictions mergeRestrictions)
     {
-        if(SqlTableAccess.canBeJoinedWithValues(left, right))
+        if(SqlTableAccess.canBeJoinedWithValues(request, left, right))
             return joinWithValues(request, left, right, mergeRestrictions);
 
         return null;
@@ -1770,37 +1770,39 @@ public final class SqlTableAccess extends SqlIntercode
      * Merges the two accesses into one when a foreign key, a shared key or declared distinct columns allow it and the
      * merged conditions do not get too many disjuncts (see {@link #conjoin}); null otherwise.
      *
-     * @param relations declarations which unrelated user IRI classes may overlap
-     * @param schema the database schema
+     * @param request the current request
      * @param left the left access
      * @param right the right access
      * @param restrictions what the parent needs of the variables
      * @return the merged access, or null
      */
-    public static SqlIntercode tryReduceJoin(ClassRelations relations, DatabaseSchema schema, SqlTableAccess left,
-            SqlTableAccess right, Restrictions restrictions)
+    public static SqlIntercode tryReduceJoin(Request request, SqlTableAccess left, SqlTableAccess right,
+            Restrictions restrictions)
     {
+        ClassRelations relations = request.getConfiguration();
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+
         Set<ColumnPair> dropLeft = SqlTableAccess.canBeJoinedByForeignKey(relations, schema, left, right);
 
         if(dropLeft != null)
-            return SqlTableAccess.joinByForeignKey(relations, left, right, dropLeft, restrictions);
+            return SqlTableAccess.joinByForeignKey(request, left, right, dropLeft, restrictions);
 
 
         Set<ColumnPair> dropRight = SqlTableAccess.canBeJoinedByForeignKey(relations, schema, right, left);
 
         if(dropRight != null)
-            return SqlTableAccess.joinByForeignKey(relations, right, left, dropRight, restrictions);
+            return SqlTableAccess.joinByForeignKey(request, right, left, dropRight, restrictions);
 
 
         if(SqlTableAccess.canBeJoinedByPrimaryKey(relations, schema, left, right))
-            return SqlTableAccess.joinByPrimaryKey(relations, left, right, restrictions);
+            return SqlTableAccess.joinByPrimaryKey(request, left, right, restrictions);
 
 
         if(SqlTableAccess.canBeJoinedByDistinctColumns(relations, left, right))
-            return SqlTableAccess.joinByDistinctColumns(relations, left, right, restrictions);
+            return SqlTableAccess.joinByDistinctColumns(request, left, right, restrictions);
 
         if(SqlTableAccess.canBeJoinedByDistinctColumns(relations, right, left))
-            return SqlTableAccess.joinByDistinctColumns(relations, right, left, restrictions);
+            return SqlTableAccess.joinByDistinctColumns(request, right, left, restrictions);
 
         return null;
     }
@@ -1832,20 +1834,21 @@ public final class SqlTableAccess extends SqlIntercode
      * its right side to its left side (inspired by the join transfer of Ontop), see
      * {@link #canBeLeftJoinedByPrimaryKey}.
      *
-     * @param relations declarations which unrelated user IRI classes may overlap
-     * @param schema the database schema
+     * @param request the current request
      * @param access the access of the left side
      * @param part the access of a part of the OPTIONAL
      * @return the access joined with the part, or null
      */
-    public static SqlTableAccess tryTransfer(ClassRelations relations, DatabaseSchema schema, SqlTableAccess access,
-            SqlTableAccess part)
+    public static SqlTableAccess tryTransfer(Request request, SqlTableAccess access, SqlTableAccess part)
     {
+        ClassRelations relations = request.getConfiguration();
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+
         if(!canBeLeftJoinedByPrimaryKey(relations, schema, access, part)
                 || !access.conditions.getIsNotNull().containsAll(part.conditions.getIsNotNull()))
             return null;
 
-        return joinByPrimaryKey(relations, access, part, null) instanceof SqlTableAccess joined ? joined : null;
+        return joinByPrimaryKey(request, access, part, null) instanceof SqlTableAccess joined ? joined : null;
     }
 
 
@@ -2240,8 +2243,9 @@ public final class SqlTableAccess extends SqlIntercode
      * and which it does not push into an access that is looked up for the rows of another one. The filter stays above
      * the access. A term the class cannot hold is left out, and no row is left when it can hold none. The conditions
      * stay as they are when they restrict the rows so already, and when the disjunction would give them too many
-     * disjuncts (see {@link #disjunctLimit}). Without the optimizer the database plans the joins by its own estimates,
-     * which would count the filter and the conditions as two restrictions, so the terms are left to the filter.
+     * disjuncts (see {@link EngineSettings#disjunctLimit()}). Without the optimizer the database plans the joins by its
+     * own estimates, which would count the filter and the conditions as two restrictions, so the terms are left to the
+     * filter.
      *
      * @param request the current request
      * @param restrictions what the parent needs of the variables
@@ -2263,7 +2267,8 @@ public final class SqlTableAccess extends SqlIntercode
             if(accepted == null || result.implies(accepted))
                 continue;
 
-            if((long) result.getConditions().size() * accepted.getConditions().size() > disjunctLimit)
+            if((long) result.getConditions().size() * accepted.getConditions().size() > request.getEngineSettings()
+                    .disjunctLimit())
                 continue;
 
             result = Conditions.and(result, accepted);

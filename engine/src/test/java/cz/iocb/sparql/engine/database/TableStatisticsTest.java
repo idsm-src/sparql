@@ -2,14 +2,17 @@ package cz.iocb.sparql.engine.database;
 
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
-import static cz.iocb.sparql.engine.database.TableStatisticsBase.CACHE_LIMIT;
 import static cz.iocb.sparql.engine.database.TableStatisticsBase.cached;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import java.sql.SQLException;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import cz.iocb.sparql.engine.config.EngineSettings;
+import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.request.Request;
 
 
@@ -41,6 +44,8 @@ public class TableStatisticsTest
     private static final Column two = new ValueColumn("2", INT4);
 
     private static final Column a = new ValueColumn("a", VARCHAR);
+
+    private static Request request;
 
 
     /**
@@ -111,17 +116,24 @@ public class TableStatisticsTest
     }
 
 
+    @BeforeAll
+    static void init() throws SQLException
+    {
+        request = new Request(new SparqlDatabaseConfiguration(null, null, null, false));
+    }
+
+
     @Test
     public void rowsOfTheWholeGroup()
     {
-        assertEquals(1000, new TestStatistics(false).estimateRows(null, new Conditions(true)));
+        assertEquals(1000, new TestStatistics(false).estimateRows(request, new Conditions(true)));
     }
 
 
     @Test
     public void rowsOfAMostCommonValue()
     {
-        assertEquals(200, new TestStatistics(false).estimateRows(null, conditions(equal(s, one))), 1e-9);
+        assertEquals(200, new TestStatistics(false).estimateRows(request, conditions(equal(s, one))), 1e-9);
     }
 
 
@@ -129,7 +141,7 @@ public class TableStatisticsTest
     public void rowsOfAnotherValue()
     {
         // the remaining 80 % of the rows over the remaining 99 values
-        assertEquals(1000 * 0.8 / 99, new TestStatistics(false).estimateRows(null, conditions(equal(s, two))), 1e-9);
+        assertEquals(1000 * 0.8 / 99, new TestStatistics(false).estimateRows(request, conditions(equal(s, two))), 1e-9);
     }
 
 
@@ -137,13 +149,13 @@ public class TableStatisticsTest
     public void rowsOfAValueOfANullableColumn()
     {
         // the half of the rows that is not null over the two values
-        assertEquals(1000 * 0.5 / 2, new TestStatistics(false).estimateRows(null, conditions(equal(n, one))), 1e-9);
+        assertEquals(1000 * 0.5 / 2, new TestStatistics(false).estimateRows(request, conditions(equal(n, one))), 1e-9);
 
         // a test of the same column for a null adds nothing
         Condition condition = equal(n, one);
         condition.addIsNotNull(n);
 
-        assertEquals(1000 * 0.5 / 2, new TestStatistics(false).estimateRows(null, conditions(condition)), 1e-9);
+        assertEquals(1000 * 0.5 / 2, new TestStatistics(false).estimateRows(request, conditions(condition)), 1e-9);
     }
 
 
@@ -152,7 +164,27 @@ public class TableStatisticsTest
     {
         TableColumn u = new TableColumn("u", INT4);
 
-        assertEquals(1000 * 0.005, new TestStatistics(false).estimateRows(null, conditions(equal(u, one))), 1e-9);
+        assertEquals(1000 * 0.005, new TestStatistics(false).estimateRows(request, conditions(equal(u, one))), 1e-9);
+    }
+
+
+    @Test
+    public void defaultsOfTheSettings() throws SQLException
+    {
+        SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, null, null, false);
+        config.setEngineSettings(EngineSettings.DEFAULT.withDefaultRows(500).withEqualitySelectivity(0.01));
+
+        try(Request changed = new Request(config))
+        {
+            TableColumn u = new TableColumn("u", INT4);
+
+            // a column nothing is known about
+            assertEquals(1000 * 0.01, new TestStatistics(false).estimateRows(changed, conditions(equal(u, one))), 1e-9);
+
+            // and a table nothing is known about
+            assertEquals(500, new DefaultStatistics().estimateRows(changed, new Conditions(true)), 1e-9);
+            assertEquals(500 * 0.01, new DefaultStatistics().estimateRows(changed, conditions(equal(u, one))), 1e-9);
+        }
     }
 
 
@@ -162,7 +194,7 @@ public class TableStatisticsTest
         Condition condition = equal(s, one);
         condition.addAreEqual(o, two);
 
-        assertEquals(200 * 0.1, new TestStatistics(false).estimateRows(null, conditions(condition)), 1e-9);
+        assertEquals(200 * 0.1, new TestStatistics(false).estimateRows(request, conditions(condition)), 1e-9);
     }
 
 
@@ -175,8 +207,8 @@ public class TableStatisticsTest
         Condition isNotNull = new Condition();
         isNotNull.addIsNotNull(n);
 
-        assertEquals(500, new TestStatistics(false).estimateRows(null, conditions(isNull)), 1e-9);
-        assertEquals(500, new TestStatistics(false).estimateRows(null, conditions(isNotNull)), 1e-9);
+        assertEquals(500, new TestStatistics(false).estimateRows(request, conditions(isNull)), 1e-9);
+        assertEquals(500, new TestStatistics(false).estimateRows(request, conditions(isNotNull)), 1e-9);
     }
 
 
@@ -188,32 +220,32 @@ public class TableStatisticsTest
         filled.addIsNotNull(n);
         filled.addIsNotNull(m);
 
-        assertEquals(1000 * 0.2, new TestStatistics(false).estimateRows(null, conditions(filled)), 1e-9);
+        assertEquals(1000 * 0.2, new TestStatistics(false).estimateRows(request, conditions(filled)), 1e-9);
 
         // one of the two values of the other column is in a half of them, as it is in a half of the rows of its column
         Condition outer = equal(n, one);
         outer.addIsNotNull(m);
 
-        assertEquals(1000 * 0.2 / 2, new TestStatistics(false).estimateRows(null, conditions(outer)), 1e-9);
+        assertEquals(1000 * 0.2 / 2, new TestStatistics(false).estimateRows(request, conditions(outer)), 1e-9);
 
         // the rows of a value of the column with the most nulls are among the rows the other column leaves
         Condition inner = equal(m, one);
         inner.addIsNotNull(n);
 
-        assertEquals(1000 * 0.2 / 4, new TestStatistics(false).estimateRows(null, conditions(inner)), 1e-9);
+        assertEquals(1000 * 0.2 / 4, new TestStatistics(false).estimateRows(request, conditions(inner)), 1e-9);
 
         // the values of the two columns are independent of each other among those rows
         Condition both = equal(n, one);
         both.addAreEqual(m, two);
 
-        assertEquals(1000 * 0.2 / 2 / 4, new TestStatistics(false).estimateRows(null, conditions(both)), 1e-9);
+        assertEquals(1000 * 0.2 / 2 / 4, new TestStatistics(false).estimateRows(request, conditions(both)), 1e-9);
 
         // a column required to be null is independent of the others
         Condition mixed = new Condition();
         mixed.addIsNull(n);
         mixed.addIsNotNull(m);
 
-        assertEquals(1000 * 0.5 * 0.2, new TestStatistics(false).estimateRows(null, conditions(mixed)), 1e-9);
+        assertEquals(1000 * 0.5 * 0.2, new TestStatistics(false).estimateRows(request, conditions(mixed)), 1e-9);
     }
 
 
@@ -222,12 +254,12 @@ public class TableStatisticsTest
     {
         TableColumn u = new TableColumn("u", INT4);
 
-        assertEquals(0.5, new TestStatistics(false).estimateNullFraction(null, n));
-        assertEquals(0, new TestStatistics(false).estimateNullFraction(null, s));
+        assertEquals(0.5, new TestStatistics(false).estimateNullFraction(request, n));
+        assertEquals(0, new TestStatistics(false).estimateNullFraction(request, s));
 
         // nothing is known about the column, and a constant is no column of the table
-        assertEquals(0, new TestStatistics(false).estimateNullFraction(null, u));
-        assertEquals(0, new TestStatistics(false).estimateNullFraction(null, one));
+        assertEquals(0, new TestStatistics(false).estimateNullFraction(request, u));
+        assertEquals(0, new TestStatistics(false).estimateNullFraction(request, one));
     }
 
 
@@ -235,7 +267,7 @@ public class TableStatisticsTest
     public void rowsOfADisjunction()
     {
         assertEquals(200 + 1000 * 0.8 / 99,
-                new TestStatistics(false).estimateRows(null, conditions(equal(s, one), equal(s, two))), 1e-9);
+                new TestStatistics(false).estimateRows(request, conditions(equal(s, one), equal(s, two))), 1e-9);
     }
 
 
@@ -245,24 +277,24 @@ public class TableStatisticsTest
         Condition condition = equal(s, one);
         condition.addAreEqual(s, two);
 
-        assertEquals(0, new TestStatistics(false).estimateRows(null, conditions(condition)));
-        assertEquals(0, new TestStatistics(false).estimateRows(null, new Conditions(false)));
+        assertEquals(0, new TestStatistics(false).estimateRows(request, conditions(condition)));
+        assertEquals(0, new TestStatistics(false).estimateRows(request, new Conditions(false)));
     }
 
 
     @Test
     public void groupColumnIsAccountedForByTheGroup()
     {
-        assertEquals(1000, new TestStatistics(true).estimateRows(null, conditions(equal(key, a))), 1e-9);
-        assertEquals(1000 * 0.005, new TestStatistics(false).estimateRows(null, conditions(equal(key, a))), 1e-9);
+        assertEquals(1000, new TestStatistics(true).estimateRows(request, conditions(equal(key, a))), 1e-9);
+        assertEquals(1000 * 0.005, new TestStatistics(false).estimateRows(request, conditions(equal(key, a))), 1e-9);
     }
 
 
     @Test
     public void distinctOfABoundColumn()
     {
-        assertEquals(1, new TestStatistics(false).estimateDistinct(null, Set.of(s), conditions(equal(s, one))));
-        assertEquals(1, new TestStatistics(true).estimateDistinct(null, Set.of(key), conditions(equal(key, a))));
+        assertEquals(1, new TestStatistics(false).estimateDistinct(request, Set.of(s), conditions(equal(s, one))));
+        assertEquals(1, new TestStatistics(true).estimateDistinct(request, Set.of(key), conditions(equal(key, a))));
     }
 
 
@@ -273,8 +305,8 @@ public class TableStatisticsTest
         double effective = 1 / (0.04 + 0.8 * 0.8 / 99);
 
         assertEquals(Math.sqrt(100 * effective),
-                new TestStatistics(false).estimateDistinct(null, Set.of(s), new Conditions(true)), 1e-9);
-        assertEquals(10, new TestStatistics(false).estimateDistinct(null, Set.of(o), new Conditions(true)), 1e-9);
+                new TestStatistics(false).estimateDistinct(request, Set.of(s), new Conditions(true)), 1e-9);
+        assertEquals(10, new TestStatistics(false).estimateDistinct(request, Set.of(o), new Conditions(true)), 1e-9);
     }
 
 
@@ -283,7 +315,7 @@ public class TableStatisticsTest
     {
         // the 8.08 rows estimated for the value 2 of s cannot hold the 10 distinct values of o
         assertEquals(1000 * 0.8 / 99,
-                new TestStatistics(false).estimateDistinct(null, Set.of(o), conditions(equal(s, two))), 1e-9);
+                new TestStatistics(false).estimateDistinct(request, Set.of(o), conditions(equal(s, two))), 1e-9);
     }
 
 
@@ -292,14 +324,15 @@ public class TableStatisticsTest
     {
         TableColumn u = new TableColumn("u", INT4);
 
-        assertEquals(200, new TestStatistics(false).estimateDistinct(null, Set.of(u), conditions(equal(s, one))), 1e-9);
+        assertEquals(200, new TestStatistics(false).estimateDistinct(request, Set.of(u), conditions(equal(s, one))),
+                1e-9);
     }
 
 
     @Test
     public void distinctOfAConstant()
     {
-        assertEquals(1, new TestStatistics(false).estimateDistinct(null, Set.of(one), new Conditions(true)));
+        assertEquals(1, new TestStatistics(false).estimateDistinct(request, Set.of(one), new Conditions(true)));
     }
 
 
@@ -311,14 +344,15 @@ public class TableStatisticsTest
 
         // the values of the column that has the most of them
         assertEquals(Math.sqrt(100 * effective),
-                new TestStatistics(false).estimateDistinct(null, Set.of(s, o), new Conditions(true)), 1e-9);
+                new TestStatistics(false).estimateDistinct(request, Set.of(s, o), new Conditions(true)), 1e-9);
 
         // a bound column and a constant have one value
-        assertEquals(10, new TestStatistics(false).estimateDistinct(null, Set.of(s, o, one), conditions(equal(s, one))),
+        assertEquals(10,
+                new TestStatistics(false).estimateDistinct(request, Set.of(s, o, one), conditions(equal(s, one))),
                 1e-9);
 
         // a column nothing is known about has a value of its own in every row
-        assertEquals(200, new TestStatistics(false).estimateDistinct(null, Set.of(o, u), conditions(equal(s, one))),
+        assertEquals(200, new TestStatistics(false).estimateDistinct(request, Set.of(o, u), conditions(equal(s, one))),
                 1e-9);
     }
 
@@ -327,12 +361,12 @@ public class TableStatisticsTest
     public void distinctOfColumnsTogether()
     {
         // the 15 combinations kept for o and n together, more than the 10 values of o
-        assertEquals(15, new TestStatistics(false).estimateDistinct(null, Set.of(o, n), new Conditions(true)), 1e-9);
-        assertEquals(15, new TestStatistics(false).estimateDistinct(null, Set.of(o, n), conditions(equal(s, one))),
+        assertEquals(15, new TestStatistics(false).estimateDistinct(request, Set.of(o, n), new Conditions(true)), 1e-9);
+        assertEquals(15, new TestStatistics(false).estimateDistinct(request, Set.of(o, n), conditions(equal(s, one))),
                 1e-9);
 
         // a column bound to a value is no part of the combination
-        assertEquals(2, new TestStatistics(false).estimateDistinct(null, Set.of(o, n), conditions(equal(o, one))),
+        assertEquals(2, new TestStatistics(false).estimateDistinct(request, Set.of(o, n), conditions(equal(o, one))),
                 1e-9);
     }
 
@@ -374,20 +408,44 @@ public class TableStatisticsTest
         Map<String, Integer> cache = new ConcurrentHashMap<>();
         AtomicInteger reads = new AtomicInteger();
 
-        // up to the limit, every value is read once and kept
-        for(int i = 0; i < CACHE_LIMIT; i++)
-            cached(cache, "value" + i, _ -> reads.incrementAndGet());
+        int limit = request.getEngineSettings().statisticsCacheLimit();
 
-        assertEquals(CACHE_LIMIT, cache.size());
-        assertEquals(1, cached(cache, "value0", _ -> reads.incrementAndGet()));
-        assertEquals(CACHE_LIMIT, reads.get());
+        // up to the limit, every value is read once and kept
+        for(int i = 0; i < limit; i++)
+            cached(request, cache, "value" + i, _ -> reads.incrementAndGet());
+
+        assertEquals(limit, cache.size());
+        assertEquals(1, cached(request, cache, "value0", _ -> reads.incrementAndGet()));
+        assertEquals(limit, reads.get());
 
         // another value empties the full cache first
-        assertEquals(CACHE_LIMIT + 1, cached(cache, "other", _ -> reads.incrementAndGet()));
+        assertEquals(limit + 1, cached(request, cache, "other", _ -> reads.incrementAndGet()));
         assertEquals(1, cache.size());
 
         // and the values are read anew
-        assertEquals(CACHE_LIMIT + 2, cached(cache, "value0", _ -> reads.incrementAndGet()));
+        assertEquals(limit + 2, cached(request, cache, "value0", _ -> reads.incrementAndGet()));
         assertEquals(2, cache.size());
+    }
+
+
+    @Test
+    public void cacheLimitOfTheSettings() throws SQLException
+    {
+        SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, null, null, false);
+        config.setEngineSettings(EngineSettings.DEFAULT.withStatisticsCacheLimit(3));
+
+        try(Request changed = new Request(config))
+        {
+            Map<String, Integer> cache = new ConcurrentHashMap<>();
+
+            for(int i = 0; i < 3; i++)
+                cached(changed, cache, "value" + i, _ -> 0);
+
+            assertEquals(3, cache.size());
+
+            cached(changed, cache, "other", _ -> 0);
+
+            assertEquals(1, cache.size());
+        }
     }
 }

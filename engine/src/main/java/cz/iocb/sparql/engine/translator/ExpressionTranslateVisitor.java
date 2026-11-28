@@ -130,12 +130,12 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
             case Subtract -> SqlBinaryArithmetic.create(relations, SUBTRACT, left, right);
             case Multiply -> SqlBinaryArithmetic.create(relations, MULTIPLY, left, right);
             case Divide -> SqlBinaryArithmetic.create(relations, DIVIDE, left, right);
-            case Equals -> SqlBinaryComparison.create(relations, EQUAL, left, right);
-            case NotEquals -> SqlBinaryComparison.create(relations, NOT_EQUAL, left, right);
-            case LessThan -> SqlBinaryComparison.create(relations, LESS_THAN, left, right);
-            case LessThanOrEqual -> SqlBinaryComparison.create(relations, LESS_THAN_OR_EQUAL, left, right);
-            case GreaterThan -> SqlBinaryComparison.create(relations, GREATER_THAN, left, right);
-            case GreaterThanOrEqual -> SqlBinaryComparison.create(relations, GREATER_THAN_OR_EQUAL, left, right);
+            case Equals -> SqlBinaryComparison.create(request, EQUAL, left, right);
+            case NotEquals -> SqlBinaryComparison.create(request, NOT_EQUAL, left, right);
+            case LessThan -> SqlBinaryComparison.create(request, LESS_THAN, left, right);
+            case LessThanOrEqual -> SqlBinaryComparison.create(request, LESS_THAN_OR_EQUAL, left, right);
+            case GreaterThan -> SqlBinaryComparison.create(request, GREATER_THAN, left, right);
+            case GreaterThanOrEqual -> SqlBinaryComparison.create(request, GREATER_THAN_OR_EQUAL, left, right);
             default -> null;
         };
     }
@@ -150,7 +150,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         for(Expression expression : inExpression.getRight())
             right.add(visitElement(expression));
 
-        return SqlInExpression.create(request.getConfiguration(), inExpression.isNegated(), left, right);
+        return SqlInExpression.create(request, inExpression.isNegated(), left, right);
     }
 
 

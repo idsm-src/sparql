@@ -19,6 +19,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import cz.iocb.sparql.engine.config.EngineSettings;
 import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
@@ -710,7 +711,7 @@ public final class SqlRecursive extends SqlIntercode
         double starts = Math.max(JoinOptimizer.estimateDistinct(request, init, beginVar), 1);
         double passed = Math.min(JoinOptimizer.estimateDistinct(request, startTest.sibling(), beginVar), starts);
         double spared = (1 - passed / starts) * (starts + JoinOptimizer.estimateRows(request, init))
-                * JoinOptimizer.LOOKUP_COST;
+                * request.getEngineSettings().lookupCost();
 
         return spared - getStartTestCost(request, getTestedSolutions(request));
     }
@@ -745,7 +746,8 @@ public final class SqlRecursive extends SqlIntercode
     {
         double hashed = getStartTestHashCost(request, solutions);
 
-        return canProbeSibling(request) ? Math.min(hashed, solutions * JoinOptimizer.LOOKUP_COST) : hashed;
+        return canProbeSibling(request) ? Math.min(hashed, solutions * request.getEngineSettings().lookupCost()) :
+                hashed;
     }
 
 
@@ -762,7 +764,8 @@ public final class SqlRecursive extends SqlIntercode
         SqlIntercode sibling = startTest.sibling();
 
         return JoinOptimizer.estimateRows(request, sibling)
-                + JoinOptimizer.HASH_COST * JoinOptimizer.estimateDistinct(request, sibling, beginVar) + solutions;
+                + request.getEngineSettings().hashCost() * JoinOptimizer.estimateDistinct(request, sibling, beginVar)
+                + solutions;
     }
 
 
@@ -796,7 +799,7 @@ public final class SqlRecursive extends SqlIntercode
     private boolean isProbed(Request request, double solutions)
     {
         return canProbeSibling(request)
-                && solutions * JoinOptimizer.LOOKUP_COST < getStartTestHashCost(request, solutions);
+                && solutions * request.getEngineSettings().lookupCost() < getStartTestHashCost(request, solutions);
     }
 
 
@@ -1957,7 +1960,7 @@ public final class SqlRecursive extends SqlIntercode
      * start as well (the graph of a walk evaluated for every start by itself) is looked up by the values of two
      * sources, which stays fenced, and the database would drop the rows kept whenever the start changes. How many
      * starts reach a node no statistics tell, so the step is memoized wherever as many starts as the lookups of a value
-     * have to repeat for the rows to be kept (see {@link JoinOptimizer#MEMOIZE_RATIO}) may reach one: the walk of the
+     * have to repeat for the rows to be kept (see {@link EngineSettings#memoizeRatio()}) may reach one: the walk of the
      * nextProt terms related to each other took 7.5 minutes instead of 17.3, whereas a node reached from a single start
      * costs about half a lookup more.
      *
@@ -1983,7 +1986,7 @@ public final class SqlRecursive extends SqlIntercode
         if(startTest != null)
             starts = Math.min(starts, JoinOptimizer.estimateDistinct(request, startTest.sibling(), beginVar));
 
-        return starts >= JoinOptimizer.MEMOIZE_RATIO;
+        return starts >= request.getEngineSettings().memoizeRatio();
     }
 
 

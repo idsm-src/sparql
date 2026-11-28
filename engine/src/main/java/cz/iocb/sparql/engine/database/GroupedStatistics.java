@@ -111,7 +111,7 @@ public final class GroupedStatistics extends TableStatisticsBase
         if(value == null)
             return catalog.lookupGroup(request, condition);
 
-        return cached(groups, value.toString(), _ -> readGroup(request, value));
+        return cached(request, groups, value.toString(), _ -> readGroup(request, value));
     }
 
 
@@ -124,7 +124,7 @@ public final class GroupedStatistics extends TableStatisticsBase
         if(valuesTable == null)
             return Double.NaN;
 
-        return cached(frequencies, group.key() + "\0" + column.getName() + "\0" + value,
+        return cached(request, frequencies, group.key() + "\0" + column.getName() + "\0" + value,
                 _ -> readFrequency(request, group, column, value));
     }
 
