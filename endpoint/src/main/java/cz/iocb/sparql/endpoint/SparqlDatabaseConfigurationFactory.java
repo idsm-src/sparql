@@ -3,8 +3,9 @@ package cz.iocb.sparql.endpoint;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.sql.SQLException;
-import java.time.Duration;
+import java.util.Enumeration;
 import java.util.Hashtable;
+import java.util.Set;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.Name;
@@ -13,28 +14,52 @@ import javax.naming.RefAddr;
 import javax.naming.Reference;
 import javax.naming.spi.ObjectFactory;
 import javax.sql.DataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import cz.iocb.sparql.engine.config.EngineSettings;
-import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
+import cz.iocb.sparql.engine.config.ServiceSettings;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
-import cz.iocb.sparql.engine.database.Function;
 
 
 
 /**
  * JNDI object factory creating the deployment's {@link SparqlDatabaseConfiguration}: the class named by the reference
  * is instantiated through its {@code (String service, DataSource, DatabaseSchema)} constructor, with the data source
- * looked up by the {@code datasource} address and the optional {@code service} IRI address of the reference. The
- * optional {@code join-optimizer} address overrides what the configuration says about the join optimizer of the engine:
- * {@code off} turns it off, {@code settings} turns it on with its joins kept by the settings of the planner, and
- * {@code advice} turns it on with its joins kept by plan advice (see {@link EngineSettings#joinOptimizer()}). The
- * optional {@code statistics-function} address names the function through which the engine reads the extended
- * statistics of the tables, its schema and its name joined by a dot (see {@link EngineSettings#statisticsFunction()}),
- * and the optional {@code statistics-check-interval} address gives the least number of seconds between two checks of
- * whether the statistics of the tables are to be renewed (see {@link EngineSettings#statisticsCheckInterval()}).
+ * looked up by the {@code datasource} address and the optional {@code service} IRI address of the reference. The other
+ * addresses of the reference, the attributes of the resource in {@code context.xml}, set the settings of the
+ * configuration over what the configuration sets itself (see {@link #configure}): an address named by a setting of the
+ * engine sets that setting (see {@link EngineSettings#with(String, String)}), like {@code join-optimizer},
+ * {@code statistics-check-interval} or {@code lookup-cost}, and an address named by a setting of the calls of remote
+ * SERVICE endpoints prefixed by {@code service-} sets the default of that setting (see
+ * {@link ServiceSettings#with(String, String)}), like {@code service-context-limit}, as in
+ *
+ * <pre>
+ * &lt;Resource name="sparql:example" auth="Container" type="org.example.ExampleConfiguration"
+ *     factory="cz.iocb.sparql.endpoint.SparqlDatabaseConfigurationFactory" datasource="jdbc:example"
+ *     join-optimizer="advice" statistics-check-interval="5min" service-context-limit="5000" /&gt;
+ * </pre>
  */
 public class SparqlDatabaseConfigurationFactory implements ObjectFactory
 {
+    /**
+     * The prefix of the names of the addresses that set the defaults of the settings of the calls of remote SERVICE
+     * endpoints.
+     */
+    static final String SERVICE_PREFIX = "service-";
+
+    /**
+     * Addresses of the reference that are no settings: those this factory reads and those Tomcat gives every resource.
+     */
+    private static final Set<String> addresses = Set.of("datasource", "service", "factory", "auth", "scope",
+            "singleton", "description");
+
+    /**
+     * Logger of the addresses that set nothing.
+     */
+    private static final Logger logger = LoggerFactory.getLogger(SparqlDatabaseConfigurationFactory.class);
+
+
     /**
      * Creates the factory; instantiated by the JNDI provider.
      */
@@ -53,9 +78,6 @@ public class SparqlDatabaseConfigurationFactory implements ObjectFactory
         Reference ref = (Reference) object;
         RefAddr datasource = ref.get("datasource");
         RefAddr service = ref.get("service");
-        RefAddr optimizer = ref.get("join-optimizer");
-        RefAddr statistics = ref.get("statistics-function");
-        RefAddr interval = ref.get("statistics-check-interval");
 
         if(datasource == null)
             return null;
@@ -72,17 +94,11 @@ public class SparqlDatabaseConfigurationFactory implements ObjectFactory
             Constructor<?> constructor = objectClass.getConstructor(String.class, DataSource.class,
                     DatabaseSchema.class);
 
-            Object config = constructor.newInstance(service == null ? null : (String) service.getContent(),
-                    connectionPool, new DatabaseSchema(connectionPool));
+            SparqlDatabaseConfiguration config = (SparqlDatabaseConfiguration) constructor.newInstance(
+                    service == null ? null : (String) service.getContent(), connectionPool,
+                    new DatabaseSchema(connectionPool));
 
-            if(optimizer != null)
-                setJoinOptimizer((SparqlDatabaseConfiguration) config, (String) optimizer.getContent());
-
-            if(statistics != null)
-                setExtendedStatisticsFunction((SparqlDatabaseConfiguration) config, (String) statistics.getContent());
-
-            if(interval != null)
-                setStatisticsCheckInterval((SparqlDatabaseConfiguration) config, (String) interval.getContent());
+            configure(config, ref);
 
             return config;
         }
@@ -94,60 +110,42 @@ public class SparqlDatabaseConfigurationFactory implements ObjectFactory
 
 
     /**
-     * Sets the join optimizer of the configuration as the {@code join-optimizer} address of the reference says.
+     * Sets the settings that the addresses of the reference give to the configuration, over what the configuration sets
+     * itself: an address named by a setting of the engine sets that setting (see
+     * {@link EngineSettings#with(String, String)}), and an address named by a setting of the calls of remote SERVICE
+     * endpoints prefixed by {@link #SERVICE_PREFIX} sets the default of that setting (see
+     * {@link ServiceSettings#with(String, String)}). An address that is neither, nor one that is no setting (see
+     * {@link #addresses}), sets nothing, which is logged as a warning, as its name is likely misspelt.
      *
      * @param config the configuration
-     * @param value the content of the address: {@code off}, {@code settings} or {@code advice}
-     * @throws IllegalArgumentException if the value is none of them
+     * @param reference the reference
+     * @throws IllegalArgumentException if an address gives no value of its setting
      */
-    private static void setJoinOptimizer(SparqlDatabaseConfiguration config, String value)
+    static void configure(SparqlDatabaseConfiguration config, Reference reference)
     {
-        JoinOptimizerMode mode = switch(value)
+        EngineSettings settings = config.getEngineSettings();
+        ServiceSettings serviceSettings = config.getServiceSettings();
+
+        for(Enumeration<RefAddr> all = reference.getAll(); all.hasMoreElements();)
         {
-            case "off" -> JoinOptimizerMode.OFF;
-            case "settings" -> JoinOptimizerMode.SETTINGS;
-            case "advice" -> JoinOptimizerMode.ADVICE;
-            default -> throw new IllegalArgumentException("unknown join-optimizer value: " + value);
-        };
+            RefAddr address = all.nextElement();
+            String name = address.getType();
 
-        config.setEngineSettings(config.getEngineSettings().withJoinOptimizer(mode));
-    }
+            if(!(address.getContent() instanceof String value))
+                continue;
 
+            String serviceName = name.startsWith(SERVICE_PREFIX) ? name.substring(SERVICE_PREFIX.length()) : null;
 
-    /**
-     * Sets the function through which the configuration reads the extended statistics of the tables as the
-     * {@code statistics-function} address of the reference names it.
-     *
-     * @param config the configuration
-     * @param value the content of the address: the schema and the name of the function joined by a dot
-     * @throws IllegalArgumentException if the value is no schema and name joined by a dot
-     */
-    private static void setExtendedStatisticsFunction(SparqlDatabaseConfiguration config, String value)
-    {
-        int dot = value.indexOf('.');
+            if(EngineSettings.NAMES.contains(name))
+                settings = settings.with(name, value);
+            else if(serviceName != null && ServiceSettings.NAMES.contains(serviceName))
+                serviceSettings = serviceSettings.with(serviceName, value);
+            else if(!addresses.contains(name))
+                logger.warn("the attribute {} of the configuration {} is no setting and sets nothing", name,
+                        reference.getClassName());
+        }
 
-        if(dot <= 0 || dot == value.length() - 1)
-            throw new IllegalArgumentException("unknown statistics-function value: " + value);
-
-        config.setEngineSettings(config.getEngineSettings()
-                .withStatisticsFunction(new Function(value.substring(0, dot), value.substring(dot + 1))));
-    }
-
-
-    /**
-     * Sets the least time between two checks of whether the statistics of the tables are to be renewed as the
-     * {@code statistics-check-interval} address of the reference says.
-     *
-     * @param config the configuration
-     * @param value the content of the address: a number of seconds, an integer that is not negative
-     * @throws IllegalArgumentException if the value is no such number
-     */
-    private static void setStatisticsCheckInterval(SparqlDatabaseConfiguration config, String value)
-    {
-        if(!value.matches("[0-9]{1,18}"))
-            throw new IllegalArgumentException("unknown statistics-check-interval value: " + value);
-
-        config.setEngineSettings(
-                config.getEngineSettings().withStatisticsCheckInterval(Duration.ofSeconds(Long.parseLong(value))));
+        config.setEngineSettings(settings);
+        config.setServiceSettings(serviceSettings);
     }
 }

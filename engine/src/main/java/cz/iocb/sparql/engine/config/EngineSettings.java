@@ -1,6 +1,14 @@
 package cz.iocb.sparql.engine.config;
 
+import static cz.iocb.sparql.engine.config.SettingValues.parseBoolean;
+import static cz.iocb.sparql.engine.config.SettingValues.parseDouble;
+import static cz.iocb.sparql.engine.config.SettingValues.parseDuration;
+import static cz.iocb.sparql.engine.config.SettingValues.parseEnum;
+import static cz.iocb.sparql.engine.config.SettingValues.parseFunction;
+import static cz.iocb.sparql.engine.config.SettingValues.parseInt;
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Objects;
 import cz.iocb.sparql.engine.database.Function;
 
@@ -17,7 +25,8 @@ import cz.iocb.sparql.engine.database.Function;
  * {@code with} methods derive changed copies, checking the values given. The default of a setting, which
  * {@link #DEFAULT} holds, is the initial value of its field, whose description tells why the value is what it is where
  * there is a reason for it. Each setting has a name, the name of its accessor written in lower case with its words
- * joined by hyphens, like {@code lookup-cost}.
+ * joined by hyphens, like {@code lookup-cost}, by which an attribute of the resource of the configuration in
+ * {@code context.xml} sets it to the value its text gives (see {@link #with(String, String)}).
  */
 public final class EngineSettings implements Cloneable
 {
@@ -61,6 +70,17 @@ public final class EngineSettings implements Cloneable
      * The default settings.
      */
     public static final EngineSettings DEFAULT = new EngineSettings();
+
+    /**
+     * The names of the settings, in the order of their accessors.
+     */
+    public static final List<String> NAMES = List.of("join-optimizer", "lookup-cost", "lookup-row-cost", "hash-cost",
+            "comparison-cost", "pairwise-margin", "second-join-margin", "memoize-ratio", "exhaustive-join-limit",
+            "counted-join-ratio", "default-rows", "equality-selectivity", "inequality-selectivity",
+            "default-selectivity", "disjunct-limit", "box-comparison-limit", "triple-term-class-limit",
+            "exists-round-limit", "statistics-function", "statistics-check-interval", "statistics-cache-limit",
+            "service-reorder", "service-table-rows", "service-batch-size", "service-check-interval",
+            "service-part-size", "service-read-ahead", "copy-drain-time", "copy-cancel-interval", "result-check-rows");
 
     /**
      * Who chooses the order and the methods of the joins the engine generates: when the engine does, it chooses them
@@ -1152,6 +1172,60 @@ public final class EngineSettings implements Cloneable
         EngineSettings copy = copy();
         copy.resultCheckRows = checkRange("result-check-rows", resultCheckRows, 1, Integer.MAX_VALUE);
         return copy;
+    }
+
+
+    /**
+     * Copy with the setting of the given name set to the value its text gives (see {@link SettingValues}), as an
+     * attribute of the resource of the configuration in {@code context.xml} sets it: the costs, the margins, the
+     * ratios, the rows and the selectivities are numbers, the limits and the sizes integers, {@code service-reorder} is
+     * {@code true} or {@code false}, {@code join-optimizer} is {@code off}, {@code settings} or {@code advice},
+     * {@code statistics-function} is the schema and the name of the function joined by a dot, and the times are
+     * integers followed by their units, or without a unit in seconds for {@code statistics-check-interval} and in
+     * milliseconds for the others.
+     *
+     * @param name name of the setting (see {@link #NAMES})
+     * @param value text of the value
+     * @return copy with the setting set to the value
+     * @throws IllegalArgumentException if no setting has the name, or the text gives no value of the setting
+     */
+    public EngineSettings with(String name, String value)
+    {
+        return switch(name)
+        {
+            case "join-optimizer" -> withJoinOptimizer(parseEnum(name, value, JoinOptimizerMode.class));
+            case "lookup-cost" -> withLookupCost(parseDouble(name, value));
+            case "lookup-row-cost" -> withLookupRowCost(parseDouble(name, value));
+            case "hash-cost" -> withHashCost(parseDouble(name, value));
+            case "comparison-cost" -> withComparisonCost(parseDouble(name, value));
+            case "pairwise-margin" -> withPairwiseMargin(parseDouble(name, value));
+            case "second-join-margin" -> withSecondJoinMargin(parseDouble(name, value));
+            case "memoize-ratio" -> withMemoizeRatio(parseDouble(name, value));
+            case "exhaustive-join-limit" -> withExhaustiveJoinLimit(parseInt(name, value));
+            case "counted-join-ratio" -> withCountedJoinRatio(parseDouble(name, value));
+            case "default-rows" -> withDefaultRows(parseDouble(name, value));
+            case "equality-selectivity" -> withEqualitySelectivity(parseDouble(name, value));
+            case "inequality-selectivity" -> withInequalitySelectivity(parseDouble(name, value));
+            case "default-selectivity" -> withDefaultSelectivity(parseDouble(name, value));
+            case "disjunct-limit" -> withDisjunctLimit(parseInt(name, value));
+            case "box-comparison-limit" -> withBoxComparisonLimit(parseInt(name, value));
+            case "triple-term-class-limit" -> withTripleTermClassLimit(parseInt(name, value));
+            case "exists-round-limit" -> withExistsRoundLimit(parseInt(name, value));
+            case "statistics-function" -> withStatisticsFunction(parseFunction(name, value));
+            case "statistics-check-interval" -> withStatisticsCheckInterval(
+                    parseDuration(name, value, ChronoUnit.SECONDS));
+            case "statistics-cache-limit" -> withStatisticsCacheLimit(parseInt(name, value));
+            case "service-reorder" -> withServiceReorder(parseBoolean(name, value));
+            case "service-table-rows" -> withServiceTableRows(parseInt(name, value));
+            case "service-batch-size" -> withServiceBatchSize(parseInt(name, value));
+            case "service-check-interval" -> withServiceCheckInterval(parseDuration(name, value, ChronoUnit.MILLIS));
+            case "service-part-size" -> withServicePartSize(parseInt(name, value));
+            case "service-read-ahead" -> withServiceReadAhead(parseInt(name, value));
+            case "copy-drain-time" -> withCopyDrainTime(parseDuration(name, value, ChronoUnit.MILLIS));
+            case "copy-cancel-interval" -> withCopyCancelInterval(parseDuration(name, value, ChronoUnit.MILLIS));
+            case "result-check-rows" -> withResultCheckRows(parseInt(name, value));
+            default -> throw new IllegalArgumentException("unknown setting: " + name);
+        };
     }
 
 

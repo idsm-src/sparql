@@ -488,9 +488,19 @@ public final class ExtendedStatistics
             }
         }
 
-        int dot = function != null ? function.indexOf('.') : -1;
+        Function statisticsFunction = null;
 
-        if(arguments.size() != 2 || function != null && (dot <= 0 || dot == function.length() - 1))
+        try
+        {
+            if(function != null)
+                statisticsFunction = SettingValues.parseFunction("--function", function);
+        }
+        catch(IllegalArgumentException e)
+        {
+            usage();
+        }
+
+        if(arguments.size() != 2)
             usage();
 
         PGSimpleDataSource source = new PGSimpleDataSource();
@@ -500,9 +510,8 @@ public final class ExtendedStatistics
                 .getConstructor(String.class, DataSource.class, DatabaseSchema.class)
                 .newInstance(service, source, new DatabaseSchema(source));
 
-        if(function != null)
-            config.setEngineSettings(config.getEngineSettings()
-                    .withStatisticsFunction(new Function(function.substring(0, dot), function.substring(dot + 1))));
+        if(statisticsFunction != null)
+            config.setEngineSettings(config.getEngineSettings().withStatisticsFunction(statisticsFunction));
 
         ExtendedStatistics statistics = new ExtendedStatistics(config, readers);
 

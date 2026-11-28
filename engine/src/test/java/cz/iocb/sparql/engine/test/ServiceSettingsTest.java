@@ -5,6 +5,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDecimalIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Locale.ROOT;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
@@ -12,6 +13,7 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -497,6 +499,41 @@ public class ServiceSettingsTest
 
         assertThat(settings, is(new ServiceSettings(true, false, 1, 2, 0, ContextOverflow.INDEPENDENT)));
         assertThat(ServiceSettings.DEFAULT.contextOverflow(), is(ContextOverflow.FAIL));
+    }
+
+
+    @Test
+    @DisplayName("a setting is set by its name to the value a text gives, a text giving no value is refused")
+    void texts()
+    {
+        // every setting is named by its component
+        assertThat(ServiceSettings.NAMES, is(Arrays.stream(ServiceSettings.class.getRecordComponents())
+                .map(c -> c.getName().replaceAll("([A-Z])", "-$1").toLowerCase(ROOT)).toList()));
+
+        ServiceSettings settings = ServiceSettings.DEFAULT.with("send-literals", "true")
+                .with("canonicalize-literals", "false").with("context-limit", "1").with("result-limit", " 2 ")
+                .with("redirect-limit", "0").with("context-overflow", "independent");
+
+        assertThat(settings, is(new ServiceSettings(true, false, 1, 2, 0, ContextOverflow.INDEPENDENT)));
+
+        // by a message naming the setting, as is a value out of its range
+        for(String name : ServiceSettings.NAMES)
+        {
+            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                    () -> ServiceSettings.DEFAULT.with(name, "x"));
+
+            assertThat(e.getMessage(), startsWith(name + " "));
+        }
+
+        IllegalArgumentException range = assertThrows(IllegalArgumentException.class,
+                () -> ServiceSettings.DEFAULT.with("context-limit", "0"));
+
+        assertThat(range.getMessage(), startsWith("context-limit "));
+
+        IllegalArgumentException unknown = assertThrows(IllegalArgumentException.class,
+                () -> ServiceSettings.DEFAULT.with("context", "1"));
+
+        assertThat(unknown.getMessage(), is("unknown setting: context"));
     }
 
 

@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.config;
 
+import static java.util.Locale.ROOT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -12,8 +13,10 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import cz.iocb.sparql.engine.config.EngineSettings.JoinOptimizerMode;
 import cz.iocb.sparql.engine.request.Request;
@@ -23,17 +26,18 @@ import cz.iocb.sparql.engine.request.Request;
 /**
  * The settings of the engine: their defaults are the values the engine used before they could be set, a copy made by a
  * {@code with} method differs from the original in its setting alone and leaves the original as it is, a value out of
- * the range of a setting is refused by a message naming the setting, and a request keeps the settings the configuration
+ * the range of a setting is refused by a message naming the setting, a setting is set by its name to the value a text
+ * gives, as an attribute of the resource of a configuration sets it, and a request keeps the settings the configuration
  * has when the request is created.
  */
 public class EngineSettingsTest
 {
     /**
-     * A setting: its name, a change of it, its value, the value the change gives it and a change it refuses, if there
-     * is one.
+     * A setting: its name, a text giving the value of a change of it, the change, its value, the value the change gives
+     * it and a change it refuses, if there is one.
      */
-    private record Setting(String name, UnaryOperator<EngineSettings> change, Function<EngineSettings, Object> value,
-            Object changed, UnaryOperator<EngineSettings> invalid)
+    private record Setting(String name, String text, UnaryOperator<EngineSettings> change,
+            Function<EngineSettings, Object> value, Object changed, UnaryOperator<EngineSettings> invalid)
     {
     }
 
@@ -42,69 +46,70 @@ public class EngineSettingsTest
      * The settings.
      */
     private static final List<Setting> settings = List.of(
-            new Setting("join-optimizer", s -> s.withJoinOptimizer(JoinOptimizerMode.ADVICE),
+            new Setting("join-optimizer", "advice", s -> s.withJoinOptimizer(JoinOptimizerMode.ADVICE),
                     EngineSettings::joinOptimizer, JoinOptimizerMode.ADVICE, null),
-            new Setting("lookup-cost", s -> s.withLookupCost(4), EngineSettings::lookupCost, 4.0,
+            new Setting("lookup-cost", "4", s -> s.withLookupCost(4), EngineSettings::lookupCost, 4.0,
                     s -> s.withLookupCost(0)),
-            new Setting("lookup-row-cost", s -> s.withLookupRowCost(1), EngineSettings::lookupRowCost, 1.0,
+            new Setting("lookup-row-cost", "1", s -> s.withLookupRowCost(1), EngineSettings::lookupRowCost, 1.0,
                     s -> s.withLookupRowCost(-1)),
-            new Setting("hash-cost", s -> s.withHashCost(3), EngineSettings::hashCost, 3.0,
+            new Setting("hash-cost", "3", s -> s.withHashCost(3), EngineSettings::hashCost, 3.0,
                     s -> s.withHashCost(Double.NaN)),
-            new Setting("comparison-cost", s -> s.withComparisonCost(0.5), EngineSettings::comparisonCost, 0.5,
+            new Setting("comparison-cost", "0.5", s -> s.withComparisonCost(0.5), EngineSettings::comparisonCost, 0.5,
                     s -> s.withComparisonCost(Double.POSITIVE_INFINITY)),
-            new Setting("pairwise-margin", s -> s.withPairwiseMargin(8), EngineSettings::pairwiseMargin, 8.0,
+            new Setting("pairwise-margin", "8", s -> s.withPairwiseMargin(8), EngineSettings::pairwiseMargin, 8.0,
                     s -> s.withPairwiseMargin(0)),
-            new Setting("second-join-margin", s -> s.withSecondJoinMargin(3), EngineSettings::secondJoinMargin, 3.0,
-                    s -> s.withSecondJoinMargin(0)),
-            new Setting("memoize-ratio", s -> s.withMemoizeRatio(4), EngineSettings::memoizeRatio, 4.0,
+            new Setting("second-join-margin", "3", s -> s.withSecondJoinMargin(3), EngineSettings::secondJoinMargin,
+                    3.0, s -> s.withSecondJoinMargin(0)),
+            new Setting("memoize-ratio", "4.0", s -> s.withMemoizeRatio(4), EngineSettings::memoizeRatio, 4.0,
                     s -> s.withMemoizeRatio(0)),
-            new Setting("exhaustive-join-limit", s -> s.withExhaustiveJoinLimit(10),
+            new Setting("exhaustive-join-limit", "10", s -> s.withExhaustiveJoinLimit(10),
                     EngineSettings::exhaustiveJoinLimit, 10, s -> s.withExhaustiveJoinLimit(31)),
-            new Setting("counted-join-ratio", s -> s.withCountedJoinRatio(2), EngineSettings::countedJoinRatio, 2.0,
-                    s -> s.withCountedJoinRatio(0)),
-            new Setting("default-rows", s -> s.withDefaultRows(100), EngineSettings::defaultRows, 100.0,
+            new Setting("counted-join-ratio", "2", s -> s.withCountedJoinRatio(2), EngineSettings::countedJoinRatio,
+                    2.0, s -> s.withCountedJoinRatio(0)),
+            new Setting("default-rows", "1e2", s -> s.withDefaultRows(100), EngineSettings::defaultRows, 100.0,
                     s -> s.withDefaultRows(0)),
-            new Setting("equality-selectivity", s -> s.withEqualitySelectivity(0.01),
+            new Setting("equality-selectivity", "0.01", s -> s.withEqualitySelectivity(0.01),
                     EngineSettings::equalitySelectivity, 0.01, s -> s.withEqualitySelectivity(0)),
-            new Setting("inequality-selectivity", s -> s.withInequalitySelectivity(0.25),
+            new Setting("inequality-selectivity", ".25", s -> s.withInequalitySelectivity(0.25),
                     EngineSettings::inequalitySelectivity, 0.25, s -> s.withInequalitySelectivity(1.5)),
-            new Setting("default-selectivity", s -> s.withDefaultSelectivity(1), EngineSettings::defaultSelectivity,
-                    1.0, s -> s.withDefaultSelectivity(-0.5)),
-            new Setting("disjunct-limit", s -> s.withDisjunctLimit(10), EngineSettings::disjunctLimit, 10,
+            new Setting("default-selectivity", "1", s -> s.withDefaultSelectivity(1),
+                    EngineSettings::defaultSelectivity, 1.0, s -> s.withDefaultSelectivity(-0.5)),
+            new Setting("disjunct-limit", "10", s -> s.withDisjunctLimit(10), EngineSettings::disjunctLimit, 10,
                     s -> s.withDisjunctLimit(0)),
-            new Setting("box-comparison-limit", s -> s.withBoxComparisonLimit(16), EngineSettings::boxComparisonLimit,
-                    16, s -> s.withBoxComparisonLimit(0)),
-            new Setting("triple-term-class-limit", s -> s.withTripleTermClassLimit(1),
+            new Setting("box-comparison-limit", "16", s -> s.withBoxComparisonLimit(16),
+                    EngineSettings::boxComparisonLimit, 16, s -> s.withBoxComparisonLimit(0)),
+            new Setting("triple-term-class-limit", "1", s -> s.withTripleTermClassLimit(1),
                     EngineSettings::tripleTermClassLimit, 1, s -> s.withTripleTermClassLimit(0)),
-            new Setting("exists-round-limit", s -> s.withExistsRoundLimit(2), EngineSettings::existsRoundLimit, 2,
+            new Setting("exists-round-limit", "2", s -> s.withExistsRoundLimit(2), EngineSettings::existsRoundLimit, 2,
                     s -> s.withExistsRoundLimit(0)),
-            new Setting("statistics-function",
+            new Setting("statistics-function", "s.f",
                     s -> s.withStatisticsFunction(new cz.iocb.sparql.engine.database.Function("s", "f")),
                     EngineSettings::statisticsFunction, new cz.iocb.sparql.engine.database.Function("s", "f"), null),
-            new Setting("statistics-check-interval", s -> s.withStatisticsCheckInterval(Duration.ofSeconds(5)),
+            new Setting("statistics-check-interval", "5", s -> s.withStatisticsCheckInterval(Duration.ofSeconds(5)),
                     EngineSettings::statisticsCheckInterval, Duration.ofSeconds(5),
                     s -> s.withStatisticsCheckInterval(Duration.ofSeconds(-1))),
-            new Setting("statistics-cache-limit", s -> s.withStatisticsCacheLimit(10),
+            new Setting("statistics-cache-limit", "10", s -> s.withStatisticsCacheLimit(10),
                     EngineSettings::statisticsCacheLimit, 10, s -> s.withStatisticsCacheLimit(0)),
-            new Setting("service-reorder", s -> s.withServiceReorder(true), EngineSettings::serviceReorder, true, null),
-            new Setting("service-table-rows", s -> s.withServiceTableRows(0), EngineSettings::serviceTableRows, 0,
+            new Setting("service-reorder", "true", s -> s.withServiceReorder(true), EngineSettings::serviceReorder,
+                    true, null),
+            new Setting("service-table-rows", "0", s -> s.withServiceTableRows(0), EngineSettings::serviceTableRows, 0,
                     s -> s.withServiceTableRows(-1)),
-            new Setting("service-batch-size", s -> s.withServiceBatchSize(10), EngineSettings::serviceBatchSize, 10,
-                    s -> s.withServiceBatchSize(0)),
-            new Setting("service-check-interval", s -> s.withServiceCheckInterval(Duration.ofMillis(10)),
+            new Setting("service-batch-size", "10", s -> s.withServiceBatchSize(10), EngineSettings::serviceBatchSize,
+                    10, s -> s.withServiceBatchSize(0)),
+            new Setting("service-check-interval", "10", s -> s.withServiceCheckInterval(Duration.ofMillis(10)),
                     EngineSettings::serviceCheckInterval, Duration.ofMillis(10),
                     s -> s.withServiceCheckInterval(Duration.ZERO)),
-            new Setting("service-part-size", s -> s.withServicePartSize(1024), EngineSettings::servicePartSize, 1024,
-                    s -> s.withServicePartSize(0)),
-            new Setting("service-read-ahead", s -> s.withServiceReadAhead(4), EngineSettings::serviceReadAhead, 4,
+            new Setting("service-part-size", "1024", s -> s.withServicePartSize(1024), EngineSettings::servicePartSize,
+                    1024, s -> s.withServicePartSize(0)),
+            new Setting("service-read-ahead", "4", s -> s.withServiceReadAhead(4), EngineSettings::serviceReadAhead, 4,
                     s -> s.withServiceReadAhead(0)),
-            new Setting("copy-drain-time", s -> s.withCopyDrainTime(Duration.ZERO), EngineSettings::copyDrainTime,
+            new Setting("copy-drain-time", "0", s -> s.withCopyDrainTime(Duration.ZERO), EngineSettings::copyDrainTime,
                     Duration.ZERO, s -> s.withCopyDrainTime(Duration.ofMillis(-1))),
-            new Setting("copy-cancel-interval", s -> s.withCopyCancelInterval(Duration.ofMillis(10)),
+            new Setting("copy-cancel-interval", "10 ms", s -> s.withCopyCancelInterval(Duration.ofMillis(10)),
                     EngineSettings::copyCancelInterval, Duration.ofMillis(10),
                     s -> s.withCopyCancelInterval(Duration.ZERO)),
-            new Setting("result-check-rows", s -> s.withResultCheckRows(10), EngineSettings::resultCheckRows, 10,
-                    s -> s.withResultCheckRows(0)));
+            new Setting("result-check-rows", " 10 ", s -> s.withResultCheckRows(10), EngineSettings::resultCheckRows,
+                    10, s -> s.withResultCheckRows(0)));
 
 
     /**
@@ -217,6 +222,85 @@ public class EngineSettingsTest
         assertEquals(1, EngineSettings.DEFAULT.withExhaustiveJoinLimit(1).exhaustiveJoinLimit());
         assertEquals(30, EngineSettings.DEFAULT.withExhaustiveJoinLimit(30).exhaustiveJoinLimit());
         assertThrows(IllegalArgumentException.class, () -> EngineSettings.DEFAULT.withExhaustiveJoinLimit(0));
+    }
+
+
+    @Test
+    public void texts()
+    {
+        // every setting is named by its accessor
+        assertEquals(EngineSettings.NAMES, settings.stream().map(Setting::name).toList());
+        assertEquals(Set.copyOf(EngineSettings.NAMES), getAccessors().stream()
+                .map(m -> m.getName().replaceAll("([A-Z])", "-$1").toLowerCase(ROOT)).collect(Collectors.toSet()));
+
+        for(Setting setting : settings)
+        {
+            EngineSettings changed = EngineSettings.DEFAULT.with(setting.name(), setting.text());
+
+            assertEquals(setting.changed(), setting.value().apply(changed), setting.name());
+
+            // a text giving no value of the setting is refused by a message naming the setting
+            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                    () -> EngineSettings.DEFAULT.with(setting.name(), "x"), setting.name());
+
+            assertTrue(e.getMessage().startsWith(setting.name() + " "), e.getMessage());
+        }
+
+        // and so is a value out of the range of the setting and a text that Java reads as a number but is none here
+        for(String text : List.of("0", "-1", "1e999", "NaN", "Infinity", "4d", "0x1p3", "1,5", "1 000", ""))
+        {
+            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                    () -> EngineSettings.DEFAULT.with("lookup-cost", text), text);
+
+            assertTrue(e.getMessage().startsWith("lookup-cost "), e.getMessage());
+        }
+
+        assertEquals(1.5e-3, EngineSettings.DEFAULT.with("equality-selectivity", "+1.5E-3").equalitySelectivity());
+        assertEquals(16, EngineSettings.DEFAULT.with("pairwise-margin", "16.").pairwiseMargin());
+
+        assertThrows(IllegalArgumentException.class, () -> EngineSettings.DEFAULT.with("disjunct-limit", "1.5"));
+        assertThrows(IllegalArgumentException.class, () -> EngineSettings.DEFAULT.with("service-reorder", "yes"));
+        assertThrows(IllegalArgumentException.class, () -> EngineSettings.DEFAULT.with("join-optimizer", "ADVICE"));
+        assertThrows(IllegalArgumentException.class, () -> EngineSettings.DEFAULT.with("statistics-function", "f"));
+        assertThrows(IllegalArgumentException.class, () -> EngineSettings.DEFAULT.with("statistics-function", "s."));
+
+        // an unknown name too
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> EngineSettings.DEFAULT.with("lookup-costs", "4"));
+
+        assertEquals("unknown setting: lookup-costs", e.getMessage());
+    }
+
+
+    @Test
+    public void times()
+    {
+        EngineSettings settings = EngineSettings.DEFAULT;
+
+        // a time without a unit is one of the unit of its setting
+        assertEquals(Duration.ofSeconds(90),
+                settings.with("statistics-check-interval", "90").statisticsCheckInterval());
+        assertEquals(Duration.ofMillis(90), settings.with("service-check-interval", "90").serviceCheckInterval());
+
+        // the units are those of PostgreSQL
+        assertEquals(Duration.ofNanos(500_000), settings.with("copy-drain-time", "500us").copyDrainTime());
+        assertEquals(Duration.ofMillis(500),
+                settings.with("statistics-check-interval", "500ms").statisticsCheckInterval());
+        assertEquals(Duration.ofSeconds(2), settings.with("copy-cancel-interval", "2 s").copyCancelInterval());
+        assertEquals(Duration.ofMinutes(5),
+                settings.with("statistics-check-interval", " 5min ").statisticsCheckInterval());
+        assertEquals(Duration.ofHours(1), settings.with("statistics-check-interval", "1h").statisticsCheckInterval());
+        assertEquals(Duration.ofDays(1), settings.with("statistics-check-interval", "1d").statisticsCheckInterval());
+
+        // other units, fractions, signs and times too long are refused by a message naming the setting
+        for(String text : List.of("5 m", "5sec", "5MIN", "1.5s", "-1s", "s", "", "9223372036854775808ms",
+                "9223372036854775807d", "106752d"))
+        {
+            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                    () -> settings.with("statistics-check-interval", text), text);
+
+            assertTrue(e.getMessage().startsWith("statistics-check-interval "), e.getMessage());
+        }
     }
 
 

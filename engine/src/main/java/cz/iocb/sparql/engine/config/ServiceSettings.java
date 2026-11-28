@@ -1,5 +1,9 @@
 package cz.iocb.sparql.engine.config;
 
+import static cz.iocb.sparql.engine.config.SettingValues.parseBoolean;
+import static cz.iocb.sparql.engine.config.SettingValues.parseEnum;
+import static cz.iocb.sparql.engine.config.SettingValues.parseInt;
+import java.util.List;
 import java.util.Objects;
 
 
@@ -9,7 +13,10 @@ import java.util.Objects;
  * clause of a call, whether the received literals are brought to their canonical forms, and the limits of the
  * evaluation. A configuration holds the settings of the endpoints with settings of their own and the defaults of all
  * the others ({@link SparqlDatabaseConfiguration#getServiceSettings(cz.iocb.sparql.engine.rdf.Iri)}). The settings are
- * immutable; the {@code with} methods derive changed copies.
+ * immutable; the {@code with} methods derive changed copies. Each setting has a name, the name of its component written
+ * in lower case with its words joined by hyphens, like {@code context-limit}, by which an attribute of the resource of
+ * a configuration in {@code context.xml} prefixed by {@code service-} sets the default of the setting to the value its
+ * text gives (see {@link #with(String, String)}).
  *
  * @param sendLiterals whether the literal values of the shared variables (and the triple terms containing a literal)
  *            are sent in the VALUES clause of a call; otherwise only the IRIs and the triple terms of IRIs are sent,
@@ -58,6 +65,12 @@ public record ServiceSettings(boolean sendLiterals, boolean canonicalizeLiterals
     public static final ServiceSettings DEFAULT = new ServiceSettings(false, true, 1000, 10000000, 3,
             ContextOverflow.FAIL);
 
+    /**
+     * The names of the settings, in the order of the components.
+     */
+    public static final List<String> NAMES = List.of("send-literals", "canonicalize-literals", "context-limit",
+            "result-limit", "redirect-limit", "context-overflow");
+
 
     /**
      * Checks the limits: the context and result limits have to be positive, the redirect limit non-negative, and the
@@ -68,16 +81,42 @@ public record ServiceSettings(boolean sendLiterals, boolean canonicalizeLiterals
      */
     public ServiceSettings
     {
-        Objects.requireNonNull(contextOverflow, "the behaviour on the overflow of the context");
+        Objects.requireNonNull(contextOverflow, "context-overflow");
 
         if(contextLimit < 1)
-            throw new IllegalArgumentException("the context limit has to be positive");
+            throw new IllegalArgumentException("context-limit has to be at least 1: " + contextLimit);
 
         if(resultLimit < 1)
-            throw new IllegalArgumentException("the result limit has to be positive");
+            throw new IllegalArgumentException("result-limit has to be at least 1: " + resultLimit);
 
         if(redirectLimit < 0)
-            throw new IllegalArgumentException("the redirect limit cannot be negative");
+            throw new IllegalArgumentException("redirect-limit has to be at least 0: " + redirectLimit);
+    }
+
+
+    /**
+     * Copy with the setting of the given name set to the value its text gives (see {@link SettingValues}), as an
+     * attribute of the resource of a configuration in {@code context.xml} sets the default of the setting: the limits
+     * are integers, {@code send-literals} and {@code canonicalize-literals} are {@code true} or {@code false}, and
+     * {@code context-overflow} is {@code fail} or {@code independent}.
+     *
+     * @param name name of the setting (see {@link #NAMES})
+     * @param value text of the value
+     * @return copy with the setting set to the value
+     * @throws IllegalArgumentException if no setting has the name, or the text gives no value of the setting
+     */
+    public ServiceSettings with(String name, String value)
+    {
+        return switch(name)
+        {
+            case "send-literals" -> withSendLiterals(parseBoolean(name, value));
+            case "canonicalize-literals" -> withCanonicalizeLiterals(parseBoolean(name, value));
+            case "context-limit" -> withContextLimit(parseInt(name, value));
+            case "result-limit" -> withResultLimit(parseInt(name, value));
+            case "redirect-limit" -> withRedirectLimit(parseInt(name, value));
+            case "context-overflow" -> withContextOverflow(parseEnum(name, value, ContextOverflow.class));
+            default -> throw new IllegalArgumentException("unknown setting: " + name);
+        };
     }
 
 
