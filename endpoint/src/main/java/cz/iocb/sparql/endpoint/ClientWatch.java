@@ -6,6 +6,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import jakarta.servlet.ServletRequest;
@@ -21,10 +22,11 @@ import cz.iocb.sparql.engine.request.Request;
  * client has closed the connection, so that a query nobody waits for any more, whose SQL statement or SERVICE call may
  * run long before the first row of its result, does not hold the database till its time limit. The Servlet API cannot
  * tell whether the client is still there without writing to it, so the watch reads the socket of the connection through
- * the internal classes of Tomcat: every {@link #INTERVAL} milliseconds a read that does not block, which finds the end
- * of the stream, or an error, once the client has closed the connection (a client that has closed only its sending side
- * is taken for gone, as nginx takes it), while bytes found there, a request a client sends before it has the response
- * to the previous one, are given back to Tomcat and end the watch, as the client is there.
+ * the internal classes of Tomcat: every so often (see {@link ServletSettings#clientWatchInterval()}) a read that does
+ * not block, which finds the end of the stream, or an error, once the client has closed the connection (a client that
+ * has closed only its sending side is taken for gone, as nginx takes it), while bytes found there, a request a client
+ * sends before it has the response to the previous one, are given back to Tomcat and end the watch, as the client is
+ * there.
  * <p>
  * Watched are the requests that the HTTP/1.1 and the AJP processors of Tomcat serve over the NIO connector without TLS;
  * for any other one, like a stream of HTTP/2, a connection with TLS or a request of another container, the watch does
@@ -36,11 +38,6 @@ import cz.iocb.sparql.engine.request.Request;
  */
 final class ClientWatch implements AutoCloseable
 {
-    /**
-     * Time between two reads of the socket in milliseconds.
-     */
-    static final long INTERVAL = 500;
-
     /**
      * Size of the buffer of a read; Tomcat reads into a buffer of this size without copying the bytes.
      */
@@ -83,6 +80,11 @@ final class ClientWatch implements AutoCloseable
     private final Method unRead;
 
     /**
+     * Time between two reads of the socket in milliseconds.
+     */
+    private final long interval;
+
+    /**
      * Buffer of the reads.
      */
     private final ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
@@ -103,14 +105,16 @@ final class ClientWatch implements AutoCloseable
      *
      * @param request the request to cancel
      * @param wrapper the socket wrapper of Tomcat for the connection, null if the request is not watched
+     * @param interval time between two reads of the socket in milliseconds
      * @throws ReflectiveOperationException if the socket wrapper has not the methods the watch reads by
      */
-    private ClientWatch(Request request, Object wrapper) throws ReflectiveOperationException
+    private ClientWatch(Request request, Object wrapper, long interval) throws ReflectiveOperationException
     {
         this.request = request;
         this.wrapper = wrapper;
         this.read = wrapper != null ? wrapper.getClass().getMethod("read", boolean.class, ByteBuffer.class) : null;
         this.unRead = wrapper != null ? wrapper.getClass().getMethod("unRead", ByteBuffer.class) : null;
+        this.interval = interval;
     }
 
 
@@ -120,13 +124,14 @@ final class ClientWatch implements AutoCloseable
      *
      * @param req the HTTP request
      * @param request the request to cancel once the client has closed the connection
+     * @param interval time between two reads of the socket, at least a millisecond
      * @return the watch of the connection
      */
-    static ClientWatch start(ServletRequest req, Request request)
+    static ClientWatch start(ServletRequest req, Request request, Duration interval)
     {
         try
         {
-            ClientWatch watch = new ClientWatch(request, getSocketWrapper(req));
+            ClientWatch watch = new ClientWatch(request, getSocketWrapper(req), interval.toMillis());
 
             if(watch.wrapper != null)
                 Thread.ofVirtual().name("client watch").start(watch::watch);
@@ -141,7 +146,7 @@ final class ClientWatch implements AutoCloseable
 
             try
             {
-                return new ClientWatch(request, null);
+                return new ClientWatch(request, null, interval.toMillis());
             }
             catch(ReflectiveOperationException x)
             {
@@ -248,7 +253,7 @@ final class ClientWatch implements AutoCloseable
 
 
     /**
-     * Reads the socket every {@link #INTERVAL} milliseconds until the watch is closed, the client has closed the
+     * Reads the socket every {@link #interval} milliseconds until the watch is closed, the client has closed the
      * connection, which cancels the request, or bytes arrive; run by the thread of the watch.
      */
     private void watch()
@@ -259,7 +264,7 @@ final class ClientWatch implements AutoCloseable
             {
                 while(!stopped)
                 {
-                    wait(INTERVAL);
+                    wait(interval);
 
                     if(stopped)
                         break;

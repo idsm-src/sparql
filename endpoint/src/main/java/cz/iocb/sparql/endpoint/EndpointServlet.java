@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -62,10 +63,11 @@ import cz.iocb.sparql.engine.translator.ServiceException;
  * type), the result announces RDF 1.2 too: by the {@code version} member of the JSON head, by the VERSION directive of
  * Turtle, TriG, N-Triples and N-Quads, and by the {@code version} parameter of their media types. A GET without a query
  * serves the page with the SPARQL editor to browsers and the service description otherwise; {@code ?info} returns a
- * JSON summary of prefixes, properties and classes. Init parameters: {@code resource} (JNDI name of the configuration),
- * {@code fetch-size}, {@code timeout} and {@code max-timeout} (seconds), {@code sql-query-size-limit}. The outcome of a
- * query is kept in attributes of the request ({@link #QUERY_ATTRIBUTE}, {@link #ERROR_ATTRIBUTE} and
- * {@link #STATUS_ATTRIBUTE}), so that a filter or the access log of the container can log it.
+ * JSON summary of prefixes, properties and classes. The initial parameters of the servlet are {@code resource}, the
+ * JNDI name of the configuration, and the settings of the servlet named as {@link ServletSettings} names them, like
+ * {@code fetch-size}, {@code timeout} or {@code max-timeout} (see {@link #getSettings}). The outcome of a query is kept
+ * in attributes of the request ({@link #QUERY_ATTRIBUTE}, {@link #ERROR_ATTRIBUTE} and {@link #STATUS_ATTRIBUTE}), so
+ * that a filter or the access log of the container can log it.
  */
 public class EndpointServlet extends HttpServlet
 {
@@ -262,27 +264,17 @@ public class EndpointServlet extends HttpServlet
     /**
      * Check, while a result is written, that the client still takes the response, which needs no internal API of the
      * container: the writer of the response does not report the failures of writing to a client that has closed the
-     * connection, it keeps them for {@link PrintWriter#checkError}, which flushes the writer, so every
-     * {@link #CHECK_ROWS} rows, or once {@link #CHECK_INTERVAL} nanoseconds have passed since the last check, the
-     * writer is flushed and its error checked, unless the response is not committed yet: nothing has been sent then, so
-     * nothing can have failed, and the flush would commit the response, whose status could tell an error no more. So
-     * the writing of the result ends soon after the client has closed the connection also where the watch of the
-     * connection does nothing (see {@link ClientWatch}), like for a stream of HTTP/2, which the client resets when it
-     * gives the request up, and behind a proxy that closes its connection once it has failed to write the response to
-     * its client.
+     * connection, it keeps them for {@link PrintWriter#checkError}, which flushes the writer, so every so many rows
+     * (see {@link ServletSettings#clientCheckRows()}), or once so much time has passed since the last check (see
+     * {@link ServletSettings#clientCheckInterval()}), the writer is flushed and its error checked, unless the response
+     * is not committed yet: nothing has been sent then, so nothing can have failed, and the flush would commit the
+     * response, whose status could tell an error no more. So the writing of the result ends soon after the client has
+     * closed the connection also where the watch of the connection does nothing (see {@link ClientWatch}), like for a
+     * stream of HTTP/2, which the client resets when it gives the request up, and behind a proxy that closes its
+     * connection once it has failed to write the response to its client.
      */
     static final class ClientCheck
     {
-        /**
-         * Largest number of rows between two checks.
-         */
-        static final int CHECK_ROWS = 1000;
-
-        /**
-         * Longest time between two checks in nanoseconds.
-         */
-        static final long CHECK_INTERVAL = 1_000_000_000L;
-
         /**
          * The response.
          */
@@ -292,6 +284,16 @@ public class EndpointServlet extends HttpServlet
          * The writer of the response.
          */
         private final PrintWriter out;
+
+        /**
+         * Largest number of rows between two checks.
+         */
+        private final int checkRows;
+
+        /**
+         * Longest time between two checks in nanoseconds.
+         */
+        private final long checkInterval;
 
         /**
          * Rows since the last check.
@@ -309,11 +311,14 @@ public class EndpointServlet extends HttpServlet
          *
          * @param response the response
          * @param out the writer of the response
+         * @param settings the settings of the servlet, which tell how often the client is checked
          */
-        ClientCheck(HttpServletResponse response, PrintWriter out)
+        ClientCheck(HttpServletResponse response, PrintWriter out, ServletSettings settings)
         {
             this.response = response;
             this.out = out;
+            this.checkRows = settings.clientCheckRows();
+            this.checkInterval = settings.clientCheckInterval().toNanos();
         }
 
 
@@ -328,7 +333,7 @@ public class EndpointServlet extends HttpServlet
          */
         boolean next(Result result) throws ClientAbortedException, SQLException
         {
-            if(++rows >= CHECK_ROWS || System.nanoTime() - checked >= CHECK_INTERVAL)
+            if(++rows >= checkRows || System.nanoTime() - checked >= checkInterval)
             {
                 rows = 0;
                 checked = System.nanoTime();
@@ -388,24 +393,9 @@ public class EndpointServlet extends HttpServlet
     private String info = null;
 
     /**
-     * JDBC fetch size ({@code fetch-size} init parameter).
+     * Settings of the servlet, given by its initial parameters.
      */
-    private int fetchSize = 1000;
-
-    /**
-     * Default timeout in nanoseconds ({@code timeout} init parameter, seconds).
-     */
-    private long timeout = 1000 * 1000000000l;
-
-    /**
-     * Maximum timeout a client may ask for, in nanoseconds ({@code max-timeout} init parameter, seconds).
-     */
-    private long maxTimeout = 6000 * 1000000000l;
-
-    /**
-     * Maximum length of the generated SQL; 0 for none ({@code sql-query-size-limit} init parameter).
-     */
-    private int sqlSizeLimit = 0;
+    private ServletSettings settings = ServletSettings.DEFAULT;
 
 
     /**
@@ -417,14 +407,27 @@ public class EndpointServlet extends HttpServlet
 
 
     /**
-     * Creates the servlet over the engine with the default limits, without {@link #init} (for tests).
+     * Creates the servlet over the engine with the default settings, without {@link #init} (for tests).
      *
      * @param engine the engine
      */
     EndpointServlet(Engine engine)
     {
+        this(engine, ServletSettings.DEFAULT);
+    }
+
+
+    /**
+     * Creates the servlet over the engine with the given settings, without {@link #init} (for tests).
+     *
+     * @param engine the engine
+     * @param settings the settings of the servlet
+     */
+    EndpointServlet(Engine engine, ServletSettings settings)
+    {
         this.engine = engine;
         this.sparqlConfig = engine.getConfig();
+        this.settings = settings;
     }
 
 
@@ -438,39 +441,42 @@ public class EndpointServlet extends HttpServlet
             if(resourceName == null || resourceName.isEmpty())
                 throw new IllegalArgumentException("resource name is not set");
 
-
-            String fetchSizeParameter = config.getInitParameter("fetch-size");
-
-            if(fetchSizeParameter != null)
-                fetchSize = Integer.parseInt(fetchSizeParameter);
-
-
-            String timeoutParameter = config.getInitParameter("timeout");
-
-            if(timeoutParameter != null)
-                timeout = Integer.parseInt(timeoutParameter) * 1000000000l;
-
-
-            String maxTimeoutParameter = config.getInitParameter("max-timeout");
-
-            if(maxTimeoutParameter != null)
-                maxTimeout = Integer.parseInt(maxTimeoutParameter) * 1000000000l;
-
-
-            String sqlSizeLimitParameter = config.getInitParameter("sql-query-size-limit");
-
-            if(sqlSizeLimitParameter != null)
-                sqlSizeLimit = Integer.parseInt(sqlSizeLimitParameter);
-
+            settings = getSettings(config);
 
             Context context = (Context) (new InitialContext()).lookup("java:comp/env");
             sparqlConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
             engine = new Engine(sparqlConfig);
         }
-        catch(NamingException | NumberFormatException e)
+        catch(NamingException | IllegalArgumentException e)
         {
             throw new ServletException(e);
         }
+    }
+
+
+    /**
+     * The settings of the servlet that its initial parameters give: a parameter named by a setting sets that setting
+     * (see {@link ServletSettings#with(String, String)}), the others keep their defaults. A parameter that is neither a
+     * setting nor {@code resource} sets nothing, which is logged as a warning, as its name is likely misspelt.
+     *
+     * @param config the configuration of the servlet
+     * @return the settings of the servlet
+     * @throws IllegalArgumentException if a parameter gives no value of its setting
+     */
+    static ServletSettings getSettings(ServletConfig config)
+    {
+        ServletSettings settings = ServletSettings.DEFAULT;
+
+        for(String name : Collections.list(config.getInitParameterNames()))
+        {
+            if(ServletSettings.NAMES.contains(name))
+                settings = settings.with(name, config.getInitParameter(name));
+            else if(!name.equals("resource"))
+                logger.warn("the initial parameter {} of the servlet {} is no setting and sets nothing", name,
+                        config.getServletName());
+        }
+
+        return settings;
     }
 
 
@@ -510,7 +516,7 @@ public class EndpointServlet extends HttpServlet
                 versions = null;
             }
 
-            process(req, res, query, defaultGraphs, namedGraphs, versions, getTimeout(req), sqlSizeLimit);
+            process(req, res, query, defaultGraphs, namedGraphs, versions, getTimeout(req));
         }
     }
 
@@ -544,7 +550,7 @@ public class EndpointServlet extends HttpServlet
         }
 
 
-        process(req, res, query, defaultGraphs, namedGraphs, versions, getTimeout(req), sqlSizeLimit);
+        process(req, res, query, defaultGraphs, namedGraphs, versions, getTimeout(req));
     }
 
 
@@ -642,27 +648,29 @@ public class EndpointServlet extends HttpServlet
 
 
     /**
-     * Timeout in nanoseconds from the {@code timeout} parameter (seconds), clamped to the configured maximum; the
-     * default when absent or invalid.
+     * Timeout in nanoseconds from the {@code timeout} parameter (seconds), clamped to the longest one the settings
+     * allow (see {@link ServletSettings#maxTimeout()}); the default of the settings when absent or invalid (see
+     * {@link ServletSettings#timeout()}).
      *
      * @param req the HTTP request
-     * @return timeout in nanoseconds from the {@code timeout} parameter (seconds), clamped to the configured maximum;
-     *         the default when absent or invalid
+     * @return timeout in nanoseconds from the {@code timeout} parameter (seconds), clamped to the longest one allowed;
+     *         the default when absent or invalid, 0 for none
      */
     private long getTimeout(HttpServletRequest req)
     {
         String timeoutParameter = req.getParameter("timeout");
 
         if(timeoutParameter == null)
-            return timeout;
+            return settings.timeout().toNanos();
 
         try
         {
-            return Math.min(maxTimeout, Math.max(1l, Integer.parseInt(timeoutParameter)) * 1000000000l);
+            return Math.min(settings.maxTimeout().toNanos(),
+                    Math.max(1l, Integer.parseInt(timeoutParameter)) * 1000000000l);
         }
         catch(NumberFormatException e)
         {
-            return timeout;
+            return settings.timeout().toNanos();
         }
     }
 
@@ -740,11 +748,10 @@ public class EndpointServlet extends HttpServlet
      * @param namedGraphs IRIs of the named graphs given by the protocol, or null
      * @param versions version labels given by the protocol (at most one is valid), or null
      * @param timeout time limit in nanoseconds, 0 for none
-     * @param sqlSizeLimit maximum length of the generated SQL, 0 for none
      * @throws IOException on output errors
      */
     private void process(HttpServletRequest req, HttpServletResponse res, String query, String[] defaultGraphs,
-            String[] namedGraphs, String[] versions, long timeout, int sqlSizeLimit) throws IOException
+            String[] namedGraphs, String[] versions, long timeout) throws IOException
     {
         // whether the client has closed the connection before the response has been written
         boolean aborted = false;
@@ -810,7 +817,7 @@ public class EndpointServlet extends HttpServlet
 
 
             try(Request request = engine.getRequest(serviceReorder);
-                    ClientWatch watch = ClientWatch.start(req, request))
+                    ClientWatch watch = ClientWatch.start(req, request, settings.clientWatchInterval()))
             {
                 try
                 {
@@ -822,14 +829,14 @@ public class EndpointServlet extends HttpServlet
                     // RDF 1.2 is announced in the result when the request announced SPARQL 1.2 or accepted RDF 1.2
                     boolean announce = isVersion12(preparedQuery.getVersion()) || acceptsVersion12(req, format);
 
-                    try(Result result = request.execute(preparedQuery, order, 0, limit, fetchSize, timeout,
-                            sqlSizeLimit))
+                    try(Result result = request.execute(preparedQuery, order, 0, limit, settings.fetchSize(), timeout,
+                            settings.sqlQuerySizeLimit()))
                     {
                         res.setContentType(announce && format.hasVersionParameter() ?
                                 format.getMime() + ";version=1.2" : format.getMime());
 
                         PrintWriter out = res.getWriter();
-                        ClientCheck client = new ClientCheck(res, out);
+                        ClientCheck client = new ClientCheck(res, out, settings);
 
                         switch(result.getResultType())
                         {

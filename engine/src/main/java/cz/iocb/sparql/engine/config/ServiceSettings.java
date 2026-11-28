@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.config;
 
+import static cz.iocb.sparql.engine.config.SettingValues.checkRange;
 import static cz.iocb.sparql.engine.config.SettingValues.parseBoolean;
 import static cz.iocb.sparql.engine.config.SettingValues.parseEnum;
 import static cz.iocb.sparql.engine.config.SettingValues.parseInt;
@@ -82,15 +83,9 @@ public record ServiceSettings(boolean sendLiterals, boolean canonicalizeLiterals
     public ServiceSettings
     {
         Objects.requireNonNull(contextOverflow, "context-overflow");
-
-        if(contextLimit < 1)
-            throw new IllegalArgumentException("context-limit has to be at least 1: " + contextLimit);
-
-        if(resultLimit < 1)
-            throw new IllegalArgumentException("result-limit has to be at least 1: " + resultLimit);
-
-        if(redirectLimit < 0)
-            throw new IllegalArgumentException("redirect-limit has to be at least 0: " + redirectLimit);
+        checkRange("context-limit", contextLimit, 1, Integer.MAX_VALUE);
+        checkRange("result-limit", resultLimit, 1, Integer.MAX_VALUE);
+        checkRange("redirect-limit", redirectLimit, 0, Integer.MAX_VALUE);
     }
 
 

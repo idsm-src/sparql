@@ -1,5 +1,9 @@
 package cz.iocb.sparql.engine.config;
 
+import static cz.iocb.sparql.engine.config.SettingValues.checkDuration;
+import static cz.iocb.sparql.engine.config.SettingValues.checkFraction;
+import static cz.iocb.sparql.engine.config.SettingValues.checkPositive;
+import static cz.iocb.sparql.engine.config.SettingValues.checkRange;
 import static cz.iocb.sparql.engine.config.SettingValues.parseBoolean;
 import static cz.iocb.sparql.engine.config.SettingValues.parseDouble;
 import static cz.iocb.sparql.engine.config.SettingValues.parseDuration;
@@ -1244,87 +1248,5 @@ public final class EngineSettings implements Cloneable
         {
             throw new AssertionError(e);
         }
-    }
-
-
-    /**
-     * Checks that the value of a setting is a positive finite number.
-     *
-     * @param name name of the setting
-     * @param value the value
-     * @return the value
-     * @throws IllegalArgumentException if the value is not a positive finite number
-     */
-    private static double checkPositive(String name, double value)
-    {
-        if(!(value > 0) || Double.isInfinite(value))
-            throw new IllegalArgumentException(name + " has to be a positive finite number: " + value);
-
-        return value;
-    }
-
-
-    /**
-     * Checks that the value of a setting is a number greater than 0 and at most 1.
-     *
-     * @param name name of the setting
-     * @param value the value
-     * @return the value
-     * @throws IllegalArgumentException if the value is not a number greater than 0 and at most 1
-     */
-    private static double checkFraction(String name, double value)
-    {
-        if(!(value > 0 && value <= 1))
-            throw new IllegalArgumentException(name + " has to be a number greater than 0 and at most 1: " + value);
-
-        return value;
-    }
-
-
-    /**
-     * Checks that the value of a setting is a time that is not less than the given one and fits into a {@code long}
-     * number of nanoseconds.
-     *
-     * @param name name of the setting
-     * @param value the value
-     * @param least the least time allowed
-     * @return the value
-     * @throws NullPointerException if the value is null
-     * @throws IllegalArgumentException if the value is less than the least time or too long
-     */
-    private static Duration checkDuration(String name, Duration value, Duration least)
-    {
-        Objects.requireNonNull(value, name);
-
-        if(value.compareTo(least) < 0 || value.compareTo(Duration.ofNanos(Long.MAX_VALUE)) > 0)
-            throw new IllegalArgumentException(
-                    name + " has to be a time from " + least.toNanos() + " to " + Long.MAX_VALUE + " ns: " + value);
-
-        return value;
-    }
-
-
-    /**
-     * Checks that the value of a setting lies in the given range.
-     *
-     * @param name name of the setting
-     * @param value the value
-     * @param least the least value allowed
-     * @param greatest the greatest value allowed
-     * @return the value
-     * @throws IllegalArgumentException if the value lies out of the range
-     */
-    private static int checkRange(String name, int value, int least, int greatest)
-    {
-        if(value < least || value > greatest)
-        {
-            if(greatest == Integer.MAX_VALUE)
-                throw new IllegalArgumentException(name + " has to be at least " + least + ": " + value);
-
-            throw new IllegalArgumentException(
-                    name + " has to be between " + least + " and " + greatest + ": " + value);
-        }
-
-        return value;
     }
 }

@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -13,13 +14,13 @@ import cz.iocb.sparql.engine.database.Function;
 
 
 /**
- * Text forms of the values of settings, by which the attributes of a resource in {@code context.xml} or the initial
- * parameters of a servlet give them: a decimal number, possibly with an exponent, an integer, {@code true} or
- * {@code false}, the name of a constant of an enumeration in lower case with its words joined by hyphens, a function as
- * its schema and its name joined by a dot, and a time as an integer followed by its unit ({@code us}, {@code ms},
- * {@code s}, {@code min}, {@code h} or {@code d}, as PostgreSQL writes them for its settings), or without a unit in the
- * unit of the setting. A text that gives no value is refused by an error naming the setting; the spaces around a text
- * and between a number and its unit are left out.
+ * Values of settings: the checks of their ranges and their text forms, by which the attributes of a resource in
+ * {@code context.xml} or the initial parameters of a servlet give them: a decimal number, possibly with an exponent, an
+ * integer, {@code true} or {@code false}, the name of a constant of an enumeration in lower case with its words joined
+ * by hyphens, a function as its schema and its name joined by a dot, and a time as an integer followed by its unit
+ * ({@code us}, {@code ms}, {@code s}, {@code min}, {@code h} or {@code d}, as PostgreSQL writes them for its settings),
+ * or without a unit in the unit of the setting. A value out of the range of its setting and a text that gives no value
+ * are refused by an error naming the setting; the spaces around a text and between a number and its unit are left out.
  */
 public final class SettingValues
 {
@@ -47,6 +48,88 @@ public final class SettingValues
      */
     private SettingValues()
     {
+    }
+
+
+    /**
+     * Checks that the value of a setting is a positive finite number.
+     *
+     * @param name name of the setting
+     * @param value the value
+     * @return the value
+     * @throws IllegalArgumentException if the value is not a positive finite number
+     */
+    public static double checkPositive(String name, double value)
+    {
+        if(!(value > 0) || Double.isInfinite(value))
+            throw new IllegalArgumentException(name + " has to be a positive finite number: " + value);
+
+        return value;
+    }
+
+
+    /**
+     * Checks that the value of a setting is a number greater than 0 and at most 1.
+     *
+     * @param name name of the setting
+     * @param value the value
+     * @return the value
+     * @throws IllegalArgumentException if the value is not a number greater than 0 and at most 1
+     */
+    public static double checkFraction(String name, double value)
+    {
+        if(!(value > 0 && value <= 1))
+            throw new IllegalArgumentException(name + " has to be a number greater than 0 and at most 1: " + value);
+
+        return value;
+    }
+
+
+    /**
+     * Checks that the value of a setting is a time that is not less than the given one and fits into a {@code long}
+     * number of nanoseconds.
+     *
+     * @param name name of the setting
+     * @param value the value
+     * @param least the least time allowed
+     * @return the value
+     * @throws NullPointerException if the value is null
+     * @throws IllegalArgumentException if the value is less than the least time or too long
+     */
+    public static Duration checkDuration(String name, Duration value, Duration least)
+    {
+        Objects.requireNonNull(value, name);
+
+        if(value.compareTo(least) < 0 || value.compareTo(Duration.ofNanos(Long.MAX_VALUE)) > 0)
+            throw new IllegalArgumentException(
+                    name + " has to be a time from " + least.toNanos() + " to " + Long.MAX_VALUE + " ns: " + value);
+
+        return value;
+    }
+
+
+    /**
+     * Checks that the value of a setting lies in the given range.
+     *
+     * @param name name of the setting
+     * @param value the value
+     * @param least the least value allowed
+     * @param greatest the greatest value allowed
+     * @return the value
+     * @throws IllegalArgumentException if the value lies out of the range
+     */
+    public static int checkRange(String name, int value, int least, int greatest)
+    {
+        if(value < least || value > greatest)
+        {
+            if(greatest == Integer.MAX_VALUE)
+                throw new IllegalArgumentException(name + " has to be at least " + least + ": " + value);
+
+            throw new IllegalArgumentException(
+                    name + " has to be between " + least + " and " + greatest + ": " + value);
+        }
+
+        return value;
     }
 
 

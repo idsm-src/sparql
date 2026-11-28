@@ -562,8 +562,42 @@ public class ClientDisconnectTest
     @DisplayName("a result is written no further once the writer of the response has failed")
     void failingWriter()
     {
-        // the writer fails as the writer of a response to a client that has gone does once its buffer is sent
-        int[] failedWrites = { 0 };
+        int failedRows = writeToFailingWriter(ServletSettings.DEFAULT);
+
+        // at most the rows begun till the next check
+        assertTrue(failedRows <= ServletSettings.DEFAULT.clientCheckRows(), failedRows + " rows begun");
+    }
+
+
+    @Test
+    @DisplayName("the response is checked as often as the settings of the servlet say")
+    void failingWriterCheckedOften()
+    {
+        // after every ten rows, whereas by default the rows begun till the next check are some five hundred
+        int byRows = writeToFailingWriter(ServletSettings.DEFAULT.withClientCheckRows(10));
+
+        assertTrue(byRows <= 10, byRows + " rows begun");
+
+        // before every row, as no time has to pass between two checks
+        int byTime = writeToFailingWriter(ServletSettings.DEFAULT.withClientCheckInterval(Duration.ZERO));
+
+        assertEquals(1, byTime);
+    }
+
+
+    /**
+     * Writes the result of a query of many rows in JSON by a servlet with the given settings to a response whose writer
+     * fails, as the writer of a response to a client that has gone does once its buffer is sent, from the row in the
+     * middle between two checks of the client by default, and checks that the response keeps the status it has been
+     * committed with.
+     *
+     * @param settings the settings of the servlet
+     * @return the number of the rows begun once the writer has failed, the row it has failed at included
+     */
+    private static int writeToFailingWriter(ServletSettings settings)
+    {
+        int[] rows = { 0 };
+        int[] failedRows = { 0 };
         int[] written = { 0 };
 
         Writer failing = new Writer()
@@ -571,9 +605,17 @@ public class ClientDisconnectTest
             @Override
             public void write(char[] buffer, int offset, int length) throws IOException
             {
-                if(written[0] > 100_000)
+                // a row of the bindings begins by a write of its own
+                boolean begins = new String(buffer, offset, length).equals("\t{");
+
+                if(begins)
+                    rows[0]++;
+
+                if(rows[0] > 1500)
                 {
-                    failedWrites[0]++;
+                    if(begins)
+                        failedRows[0]++;
+
                     throw new IOException("the client has gone");
                 }
 
@@ -619,12 +661,11 @@ public class ClientDisconnectTest
                     default -> EndpointServletTest.defaultValue(method.getReturnType());
                 });
 
-        EndpointServlet servlet = new EndpointServlet(engine);
+        EndpointServlet servlet = new EndpointServlet(engine, settings);
 
         assertTimeoutPreemptively(Duration.ofSeconds(30), () -> servlet.doGet(request, response));
-
-        // at most the rows written since the last check, each by fewer than twenty writes
-        assertTrue(failedWrites[0] < 20 * EndpointServlet.ClientCheck.CHECK_ROWS, failedWrites[0] + " failed writes");
         assertEquals(HttpServletResponse.SC_OK, status[0]);
+
+        return failedRows[0];
     }
 }
